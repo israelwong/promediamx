@@ -2,7 +2,7 @@ import React from 'react'
 import type { Metadata } from "next";
 import BtnCerrarVentana from '../../_components/BtnCerrarVentana';
 import BtnWaServicios from '../../_components/BtnWaServicios';
-// import Galeria from '../../_components/Galeria';
+import Galeria from '../../_components/Galeria';
 import { Flame, Flag, MessageCircleMore, Heart } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -108,11 +108,7 @@ function page() {
             </div>
 
 
-            {/* <Galeria
-                ruta={ruta}
-                num_fotos={num_fotos}
-                rowHeight={rowHeight}
-            /> */}
+            <Galeria />
 
             <BtnCerrarVentana
                 url={'/servicios'}
