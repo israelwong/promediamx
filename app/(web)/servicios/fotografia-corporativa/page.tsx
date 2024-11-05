@@ -12,12 +12,7 @@ export const metadata: Metadata = {
 };
 
 function page() {
-
-    // const ruta = "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/galeria/Corporativo/"
-    // const num_fotos = 25
-    // const rowHeight = 300
     const color = "#155e75"
-
     const dataBtnWa = {
         title: "Cotizar fotografía corporativa",
         message: "Hola, me interesa cotizar el servicio de fotografía corporativa"
@@ -108,7 +103,7 @@ function page() {
             </div>
 
 
-            <Galeria />
+            <Galeria folder={'Corporativo'} galleryID='galeria-corporativa' />
 
             <BtnCerrarVentana
                 url={'/servicios'}

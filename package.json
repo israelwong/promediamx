@@ -11,15 +11,22 @@
   "dependencies": {
     "@next/third-parties": "^15.0.2",
     "@prisma/client": "^5.22.0",
+    "@supabase/supabase-js": "^2.46.1",
     "bcryptjs": "^2.4.3",
+    "image-size": "^1.1.1",
     "jose": "^5.9.6",
     "lucide-react": "^0.454.0",
     "next": "15.0.2",
+    "node-fetch": "^3.3.2",
+    "photoswipe": "^5.4.4",
+    "probe-image-size": "^7.2.3",
     "react": "19.0.0-rc-02c0e824-20241028",
     "react-dom": "19.0.0-rc-02c0e824-20241028"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/node-fetch": "^2.6.11",
+    "@types/probe-image-size": "^7.2.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
