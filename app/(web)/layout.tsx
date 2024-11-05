@@ -22,6 +22,14 @@ export default function RootLayout({
   return (
 
     <html lang="en">
+      <head>
+        <link
+          rel="icon"
+          href="https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/favicon_fullcolor.svg"
+          type="image/<generated>"
+          sizes="<generated>"
+        />
+      </head>
       <body className={'antialiased'}>
         <Navbar />
         {children}

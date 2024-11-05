@@ -13,17 +13,25 @@ interface GaleriaProps {
 function Galeria({ folder, galleryID }: GaleriaProps) {
     const [galeria, setGaleria] = useState<{ url: string, width: number, height: number }[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         async function fetchImages() {
-            const response = await getImagesUrls(folder);
-            response.galeria.sort(() => Math.random() - 0.5);
-            if (response.success) {
-                setGaleria(response.galeria);
-            } else {
-                console.error(response.message);
+            try {
+                const response = await getImagesUrls(folder);
+                if (response.success) {
+                    response.galeria.sort(() => Math.random() - 0.5);
+                    setGaleria(response.galeria);
+                } else {
+                    console.error(response.message);
+                    setError(response.message);
+                }
+            } catch (err) {
+                console.error('Error fetching images:', err);
+                setError('Error fetching images');
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         }
         fetchImages();
 
@@ -43,6 +51,14 @@ function Galeria({ folder, galleryID }: GaleriaProps) {
         return <div className='text-center h-1/4 justify-center items-center flex py-10'>
             <div>
                 Cargando galería...
+            </div>
+        </div>;
+    }
+
+    if (error) {
+        return <div className='text-center h-1/4 justify-center items-center flex py-10'>
+            <div>
+                Error: {error}
             </div>
         </div>;
     }
