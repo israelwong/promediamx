@@ -2,8 +2,19 @@
 
 const nextConfig = {
   images: {
-    domains:
-      ['sfsjdyuwttrcgchbsxim.supabase.co', 'bgtapcutchryzhzooony.supabase.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'sfsjdyuwttrcgchbsxim.supabase.co',
+        pathname: '/storage/v1/object/public/ProMedia/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'bgtapcutchryzhzooony.supabase.co',
+        pathname: '/storage/v1/object/public/ProMedia/**',
+      },
+    ],
+    dangerouslyAllowSVG: true,
   },
 };
 
