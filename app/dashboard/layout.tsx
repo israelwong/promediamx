@@ -1,11 +1,9 @@
 'use client'
-// import "@/app/globals.css";
 import { useEffect, useState } from "react";
 import Navbar from "./_components/Navbar";
 import { verifyToken } from "../_lib/Auth";
 import Cookies from "js-cookie";
 import { useRouter } from "next/navigation";
-
 
 interface User {
   id: string
