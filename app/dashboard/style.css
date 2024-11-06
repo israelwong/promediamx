@@ -1,0 +1,21 @@
+/* styles.css */
+
+/* Estilos para el Navbar */
+.navbar-item {
+  color: gray;
+}
+
+.navbar-item.navbar-active {
+  font-weight: bold;
+  color: white;
+}
+
+/* Estilos para el Sidebar */
+.sidebar-item {
+  color: gray;
+}
+
+.sidebar-item.sidebar-active {
+  font-weight: bold;
+  color: white;
+}
