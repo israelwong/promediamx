@@ -19,10 +19,6 @@ function page() {
         message: "Hola, me interesa cotizar el servicio de fotografía social"
     }
 
-    // const ruta = "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/galeria/Social/"
-    // const num_fotos = 22
-    // const rowHeight = 380
-
     return (
 
         <div>
