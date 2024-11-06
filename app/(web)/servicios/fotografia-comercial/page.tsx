@@ -2,7 +2,7 @@ import React from 'react'
 import type { Metadata } from "next";
 import BtnCerrarVentana from '../../_components/BtnCerrarVentana';
 import BtnWaServicios from '../../_components/BtnWaServicios';
-// import Galeria from '@/app/ui/components/Galeria';
+import Galeria from '../../_components/Galeria';
 import { Rocket, Check, UsersRound, Megaphone, Star } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -12,10 +12,6 @@ export const metadata: Metadata = {
 };
 
 function page() {
-
-    // const ruta = "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/galeria/Comercial/"
-    // const num_fotos = 23
-    // const rowHeight = 250
 
     const color = "#155e75"
     const dataBtnWa = {
@@ -114,12 +110,9 @@ function page() {
 
             </div>
 
-            {/* <Galeria
-                ruta={ruta}
-                num_fotos={num_fotos}
-                rowHeight={rowHeight}
-            />
- */}
+            <div className='mx-auto text-center min-w-fit flex justify-center' >
+                <Galeria folder={'Comercial'} />
+            </div>
 
             <BtnCerrarVentana
                 url={'/servicios'}
