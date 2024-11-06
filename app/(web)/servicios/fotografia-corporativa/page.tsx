@@ -102,9 +102,8 @@ function page() {
                 </div>
             </div>
 
-            <div className='mx-auto text-center min-w-fit flex justify-center' >
-                <Galeria folder={'Corporativo'} />
-            </div>
+
+            <Galeria folder={'Corporativo'} />
 
             <BtnCerrarVentana
                 url={'/servicios'}
