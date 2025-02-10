@@ -1,4 +1,4 @@
-'use client'
+'use client';
 import React from 'react';
 import Image from 'next/image';
 import SolucionesLista from '@/app/(main)/_components/SolucionesLista';
@@ -322,14 +322,17 @@ const proyectos = [
 
 ];
 
+
 export default function ListaProyectos() {
     const [currentPage, setCurrentPage] = React.useState(0);
+    const [showAll, setShowAll] = React.useState(false);
     const itemsPerPage = 3;
+
+    const displayedProjects = showAll ? proyectos : proyectos.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage);
+
     return (
         <div className='max-w-screen-xl mx-auto p-5'>
-
             <div className=''>
-
                 <div>
                     <header className='mb-5'>
                         <h1 className='font-FunnelSans-Bold text-3xl text-zinc-200 mb-2'>
@@ -342,10 +345,8 @@ export default function ListaProyectos() {
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-5'>
-
                     <div className='md:col-span-2 col-span-1 mb-10'>
-
-                        {proyectos.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage).map((proyecto, index) => (
+                        {displayedProjects.map((proyecto, index) => (
                             <div key={index} className='font-FunnelSans-Regular mb-3 px-5 py-3 border border-zinc-800 bg-zinc-900/50 rounded-md'>
                                 <div className='flex items-center pr-4 mb-3'>
                                     {proyecto.url_logo && (
@@ -367,27 +368,39 @@ export default function ListaProyectos() {
                                 </ul>
                             </div>
                         ))}
-                        <div className='flex justify-between mt-5 space-x-3 mb-2'>
-                            {currentPage > 0 && (
-                                <button
-                                    className='flex-1 px-4 py-2  bg-zinc-800 text-zinc-400 rounded-md'
-                                    onClick={() => setCurrentPage(currentPage - 1)}
-                                >
-                                    Anterior
-                                </button>
-                            )}
-                            {(currentPage + 1) * itemsPerPage < proyectos.length && (
-                                <button
-                                    className='flex-1 px-4 py-2  bg-zinc-800 text-zinc-400 rounded-md'
-                                    onClick={() => setCurrentPage(currentPage + 1)}
-                                >
-                                    Siguiente
-                                </button>
-                            )}
-                        </div>
+                        {!showAll && (
+                            <div className='flex justify-between mt-5 space-x-3 mb-2 text-sm'>
+                                {currentPage > 0 && (
+                                    <button
+                                        className='flex-1 px-4 py-2 bg-zinc-800 text-zinc-400 rounded-md'
+                                        onClick={() => setCurrentPage(currentPage - 1)}
+                                    >
+                                        Anterior
+                                    </button>
+                                )}
+                                {(currentPage + 1) * itemsPerPage < proyectos.length && (
+                                    <button
+                                        className='flex-1 px-4 py-2 bg-zinc-800 text-zinc-400 rounded-md'
+                                        onClick={() => setCurrentPage(currentPage + 1)}
+                                    >
+                                        Siguiente
+                                    </button>
+                                )}
 
+                                <button
+                                    className='px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-md '
+                                    onClick={() => setShowAll(!showAll)}
+                                >
+                                    {showAll ? 'Mostrar menos' : 'Mostrar todos'}
+                                </button>
+
+                            </div>
+                        )}
                         <div className='mt-1 text-zinc-400 text-xs text-center font-FunnelSans-Light'>
                             Mostrando del {currentPage * itemsPerPage + 1} al {Math.min((currentPage + 1) * itemsPerPage, proyectos.length)} de {proyectos.length} proyectos en total
+                        </div>
+                        <div className='flex justify-center mt-5'>
+
                         </div>
                     </div>
 
@@ -395,7 +408,6 @@ export default function ListaProyectos() {
                         <SolucionesLista />
                         <BuscasOtraSolucion />
                     </div>
-
                 </div>
             </div>
         </div>
