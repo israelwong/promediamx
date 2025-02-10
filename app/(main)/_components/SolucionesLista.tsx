@@ -5,22 +5,29 @@ import LeadFormLite from './LeadFormLite';
 const soluciones = [
     {
         titulo: 'Automatización de respuestas a mensajes en redes sociales',
-        descripcion: 'Configuramos bots para WhatsApp, Instagram, Facebook y Tiktok para atender prospectos y clientes, resolver dudas y recuperar conversaciones en las primeras 24hrs.',
+        descripcion: 'Automatiza tu atención al cliente 24/7 en WhatsApp, Instagram, Facebook o TikTok, ahorra tiempo, aumenta ventas y monitoreamos tus contactos para evitar costos extra; ¡prueba gratis por 7 días!',
         recurrente: true,
-        precio: 300,
-        comentarios: 'Precio por red social y configuración básica. Configuraciones avanzadas tienen un costo adicional.',
+        precio: 2500,
+        comentarios: 'Precio por red social. Red social adicional $1,500. No incluye costo por campañas de publicidad',
     },
     {
         titulo: 'Cobrar en línea con TD/TC, MSI y OXXO',
-        descripcion: 'Configuramos y monitoreamos cobros en línea seguros con pasarela de pago Stripe, brindando flexibilidad y seguridad en cada transacción.',
-        precio: 1000,
+        descripcion: 'Olvídate de las terminales bancarias y obtén una solución flexible y escalable para aceptar pagos online en tu sitio web, landing page o redes sociales. Con nuestra pasarela de pagos Stripe, puedes aceptar pagos con tarjetas, OXXO y más, sin costos de instalación ni comisiones ocultas.',
+        precio: 2000,
         recurrente: true,
-        comentarios: 'Stripe cobra una comisión fija + comisión variable por transacción según método de pago',
+        comentarios: 'Sin costo de implementación. Stripe cobra una comisión fija + comisión variable por transacción según método de pago',
+    },
+    {
+        titulo: 'Pagina web básicoa para captar clientes',
+        descripcion: 'Te ofrecemos una landing page personalizada con un leadform integrado, diseñado para captar interesados y generar oportunidades de negocio. Los leads generados serán enviados en tiempo real a tu WhatsApp y podrás consultarlos en tu web app de manera fácil y rápida.',
+        precio: 2500,
+        recurrente: true,
+        comentarios: 'El precio no incluye dominio, catálogo de productos, tienda en línea o pasarela de pagos',
     },
     {
         titulo: 'Aumentar la visibilidad de mi negocio',
-        descripcion: 'Optimizamos tu presencia en Google, mejoramos tu SEO y gestionamos campañas pagadas en Google Ads y Meta Ads para que aparezcas en búsquedas y redes sociales.',
-        precio: 2000,
+        descripcion: 'Aumenta tu visibilidad y atrae clientes con campañas personalizadas en Google Ads y Meta Ads. Gestionamos, optimizamos y maximizamos tus resultados con seguimiento constante y reportes mensuales. ¡Haz crecer tu negocio en línea hoy mismo!',
+        precio: 4000,
         recurrente: true,
         comentarios: 'El precio no incluye el presupuesto de publicidad',
     },
@@ -30,13 +37,6 @@ const soluciones = [
         precio: 500,
         recurrente: false,
         comentarios: 'El precio solo cinluye la configuración y envio. No incluye el costo de los mensajes',
-    },
-    {
-        titulo: 'Pagina web básica con formulario de contacto',
-        descripcion: 'Creamos una página web básica con información de tu negocio, producto o servicio más n formulario de contacto.',
-        precio: 1000,
-        recurrente: true,
-        comentarios: 'El precio no incluye catálogo de productos, tienda en línea o blog',
     },
 ];
 
