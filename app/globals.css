@@ -19,3 +19,87 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@font-face {
+  font-family: "Bebas Neue";
+  src: url("/fonts/BebasNeue-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "FunnelSans-Bold";
+  src: url("/fonts/FunnelSans-Bold.ttf") format("truetype");
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "FunnelSans-BoldItalic";
+  src: url("/fonts/FunnelSans-BoldItalic.ttf") format("truetype");
+  font-weight: bold;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "FunnelSans-ExtraBold";
+  src: url("/fonts/FunnelSans-ExtraBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "FunnelSans-Italic";
+  src: url("/fonts/FunnelSans-Italic.ttf") format("truetype");
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "FunnelSans-Light";
+  src: url("/fonts/FunnelSans-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "FunnelSans-LightItalic";
+  src: url("/fonts/FunnelSans-LightItalic.ttf") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "FunnelSans-Medium";
+  src: url("/fonts/FunnelSans-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "FunnelSans-MediumItalic";
+  src: url("/fonts/FunnelSans-MediumItalic.ttf") format("truetype");
+  font-weight: 500;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "FunnelSans-Regular";
+  src: url("/fonts/FunnelSans-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "FunnelSans-SemiBold";
+  src: url("/fonts/FunnelSans-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "FunnelSans-SemiBoldItalic";
+  src: url("/fonts/FunnelSans-SemiBoldItalic.ttf") format("truetype");
+  font-weight: 600;
+  font-style: italic;
+}

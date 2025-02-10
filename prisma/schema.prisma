@@ -1,0 +1,285 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        String    @id @default(cuid())
+  username  String    @unique
+  email     String    @unique
+  telefono  String    @unique @default("")
+  direccion String    @default("")
+  clabe     String    @default("")
+  password  String
+  rol       String
+  status    String   @default("active")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sesiones  Sesion[]
+  Cliente   Cliente[]
+}
+
+model Sesion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  token     String
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Cliente {
+  id        String    @id @default(cuid())
+  usuarioId String
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+  nombre    String    @unique
+  email     String    @unique
+  telefono  String    @unique
+  direccion String    @default("")
+  status    String    @default("active")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Negocio   Negocio[]
+}
+
+model Negocio {
+  id                 String        @id @default(cuid())
+  clienteId          String
+  cliente            Cliente       @relation(fields: [clienteId], references: [id])
+  nombre             String
+  slogan             String?
+  descripcion        String?
+  telefono           String
+  email              String
+  rfc                String?
+  razon              String?
+  direccion          String?
+  url_web            String?
+  url_google_maps    String?
+  iframe_google_maps String?
+  url_logo           String?
+  url_facebook       String?
+  url_instagram      String?
+  url_x              String?
+  url_linkedin       String?
+  url_tiktok         String?
+  status             String
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  stripeCustomerId   String?
+  Contrato           Contrato[]
+  NegocioItem        NegocioItem[]
+  Transaccion        Transaccion[]
+  Landing            Landing[]
+  Lead               Lead[]
+  Actividad          Actividad[]
+}
+
+model Transaccion {
+  id              Int      @id @default(autoincrement())
+  negocioId       String
+  negocio         Negocio  @relation(fields: [negocioId], references: [id])
+  stripePaymentId String? // ID del pago en Stripe
+  tipoTransaccion String // Ejemplo: "INGRESO" o "EGRESO"
+  cantidad        Float // Monto de la transacción
+  status          String // Estado de la transacción (Ejemplo: "completado", "pendiente")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Contrato {
+  id          String   @id @default(cuid())
+  negocioId   String
+  negocio     Negocio  @relation(fields: [negocioId], references: [id])
+  fechaInicio DateTime
+  fechaFin    DateTime
+  status      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ServicioCategoria {
+  id        String     @id @default(cuid())
+  nombre    String
+  servicios Servicio[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Servicio {
+  id                      String                    @id @default(cuid())
+  categoriaId             String
+  categoria               ServicioCategoria         @relation(fields: [categoriaId], references: [id])
+  nombre                  String
+  descripcion             String?
+  precio                  Float?
+  cuota_mensual           Float?
+  cuota_anual             Float?
+  status                  String
+  order                   Int?                      @unique
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  ServicioPaqueteServicio ServicioPaqueteServicio[]
+}
+
+model ServicioPaquete {
+  id            String                    @id @default(cuid())
+  nombre        String
+  descripcion   String?
+  precio        Float?
+  cuota_mensual Float?
+  cuota_anual   Float?
+  status        String
+  order         Int?                      @unique
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  servicios     ServicioPaqueteServicio[]
+}
+
+model ServicioPaqueteServicio {
+  id                String          @id @default(cuid())
+  servicioPaqueteId String
+  servicioPaquete   ServicioPaquete @relation(fields: [servicioPaqueteId], references: [id])
+  servicioId        String
+  servicio          Servicio        @relation(fields: [servicioId], references: [id])
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+//LANDING PAGE
+model Landing {
+  id        String      @id @default(cuid())
+  negocioId String
+  nombre    String      @unique
+  url       String      @unique
+  status    String      @default("inactive")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  Analitica Analitica[]
+  Seccion   Seccion[]
+  Negocio   Negocio     @relation(fields: [negocioId], references: [id])
+}
+
+model Analitica {
+  id        String   @id @default(cuid())
+  landingId String
+  landing   Landing  @relation(fields: [landingId], references: [id])
+  accion    String
+  fecha     DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Seccion {
+  id        String      @id @default(cuid())
+  landingId String
+  landing   Landing     @relation(fields: [landingId], references: [id])
+  nombre    String
+  status    String      @default("active")
+  position  Int         @unique @map("position")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  Component Component[]
+}
+
+model Component {
+  id              String            @id @default(cuid())
+  seccionId       String
+  seccion         Seccion           @relation(fields: [seccionId], references: [id])
+  nombre          String
+  position        Int               @unique @map("position")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  ComponentConfig ComponentConfig[]
+}
+
+model ComponentConfig {
+  id           String    @id @default(cuid())
+  componentId  String
+  component    Component @relation(fields: [componentId], references: [id])
+  config_key   String
+  config_value String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+//CRM
+model Lead {
+  id        String      @id @default(cuid())
+  nombre    String
+  negocioId String
+  negocio   Negocio  @relation(fields: [negocioId], references: [id])
+  telefono  String?
+  email     String?
+  asunto    String
+  empresa   String?
+  etapaId   String
+  etapa     LeadEtapa @relation(fields: [etapaId], references: [id])
+  canalId   String
+  canal     CanalAdquisicion @relation(fields: [canalId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model LeadEtapa {
+  id        String   @id @default(cuid())
+  nombre    String
+  order     Int      @unique
+  Leads     Lead[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CanalAdquisicion {
+  id        String   @id @default(cuid())
+  nombre    String
+  Leads     Lead[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Actividad {
+  id            Int      @id @default(autoincrement())
+  opportunityId Int
+  type          String // Tipo de actividad, ej., llamada o reunión
+  description   String?
+  negocioId     String
+  negocio       Negocio  @relation(fields: [negocioId], references: [id])
+  date          DateTime @default(now())
+}
+
+//!catlaógo del cliente
+model Item {
+  id            String        @id @default(cuid())
+  nombre        String
+  descripcion   String?
+  precio        Float?
+  cuota_mensual Float?
+  cuota_anual   Float?
+  status        String
+  order         Int?          @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  negocioItem   NegocioItem[]
+}
+
+model NegocioItem {
+  id              String    @id @default(cuid())
+  negocioId       String
+  negocio         Negocio   @relation(fields: [negocioId], references: [id])
+  itemId          String
+  item            Item      @relation(fields: [itemId], references: [id])
+  anexoContratoId String
+  fechaInicio     DateTime
+  fechaFin        DateTime?
+  cuota_mensual   Float?
+  cuota_anual     Float?
+  pago_unico      Float?
+  status          String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
