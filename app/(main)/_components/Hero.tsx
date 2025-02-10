@@ -27,7 +27,8 @@ export default function Hero() {
 
       <div className="text-center text-sm space-x-2">
         <div className="flex items-center gap-2 justify-center">
-          <button className="bg-zinc-800 border border-zinc-700 text-white py-2 px-6 rounded-md">
+          <button className="bg-zinc-800 border border-zinc-700 text-white py-2 px-6 rounded-md"
+            onClick={() => window.open('tel:+525544546582')}>
             Llama ahora
           </button>
           <div>
