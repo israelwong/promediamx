@@ -1,8 +1,8 @@
 'use client';
 import React, { useState } from 'react';
+import LeadFormLite from './LeadFormLite';
 
 const soluciones = [
-
     {
         titulo: 'Automatización de respuestas a mensajes en redes sociales',
         descripcion: 'Configuramos bots para WhatsApp, Instagram, Facebook y Tiktok para atender prospectos y clientes, resolver dudas y recuperar conversaciones en las primeras 24hrs.',
@@ -42,10 +42,17 @@ const soluciones = [
 
 export default function SolucionesLista() {
     const [visibleIndex, setVisibleIndex] = useState<number | null>(null);
+    const [asunto, setAsunto] = useState('');
 
     const toggleDescripcion = (index: number) => {
         setVisibleIndex(visibleIndex === index ? null : index);
     };
+
+    const [showModal, setShowModal] = useState(false);
+    function mostrarModalLeadForm(asuntoOpcion: string) {
+        setAsunto(asuntoOpcion)
+        setShowModal(true);
+    }
 
     return (
         <section>
@@ -93,12 +100,21 @@ export default function SolucionesLista() {
                                 </p>
                             )}
                         </div>
-                        <button className="w-full bg-rose-900 border border-rose-600 text-rose-300 py-2 mt-3 rounded-md hover:bg-pink-950 transition-colors duration-300 text-sm">
+                        <button className="w-full bg-rose-900 border border-rose-600 text-rose-300 py-2 mt-3 rounded-md hover:bg-pink-950 transition-colors duration-300 text-sm"
+                            onClick={() => mostrarModalLeadForm(`Me interesa la solución: ${solucion.titulo}`)}>
                             Me interesa esta solución
                         </button>
                     </div>
                 </article>
             ))}
+
+            <div className='text-left'>
+                {showModal && <LeadFormLite
+                    asunto={asunto}
+                    onClose={() => setShowModal(false)}
+                />}
+            </div>
+
         </section>
     );
 }

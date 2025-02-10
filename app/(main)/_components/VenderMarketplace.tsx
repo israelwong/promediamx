@@ -1,8 +1,18 @@
-import React from 'react'
+'use client';
+import React, { useState } from 'react'
+import LeadFormLite from './LeadFormLite';
+
 import Image from 'next/image'
 import Head from 'next/head'
 
 export default function VenderMarketplace() {
+
+    const [showModal, setShowModal] = useState(false);
+    const asunto = 'Vender productos en Marketplace de Mercado Libre y Amazon.'
+    function mostrarModalLeadForm() {
+        setShowModal(true);
+    }
+
     return (
         <>
             <Head>
@@ -16,8 +26,7 @@ export default function VenderMarketplace() {
                         ¿Quieres vender en Marketplace?
                     </p> */}
                     <h1 className='md:text-4xl text-4xl font-FunnelSans-Bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500'>
-                        {/* Sube tus productos a Mercado Libre y/o Amazon */}
-                        Vender productos en Marketplace de Mercado Libre y Amazon
+                        {asunto}
                     </h1>
                 </header>
 
@@ -54,7 +63,9 @@ export default function VenderMarketplace() {
                         <p className='text-zinc-300 text-2xl font-FunnelSans-Light mb-2'>
                             Plan desde $8,000 <span className='text-zinc-500'>/mes</span>
                         </p>
-                        <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'>
+                        <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'
+                            onClick={mostrarModalLeadForm}
+                        >
                             Contáctanos hoy mismo
                         </button>
                     </div>
@@ -65,6 +76,12 @@ export default function VenderMarketplace() {
                         </p>
                     </footer>
                 </main>
+
+                {showModal && <LeadFormLite
+                    asunto={asunto}
+                    onClose={() => setShowModal(false)}
+                />}
+
             </div>
         </>
     )

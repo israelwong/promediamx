@@ -2,7 +2,6 @@
 
 import React from 'react'
 import Hero from "@/app/(main)/_components/Hero";
-// import SolucionesPlan from "./SolucionesPlan";
 import SolucionesPlanV2 from "./SolucionesPlan-v2";
 import SolucionesLista from "./SolucionesLista";
 import ProyectosSlider from "./ProyectosSlider";
@@ -24,7 +23,6 @@ export default function Principal() {
             </div>
 
             <div>
-                {/* <SolucionesPlan /> */}
                 <SolucionesPlanV2 />
             </div>
 

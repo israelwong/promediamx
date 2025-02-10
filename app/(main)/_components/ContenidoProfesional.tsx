@@ -1,18 +1,20 @@
-import React from 'react'
+'use client';
+import React, { useState } from 'react'
+import LeadFormLite from './LeadFormLite';
 
 export default function ContenidoProfesional() {
+
+    const [showModal, setShowModal] = useState(false);
+    const asunto = 'Creación de imagen profesional para destacar en el sector.'
+    function mostrarModalLeadForm() {
+        setShowModal(true);
+    }
+
     return (
         <section>
             <header>
-                {/* <p className='font-FunnelSans-SemiBold text-pink-500 mb-2'>
-                    ¿Quieres posicionarte como líder en tu sector?
-                </p> */}
-                {/* <p className='font-FunnelSans-SemiBold text-pink-500 mb-2'>
-                    Solución integral
-                </p> */}
-
                 <h1 className='md:text-4xl text-4xl font-FunnelSans-Bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-cyan-500'>
-                    Creación de imagen profesional para destacar en el sector.
+                    {asunto}
                 </h1>
             </header>
 
@@ -64,7 +66,9 @@ export default function ContenidoProfesional() {
                         Plan desde $5,000 <span className='text-zinc-500'>/mes</span>
                     </p>
 
-                    <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'>
+                    <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'
+                        onClick={() => mostrarModalLeadForm()}
+                    >
                         Contáctanos hoy mismo
                     </button>
                 </div>
@@ -75,6 +79,13 @@ export default function ContenidoProfesional() {
                     </p>
                 </footer>
             </article>
+
+            {showModal && <LeadFormLite
+                asunto={asunto}
+                onClose={() => setShowModal(false)}
+            />}
+
+
         </section>
     )
 }

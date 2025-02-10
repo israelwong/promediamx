@@ -1,6 +1,15 @@
-import React from 'react'
+'use client';
+import React, { useState } from 'react'
+import LeadFormLite from './LeadFormLite';
 
 export default function BuscasOtraSolucion() {
+
+    const [showModal, setShowModal] = useState(false);
+    const asunto = 'Quiero una asesoría sobre las soluciones que puedo implementar en mi negocio.'
+    function mostrarModalLeadForm() {
+        setShowModal(true);
+    }
+
     return (
         <section aria-labelledby="solution-heading" className='bg-zinc-900/20 py-10 px-5'>
             <header className="text-center mb-5">
@@ -21,7 +30,9 @@ export default function BuscasOtraSolucion() {
                     <div>
                         <div className="relative z-10 flex cursor-pointer overflow-hidden rounded-md border border-none p-[1.5px] mx-auto">
                             <div className="animate-rotate absolute h-full w-full rounded-md bg-[conic-gradient(#22c55e_20deg,transparent_120deg)]"></div>
-                            <button aria-label="Enviar mensaje" className="relative z-20 items-center justify-center rounded-md bg-green-800 px-6 py-2 border border-green-600 text-white">
+                            <button aria-label="Enviar mensaje" className="relative z-20 items-center justify-center rounded-md bg-green-800 px-6 py-2 border border-green-600 text-white"
+                                onClick={mostrarModalLeadForm}
+                            >
                                 <span className="relative z-50 rounded-md py-2 text-center shadow-2xl text-sm">
                                     Enviar mensaje
                                 </span>
@@ -29,6 +40,13 @@ export default function BuscasOtraSolucion() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div className='text-left'>
+                {showModal && <LeadFormLite
+                    asunto={asunto}
+                    onClose={() => setShowModal(false)}
+                />}
             </div>
         </section>
     )

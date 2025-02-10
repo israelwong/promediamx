@@ -15,6 +15,8 @@ export default function LeadFormLite({ asunto, onClose }: Props) {
     const [empresa, setEmpresa] = useState('');
     const [asuntoEntrada, setAsuntoEntrada] = useState(asunto);
 
+    const [enviando, setEnviando] = useState(false);
+
     const [errorNombre, setErrorNombre] = useState('');
     const [errorTelefono, setErrorTelefono] = useState('');
     const [errorAsunto, setErrorAsunto] = useState('');
@@ -57,7 +59,9 @@ export default function LeadFormLite({ asunto, onClose }: Props) {
             };
 
             try {
-                console.log('Enviando datos:', JSON.stringify(nuevoLead)); // Agregar esta línea para depuración
+                // console.log('Enviando datos:', JSON.stringify(nuevoLead)); // Agregar esta línea para depuración
+
+                setEnviando(true);
                 const response = await fetch('/api/webhook/leadform', {
                     method: 'POST',
                     headers: {
@@ -67,12 +71,14 @@ export default function LeadFormLite({ asunto, onClose }: Props) {
                 });
 
                 if (!response.ok) {
+                    setEnviando(false);
                     const errorData = await response.json();
                     throw new Error(`Network response was not ok: ${errorData.message || response.statusText}`);
                 }
-                const data = await response.json();
-                console.log('Success:', data);
+
                 setEtapa(2); // Cambiar a la siguiente etapa si la solicitud es exitosa
+                setEnviando(false);
+
             } catch (error) {
                 if (error instanceof Error) {
                     console.error('Error:', error.message);
@@ -183,18 +189,14 @@ export default function LeadFormLite({ asunto, onClose }: Props) {
                                 {errorAsunto && <p className='text-red-500 text-sm mt-1'>* {errorAsunto}</p>}
                             </div>
 
-                            <button type="button" onClick={() => handleNext()}
-                                className='w-full bg-blue-900 border border-blue-700 text-white py-2 mt-3 rounded-md hover:bg-blu-950 transition-colors duration-300'
-                            >
-                                Enviar solicitud de información
-                            </button>
                             <button
-                                className='w-full bg-red-800 border border-zinc-700 text-white py-2 mt-3 rounded-md hover:bg-zinc-700 transition-colors duration-300'
-                                onClick={onClose}
+                                type="button"
+                                onClick={() => handleNext()}
+                                disabled={enviando}
+                                className={`w-full border text-white py-2 mt-3 rounded-md transition-colors duration-300 ${enviando ? 'bg-blue-700 border-blue-600' : 'bg-blue-900 border-blue-700 hover:bg-blue-950'}`}
                             >
-                                Cerrar ventana
+                                {enviando ? 'Enviando...' : 'Enviar solicitud'}
                             </button>
-
                         </div>
                     )}
                     {etapa === 2 && (

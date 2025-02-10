@@ -1,17 +1,20 @@
-import React from 'react';
+'use client';
+import React, { useState } from 'react'
+import LeadFormLite from './LeadFormLite';
 
 export default function ContenidoOrganico() {
+
+    const [showModal, setShowModal] = useState(false);
+    const asunto = 'Creación de contenido profesional y orgánico para redes sociales.'
+    function mostrarModalLeadForm() {
+        setShowModal(true);
+    }
+
     return (
         <section>
             <header>
-                {/* <p className='font-FunnelSans-SemiBold bg-pink-800 mb-2 inline-block rounded-full px-3 py-1 text-sm text-pink-300 border border-pink-500'> */}
-                {/* ¿Quieres generar más confianza? */}
-                {/* <p className='font-FunnelSans-SemiBold text-yellow-500 mb-2'>
-                    Solución integral
-                </p> */}
                 <h1 className='md:text-4xl text-4xl font-FunnelSans-Bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500'>
-                    {/* Crea contenido para redes sociales */}
-                    Creación de contenido profesional y orgánico para redes sociales
+                    {asunto}
                 </h1>
             </header>
 
@@ -58,7 +61,8 @@ export default function ContenidoOrganico() {
                     <p className='text-zinc-300 text-2xl font-FunnelSans-Light mb-2'>
                         Plan desde $5,000 <span className='text-zinc-500'>/mes</span>
                     </p>
-                    <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'>
+                    <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'
+                        onClick={() => mostrarModalLeadForm()}>
                         Contáctanos hoy mismo
                     </button>
                 </div>
@@ -66,6 +70,12 @@ export default function ContenidoOrganico() {
                 <p className='text-zinc-500 text-xs font-light mt-5'>
                     * Los planes varían según el alcance y recurrencia de los servicios.
                 </p>
+
+                {showModal && <LeadFormLite
+                    asunto={asunto}
+                    onClose={() => setShowModal(false)}
+                />}
+
             </article>
         </section>
     );

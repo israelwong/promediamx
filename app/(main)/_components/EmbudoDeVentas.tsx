@@ -1,18 +1,23 @@
-import React from 'react';
+'use client';
+import React, { useState } from 'react'
+import LeadFormLite from './LeadFormLite';
+
 
 export default function EmbudoDeVentas() {
+
+    const [showModal, setShowModal] = useState(false);
+    const asunto = 'Obtener clientes potenciales usando plataformas digitales.'
+    function mostrarModalLeadForm() {
+        setShowModal(true);
+    }
+
     return (
         <div>
-            {/* <header>
-                <h1 className='font-FunnelSans-SemiBold text-red-500 mb-2'>
-                    ¿Quieres vender usando redes sociales?
-                </h1>
-            </header> */}
 
             <main>
                 <section>
                     <h2 className='md:text-4xl text-4xl font-FunnelSans-Bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-red-500'>
-                        Obtener clientes potenciales usando plataformas digitales
+                        {asunto}
                     </h2>
 
                     <p className='text-lg text-zinc-300 mb-5'>
@@ -75,7 +80,9 @@ export default function EmbudoDeVentas() {
                         Plan desde $7,000 <span className='text-zinc-500'>/mes</span>
                     </p>
 
-                    <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'>
+                    <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'
+                        onClick={() => mostrarModalLeadForm()}
+                    >
                         Contáctanos hoy mismo
                     </button>
                 </section>
@@ -85,6 +92,14 @@ export default function EmbudoDeVentas() {
                         * Contratación mínima 6 meses. Eñ precio del servicio según la complejidad del embido de ventas. La agencia cobra comisión adicional a negociar independiente a la comisión de Stripe .
                     </p>
                 </footer>
+
+
+                {showModal && <LeadFormLite
+                    asunto={asunto}
+                    onClose={() => setShowModal(false)}
+                />}
+
+
             </main>
         </div>
     );
