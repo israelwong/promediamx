@@ -324,7 +324,7 @@ const proyectos = [
 
 export default function ListaProyectos() {
     const [currentPage, setCurrentPage] = React.useState(0);
-    const itemsPerPage = 4;
+    const itemsPerPage = 3;
     return (
         <div className='max-w-screen-xl mx-auto p-5'>
 
