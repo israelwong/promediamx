@@ -89,7 +89,7 @@ export default function EmbudoDeVentas() {
 
                 <footer>
                     <p className='text-zinc-500 text-xs font-light mt-5'>
-                        * Contratación mínima 6 meses. Eñ precio del servicio según la complejidad del embido de ventas. La agencia cobra comisión adicional a negociar independiente a la comisión de Stripe .
+                        Contratación mínima de 6 meses. El precio del servicio varía según la complejidad del embudo de ventas. La agencia cobra una comisión adicional, a negociar, independiente de la comisión de Stripe.
                     </p>
                 </footer>
 

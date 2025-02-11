@@ -6,6 +6,18 @@ const soluciones = [
     {
         titulo: 'Automatización de respuestas a mensajes en redes sociales',
         descripcion: 'Automatiza tu atención al cliente 24/7 en WhatsApp, Instagram, Facebook o TikTok, ahorra tiempo, aumenta ventas y monitoreamos tus contactos para evitar costos extra; ¡prueba gratis por 7 días!',
+        // beneficios: [
+        //     'Responde en segundos en Instagram, Facebook, WhatsApp o TikTok.',
+        //     'Aumenta ventas al capturar leads automáticamente.',
+        //     'Reduce carga operativa, evitando que el personal pierda tiempo en respuestas repetitivas.',
+        //     'Evita costos ocultos, ya que nuestra agencia monitorea los contactos para optimizar el uso de contactos',
+        // ],
+        // proceso: [
+        //     'Configuramos la automatización en la red social que elijas.',
+        //     'Creamos respuestas personalizadas según las preguntas más comunes.',
+        //     'Monitoreamos y optimizamos para evitar costos extra.',
+        //     'Tú solo recibes clientes listos para comprar o agendar una cita.',
+        // ],
         recurrente: true,
         precio: 2500,
         comentarios: 'Precio por red social. Red social adicional $1,500. No incluye costo por campañas de publicidad',
@@ -18,7 +30,7 @@ const soluciones = [
         comentarios: 'Sin costo de implementación. Stripe cobra una comisión fija + comisión variable por transacción según método de pago',
     },
     {
-        titulo: 'Pagina web básicoa para captar clientes',
+        titulo: 'Pagina web básica para captar clientes',
         descripcion: 'Te ofrecemos una landing page personalizada con un leadform integrado, diseñado para captar interesados y generar oportunidades de negocio. Los leads generados serán enviados en tiempo real a tu WhatsApp y podrás consultarlos en tu web app de manera fácil y rápida.',
         precio: 2500,
         recurrente: true,
@@ -36,7 +48,7 @@ const soluciones = [
         descripcion: 'Enviamos mensajes personalizados y promociones a gran escala, asegurando que tu mensaje llegue de manera directa y efectiva. Se pueden incluir links de cobro.',
         precio: 500,
         recurrente: false,
-        comentarios: 'El precio solo cinluye la configuración y envio. No incluye el costo de los mensajes',
+        comentarios: 'El precio solo inluye la configuración y envio. No incluye el costo de los mensajes',
     },
 ];
 
@@ -77,7 +89,7 @@ export default function SolucionesLista() {
                         </div>
                     </header>
                     <div
-                        className={`transition-max-height duration-500 ease-in-out overflow-hidden ${visibleIndex === index ? 'max-h-80' : 'max-h-0'}`}
+                        className={`transition-max-height duration-500 ease-in-out overflow-hidden ${visibleIndex === index ? '' : 'max-h-0'}`}
                     >
                         <p className="text-sm text-zinc-300 pt-2 pb-3">
                             {solucion.descripcion}
@@ -93,13 +105,31 @@ export default function SolucionesLista() {
                                 <span className="font-bold">Pago por servicio de </span> {solucion.precio.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
                             </p>
                         )}
+
+                        {/* <div className='text-sm'>
+                            <h3 className='font-FunnelSans-SemiBold mt-3'>Beneficios</h3>
+                            <ul className='list-disc ml-5'>
+                                {solucion.beneficios?.map((beneficio, index) => (
+                                    <li key={index}>{beneficio}</li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div className='text-sm'>
+                            <h3 className='font-FunnelSans-SemiBold mt-3'>Proceso</h3>
+                            <ol className='list-decimal ml-5'>
+                                {solucion.proceso?.map((paso, index) => (
+                                    <li key={index}>{paso}</li>
+                                ))}
+                            </ol>
+                        </div>
                         <div className='my-2'>
                             {solucion.comentarios && (
                                 <p className="text-zinc-500 text-xs italic">
                                     * {solucion.comentarios}
                                 </p>
                             )}
-                        </div>
+                        </div> */}
                         <button className="w-full bg-rose-900 border border-rose-600 text-rose-300 py-2 mt-3 rounded-md hover:bg-pink-950 transition-colors duration-300 text-sm"
                             onClick={() => mostrarModalLeadForm(`Me interesa la solución: ${solucion.titulo}`)}>
                             Me interesa esta solución

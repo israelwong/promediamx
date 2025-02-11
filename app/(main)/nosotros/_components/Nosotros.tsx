@@ -7,7 +7,7 @@ export default function Nosotros() {
 
             <header className='my-16 text-center md:p-5 rounded-md'>
                 <div className='md:max-w-screen-md mx-auto'>
-                    <p className='md:font-FunnelSans-Regular text-xl text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-blue-500 to-purple-600'>
+                    <p className='md:font-FunnelSans-Regular md:text-3xl text-xl text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-blue-500 to-purple-600'>
                         Nosotros somos una
                     </p>
                     <p className='md:font-FunnelSans-Bold font-FunnelSans-Bold md:text-5xl text-3xl mb-2 text-zinc-300'>

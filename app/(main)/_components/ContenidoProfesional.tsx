@@ -75,7 +75,7 @@ export default function ContenidoProfesional() {
 
                 <footer>
                     <p className='text-zinc-500 text-xs font-light mt-5'>
-                        * El precio del servicio se calcula y divide en a pagos
+                        * El precio del servicio se calcula y divide hasta en 12 pagos
                     </p>
                 </footer>
             </article>

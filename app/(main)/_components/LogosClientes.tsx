@@ -6,7 +6,6 @@ function LogosClientes() {
 
     const logos_secundarios = [
         [
-
             "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/IPN.svg",
             'Instituto Politécnico Nacional',
         ],
@@ -178,7 +177,34 @@ function LogosClientes() {
             "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Tania-Sandoval.svg",
             "Tania Sandoval"
         ],
-
+        [
+            "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Barsa.svg",
+            "Barsa Acuática And Sport Center"
+        ],
+        [
+            "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Aluvitec.svg",
+            "Aluvitec"
+        ],
+        [
+            "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/ateneo/logo_sin_sombra.svg",
+            "Colegio Ateneo Mexicano"
+        ],
+        [
+            "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/TGH.svg",
+            "TGH"
+        ],
+        [
+            "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/CCT-Plantilla-3.svg",
+            "CTC Sindicato"
+        ],
+        [
+            "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/ITEC.svg",
+            "Universidad ITEC"
+        ],
+        [
+            "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Dar-Comunicaciones.svg",
+            "Dar Comunicaciones"
+        ],
     ]
 
     return (
