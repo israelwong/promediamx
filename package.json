@@ -10,11 +10,14 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@glidejs/glide": "^3.7.1",
     "@prisma/client": "^6.3.1",
     "@supabase/supabase-js": "^2.48.1",
     "@tailwindcss/postcss": "^4.0.4",
     "@types/js-cookie": "^3.0.6",
     "axios": "^1.7.9",
+    "embla-carousel-autoplay": "^8.5.2",
+    "embla-carousel-react": "^8.5.2",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.474.0",
@@ -30,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@types/glidejs__glide": "^3.6.6",
     "@types/jsonwebtoken": "^9.0.8",
     "@types/node": "^20.17.17",
     "@types/react": "^19.0.8",
