@@ -3,46 +3,59 @@ import React, { useState } from 'react';
 
 const soluciones = [
     {
-        titulo: 'Obtener más clientes',
-        descripcion: 'Generamos más clientes potenciales para tu negocio con una estrategia combinada de contenido orgánico, anuncios pagados y optimización digital. Implementamos campañas de Ads segmentadas y estrategias de remarketing para maximizar tu visibilidad y conversión. Además, automatizamos la captación de leads con formularios inteligentes y seguimiento automatizado.',
+        pregunta: '¿Existen contratos de permanencia mínima?',
+        respuesta: 'No, no hay contratos de permanencia mínima. Puedes cancelar en cualquier momento.',
     },
     {
-        titulo: 'Aumentar la visibilidad de mi negocio',
-        descripcion: 'Optimizamos tu presencia en Google, mejoramos tu SEO y gestionamos campañas pagadas en Google Ads y Meta Ads para que aparezcas en búsquedas y redes sociales.',
+        pregunta: '¿Ofrecen descuentos por contratos a largo plazo?',
+        respuesta: 'Sí, contamos con descuentos para contratos a partir de 6 meses.',
     },
     {
-        titulo: 'Automatización respuestas a mensajes',
-        descripcion: 'Configuramos bots inteligentes para WhatsApp, Instagram, Facebook y Tiktok para atender prospectos y clientes, resolver dudas y generar leads.',
+        pregunta: '¿Cómo se calculan los precios de los servicios adicionales?',
+        respuesta: 'Se suman al costo base del plan y se prorratean según el tiempo restante del contrato.',
     },
     {
-        titulo: 'Enviar masivos por correo',
-        descripcion: 'Descripción de la solución 3'
+        pregunta: '¿Qué métodos de pago aceptan?',
+        respuesta: 'Tarjeta de crédito, débito, transferencia bancaria y depósito en OXXO.',
     },
     {
-        titulo: 'Recontactar a prospectos que no compraron',
-        descripcion: 'Recupera clientes potenciales con mensajes automatizados. Utilizamos estrategias de remarketing y automatización con ManyChat Pro para reactivar a los prospectos que no completaron su compra, manteniéndolos interesados y listos para convertir.',
+        pregunta: '¿Cómo funcionan los pagos recurrentes?',
+        respuesta: 'Se realizan mensualmente de forma automática con tarjeta de crédito o débito.',
     },
     {
-        titulo: 'Chatbot en mi pagina web',
-        descripcion: 'Implementamos un sistema automático que responde preguntas, captura leads y guía a los visitantes en tiempo real, mejorando la experiencia del usuario y aumentando conversiones.',
+        pregunta: '¿Puedo modificar el diseño de mi landing page?',
+        respuesta: 'Nosotros lo hacemos por ti según tus necesidades, entregándote un diseño atractivo y funcional.',
     },
     {
-        titulo: 'Cobrar en línea',
-        descripcion: 'Configuramos cobros en línea con opciones como OXXO, SPEI, tarjetas y pagos en mensualidades (MSI), brindando flexibilidad y seguridad en cada transacción.',
+        pregunta: '¿Las landing pages incluyen dominio y hosting?',
+        respuesta: 'Incluyen un subdominio de la plataforma y hosting en nuestros servidores.',
     },
     {
-        titulo: 'Enviar mensajes de WhatsApp masivos',
-        descripcion: 'Usamos la API de WhatsApp para enviar promociones, actualizaciones y notificaciones a grandes grupos de manera eficiente y personalizada.',
+        pregunta: '¿Qué es una landing page omnicanal?',
+        respuesta: 'Es una página web donde se concentra toda la información de tu producto o servicio, con acciones de contacto como formularios, WhatsApp, teléfonos, horarios y mapa de ubicación.',
     },
     {
-        titulo: 'Enviar SMS masivos',
-        descripcion: 'Enviamos mensajes personalizados y promociones a gran escala, asegurando que tu mensaje llegue de manera directa y efectiva.',
+        pregunta: '¿Ustedes crean el contenido o debo proporcionarlo?',
+        respuesta: 'Te ayudamos a crear el contenido, pero si ya cuentas con él, lo optimizamos para tus redes sociales.',
     },
     {
-        titulo: 'Enviar correos masivos',
-        descripcion: 'Usamos Mailchimp para diseñar plantillas atractivas y monitorear aperturas, asegurando que tus mensajes lleguen a los clientes adecuados y generen resultados.',
+        pregunta: '¿En qué redes sociales publican contenido?',
+        respuesta: 'Publicamos en todas las redes sociales, pero nos adaptamos a tus preferencias.',
+    },
+    {
+        pregunta: '¿Manejan campañas pagadas o solo contenido orgánico?',
+        respuesta: 'Manejamos ambos, pero recomendamos combinarlos para obtener mejores resultados.',
+    },
+    {
+        pregunta: '¿Cómo se organiza la planificación de contenido?',
+        respuesta: 'Creamos un calendario de publicaciones mensual y lo ajustamos según los resultados.',
+    },
+    {
+        pregunta: '¿Tienen más soluciones o solo las que se listan?',
+        respuesta: 'Contamos con más soluciones, pero estas son las más solicitadas por nuestros clientes.',
     },
 ];
+
 
 export default function SolucionesLista() {
     const [visibleIndex, setVisibleIndex] = useState<number | null>(null);
@@ -55,19 +68,16 @@ export default function SolucionesLista() {
         <section>
             <header className='mb-5'>
                 <h1 className='font-FunnelSans-SemiBold text-2xl bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 text-transparent bg-clip-text mb-2'>
-                    Soluciones digitales más populares entre nuestros clientes
+                    Preguntas frecuentes
                 </h1>
-                <p className='text-zinc-500 font-FunnelSans-Light mx-auto mb-3'>
-                    Te presentamos otras soluciones digitales populares que hemos implementado para nuestros clientes.
-                </p>
             </header>
             {soluciones.map((solucion, index) => (
-                <article key={index} className="px-5 py-3 border border-pink-950 rounded-md mb-3">
-                    <header className="flex items-center justify-between"
-                        onClick={() => toggleDescripcion(index)} style={{ cursor: 'pointer' }}>
+                <article key={index} className="px-5 py-3 border border-pink-950 rounded-md mb-3"
+                    onClick={() => toggleDescripcion(index)} style={{ cursor: 'pointer' }}>
+                    <header className="flex items-center justify-between">
 
                         <h2 className="bg-gradient-to-r from-pink-500 to-red-500 text-transparent bg-clip-text">
-                            {solucion.titulo}
+                            {solucion.pregunta}
                         </h2>
                         <div className='text-rose-950'>
                             {visibleIndex === index ? '▲' : '▼'}
@@ -77,12 +87,8 @@ export default function SolucionesLista() {
                         className={`transition-max-height duration-500 ease-in-out overflow-hidden ${visibleIndex === index ? 'max-h-80' : 'max-h-0'}`}
                     >
                         <p className="text-sm text-zinc-500 pt-2 pb-1">
-                            {solucion.descripcion}
+                            {solucion.respuesta}
                         </p>
-
-                        <button className="w-full bg-rose-900 border border-rose-600 text-rose-300 py-2 mt-3 rounded-md hover:bg-pink-950 transition-colors duration-300 text-sm">
-                            Me interesa esta solución
-                        </button>
 
                     </div>
 

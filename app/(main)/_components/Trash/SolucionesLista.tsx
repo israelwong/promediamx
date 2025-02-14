@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import LeadFormLite from './LeadFormLite';
+import LeadFormLite from '../LeadFormLite';
 
 const soluciones = [
     {
@@ -106,30 +106,6 @@ export default function SolucionesLista() {
                             </p>
                         )}
 
-                        {/* <div className='text-sm'>
-                            <h3 className='font-FunnelSans-SemiBold mt-3'>Beneficios</h3>
-                            <ul className='list-disc ml-5'>
-                                {solucion.beneficios?.map((beneficio, index) => (
-                                    <li key={index}>{beneficio}</li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <div className='text-sm'>
-                            <h3 className='font-FunnelSans-SemiBold mt-3'>Proceso</h3>
-                            <ol className='list-decimal ml-5'>
-                                {solucion.proceso?.map((paso, index) => (
-                                    <li key={index}>{paso}</li>
-                                ))}
-                            </ol>
-                        </div>
-                        <div className='my-2'>
-                            {solucion.comentarios && (
-                                <p className="text-zinc-500 text-xs italic">
-                                    * {solucion.comentarios}
-                                </p>
-                            )}
-                        </div> */}
                         <button className="w-full bg-rose-900 border border-rose-600 text-rose-300 py-2 mt-3 rounded-md hover:bg-pink-950 transition-colors duration-300 text-sm"
                             onClick={() => mostrarModalLeadForm(`Me interesa la solución: ${solucion.titulo}`)}>
                             Me interesa esta solución

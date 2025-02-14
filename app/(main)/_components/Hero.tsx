@@ -22,7 +22,7 @@ export default function Hero() {
 
       <p className="text-center md:text-2xl mt-4 md:px-24 px-3 font-light leading-relaxed font-FunnelSans-Light text-zinc-200 mb-8">
         No te compliques, vayamos al punto.
-        ¿Qué necesita el tuyo para <span className='text-yellow-500 leading-3 underline'>cerrar</span> más ventas?
+        ¿Qué necesitas para <span className='text-yellow-500 leading-3 underline'>cerrar</span> más ventas?
       </p>
 
       <div className="text-center text-sm space-x-2">

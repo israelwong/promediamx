@@ -22,6 +22,7 @@ export default function Navbar() {
     { href: '/nosotros', label: 'Nosotros' },
     { href: '/proyectos', label: 'Proyectos' },
     { href: '/clientes', label: 'Clientes' },
+    // { href: '/vacantes', label: 'Vacantes' },
   ]
 
   return (

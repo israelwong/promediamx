@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react'
-import LeadFormLite from './LeadFormLite';
+import LeadFormLite from '../LeadFormLite';
+import Link from 'next/link';
 
 export default function ContenidoOrganico() {
 
@@ -65,6 +66,9 @@ export default function ContenidoOrganico() {
                         onClick={() => mostrarModalLeadForm()}>
                         Contáctanos hoy mismo
                     </button>
+                    <Link href='/servicios/automatizacion-de-respuestas-a-mensajes-en-redes-sociales'>
+                        Más detalles
+                    </Link>
                 </div>
 
                 <p className='text-zinc-500 text-xs font-light mt-5'>

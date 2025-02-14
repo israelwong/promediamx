@@ -1,9 +1,12 @@
 'use client';
 import React, { useState } from 'react'
-import LeadFormLite from './LeadFormLite';
+import LeadFormLite from '@/app/(main)/_components/LeadFormLite';
+import Head from 'next/head'
 
 
 export default function EmbudoDeVentas() {
+
+
 
     const [showModal, setShowModal] = useState(false);
     const asunto = 'Obtener clientes potenciales usando plataformas digitales.'
@@ -13,6 +16,12 @@ export default function EmbudoDeVentas() {
 
     return (
         <div>
+
+            <Head>
+                <title>Vender en Marketplace - Promedia App</title>
+                <meta name="description" content="Sube tus productos a Mercado Libre y/o Amazon con nuestra ayuda. Gestionamos todo el proceso para que puedas escalar tu negocio sin complicaciones." />
+                <meta name="keywords" content="vender en marketplace, Mercado Libre, Amazon, gestión de ventas, automatización de ventas" />
+            </Head>
 
             <main>
                 <section>

@@ -10,6 +10,7 @@ export default function TecnologiasYHerramientas() {
                 <meta name="description" content="Usamos herramientas de última generación para implementar en tu estrategias para que puedas alcanzar tus objetivos." />
                 <meta name="keywords" content="Frontend, Backend, DevOps, Automatización conversacional, Marketing digital, SEO, Ads, Marketplaces" />
             </Head>
+
             <main className='p-5 border border-blue-900 rounded-md border-dotted' aria-label="Tecnologías y herramientas">
                 <header className='mb-5 max-w-screen-sm '>
                     <h1 className='font-FunnelSans-SemiBold md:text-3xl text-xl text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-green-500 mb-2'>

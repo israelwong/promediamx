@@ -1,8 +1,7 @@
 'use client';
 import React from 'react';
 import Image from 'next/image';
-import SolucionesLista from '@/app/(main)/_components/SolucionesLista';
-import BuscasOtraSolucion from '@/app/(main)/_components/BuscasOtraSolucion';
+import ModelosContratacion from '@/app/(main)/_components/ModelosContratacion';
 
 const proyectos = [
     {
@@ -319,14 +318,13 @@ const proyectos = [
         etiquetas: ['Pagina web', 'Fotografía'],
     },
 
-
 ];
 
 
 export default function ListaProyectos() {
     const [currentPage, setCurrentPage] = React.useState(0);
     const [showAll, setShowAll] = React.useState(false);
-    const itemsPerPage = 3;
+    const itemsPerPage = 4;
 
     const displayedProjects = showAll ? proyectos : proyectos.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage);
 
@@ -345,6 +343,7 @@ export default function ListaProyectos() {
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-5'>
+
                     <div className='md:col-span-2 col-span-1 mb-10'>
                         {displayedProjects.map((proyecto, index) => (
                             <div key={index} className='font-FunnelSans-Regular mb-3 px-5 py-3 border border-zinc-800 bg-zinc-900/50 rounded-md'>
@@ -405,8 +404,7 @@ export default function ListaProyectos() {
                     </div>
 
                     <div className='md:col-span-1 col-span-1'>
-                        <SolucionesLista />
-                        <BuscasOtraSolucion />
+                        <ModelosContratacion />
                     </div>
                 </div>
             </div>
