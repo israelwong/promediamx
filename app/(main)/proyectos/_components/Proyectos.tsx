@@ -23,7 +23,7 @@ const proyectos = [
         descripcion: 'Colegio privado',
         url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/ateneo/logo_sin_sombra.svg',
         bg_color: 'bg-zinc-100',
-        etiquetas: ['Fotografía', 'Diseño gráfico', 'Web App', 'Impresión'],
+        etiquetas: ['Fotografía', 'Diseño gráfico', 'Web App'],
     },
     {
         nombre: 'Dancerías',
@@ -40,15 +40,21 @@ const proyectos = [
     },
     {
         nombre: 'Grupo Aselac',
-        descripcion: 'Asesoría en seguridad laboral',
+        descripcion: 'Distribuidora e importadora de productos de químicos',
         url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Grupo-Aselac.svg',
         etiquetas: ['Diseño gráfico', 'Fotografía'],
+    },
+    {
+        nombre: 'Jemiza',
+        descripcion: 'Distribuidor SIEMENS',
+        // url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Grupo-Aselac.svg',
+        etiquetas: ['Video institucional', 'Fotografía corporativa'],
     },
     {
         nombre: 'Vinte',
         descripcion: 'Desarrolladora de vivienda',
         url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Vinte.svg',
-        etiquetas: ['Fotografía', 'Video'],
+        etiquetas: ['Video'],
     },
     {
         nombre: 'Universidad Insurgentes',
