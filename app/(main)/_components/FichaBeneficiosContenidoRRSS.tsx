@@ -46,13 +46,13 @@ export default function FichaBeneficiosContenidoRRSS() {
                     <div className="embla__container font-FunnelSans-Regular">
                         {beneficios.map((beneficio, index) => (
                             <div className="embla__slide px-2" key={index}>
-                                <h4 className='text-zinc-400 text-xl mb-2 font-FunnelSans-Light'>
+                                <h4 className='text-zinc-200 text-xl mb-2 font-FunnelSans-Light'>
                                     {index + 1}. {beneficio.title}
                                 </h4>
 
                                 <Image src={beneficio.image} width={400} height={400} alt={beneficio.title} className='object-cover rounded-lg mb-2' />
 
-                                <p className='text-zinc-400 font-FunnelSans-Light'>
+                                <p className='text-zinc-200 font-FunnelSans-Light'>
                                     {beneficio.description}
                                 </p>
                             </div>

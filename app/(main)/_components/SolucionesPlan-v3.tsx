@@ -35,10 +35,10 @@ export default function Servicios() {
     return (
         <section>
             <div>
-                <h1 className='text-center md:text-3xl text-3xl px-5 md:mb-0 mb-3 md:font-FunnelSans-Light font-FunnelSans-Regular text-zinc-300'>
+                <h1 className='text-center md:text-3xl text-3xl px-5 md:mb-0 mb-3 md:font-FunnelSans-Light font-FunnelSans-Regular text-white'>
                     Soluciones integrales para negocios
                 </h1>
-                <p className='font-FunnelSans-Regular text-zinc-500 text-center md:px-12 px-5 mb-5'>
+                <p className='font-FunnelSans-Regular text-white text-center md:px-12 px-5 mb-5'>
                     Te presentamos algunas de las soluciones integrales que hemos implementado para nuestros clientes.
                 </p>
             </div>
@@ -51,10 +51,10 @@ export default function Servicios() {
                             <h1 className={`md:text-2xl text-2xl font-FunnelSans-Bold mb-2 bg-clip-text text-transparent ${servicio.title_gradient || ''}`}>
                                 {servicio.nombre}
                             </h1>
-                            <p className='mt-2 text-sm text-zinc-500'>
+                            <p className='mt-2 text-sm text-zinc-300'>
                                 {servicio.descripcion}
                             </p>
-                            <p className='mt-2 font-FunnelSans-Light mb-4'>
+                            <p className='mt-2 font-FunnelSans-Light mb-4 text-lg'>
                                 Plan desde {servicio.precio.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}/mes
                             </p>
 
@@ -63,8 +63,9 @@ export default function Servicios() {
                                 href={'https://calendly.com/promediamx/30min'}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                title="Agenda una reunión virtual"
                             >
-                                Más información
+                                Agenda una reunión virtual
                             </Link>
 
                         </div>

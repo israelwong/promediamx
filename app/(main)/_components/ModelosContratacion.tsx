@@ -102,12 +102,13 @@ const Page = () => {
                         Encontremos la mejor solución para tu negocio. ¡Trabajemos juntos!
                     </p>
 
-                    <Link className="text-sm bg-blue-700 border border-blue-600 text-white py-3 px-6 rounded-full inline-block"
+                    <Link className="text-sm bg-blue-700 border border-blue-500 text-white py-3 px-6 rounded-full inline-block "
                         href={'https://calendly.com/promediamx/30min'}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title="Agendar reunión virtual"
                     >
-                        Contactar ahora
+                        Agendar reunión virtual
                     </Link>
                 </div>
             </div>

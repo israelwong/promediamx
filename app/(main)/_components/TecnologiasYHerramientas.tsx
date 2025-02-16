@@ -25,56 +25,56 @@ export default function TecnologiasYHerramientas() {
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> Frontend</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             NextJS, Typescript, ReactJS, Tailwind
                         </p>
                     </article>
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> Backend</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             NodeJS, Supabase, Postgrestql, Prisma
                         </p>
                     </article>
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> DevOps</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             Vercel, GitHub
                         </p>
                     </article>
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> Automatización conversacional</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             Manychat, Message Bird, Mailchimp
                         </p>
                     </article>
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> Marketing digital</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             Google Analytics, Facebook Pixel, Google Tag Manager
                         </p>
                     </article>
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> SEO</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             Google Search Console, Google My Business
                         </p>
                     </article>
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> Ads</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             Google Ads, Facebook Ads, Instagram Ads, Tiktok Ads, Spotify Ads
                         </p>
                     </article>
 
                     <article className='md:p-5 md:px-5 pd:py-3 ml-2 md:ml-0'>
                         <h2 className='font-FunnelSans-Regular md:text-xl text-blue-400'><i className="fas fa-caret-right"></i> Marketplaces</h2>
-                        <p className='text-zinc-600 font-FunnelSans-Light'>
+                        <p className='text-zinc-200 font-FunnelSans-Light'>
                             Amazon, Mercado libre
                         </p>
                     </article>

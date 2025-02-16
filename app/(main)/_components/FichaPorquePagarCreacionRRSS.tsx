@@ -8,7 +8,7 @@ export default function FichaPorquePagarCreacionRRSS() {
                     ¿Crees que pagar por creación de contenido es tirar el dinero?
                 </h3>
 
-                <ol className='list-decimal list-inside mb-5 text-zinc-400 space-y-3'>
+                <ol className='list-decimal list-inside mb-5 text-zinc-200 space-y-3'>
                     <li className='flex items-start'>
                         <span>👉</span>
                         <span className='ml-2'>Las personas validan y comparan antes de comprar,</span>

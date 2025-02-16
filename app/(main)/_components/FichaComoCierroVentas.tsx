@@ -8,7 +8,7 @@ export default function FichaComoCierroVentas() {
                 <h2 className='font-FunnelSans-Bold text-2xl mb-3 text-blue-600'>
                     Ya tengo contenido en redes, ¿cómo cierro ventas?
                 </h2>
-                <p className='font-FunnelSans-Light text-zinc-400 mb-5'>
+                <p className='font-FunnelSans-Light text-zinc-200 mb-5'>
                     Nosotros podemos ayudarte a diseñar tu embudo de ventas digitales e integrar herramientas para agilizar las conversiones:
                 </p>
 
@@ -40,6 +40,7 @@ export default function FichaComoCierroVentas() {
                         href={'https://calendly.com/promediamx/30min'}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title="Agenda una reunión virtual"
                     >
                         Agenda una reunión virtual
                     </Link>

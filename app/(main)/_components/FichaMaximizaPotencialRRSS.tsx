@@ -8,7 +8,7 @@ export default function FichaMaximizaPotencialRRSS() {
                 Maximiza el potencial de tus redes sociales
             </p>
 
-            <p className='text-zinc-300 text-lg font-FunnelSans-Light mb-5'>
+            <p className='text-zinc-200 text-lg font-FunnelSans-Light mb-5'>
                 Ya sea que quieras ganerar más seguidores, fortalecer tu presencia o aumentar ventas.
             </p>
             <p className='text-zinc-300 text-2xl font-FunnelSans-Light mb-2'>

@@ -47,6 +47,7 @@ export default function Hero() {
                 href={'https://calendly.com/promediamx/30min'}
                 target="_blank"
                 rel="noopener noreferrer"
+                title="Agenda una reunión virtual"
               >
                 <span className="relative z-50 rounded-md py-2 text-center shadow-2xl text-sm">
                   Agendar una reunión virtual

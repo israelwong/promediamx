@@ -39,10 +39,10 @@ export default function SolucionesPopulares() {
     return (
         <section className='container mx-auto px-5 py-10 border border-dotted border-zinc-800 rounded-md bg-zinc-900/50'>
             <header className='mb-5 text-left'>
-                <h1 className='text-2xl text-zinc-200 font-FunnelSans-Light'>
+                <h1 className='text-2xl text-zinc-200 font-FunnelSans-Medium mb-3'>
                     Soluciones puntuales, flexibles y escalables
                 </h1>
-                <p className='text-zinc-500 font-FunnelSans-Light mx-auto mb-3'>
+                <p className='text-zinc-200 font-FunnelSans-Light mx-auto mb-3'>
                     Ofrecemos soluciones que puedes usar de forma independiente o integrar a medida que tu negocio crece.
                 </p>
             </header>
@@ -52,15 +52,15 @@ export default function SolucionesPopulares() {
 
                     <article key={index} className="px-5 py-3 border-l border-pink-950 bg-zinc-900/50">
                         <header className="flex items-center justify-between">
-                            <h2 className="bg-gradient-to-r from-pink-500 to-red-500 text-transparent bg-clip-text">
+                            <h2 className="bg-gradient-to-r from-pink-500 to-red-500 text-transparent bg-clip-text text-lg">
                                 {solucion.titulo}
                             </h2>
                         </header>
-                        <p className="text-sm text-zinc-500 pt-2 pb-3">
+                        <p className="text-sm text-zinc-300 pt-2 pb-3">
                             {solucion.descripcion}
                         </p>
 
-                        <div className='font-FunnelSans-SemiBold text-sm mb-3'>
+                        <div className='font-FunnelSans-SemiBold mb-2 text-lg'>
                             {solucion.recurrente ? (
                                 <p>
                                     <span className="font-bold">Plan desde </span> {solucion.precio.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
@@ -78,6 +78,7 @@ export default function SolucionesPopulares() {
                             href={'https://calendly.com/promediamx/30min'}
                             target="_blank"
                             rel="noopener noreferrer"
+                            title="Agenda una reunión virtual"
                         >
                             Más información
                         </Link>

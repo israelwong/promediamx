@@ -12,7 +12,7 @@ export default function BuscasOtraSolucion() {
                 </h3>
             </header>
 
-            <p className="text-zinc-300 font-FunnelSans-Light text-lg max-w-screen-sm mx-auto mb-5">
+            <p className="text-zinc-200 font-FunnelSans-Light text-lg max-w-screen-sm mx-auto mb-5">
                 Contáctanos hoy mismo para platicar sobre tus necesidades y encontrar la mejor solución para tu negocio.
             </p>
 
@@ -25,6 +25,7 @@ export default function BuscasOtraSolucion() {
                                 href={'https://calendly.com/promediamx/30min'}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                title="Agenda una reunión virtual"
                             >
                                 <span className="relative z-50 rounded-md py-2 text-center shadow-2xl text-sm">
                                     Agendar una reunión virtual
