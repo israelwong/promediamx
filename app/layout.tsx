@@ -1,11 +1,17 @@
+import { GoogleTagManager } from '@next/third-parties/google';
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ProMedia",
-  description: "Conectamos marcas con audiencias a través de la producción de contenido audiovisual y la comercialización digital.",
+  title: {
+    template: '%s | ProMedia',
+    default: 'Bienvenido | ProMedia',
+  },
+  description: 'Marketing Digital y Producción de Medios Audiovisuales.',
+  metadataBase: new URL('https://promedia.mx'),
 };
+
 
 export default function RootLayout({
   children,
@@ -28,6 +34,7 @@ export default function RootLayout({
 
       <body className={'antialiased'}>
         {children}
+        <GoogleTagManager gtmId="GTM-M9ZT7HQ9" />
       </body>
     </html>
   );

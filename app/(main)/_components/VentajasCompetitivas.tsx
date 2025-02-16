@@ -45,7 +45,6 @@ export default function VentajasCompetitivas() {
                                 <span className="text-xl text-yellow-500 mr-2">{index + 1}.</span>
                                 <div>
                                     <h3 className="text-xl text-yellow-500 mb-0">
-                                        {/* <span className="animate-pulse mr-1">•</span> */}
                                         {ventaja.titulo}
                                     </h3>
                                     <p className="text-zinc-300">{ventaja.descripcion}</p>

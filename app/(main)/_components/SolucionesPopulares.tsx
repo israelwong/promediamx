@@ -5,35 +5,28 @@ import Link from 'next/link';
 const soluciones = [
     {
         titulo: 'Automatización de mensajes en tus redes',
-        descripcion: 'Automatización 24/7 de conversaciones en WhatsApp, Instagram, Facebook y TikTok.',
+        descripcion: 'Automatización 24/7 de conversaciones en WhatsApp, Instagram, Facebook y TikTok. Responde preguntas frecuentes y envía enlaces de compra a Mercado Libre, Amazon, landing pages o pasarelas de pago.',
         recurrente: true,
         precio: 2000,
         link: '/servicios/respuestas-automatizadas-redes-sociales'
     },
     {
-        titulo: 'Cobro a través de links de pago con Stripe',
-        descripcion: 'Pagos seguros en línea con Stripe, sin costos de implementación.',
-        precio: 500,
-        recurrente: true,
-        link: '/servicios/links-pago-stripe-online'
-    },
-    {
         titulo: 'Diseño de landing page para captar clientes',
-        descripcion: 'Página omnicanal con lead form para captar y mejorar la calidad de tus prospectos.',
+        descripcion: 'Diseñamos una página omnicanal con formulario de contacto para captar prospectos de mayor calidad. Integramos links de tus redes sociales, WhatsApp y otros canales para mejorar la conversión y el seguimiento.',
         precio: 1500,
         recurrente: true,
         link: '/servicios/diseno-landing-page'
     },
     {
         titulo: 'Producción de imagen para redes sociales',
-        descripcion: "Capturamos y entregamos contenido visual listo para que lo gestiones a tu manera.",
+        descripcion: 'Capturamos contenido visual en fotografía y video y te lo entregamos para que lo edites y gestiones a tu manera. En este servicio solo realizamos la toma de imágenes, sin edición.',
         precio: 2500,
         recurrente: false,
         link: '/servicios/produccion-fotos-videos-redes-sociales'
     },
     {
-        titulo: "Optimización de contenido para redes sociales",
-        descripcion: "Tú generas el contenido, nosotros lo optimizamos en varios formatos para tus redes.",
+        titulo: 'Optimización de contenido para redes sociales',
+        descripcion: 'Tú generas el contenido, nosotros lo optimizamos en varios formatos para tus redes. En este servicio solo recibimos y editamos el material para adaptarlo a reels, historias, carruseles, etc.',
         precio: 2000,
         recurrente: true,
         link: '/servicios/edicion-contenido-redes-sociales'
@@ -54,7 +47,7 @@ export default function SolucionesPopulares() {
                 </p>
             </header>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-2 gap-4">
                 {soluciones.map((solucion, index) => (
 
                     <article key={index} className="px-5 py-3 border-l border-pink-950 bg-zinc-900/50">
@@ -81,8 +74,10 @@ export default function SolucionesPopulares() {
                         </div>
 
                         <Link
-                            href={solucion.link}
                             className="py-2 px-3 bg-rose-900 border border-rose-600 text-rose-300  mt-3 rounded-full hover:bg-pink-950 transition-colors duration-300 text-xs mb-3 inline-block"
+                            href={'https://calendly.com/promediamx/30min'}
+                            target="_blank"
+                            rel="noopener noreferrer"
                         >
                             Más información
                         </Link>

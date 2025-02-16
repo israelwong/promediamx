@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import LeadFormLite from './LeadFormLite';
+import Link from "next/link";
 
 const modelos = [
     {
@@ -24,10 +24,6 @@ const modelos = [
 
 const Page = () => {
 
-    const [showModal, setShowModal] = useState(false);
-    function mostrarModalLeadForm() {
-        setShowModal(true);
-    }
 
     const [visibleIndex, setVisibleIndex] = useState<number | null>(null);
 
@@ -106,17 +102,17 @@ const Page = () => {
                         Encontremos la mejor solución para tu negocio. ¡Trabajemos juntos!
                     </p>
 
-                    <button className="text-sm bg-blue-700 border border-blue-600 text-white py-3 px-6 rounded-full"
-                        onClick={() => mostrarModalLeadForm()}>
+                    <Link className="text-sm bg-blue-700 border border-blue-600 text-white py-3 px-6 rounded-full inline-block"
+                        href={'https://calendly.com/promediamx/30min'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
                         Contactar ahora
-                    </button>
+                    </Link>
                 </div>
             </div>
 
-            {showModal && <LeadFormLite
-                asunto="Quiero platicar sobre los modelos de contratación"
-                onClose={() => setShowModal(false)}
-            />}
+
 
         </div>
     );

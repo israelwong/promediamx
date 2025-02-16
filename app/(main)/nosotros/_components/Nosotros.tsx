@@ -8,15 +8,15 @@ export default function Nosotros() {
             <header className='my-16 text-center md:p-5 rounded-md'>
                 <div className='md:max-w-screen-md mx-auto'>
                     <p className='md:font-FunnelSans-Regular md:text-3xl text-xl text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-blue-500 to-purple-600'>
-                        Nosotros somos una
+                        Somos agencia especializada
                     </p>
                     <p className='md:font-FunnelSans-Bold font-FunnelSans-Bold md:text-5xl text-3xl mb-2 text-zinc-300'>
-                        agencia especializada en <span className='underline decoration-yellow-400'>
-                            comercialización digital
+                        <span className='underline decoration-yellow-400'>
+                            en marketing digital
                         </span>
                     </p>
                     <p className='md:font-FunnelSans-Regular uppercase md:px-32 px-10 md:text-2xl text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 font-FunnelSans-Bold'>
-                        con experiencia en branding, marketing y social media
+                        con experiencia en comunicación visual y automatización de procesos.
                     </p>
                 </div>
             </header>

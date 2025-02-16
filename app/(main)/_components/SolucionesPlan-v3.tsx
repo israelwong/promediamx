@@ -1,3 +1,4 @@
+
 import React from 'react'
 import Link from 'next/link';
 
@@ -6,27 +7,27 @@ export default function Servicios() {
 
     const servicios = [
         {
-            nombre: 'Plan de creación de contenido profesional y orgánico para destacar en redes sociales',
+            nombre: 'Plan de creación de contenido todo incluido para destacar en redes sociales',
             descripcion: 'Comunicamos tu oferta de forma clara y atractiva, generando contenido que refuerce la confianza y facilite la decisión de compra.',
             precio: 5000,
             title_gradient: 'bg-gradient-to-r from-pink-500 to-yellow-500',
             background: 'bg-zinc-900',
-            link: '/servicios/plan-contenido-redes-sociales',
+            // link: '/servicios/plan-contenido-redes-sociales',
         },
         {
-            nombre: 'Kit de imagen profesional para posicionarte como líder en tu sector',
-            descripcion: 'Construimos una imagen sólida con diseño gráfico, web y producción audiovisual para destacar tu marca y posicionarte como líder en tu industria.',
+            nombre: 'Kit de imagen profesional digital para posicionarte como líder en tu sector',
+            descripcion: 'Construimos una imagen sólida con diseño gráfico, web y producción audiovisual para destacar tu marca y posicionarte como líder en tu sector.',
             title_gradient: 'bg-gradient-to-r from-blue-500 to-cyan-500',
             precio: 5000,
-            link: '/servicios/kit-imagen-marca-profesional',
+            // link: '/servicios/kit-imagen-marca-profesional',
         },
         {
             nombre: 'Diseño de embudo de ventas para obtener clientes potenciales usando redes sociales',
-            descripcion: 'Te ayudamos diseñar un embudo de ventas personalziado para a atraer más clientes potenciales de mejor calidad desde el diseo de la campaña hasta el cierre.',
+            descripcion: 'Diseñamos un embudo de ventas personalizado para atraer más clientes potenciales de mejor calidad, desde el diseño de la campaña hasta el cierre.',
             precio: 8000,
             title_gradient: 'bg-gradient-to-r from-pink-500 to-red-500',
             background: 'bg-zinc-900',
-            link: '/servicios/diseno-embudo-ventas-digital'
+            // link: '/servicios/diseno-embudo-ventas-digital'
         },
     ];
 
@@ -57,8 +58,11 @@ export default function Servicios() {
                                 Plan desde {servicio.precio.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}/mes
                             </p>
 
-                            <Link href={servicio.link}
+                            <Link
                                 className='border border-zinc-700 bg-zinc-900 text-zinc-400 px-4 py-2 rounded-full mt-2 text-sm'
+                                href={'https://calendly.com/promediamx/30min'}
+                                target="_blank"
+                                rel="noopener noreferrer"
                             >
                                 Más información
                             </Link>
