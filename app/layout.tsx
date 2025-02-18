@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: {
     template: '%s | ProMedia',
-    default: 'Bienvenido | ProMedia',
+    default: 'Bienvenido',
   },
   description: 'Marketing Digital y Producción de Medios Audiovisuales.',
   metadataBase: new URL('https://promedia.mx'),
@@ -20,7 +20,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-
       <head>
         <link
           rel="icon"
@@ -29,9 +28,7 @@ export default function RootLayout({
           sizes="<generated>"
         />
       </head>
-
       <Script src="https://kit.fontawesome.com/74d1405387.js"></Script>
-
       <body className={'antialiased'}>
         {children}
         <GoogleTagManager gtmId="GTM-M9ZT7HQ9" />

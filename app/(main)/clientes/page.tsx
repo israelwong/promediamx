@@ -3,12 +3,12 @@ import { Metadata } from 'next'
 import Clientes from './_components/Clientes'
 
 export const metadata: Metadata = {
-    title: 'Clientes - Promedia App',
+    title: 'Clientes',
     description: 'Conoce a nuestros clientes en Promedia App.',
     keywords: 'clientes, promedia, empresa, información',
     authors: [{ name: 'Promedia App' }],
     openGraph: {
-        title: 'Clientes - Promedia App',
+        title: 'Clientes',
         description: 'Conoce a nuestros clientes en Promedia App.',
         url: 'https://www.promedia-app.com/clientes',
         type: 'website',
