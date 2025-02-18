@@ -47,15 +47,15 @@ const proyectos = [
     {
         nombre: 'Jemiza',
         descripcion: 'Distribuidor SIEMENS',
-        // url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Grupo-Aselac.svg',
+        url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Jemiza.svg',
         etiquetas: ['Video institucional', 'Fotografía corporativa'],
     },
-    {
-        nombre: 'Vinte',
-        descripcion: 'Desarrolladora de vivienda',
-        url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Vinte.svg',
-        etiquetas: ['Video'],
-    },
+    // {
+    //     nombre: 'Vinte',
+    //     descripcion: 'Desarrolladora de vivienda',
+    //     url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Vinte.svg',
+    //     etiquetas: ['Video '],
+    // },
     {
         nombre: 'Universidad Insurgentes',
         descripcion: 'Universidad privada',

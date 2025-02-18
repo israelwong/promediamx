@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 grant_type: "authorization_code",
                 client_id: process.env.HUBSPOT_CLIENT_ID!,
                 client_secret: process.env.HUBSPOT_CLIENT_SECRET!,
-                redirect_uri: "https://promedia.mx/api/hubspot/oauth",
+                redirect_uri: "https://www.promedia.mx/api/hubspot/oauth",
                 code: code as string,
             }),
         });
