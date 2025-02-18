@@ -50,12 +50,12 @@ const proyectos = [
         url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Jemiza.svg',
         etiquetas: ['Video institucional', 'Fotografía corporativa'],
     },
-    // {
-    //     nombre: 'Vinte',
-    //     descripcion: 'Desarrolladora de vivienda',
-    //     url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/Vinte.svg',
-    //     etiquetas: ['Video '],
-    // },
+    {
+        nombre: 'Bricks N Fire',
+        descripcion: 'Distribuidor de tenis',
+        url_logo: 'https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_clientes/B&F.svg',
+        etiquetas: ['Diseño gráfico', 'Fotografía', 'Motion graphics', 'Video'],
+    },
     {
         nombre: 'Universidad Insurgentes',
         descripcion: 'Universidad privada',
