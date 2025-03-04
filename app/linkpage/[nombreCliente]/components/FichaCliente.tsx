@@ -3,20 +3,16 @@ import Header from "./Header";
 import Descripcion from './Descripcion';
 
 import SocialLinks from "./SocialLinks";
+import Slider from "./Slider";
 import MapaGoogle from "./MapaGoogle";
 import FAQ from "./FAQ";
 import Footer from "./Footer";
-
 
 
 interface Props {
     nombreCliente: string;
 }
 
-interface Faq {
-    pregunta: string;
-    respuesta: string;
-}
 
 export default function FichaCliente({ nombreCliente }: Props) {
 
@@ -27,6 +23,27 @@ export default function FichaCliente({ nombreCliente }: Props) {
     Somos profesionales con experiencia, calidad garantizada y atención personalizada.
     Contáctanos y captura tus recuerdos!
   `;
+
+    const images = [
+        {
+            src: '/images/rrss-confianza.jpg',
+            alt: 'Image 1',
+            width: 800,
+            height: 400,
+        },
+        {
+            src: '/images/rrss-destaca.jpg',
+            alt: 'Image 2',
+            width: 800,
+            height: 400,
+        },
+        {
+            src: '/images/rrss-fideliza.jpg',
+            alt: 'Image 3',
+            width: 800,
+            height: 400,
+        },
+    ];
 
     const descripcion = 'Agencia de fotografía y video profesional para la cobertura de eventos sociales.';
 
@@ -50,12 +67,17 @@ export default function FichaCliente({ nombreCliente }: Props) {
             {/* //!DESCRIPCIÓN */}
             <div className="container mx-auto py-4">
 
-
-
                 <div className="p-5">
                     <Descripcion
                         nombreCliente={nombreCliente}
                         description={description} maxLines={3} />
+                </div>
+
+                <div className="p-4">
+                    <Slider
+                        titulo="Galería de imágenes"
+                        descripcion="Te compartumos algunoas muestras de nuestro trabajo para que nos conozcas mejor."
+                        images={images} />
                 </div>
 
 
