@@ -45,6 +45,7 @@ model Cliente {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   Negocio   Negocio[]
+  Lead      Lead[]
 }
 
 model Negocio {
@@ -76,7 +77,7 @@ model Negocio {
   NegocioItem        NegocioItem[]
   Transaccion        Transaccion[]
   Landing            Landing[]
-  Lead               Lead[]
+  // Lead               Lead[]
   Actividad          Actividad[]
 }
 
@@ -208,30 +209,29 @@ model ComponentConfig {
   updatedAt    DateTime  @updatedAt
 }
 
-//CRM
+//! Lead Promedia
 model Lead {
   id        String      @id @default(cuid())
-  nombre    String
-  negocioId String
-  negocio   Negocio  @relation(fields: [negocioId], references: [id])
-  telefono  String?
-  email     String?
-  asunto    String
-  empresa   String?
-  etapaId   String
-  etapa     LeadEtapa @relation(fields: [etapaId], references: [id])
-  canalId   String
-  canal     CanalAdquisicion @relation(fields: [canalId], references: [id])
+  nombre        String?
+  email             String?
+  telefono          String?
+  clienteId         String?
+  cliente           Cliente? @relation(fields: [clienteId], references: [id])
+  json Json?
+  canalAdquisicionId String //
+  etapaLeadId       String//
   createdAt DateTime @default(now())
+  canalAdquisicion  CanalAdquisicion @relation(fields: [canalAdquisicionId], references: [id])
+  etapaLead         LeadEtapa @relation(fields: [etapaLeadId], references: [id])
 }
 
 model LeadEtapa {
   id        String   @id @default(cuid())
   nombre    String
-  order     Int      @unique
-  Leads     Lead[]
+  order     Int     
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  Leads     Lead[]
 }
 
 model CanalAdquisicion {
