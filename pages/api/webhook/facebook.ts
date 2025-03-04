@@ -53,7 +53,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
                         const fullUrl = new URL(endpoint, `http://${req.headers.host}`).toString();
 
                         // console.log('Datos del lead:', endpoint, payload);
-
                         // return
 
                         fetch(fullUrl, {

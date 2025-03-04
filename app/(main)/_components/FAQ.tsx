@@ -59,7 +59,6 @@ const soluciones = [
 
 export default function SolucionesLista() {
     const [visibleIndex, setVisibleIndex] = useState<number | null>(null);
-
     const toggleDescripcion = (index: number) => {
         setVisibleIndex(visibleIndex === index ? null : index);
     };
@@ -89,9 +88,7 @@ export default function SolucionesLista() {
                         <p className="text-sm text-zinc-500 pt-2 pb-1">
                             {solucion.respuesta}
                         </p>
-
                     </div>
-
                 </article>
             ))}
         </section>
