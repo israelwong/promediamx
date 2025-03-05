@@ -62,7 +62,7 @@ const Description: React.FC<DescriptionProps> = ({ description, maxLines = 3, no
                 </button>
             </div>
             <div className="mt-1 text-zinc-400 font-FunnelSans-Light cursor-pointer" onClick={toggleExpanded}>
-                {expanded ? 'Ver menos' : 'Ver más ...'}
+                {expanded ? 'Ver menos' : 'Leer más ...'}
             </div>
         </div>
     );
