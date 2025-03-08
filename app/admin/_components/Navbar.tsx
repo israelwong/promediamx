@@ -17,6 +17,8 @@ function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
     const token = Cookies.get('token');
+
+
     // const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
 
     //! NOTIFICACIONES
@@ -54,9 +56,9 @@ function Navbar() {
                     const response = await verifyToken(token);
                     if (response.payload) {
                         const userData: Usuario = response.payload as unknown as Usuario;
-                        // console.log('userData:', userData);
                         userData.token = token;
                         setUser(userData);
+                        // console.log('Usuario:', userData);
                         Cookies.set('user', JSON.stringify(userData));
                     } else {
                         router.push('/admin');
@@ -88,10 +90,9 @@ function Navbar() {
 
     const links = [
         { href: '/admin/dashboard', label: 'Dashboard' },
-        // { href: '/admin/presentacion', label: 'Presentar' }
     ];
 
-    if (user && user.rol === 'admin') {
+    if (user && user.rol == 'cm7xmskcw0000gu1h6d6chh37') {
         links.push(
             // { href: '/admin/marketing', label: 'Marketing' },
             { href: '/admin/configurar', label: 'Configurar' },
@@ -117,7 +118,7 @@ function Navbar() {
                     <Bell size={16} />
                 </div>
 
-                {user && user.rol === 'admin' ? (
+                {user && (
                     links.map((link) => (
                         <Link key={link.href} href={link.href}>
                             <span className={`text-gray-500 ${pathname && pathname.includes(link.href) ? 'font-bold text-white' : ''}`}>
@@ -125,7 +126,7 @@ function Navbar() {
                             </span>
                         </Link>
                     ))
-                ) : null}
+                )}
                 <button
                     className='border border-zinc-600 rounded-md text-sm leading-3 px-3 py-2'
                     onClick={handleCerrarSesion}

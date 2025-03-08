@@ -7,20 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Sistema base
+
+model Rol {
+  id        String    @id @default(cuid())
+  nombre    String?
+  descripcion String?
+  status    String    @default("activ")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Usuario   Usuario[]
+}
+
 model Usuario {
   id        String    @id @default(cuid())
   username  String    @unique
   email     String    @unique
   telefono  String    @unique @default("")
-  direccion String    @default("")
-  clabe     String    @default("")
   password  String
-  rol       String 
-  status    String   @default("active")
+  rol       String? 
+  Rol      Rol?     @relation(fields: [rol], references: [id])//added
+  status    String   @default("activo")
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  updatedAt DateTime @updatedAt
   sesiones  Sesion[]
-  Cliente   Cliente[]
 }
 
 model Sesion {
@@ -33,253 +43,352 @@ model Sesion {
   updatedAt DateTime @updatedAt
 }
 
-model Cliente {
-  id        String    @id @default(cuid())
-  usuarioId String
-  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
-  nombre    String    @unique
-  email     String    @unique
-  telefono  String    @unique
-  direccion String    @default("")
-  status    String    @default("active")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  Negocio   Negocio[]
+model Cliente{
+  id        String   @id @default(cuid())
+  nombre    String
+  email     String
+  telefono  String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Perfil    Perfil[]
+  contrato  Contrato[]
+}
+
+model Perfil{
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  nombre    String
+  slogan    String
+  descripcion String
+  direccion String
+  horarios Json
+  email     String
+  telefono  String
+  whatsapp  String
+  google_maps_iframe String
+  google_maps   String
+  web        String
+  faq        Json
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  perfilRRSS RRSS[]
+}
+
+model RRSS{
+  id        String   @id @default(cuid())
+  orden     Int
+  perfilId  String
+  perfil    Perfil @relation(fields: [perfilId], references: [id])
+  nombre    String
+  url       String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Contrato{
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  servicioId String
+  servicio   Servicio @relation(fields: [servicioId], references: [id])
+  precio    Float
+  demo      Boolean
+  vigencia  DateTime
+  suscripcion Boolean
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Pago      Pago[]
+  Landingpage  Landingpage[]
+  CRM      CRM[]
+  Pasarela Pasarela[]
+}
+
+model Servicio{
+  id        String   @id @default(cuid())
+  tipo      String
+  TipoServicio TipoServicio @relation(fields: [tipo], references: [id])
+  nombre    String
+  descripcion String
+  precio    Float
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  contrato  Contrato[]
+  ConceptosServicio ConceptosServicio[]
+}
+
+model TipoServicio{
+  id        String   @id @default(cuid())
+  nombre    String
+  descripcion String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Servicio  Servicio[]
+}
+
+model ConceptosServicio{
+  id        String   @id @default(cuid())
+  servicioId String
+  servicio   Servicio @relation(fields: [servicioId], references: [id])
+  nombre    String
+  descripcion String
+  costo     Float
+  precio    Float
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Pago{
+  id        String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
+  metodoPago String
+  monto     Float
+  fecha     DateTime
+  linkPagoId String?
+  linkPago  LinkPago? @relation(fields: [linkPagoId], references: [id])
+  stripe_session_id                  String?                           @unique
+  stripe_payment_id                  String?                           @unique
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Pasarela  Pasarela[]
+}
+
+//! Landingpage
+model Landingpage{
+  id        String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
+  nombre    String
+  url       String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Modulo Modulo[]
+  Estadistica Estadistica[]
+  Leadform Leadform[]
+  Agente    Agente[]
+}
+
+model Modulo{
+  id        String   @id @default(cuid())
+  landingpageId String
+  landingpage   Landingpage @relation(fields: [landingpageId], references: [id])
+  orden     Int
+  nombre    String
+  jsonStyle Json
+  jsonParams Json
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  componenteId String
+  componente   Componente @relation(fields: [componenteId], references: [id])  
+  Estadistica Estadistica[]
+}
+
+model Componente{
+  id        String   @id @default(cuid())
+  nombre    String
+  descripcion String
+  jsonStyle Json // estilo por defecto
+  jsonParams Json // parametros por defecto //si es botón target:_blank/self url link pago, leadform, 
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Modulo Modulo[]
+}
+
+model Estadistica{
+  id        String   @id @default(cuid())
+  landingpageId String
+  landingpage   Landingpage @relation(fields: [landingpageId], references: [id])
+  moduloId String
+  modulo    Modulo @relation(fields: [moduloId], references: [id])
+  tipoEvento String //click, view, lead
+  origen    String //facebook, google, instagram, email, whatsapp
+  fecha     DateTime
+  visitas   Int
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//! Leadform
+model Leadform{
+  id        String   @id @default(cuid())
+  nombre    String
+  descripcion String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  landingpageId String
+  landingpage   Landingpage @relation(fields: [landingpageId], references: [id])
   Lead      Lead[]
 }
 
-model Negocio {
-  id                 String        @id @default(cuid())
-  clienteId          String
-  cliente            Cliente       @relation(fields: [clienteId], references: [id])
-  nombre             String
-  slogan             String?
-  descripcion        String?
-  telefono           String
-  email              String
-  rfc                String?
-  razon              String?
-  direccion          String?
-  url_web            String?
-  url_google_maps    String?
-  iframe_google_maps String?
-  url_logo           String?
-  url_facebook       String?
-  url_instagram      String?
-  url_x              String?
-  url_linkedin       String?
-  url_tiktok         String?
-  status             String
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  stripeCustomerId   String?
-  Contrato           Contrato[]
-  NegocioItem        NegocioItem[]
-  Transaccion        Transaccion[]
-  Landing            Landing[]
-  // Lead               Lead[]
-  Actividad          Actividad[]
-}
+//!CRM
 
-model Transaccion {
-  id              Int      @id @default(autoincrement())
-  negocioId       String
-  negocio         Negocio  @relation(fields: [negocioId], references: [id])
-  stripePaymentId String? // ID del pago en Stripe
-  tipoTransaccion String // Ejemplo: "INGRESO" o "EGRESO"
-  cantidad        Float // Monto de la transacción
-  status          String // Estado de la transacción (Ejemplo: "completado", "pendiente")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
-model Contrato {
-  id          String   @id @default(cuid())
-  negocioId   String
-  negocio     Negocio  @relation(fields: [negocioId], references: [id])
-  fechaInicio DateTime
-  fechaFin    DateTime
-  status      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model ServicioCategoria {
-  id        String     @id @default(cuid())
-  nombre    String
-  servicios Servicio[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-}
-
-model Servicio {
-  id                      String                    @id @default(cuid())
-  categoriaId             String
-  categoria               ServicioCategoria         @relation(fields: [categoriaId], references: [id])
-  nombre                  String
-  descripcion             String?
-  precio                  Float?
-  cuota_mensual           Float?
-  cuota_anual             Float?
-  status                  String
-  order                   Int?                      @unique
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
-  ServicioPaqueteServicio ServicioPaqueteServicio[]
-}
-
-model ServicioPaquete {
-  id            String                    @id @default(cuid())
-  nombre        String
-  descripcion   String?
-  precio        Float?
-  cuota_mensual Float?
-  cuota_anual   Float?
-  status        String
-  order         Int?                      @unique
-  createdAt     DateTime                  @default(now())
-  updatedAt     DateTime                  @updatedAt
-  servicios     ServicioPaqueteServicio[]
-}
-
-model ServicioPaqueteServicio {
-  id                String          @id @default(cuid())
-  servicioPaqueteId String
-  servicioPaquete   ServicioPaquete @relation(fields: [servicioPaqueteId], references: [id])
-  servicioId        String
-  servicio          Servicio        @relation(fields: [servicioId], references: [id])
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-}
-
-//LANDING PAGE
-model Landing {
-  id        String      @id @default(cuid())
-  negocioId String
-  nombre    String      @unique
-  url       String      @unique
-  status    String      @default("inactive")
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  Analitica Analitica[]
-  Seccion   Seccion[]
-  Negocio   Negocio     @relation(fields: [negocioId], references: [id])
-}
-
-model Analitica {
+model Canal{
   id        String   @id @default(cuid())
-  landingId String
-  landing   Landing  @relation(fields: [landingId], references: [id])
-  accion    String
+  orden     Int
+  nombre    String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+  Agente    Agente[]
+}
+
+model CRM{
+  id        String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+  Agente    Agente[]
+}
+
+model Pipeline{
+  id        String   @id @default(cuid())
+  orden     Int
+  nombre    String //nuevo, seguimiento, promesa, ganado, perdido
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+}
+
+
+model Lead{
+  id        String   @id @default(cuid())
+  crmId     String
+  crm       CRM @relation(fields: [crmId], references: [id])
+  agenteId  String?
+  agente    Agente? @relation(fields: [agenteId], references: [id])
+  canalId   String?
+  Canal     Canal? @relation(fields: [canalId], references: [id])
+  nombre    String
+  email     String
+  telefono  String
+  jsonParams Json
+  pilelineId String
+  Pipeline  Pipeline @relation(fields: [pilelineId], references: [id])
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  LeadformId String
+  Leadform   Leadform @relation(fields: [LeadformId], references: [id])
+  Bitacora  Bitacora[]
+  Agenda    Agenda[]
+}
+
+model Agente{
+  id        String   @id @default(cuid())
+  crmId     String
+  crm       CRM @relation(fields: [crmId], references: [id])
+  landingpageId String
+  landingpage   Landingpage @relation(fields: [landingpageId], references: [id])
+  canalId   String
+  Canal     Canal @relation(fields: [canalId], references: [id])
+  username    String
+  email     String
+  telefono  String
+  password  String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+  Bitacora  Bitacora[]
+  Agenda    Agenda[]
+}
+
+model Bitacora{
+  id        String   @id @default(cuid())
+  agenteId  String
+  agente    Agente @relation(fields: [agenteId], references: [id])
+  leadId    String
+  lead      Lead @relation(fields: [leadId], references: [id])
+  descripcion String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Agenda{
+  id        String   @id @default(cuid())
+  agenteId  String
+  leadId    String
+  lead      Lead @relation(fields: [leadId], references: [id])
+  agente    Agente @relation(fields: [agenteId], references: [id])
   fecha     DateTime
+  hora      DateTime
+  descripcion String
+  status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Seccion {
-  id        String      @id @default(cuid())
-  landingId String
-  landing   Landing     @relation(fields: [landingId], references: [id])
-  nombre    String
-  status    String      @default("active")
-  position  Int         @unique @map("position")
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  Component Component[]
-}
+//! Passarela de pagos
 
-model Component {
-  id              String            @id @default(cuid())
-  seccionId       String
-  seccion         Seccion           @relation(fields: [seccionId], references: [id])
-  nombre          String
-  position        Int               @unique @map("position")
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  ComponentConfig ComponentConfig[]
-}
-
-model ComponentConfig {
-  id           String    @id @default(cuid())
-  componentId  String
-  component    Component @relation(fields: [componentId], references: [id])
-  config_key   String
-  config_value String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-}
-
-//! Lead Promedia
-model Lead {
-  id        String      @id @default(cuid())
-  nombre        String?
-  email             String?
-  telefono          String?
-  clienteId         String?
-  cliente           Cliente? @relation(fields: [clienteId], references: [id])
-  json Json?
-  canalAdquisicionId String //
-  etapaLeadId       String//
-  createdAt DateTime @default(now())
-  canalAdquisicion  CanalAdquisicion @relation(fields: [canalAdquisicionId], references: [id])
-  etapaLead         LeadEtapa @relation(fields: [etapaLeadId], references: [id])
-}
-
-model LeadEtapa {
+model Pasarela{
   id        String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
   nombre    String
-  order     Int     
+  descripcion String
+  status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  Leads     Lead[]
+  PasarelaMetodoPago PasarelaMetodoPago[]
+  LinkPago  LinkPago[]
+  Pago      Pago[]
 }
 
-model CanalAdquisicion {
+model metodoPago{
   id        String   @id @default(cuid())
+  orden     Int
   nombre    String
-  Leads     Lead[]
+  comiisionPorcentajeFintech Float
+  comisionFijaFintech Float
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  PasarelaMetodoPago PasarelaMetodoPago[]
+}
+
+model PasarelaMetodoPago{
+  id        String   @id @default(cuid())
+  pasarelaId String
+  pasarela   Pasarela @relation(fields: [pasarelaId], references: [id])
+  metodoPagoId String
+  metodoPago   metodoPago @relation(fields: [metodoPagoId], references: [id])
+  status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Actividad {
-  id            Int      @id @default(autoincrement())
-  opportunityId Int
-  type          String // Tipo de actividad, ej., llamada o reunión
-  description   String?
-  negocioId     String
-  negocio       Negocio  @relation(fields: [negocioId], references: [id])
-  date          DateTime @default(now())
-}
-
-//!catlaógo del cliente
-model Item {
-  id            String        @id @default(cuid())
-  nombre        String
-  descripcion   String?
-  precio        Float?
-  cuota_mensual Float?
-  cuota_anual   Float?
-  status        String
-  order         Int?          @unique
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  negocioItem   NegocioItem[]
-}
-
-model NegocioItem {
-  id              String    @id @default(cuid())
-  negocioId       String
-  negocio         Negocio   @relation(fields: [negocioId], references: [id])
-  itemId          String
-  item            Item      @relation(fields: [itemId], references: [id])
-  anexoContratoId String
-  fechaInicio     DateTime
-  fechaFin        DateTime?
-  cuota_mensual   Float?
-  cuota_anual     Float?
-  pago_unico      Float?
-  status          String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+model LinkPago{
+  id        String   @id @default(cuid())
+  pasarelaPagoId String
+  pasarela   Pasarela @relation(fields: [pasarelaPagoId], references: [id])
+  link      String
+  concepto  String
+  descripcion String
+  monto    Float
+  suscripcion Boolean
+  status    String   @default("pendiente")
+  vigenca  DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt  
+  Pago      Pago[]
 }

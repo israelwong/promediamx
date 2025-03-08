@@ -1,17 +1,24 @@
+export interface Rol { //ok
+    id?: string;
+    nombre?: string | null;
+    descripcion?: string | null;
+    status?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+}
 
 export interface Usuario {
+    rol: string | null;
     id: string;
-    username: string;
-    email: string;
-    telefono: string;
+    status: string | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+    username: string | null;
+    email: string | null;
+    telefono: string | null;
     direccion: string;
-    clabe: string;
+    clabe: string | null;
     password: string;
-    rol: string;
-    token?: string;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
 }
 
 export interface Evento {

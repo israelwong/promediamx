@@ -20,7 +20,7 @@ function NotFound() {
               <p>Página no encontrada</p>
             </div>
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.back()}
               className='px-4 py-3 bg-zinc-800 rounded-md'>
               Regresar
             </button>
