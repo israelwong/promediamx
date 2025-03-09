@@ -18,19 +18,6 @@ export default function Servicios() {
         });
     }, []);
 
-    const agruparServiciosPorTipo = (servicios: Servicio[]) => {
-        return servicios.reduce((grupos, servicio) => {
-            const tipo = servicio.tipo;
-            if (!grupos[tipo]) {
-                grupos[tipo] = [];
-            }
-            grupos[tipo].push(servicio);
-            return grupos;
-        }, {} as { [tipo: string]: Servicio[] });
-    };
-
-    const serviciosAgrupados = agruparServiciosPorTipo(servicios);
-
     return (
         <div>
             {/* encabezado */}
@@ -59,42 +46,48 @@ export default function Servicios() {
                 </div>
             </div>
 
-            {/* tablas */}
+            {/* fichas */}
             {loading ? (
                 <LoadingPage mensaje="Cargando servicios" />
             ) : (
-                Object.entries(serviciosAgrupados).map(([tipo, serviciosDelTipo]) => (
-                    <div
-                        key={tipo}
-                        className="overflow-x-auto border bg-zinc-900 border-zinc-800 rounded-lg p-5 text-zinc-200 mb-10"
-                    >
+                <div className="grid grid-cols-1 gap-4 max-w-screen-sm mx-auto">
+                    {servicios.map((servicio) => (
+                        <div
+                            key={servicio.id}
+                            className="border bg-zinc-900 border-zinc-800 rounded-lg p-5 cursor-pointer hover:bg-zinc-800"
+                            onClick={() => router.push(`/admin/configurar/servicios/${servicio.id}`)}
+                        >
+                            <div className="text-lg font-semibold mb-2 flex items-start space-x-2 justify-between ">
+                                <p className='pr-10'>
+                                    {servicio.nombre}
+                                </p>
+                                <span className={`mt-3 inline-block w-2 h-2 rounded-full ${servicio.status === 'activo' ? 'bg-green-500' : 'bg-amber-500'}`}></span>
+                            </div>
+                            <p className="text-zinc-400 mb-5">
+                                <strong>Descripción:</strong> {servicio.descripcion || 'Sin descripción'}
+                            </p>
+                            <div className='grid grid-cols-3 gap-2'>
 
-                        <table className="w-full">
-                            <thead>
-                                <tr>
-                                    <th className="text-left">{tipo}</th>
-                                    <th className="text-left">Descripción</th>
-                                    <th className="text-left">Precio</th>
-                                    <th className="text-left">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {serviciosDelTipo.map((servicio) => (
-                                    <tr
-                                        key={servicio.id}
-                                        className="border-b border-zinc-800 cursor-pointer hover:bg-zinc-800 py-5"
-                                        onClick={() => router.push(`/admin/configurar/servicios/detalle/${servicio.id}`)}
-                                    >
-                                        <td>{servicio.nombre}</td>
-                                        <td>{servicio.descripcion}</td>
-                                        <td>{servicio.precio}</td>
-                                        <td>{servicio.status}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ))
+                                <p className="text-sm mb-1">
+                                    <strong>Precio:</strong> {(servicio.precio ?? 0).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                                </p>
+                                <p className="text-sm mb-1">
+                                    <strong>Costo:</strong> {(servicio.costo ?? 0).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+                                </p>
+                                <p className="text-sm mb-1">
+                                    <strong>Utilidad:</strong> {servicio.precio - (servicio.costo ?? 0)}
+                                </p>
+
+                            </div>
+                            <p className="text-sm mb-1">
+
+                            </p>
+                            <p className="text-sm">
+                                <strong>Tipo:</strong> {servicio.tipo}
+                            </p>
+                        </div>
+                    ))}
+                </div>
             )}
         </div>
     );

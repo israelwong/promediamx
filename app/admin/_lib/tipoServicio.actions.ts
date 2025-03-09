@@ -3,7 +3,11 @@ import prisma from './prismaClient'
 import { TipoServicio } from './types'
 
 export async function obtenerTiposServicios() {
-    return await prisma.tipoServicio.findMany()
+    return await prisma.tipoServicio.findMany({
+        orderBy: {
+            createdAt: 'asc'
+        }
+    })
 }
 
 export async function obtenerTipoServicio(id: string) {
