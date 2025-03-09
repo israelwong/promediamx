@@ -4,7 +4,7 @@ import { Rol } from '@/app/admin/_lib/types'
 import { crearRol } from '@/app/admin/_lib/roles.actions'
 import { useRouter } from 'next/navigation'
 import RolFormNuevo from './RolFormNuevo'
-import HeaderEdith from '@/app/admin/configurar/components/HeaderEdith'
+import HeaderEdith from '@/app/admin/_components/HeaderPage'
 
 export default function Editar() {
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { obtenerRoles } from '@/app/admin/_lib/roles.actions'
 import { Rol } from '@/app/admin/_lib/types'
-import LoadingPage from '../../../components/LoadingPage'
+import LoadingPage from '../../../../_components/LoadingPage'
 
 export default function Roles() {
 

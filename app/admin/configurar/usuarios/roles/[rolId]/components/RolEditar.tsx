@@ -5,8 +5,8 @@ import { obtenerRol, actualizarRol, eliminarRol } from '@/app/admin/_lib/roles.a
 import { useRouter } from 'next/navigation'
 
 import RolFormEditar from './RolFormEditar'
-import HeaderEdith from '@/app/admin/configurar/components/HeaderEdith'
-import LoadingPage from '@/app/admin/configurar/components/LoadingPage'
+import HeaderEdith from '@/app/admin/_components/HeaderPage'
+import LoadingPage from '@/app/admin/_components/LoadingPage'
 
 interface Props {
     rolId: string;
@@ -27,8 +27,7 @@ export default function Editar({ rolId }: Props) {
             .catch((error) => {
                 console.error('Error fetching role:', error)
             })
-    }
-        , [rolId])
+    }, [rolId])
 
     function guardar(nombre: string, descripcion: string, status: string) {
         const rol: Rol = {

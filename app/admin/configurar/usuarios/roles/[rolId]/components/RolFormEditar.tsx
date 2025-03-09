@@ -43,6 +43,10 @@ export default function RolFormEditar({
     };
 
     const handleEliminar = () => {
+        if (nombre.toLowerCase() === 'admin') {
+            alert('No se puede eliminar el rol de administrador.');
+            return;
+        }
         const confirmar = confirm('¿Estás seguro de eliminar este rol?');
         if (!confirmar) return;
         setEliminando(true);

@@ -92,7 +92,7 @@ function Navbar() {
         { href: '/admin/dashboard', label: 'Dashboard' },
     ];
 
-    if (user && user.rol == 'cm7xmskcw0000gu1h6d6chh37') {
+    if (user && user.rol == 'admin') {
         links.push(
             // { href: '/admin/marketing', label: 'Marketing' },
             { href: '/admin/configurar', label: 'Configurar' },
