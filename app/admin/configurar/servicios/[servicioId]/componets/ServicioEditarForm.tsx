@@ -1,7 +1,10 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Servicio, TipoServicio } from '@/app/admin/_lib/types';
 import { useRouter } from 'next/navigation';
+
+import Quill from 'quill';
+import 'quill/dist/quill.bubble.css';
 
 interface Props {
     servicio: Servicio;
@@ -13,10 +16,9 @@ interface Props {
 export default function ServicioEditarForm({ servicio, tiposServicios, onGuardar, onEliminar }: Props) {
     const router = useRouter();
     const [nombre, setNombre] = useState(servicio.nombre);
-    const [descripcion, setDescripcion] = useState(servicio.descripcion);
     const [costo, setCosto] = useState(servicio.costo?.toString() || '');
     const [precio, setPrecio] = useState(servicio.precio);
-    const [tipo, setTipo] = useState(servicio.tipo);
+    // const [tipo, setTipo] = useState(servicio.tipo);
     const [status, setStatus] = useState(servicio.status);
     const [guardando, setGuardando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
@@ -28,13 +30,64 @@ export default function ServicioEditarForm({ servicio, tiposServicios, onGuardar
         setDescripcion(servicio.descripcion);
         setCosto(servicio.costo?.toString() || '');
         setPrecio(servicio.precio);
-        setTipo(servicio.tipo);
+        // setTipo(servicio.tipo);
         setStatus(servicio.status);
     }, [servicio]);
+
+    //! Descripción Quill Editor
+    const [descripcion, setDescripcion] = useState(servicio.descripcion);
+    const editorRef = useRef(null);
+    const quillInstance = useRef<Quill | null>(null);
+    useEffect(() => {
+        if (editorRef.current && !quillInstance.current) {
+            quillInstance.current = new Quill(editorRef.current, {
+                theme: 'bubble',
+                modules: {
+                    toolbar: [
+                        [{ header: [1, 2, false] }],
+                        ['bold', 'italic', 'underline'],
+                        ['link'],
+                        [{ list: 'bullet' }],
+                        [{ indent: '-1' }, { indent: '+1' }],
+                    ]
+                },
+            });
+
+            quillInstance.current.on('text-change', () => {
+                if (quillInstance.current) {
+                    setDescripcion(quillInstance.current.root.innerHTML);
+                }
+            });
+
+            quillInstance.current.root.innerHTML = descripcion;
+        }
+    }, [descripcion]);
+
+
+    //! Tipos de Servicios
+    const [tiposSeleccionados, setTiposSeleccionados] = useState<string[]>([]);
+    const handleCheckboxChange = (nombre: string) => {
+        setTiposSeleccionados((prevTipos) => {
+            if (prevTipos.includes(nombre)) {
+                return prevTipos.filter((tipo) => tipo !== nombre);
+            } else {
+                return [...prevTipos, nombre];
+            }
+        });
+    };
+
+    useEffect(() => {
+        if (servicio.tipo) {
+            setTiposSeleccionados(servicio.tipo.split(','));
+        }
+    }, [servicio.tipo]);
+
 
     const handleGuardar = async () => {
         setGuardando(true);
         setError(null);
+
+        const tiposString = tiposSeleccionados.join(',');
 
         const servicioActualizado: Servicio = {
             ...servicio,
@@ -42,7 +95,7 @@ export default function ServicioEditarForm({ servicio, tiposServicios, onGuardar
             descripcion,
             costo: costo !== '' ? parseFloat(costo) : null,
             precio,
-            tipo,
+            tipo: tiposString,
             status,
         };
 
@@ -81,6 +134,8 @@ export default function ServicioEditarForm({ servicio, tiposServicios, onGuardar
     return (
         <div className="max-w-screen-sm mx-auto">
             <div className="border bg-zinc-900 border-zinc-800 rounded-lg p-5 text-zinc-200">
+
+
                 <div className="mb-5 space-y-3">
                     <label htmlFor="nombre">Nombre*:</label>
                     <input
@@ -91,50 +146,64 @@ export default function ServicioEditarForm({ servicio, tiposServicios, onGuardar
                         className="bg-zinc-950/20 border border-zinc-700 rounded w-full p-2"
                     />
                 </div>
+
+                {/* //! DESCRIPCIÓN QUILL COMPONENT */}
                 <div className="mb-5 space-y-3">
                     <label htmlFor="descripcion">Descripción (opcional):</label>
-                    <textarea
-                        id="descripcion"
-                        value={descripcion}
-                        onChange={(e) => setDescripcion(e.target.value)}
-                        className="bg-zinc-950/20 border border-zinc-700 rounded w-full p-2"
-                    />
+                    <div className='bg-zinc-950 rounded-md' ref={editorRef}></div>
                 </div>
-                <div className="mb-5 space-y-3">
-                    <label htmlFor="costo">Costo (opcional):</label>
-                    <input
-                        type="number"
-                        id="costo"
-                        value={costo}
-                        onChange={(e) => setCosto(e.target.value)}
-                        className="bg-zinc-950/20 border border-zinc-700 rounded w-full p-2"
-                    />
+
+
+                <div className="mb-5  grid grid-cols-2 gap-4">
+                    <div>
+                        <label htmlFor="precio">Precio *:</label>
+                        <input
+                            type="number"
+                            id="precio"
+                            value={precio}
+                            onChange={(e) => setPrecio(parseFloat(e.target.value))}
+                            className="bg-zinc-950/20 border border-zinc-700 rounded w-full p-2"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="costo">Costo (opcional):</label>
+                        <input
+                            type="number"
+                            id="costo"
+                            value={costo}
+                            onChange={(e) => setCosto(e.target.value)}
+                            className="bg-zinc-950/20 border border-zinc-700 rounded w-full p-2"
+                        />
+                    </div>
                 </div>
-                <div className="mb-5 space-y-3">
-                    <label htmlFor="precio">Precio*:</label>
-                    <input
-                        type="number"
-                        id="precio"
-                        value={precio}
-                        onChange={(e) => setPrecio(parseFloat(e.target.value))}
-                        className="bg-zinc-950/20 border border-zinc-700 rounded w-full p-2"
-                    />
-                </div>
-                <div className="mb-5 space-y-3">
-                    <label htmlFor="tipo">Tipo de servicio:</label>
-                    <select
-                        id="tipo"
-                        value={tipo}
-                        onChange={(e) => setTipo(e.target.value)}
-                        className="bg-zinc-950/20 border border-zinc-700 rounded w-full p-2"
-                    >
+
+                <div className="mb-5 space-y-3 p-5 bg-zinc-900 border border-zinc-600 rounded-lg">
+
+                    <div className="flex items-center justify-between">
+                        <p>Selecionar 1 o más opciones de aplicación del servicio:</p>
+                        <button onClick={() => setTiposSeleccionados([])} className="bg-red-800 border-red-600 text-zinc-100 rounded p-1 text-sm">
+                            Limpiar
+                        </button>
+                    </div>
+                    <div className="space-y-2">
                         {tiposServicios.map((tipoServicio) => (
-                            <option key={tipoServicio.id} value={tipoServicio.nombre}>
-                                {tipoServicio.nombre}
-                            </option>
+                            <label key={tipoServicio.id} className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    value={tipoServicio.nombre}
+                                    checked={tiposSeleccionados.includes(tipoServicio.nombre)}
+                                    onChange={() => handleCheckboxChange(tipoServicio.nombre)}
+                                    className="form-checkbox h-4 w-4 text-indigo-600"
+                                />
+                                <span className='text-zinc-400'>{tipoServicio.nombre}</span>
+                            </label>
                         ))}
-                    </select>
+                    </div>
+                    <div>
+                        <p>Tipos seleccionados: {tiposSeleccionados.join(', ') || 'Ninguno'}</p>
+                    </div>
                 </div>
+
                 <div className="mb-5 space-y-3">
                     <label htmlFor="status">Estado:</label>
                     <select

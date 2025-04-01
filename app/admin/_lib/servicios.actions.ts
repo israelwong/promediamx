@@ -5,7 +5,7 @@ import { Servicio } from './types'
 export async function obtenerServicios() {
     return await prisma.servicio.findMany({
         orderBy: {
-            createdAt: 'asc'
+            orden: 'asc'
         }
     })
 }
@@ -68,4 +68,17 @@ export async function crearServicio(data: Servicio) {
     } catch (error) {
         return { success: false, error: (error as unknown as Error).message }
     }
+}
+
+export async function actualizarPosicionesSevicios(servicios: Servicio[]) {
+    // console.log('actualizarPosicionesSevicios', servicios);
+    servicios.forEach(async (servicio) => {
+        await prisma.servicio.update({
+            where: { id: servicio.id },
+            data: {
+                orden: servicio.orden
+            }
+        });
+    });
+
 }

@@ -22,7 +22,6 @@ export default function ServicioEditar({ servicioId }: Props) {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-
         obtenerServicio(servicioId)
             .then((res) => {
                 setServicio(res)

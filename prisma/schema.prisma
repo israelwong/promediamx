@@ -136,8 +136,10 @@ model TipoServicio{
 
 model Paquete{
   id        String   @id @default(cuid())
+  orden     Int?
   nombre    String
   descripcion String?
+  precio    Float
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -289,13 +291,13 @@ model Lead{
   email     String
   telefono  String
   jsonParams Json?
-  pilelineId String
-  Pipeline  Pipeline @relation(fields: [pilelineId], references: [id])
+  pilelineId String?
+  Pipeline  Pipeline? @relation(fields: [pilelineId], references: [id])
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  LeadformId String
-  Leadform   Leadform @relation(fields: [LeadformId], references: [id])
+  LeadformId String?
+  Leadform   Leadform? @relation(fields: [LeadformId], references: [id])
   Bitacora  Bitacora[]
   Agenda    Agenda[]
   Cotizacion Cotizacion[]

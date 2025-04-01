@@ -44,9 +44,12 @@ export interface Servicio {
     updatedAt?: Date | null;
 }
 
+
+//! PAQUETES
 export interface Paquete {
     id?: string;
     nombre: string;
+    precio: number;
     descripcion?: string;
     status?: string;
     createdAt?: Date;

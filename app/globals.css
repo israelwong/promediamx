@@ -103,3 +103,9 @@ body {
   font-weight: 600;
   font-style: italic;
 }
+
+#quill ul,
+#quill ol {
+  list-style-type: disc;
+  padding-left: 20px;
+}
