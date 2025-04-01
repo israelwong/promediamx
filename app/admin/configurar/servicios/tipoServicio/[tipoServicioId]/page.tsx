@@ -6,7 +6,8 @@ export const metadata: Metadata = {
     description: 'Configuración de la aplicación',
 }
 
-export default async function page({ params }: { params: { tipoServicioId: string } }) {
-    const { tipoServicioId } = params
+export default async function Page({ params }: { params: Promise<{ tipoServicioId: string }> }) {
+    const { tipoServicioId } = await params;
     return <TipoServicioEditar tipoServicioId={tipoServicioId} />
 }
+

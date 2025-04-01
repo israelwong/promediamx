@@ -31,13 +31,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
             await prisma.lead.create({
                 data: {
-                    nombre: leadData.nombre || null,
-                    email: leadData.email || null,
-                    telefono: leadData.telefono || null,
-                    clienteId: leadData.clienteId || null,
-                    json: JSON.stringify(customFields), // Convert customFields to JSON string
-                    canalAdquisicionId: leadData.canalAdquisicionId || '',
-                    etapaLeadId: 'cm7nx2rsi0001gubfxk4zatfa',
+                    nombre: leadData.nombre || '',
+                    email: leadData.email || '',
+                    telefono: leadData.telefono || '',
+                    // clienteId: leadData.clienteId || '',
+                    // json: JSON.stringify(customFields), // Convert customFields to JSON string
+                    // canalAdquisicionId: leadData.canalAdquisicionId || '',
+                    // etapaLeadId: 'cm7nx2rsi0001gubfxk4zatfa',
                 },
             });
             console.log('Datos guardados en la tabla lead promedia');

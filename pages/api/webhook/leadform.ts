@@ -8,18 +8,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { nombre, empresa, telefono, email, asunto, negocioId } = req.body;
+    // const { nombre, empresa, telefono, email, asunto, negocioId } = req.body;
+    const { nombre, telefono, email } = req.body;
 
     try {
         const newLead = await prisma.lead.create({
             data: {
                 nombre,
-                negocioId,
+                // negocioId,
                 telefono,
                 email,
-                asunto,
-                empresa,
-                etapaId: 'cm6zhg6cj0003gumu3mu5swc7',
+                // asunto,
+                // empresa,
+                // etapaId: 'cm6zhg6cj0003gumu3mu5swc7',
                 canalId: 'cm6zhgzow0004gumu32pz0q95'
             },
         });
