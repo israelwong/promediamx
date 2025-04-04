@@ -1,8 +1,6 @@
-import path from "path";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
-import { PythonShell } from "python-shell";
 
 dotenv.config();
 
@@ -31,41 +29,46 @@ const instrucciones = [
   Por favor, se breve y conciso en tus respuestas. No incluyas información innecesaria o redundante. Si la respuesta es muy larga, divídela en párrafos cortos y claros.
 
   Instrucciones de formato:
-  Formatea la respuesta en párrafos estructurados, siguiendo estas reglas:
-  * Cada párrafo debe tener un propósito claro y estar separado por dos saltos de línea (\\n\\n).
-  * Si un párrafo tiene dos puntos y seguido una lista debe mantnerse en el mismo parrafo todos con un salto de línea (\\n).
-  * Si un párrafo tiene un título, debe ir al inicio, seguido de un salto de línea (\\n) y luego la descripción.
-  * Si un párrafo contiene una lista, cada elemento de la lista debe estar en una línea separada, seguido de un salto de línea (\\n).
-  * Asegúrate de que no haya párrafos vacíos o innecesarios.
-  * Mantén la información concisa y clara, utilizando un lenguaje apropiado para la conversación."
-  * Utiliza títulos en **negrita** para cada sección principal.
-  * Utiliza bullets para las listas.
-  - Deja doble salto de línea entre párrafos para mayor claridad.
-  - Incluye emojis relevantes cuando sea apropiado para enfatizar o aclarar puntos.
+  "Formatea la respuesta en párrafos estructurados, siguiendo estas reglas:
 
-  Instrucciones para formatear mensajes de WhatsApp:
-  Negrita: Utiliza asteriscos (*) al inicio y al final del texto. Ejemplo: *Este texto estará en negrita*
-  Cursiva: Utiliza guiones bajos (_) al inicio y al final del texto. Ejemplo: _Este texto estará en cursiva_
-  Tachado: Utiliza virgulillas (~) al inicio y al final del texto. Ejemplo: ~Este texto estará tachado~
-  Monoespaciado: Utiliza tres comillas invertidas () al inicio y al final del texto. Ejemplo:Este texto estará en monoespaciado
-  Listas:
-  Para listas con viñetas, utiliza un asterisco o un guion seguido de un espacio antes de cada elemento. Ejemplo:
-  * Elemento 1
-  - Elemento 2
-  Para listas numeradas, utiliza un número, un punto y un espacio antes de cada elemento. Ejemplo:
-  1. Elemento 1
-  2. Elemento 2
-  Citas:
-  Para agregar citas, utiliza el simbolo (>), y un espacio antes del texto que deseas resaltar. Ejemplo:
-  > Este texto es una cita.
+* Cada párrafo debe tener un propósito claro y estar separado por dos saltos de línea (\\n\\n).
+* Si un párrafo tiene dos puntos y seguido una lista debe mantnerse en el mismo parrafo todos con un salto de línea (\\n).
+* Si un párrafo tiene un título, debe ir al inicio, seguido de un salto de línea (\\n) y luego la descripción.
+* Si un párrafo contiene una lista, cada elemento de la lista debe estar en una línea separada, seguido de un salto de línea (\\n).
+* Asegúrate de que no haya párrafos vacíos o innecesarios.
+* Mantén la información concisa y clara, utilizando un lenguaje apropiado para la conversación."
+* Utiliza títulos en **negrita** para cada sección principal.
+* Utiliza bullets para las listas.
+* Deja doble salto de línea entre párrafos para mayor claridad.
+* No agregues signos de puntuación al inicio de los párrafos.
+
+Instrucciones para formatear mensajes de WhatsApp:
+Negrita: Utiliza asteriscos (*) al inicio y al final del texto. Ejemplo: *Este texto estará en negrita*
+Cursiva: Utiliza guiones bajos (_) al inicio y al final del texto. Ejemplo: _Este texto estará en cursiva_
+Tachado: Utiliza virgulillas (~) al inicio y al final del texto. Ejemplo: ~Este texto estará tachado~
+Monoespaciado: Utiliza tres comillas invertidas () al inicio y al final del texto. Ejemplo:Este texto estará en monoespaciado
+Listas:
+Para listas con viñetas, utiliza un asterisco o un guion seguido de un espacio antes de cada elemento. Ejemplo:
+* Elemento 1
+- Elemento 2
+Para listas numeradas, utiliza un número, un punto y un espacio antes de cada elemento. Ejemplo:
+1. Elemento 1
+2. Elemento 2
+Citas:
+Para agregar citas, utiliza el simbolo (>), y un espacio antes del texto que deseas resaltar. Ejemplo:
+> Este texto es una cita.
 
 
-  ***************
-  **Resumen Ejecutivo: ProMedia - Conectando con tu Audiencia**  
-  ProMedia es una agencia B2B que impulsa el crecimiento de PyMEs y profesionistas en México a través de la automatización inteligente. Nos especializamos en la creación e implementación de asistentes virtuales avanzados, potenciados por IA y LLM, para optimizar la comunicación y las ventas. Nuestra propuesta de valor se centra en ofrecer soluciones integrales que integran CRM, plataformas de pago y sistemas de agendamiento, creando un ecosistema digital completo y personalizado. Con ProMedia, transforma la interacción con tus clientes, genera leads calificados y aumenta tus ventas, liberando tu tiempo para enfocarte en lo que mejor sabes hacer: hacer crecer tu negocio
-  
-  ***************
-  **Lista de Servicios y Precios (Versión 1.0 - con notas):**
+  **Resumen Ejecutivo: ProMedia - Conectando con tu Audiencia**
+  ProMedia es una agencia B2B especializada en crear y automatizar embudos de venta digitales para emprendedores, negocios y pymes en México (inicialmente Ciudad de México, Estado de México, Querétaro, Puebla, Guadalajara). Nuestra preferencia de trabajo está orientada a servicios y productos digitales como coaching, consultorías, educación en línea, cursos y talleres virtuales, con la visión de desarrollar soluciones específicas por nicho y sub-nicho. Sin embargo, es importante destacar que estamos abiertos a considerar otras soluciones y nichos de mercado en caso de que un proyecto presente requerimientos diferentes a los mencionados. Un aspecto fundamental de nuestra oferta es la flexibilidad para crear soluciones personalizadas que se adapten a las necesidades y objetivos únicos de cada cliente.
+  Nuestra propuesta de valor radica en entregar clientes potenciales calificados con alta intención de compra, automatizando el flujo completo de marketing y ventas de principio a fin. Nos encargamos de la generación de leads a través de campañas multicanal (principalmente Meta Ads), la automatización de la comunicación (WhatsApp, redes sociales), el perfilamiento y seguimiento de prospectos, la implementación de herramientas para agendamiento y pagos (Manychat, Calendly, Stripe), y el diseño de páginas promocionales de alta conversión.
+  Abordamos problemáticas comunes en la comercialización digital como la baja calidad de leads, gestión ineficiente de redes sociales, falta de medición del ROI y contenido no optimizado. Nuestra metodología es orientada a resultados, eficaz y eficiente, basada en procesos claros y una mejora continua, con una fase inicial de configuración de 15 días.
+  Ofrecemos modelos de servicio flexibles que se adaptan a las necesidades de cada cliente:
+  Servicios por Proyecto: Con la opción de contratar servicios de mantenimiento posteriores para asegurar la continuidad y optimización de las soluciones implementadas.
+  Plan Mensual: Incluye un setup inicial para la configuración e implementación de la estrategia digital, seguido de un plan de mantenimiento mensual para la gestión, monitoreo y optimización continua.
+  Nuestra estructura de costos considera tanto un pago inicial único (Setup) como una membresía mensual recurrente, con la posibilidad de presupuestos por proyecto. Garantizamos seguridad, disponibilidad, calidad y control en nuestros servicios, con cuentas creadas a nombre del cliente y soporte técnico continuo.
+  En resumen, ProMedia busca ser el socio estratégico de negocios que desean optimizar su proceso de ventas digital, atraer clientes de calidad y escalar su crecimiento a través de soluciones automatizadas y personalizadas, ofreciendo la flexibilidad de elegir entre servicios por proyecto con mantenimiento opcional o un plan mensual integral, y manteniendo una mentalidad abierta a explorar nuevas oportunidades y nichos que puedan surgir.`,
+  `**Lista de Servicios y Precios (Versión 1.0 - con notas):**
 
   **Servicios de Configuración (Setup):**
   * **Configuración Manychat (No incluye licencia):** $0
@@ -227,78 +230,25 @@ const model = genAI.getGenerativeModel({
   systemInstruction: instrucciones.join("\n"),
 });
 
-//! Función para analizar la intención del texto
-async function analizarIntencion(texto) {
-  let options = {
-    mode: "text",
-    pythonOptions: ["-u"],
-    scriptPath: path.resolve(process.cwd(), "scripts_python"), // Construir la ruta absoluta
-    args: [texto],
-  };
-
-  // const scriptPath = path.resolve(
-  //   process.cwd(),
-  //   "scripts_python",
-  //   "analizar_intencion.py"
-  // );
-  // console.log("Intentando ejecutar script de Python en:", scriptPath);
-
-  return new Promise((resolve, reject) => {
-    PythonShell.run("analizar_intencion.py", options, function (err, results) {
-      if (err) reject(reject(err));
-      try {
-        resolve(JSON.parse(results[results.length - 1]));
-      } catch (e) {
-        reject(e);
-      }
-    });
-  });
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
+  // console.log("Request body:", req.body);
   const { prompt } = req.body;
-
-  const pythonScriptPath = path.resolve(
-    process.cwd(),
-    "scripts_python",
-    "analizar_intencion.py"
-  );
-
-  try {
-    const results = await PythonShell.run(pythonScriptPath, {
-      mode: "text",
-      pythonOptions: ["-u"],
-      args: [prompt],
-    });
-
-    const parsedResult = JSON.parse(results[results.length - 1]);
-    res.status(200).json({ response: parsedResult });
-  } catch (error) {
-    console.error("Error al ejecutar Python:", error);
-    res.status(500).json({ error: "Error interno" });
-  }
-
   const { contactId } = req.body;
   const { whatsappId } = req.body; // Opcional: ID de WhatsApp del usuario
   const { clienteId } = req.body; // Opcional: ID de cliente del usuario
   const { canalId } = req.body; // Opcional: ID de canal del usuario
 
   //!obtener conversación e interacciones de la base de datos
+
   if (!prompt) {
     return res.status(400).json({ error: "El campo 'prompt' es requerido." });
   }
 
   try {
-    // 1. Análisis de la Intención con PLN (spaCy)
-    const analisisIntencion = await analizarIntencion(prompt);
-    console.log("Análisis de Intención:", analisisIntencion);
-
-    return res.status(200).json({ analisisIntencion });
-
     let conversacionId = "";
     let interacciones = [];
 
@@ -356,37 +306,44 @@ export default async function handler(req, res) {
     });
 
     //!Genera parrafos
-    // function formatearRespuestaParaManyChat(respuesta) {
-    //   const parrafos = respuesta.split(/\r\n\r\n|\n\n/); // Usamos una expresión regular para cubrir diferentes tipos de saltos de línea
-    //   const mensajes = parrafos.map((parrafo) => ({
-    //     text: parrafo.trim(),
-    //   }));
-    //   console.log("Párrafos encontrados:", parrafos); // Para verificar cómo se dividió el texto
-    //   return {
-    //     parrafos: mensajes,
-    //     numeroParrafos: parrafos.length,
-    //   };
-    // }
+    function formatearRespuestaParaManyChat(respuesta) {
+      const parrafos = respuesta.split(/\r\n\r\n|\n\n/);
+      const mensajes = parrafos.map((parrafo) => ({
+        text: parrafo.trim().replace(/"/g, "'"), // Reemplazamos solo las comillas dobles dentro del texto
+      }));
+      console.log("Párrafos encontrados:", parrafos);
+      return {
+        parrafos: mensajes,
+        numeroParrafos: parrafos.length,
+      };
+    }
 
     const result = await chatSession.sendMessage(prompt);
     const responseText = result.response.text().replace(/\*/g, ""); // Eliminar asteriscos (negrita)
 
-    // console.log("Enviando mensaje a Gemini:", prompt);
-    // console.log("Respuesta de Gemini:", responseText);
+    const mensajeFormateado = formatearRespuestaParaManyChat(responseText);
 
-    //!guardar la interacción en la base de datos usuario
-    await prisma.interaccion.create({
-      data: {
-        conversacionId: conversacionId,
-        history: [
-          { role: "user", content: prompt },
-          { role: "gemini", content: responseText },
-        ],
-      },
-    });
+    // Convertir el objeto a una cadena JSON
+    let jsonString = JSON.stringify(mensajeFormateado);
+    const parsedObject = JSON.parse(jsonString);
 
+    // Formatear el array de párrafos como una cadena con comillas simples
+    if (parsedObject.parrafos && Array.isArray(parsedObject.parrafos)) {
+      const parrafosString = parsedObject.parrafos
+        .map((p) => `{'text':'${p.text.replace(/'/g, "\\'")}'}`)
+        .join(",");
+      parsedObject.parrafos = `${parrafosString}`;
+    }
+
+    const finalJsonResponse = JSON.stringify(parsedObject);
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send(finalJsonResponse);
+
+    // const result = await chatSession.sendMessage(prompt);
+    // const responseText = result.response.text().replace(/\*/g, ""); // Eliminar asteriscos (negrita)
     // const mensajeFormateado = formatearRespuestaParaManyChat(responseText);
-    res.status(200).json({ response: responseText }); // Enviar directamente el objeto formateado
+    // res.status(200).json(mensajeFormateado); // Enviar directamente el objeto formateado
   } catch (error) {
     console.error("Error al procesar la solicitud:", error);
     res.status(500).json({ error: "Error interno del servidor" });

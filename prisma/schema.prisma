@@ -51,6 +51,7 @@ model Cliente{
   updatedAt DateTime @updatedAt
   Perfil    Perfil[]
   contrato  Contrato[]
+  Conversacion Conversacion[]
 }
 
 model Perfil{
@@ -255,6 +256,7 @@ model Canal{
   updatedAt DateTime @updatedAt
   Lead      Lead[]
   Agente    Agente[]
+  Conversacion Conversacion[]
 }
 
 model CRM{
@@ -277,7 +279,6 @@ model Pipeline{
   updatedAt DateTime @updatedAt
   Lead      Lead[]
 }
-
 
 model Lead{
   id        String   @id @default(cuid())
@@ -417,4 +418,30 @@ model Cotizacion{
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   Pago      Pago[]
+}
+
+//!Conversaciones
+
+model Conversacion{
+  id        String   @id @default(cuid())
+  clienteId String //pasa sber a que cliente pertenece
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  canalId   String // pasa saber de que canal es la conversacion
+  canal     Canal @relation(fields: [canalId], references: [id])
+  contactId String
+  whatsappId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Interaccion Interaccion[]
+}
+
+model Interaccion{
+  id        String   @id @default(cuid())
+  conversacionId String
+  conversacion Conversacion @relation(fields: [conversacionId], references: [id])
+  role      String? //user, bot
+  question  String?
+  response  String?
+  history Json
+  createdAt DateTime @default(now())
 }
