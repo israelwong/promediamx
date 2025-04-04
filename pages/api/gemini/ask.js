@@ -1,8 +1,6 @@
-import path from "path";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
-import { PythonShell } from "python-shell";
 
 dotenv.config();
 
@@ -227,60 +225,12 @@ const model = genAI.getGenerativeModel({
   systemInstruction: instrucciones.join("\n"),
 });
 
-//! Función para analizar la intención del texto
-async function analizarIntencion(texto) {
-  let options = {
-    mode: "text",
-    pythonOptions: ["-u"],
-    scriptPath: path.resolve(process.cwd(), "scripts_python"), // Construir la ruta absoluta
-    args: [texto],
-  };
-
-  // const scriptPath = path.resolve(
-  //   process.cwd(),
-  //   "scripts_python",
-  //   "analizar_intencion.py"
-  // );
-  // console.log("Intentando ejecutar script de Python en:", scriptPath);
-
-  return new Promise((resolve, reject) => {
-    PythonShell.run("analizar_intencion.py", options, function (err, results) {
-      if (err) reject(reject(err));
-      try {
-        resolve(JSON.parse(results[results.length - 1]));
-      } catch (e) {
-        reject(e);
-      }
-    });
-  });
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
   const { prompt } = req.body;
-
-  const pythonScriptPath = path.resolve(
-    process.cwd(),
-    "scripts_python",
-    "analizar_intencion.py"
-  );
-
-  try {
-    const results = await PythonShell.run(pythonScriptPath, {
-      mode: "text",
-      pythonOptions: ["-u"],
-      args: [prompt],
-    });
-
-    const parsedResult = JSON.parse(results[results.length - 1]);
-    res.status(200).json({ response: parsedResult });
-  } catch (error) {
-    console.error("Error al ejecutar Python:", error);
-    res.status(500).json({ error: "Error interno" });
-  }
 
   const { contactId } = req.body;
   const { whatsappId } = req.body; // Opcional: ID de WhatsApp del usuario
@@ -293,12 +243,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Análisis de la Intención con PLN (spaCy)
-    const analisisIntencion = await analizarIntencion(prompt);
-    console.log("Análisis de Intención:", analisisIntencion);
-
-    return res.status(200).json({ analisisIntencion });
-
     let conversacionId = "";
     let interacciones = [];
 
