@@ -1,8 +1,8 @@
 'use client'
 import React, { useState } from 'react'
-import { Shuffle, Home, Calendar, Users, Wallet, Inbox } from 'lucide-react'
-// import { supabase } from '../_lib/supabase'
+import { Shuffle, Home, Calendar, Wallet, Inbox, SquareUser } from 'lucide-react'
 import Link from 'next/link'
+// import { supabase } from '../_lib/supabase'
 // import { validarPagoStripe } from '../../_lib/pago.actions'
 
 const links = [
@@ -10,7 +10,7 @@ const links = [
     { href: '/admin/dashboard/promesas', label: 'Promesas', icon: <Inbox size={24} />, count: 0, alt: 'Promesas' },
     { href: '/admin/dashboard/seguimiento', label: 'Gestión', icon: <Shuffle size={24} />, count: 0, alt: 'Eventos' },
     { href: '/admin/dashboard/agenda', label: 'Agenda', icon: <Calendar size={24} />, alt: 'Agenda' },
-    { href: '/admin/dashboard/contactos', label: 'Contactos', icon: <Users size={24} />, alt: 'Contactos' },
+    { href: '/admin/dashboard/contactos', label: 'Contactos', icon: <SquareUser size={24} />, alt: 'Contactos' },
     { href: '/admin/dashboard/finanzas', label: 'Finanzas', icon: <Wallet size={24} />, alt: 'Finanzas' },
 ]
 

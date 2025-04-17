@@ -94,7 +94,8 @@ function Navbar() {
 
     if (user && user.rol == 'admin') {
         links.push(
-            // { href: '/admin/marketing', label: 'Marketing' },
+            { href: '/admin/IA', label: 'IA' },
+            { href: '/admin/clientes', label: 'Clientes' },
             { href: '/admin/configurar', label: 'Configurar' },
         );
     }
