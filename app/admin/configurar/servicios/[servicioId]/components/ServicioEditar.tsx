@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { obtenerServicio, actualizarServicio, eliminarServicio } from '@/app/admin/_lib/servicios.actions'
+import { obtenerServicio, actualizarServicio, eliminarServicio } from '@/app/admin/_lib/x servicios.actions'
 import { TipoServicio } from '@/app/admin/_lib/types'
-import { obtenerTiposServicios } from '@/app/admin/_lib/tipoServicio.actions'
+import { obtenerTiposServicios } from '@/app/admin/_lib/x tipoServicio.actions'
 import { Servicio } from '@/app/admin/_lib/types'
 
 import HeaderPage from '@/app/admin/_components/HeaderPage'

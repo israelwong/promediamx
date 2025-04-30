@@ -1,7 +1,7 @@
 'use client'
 import React from 'react'
 import { TipoServicio } from '@/app/admin/_lib/types'
-import { crearTipoServicio } from '@/app/admin/_lib/tipoServicio.actions'
+import { crearTipoServicio } from '@/app/admin/_lib/x tipoServicio.actions'
 import TipoServicioFormNuevo from './TipoServicioFormNuevo'
 import HeaderPage from '@/app/admin/_components/HeaderPage'
 

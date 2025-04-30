@@ -1,0 +1,586 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//! Sistema
+model Usuario {
+  id        String    @id @default(cuid())
+  rol       String // admin, cliente, supervisor
+  status    String   @default("activo")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime @updatedAt
+  username  String    @unique
+  email     String    @unique
+  telefono  String    @unique @default("")
+  password  String
+  sesiones  Sesion[]
+}
+
+model Sesion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  token     String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//! Cliente
+model Cliente{
+  id        String   @id @default(cuid())
+  nombre    String?
+  email     String
+  telefono  String
+  password  String
+  rfc      String?
+  curp     String?
+  razonSocial String?
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  contrato  Contrato[]
+  cotizaciones Cotizacion[]
+  // NumeroWhatsappBusiness NumeroWhatsappBusiness[]
+  Negocio   Negocio[]
+}
+
+//! Contrato
+model Contrato{
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  cotizacionId String
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], name: "CotizacionToContrato")
+  fechaInicio DateTime
+  fechaFin   DateTime
+  status    String   @default("activo") // activo, inactivo, cancelado
+  suscripcion Boolean @default(true)
+  recurrencia String // mensual, trimestral, semestral, anual
+  monto     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Pago      Pago[]
+  AsistenteVirtual AsistenteVirtual[]
+}
+
+model Pago{
+  id        String   @id @default(cuid())
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id])
+  metodoPagoId String
+  metodoPago   metodoPago @relation(fields: [metodoPagoId], references: [id], name: "MetodoPagoToPago")
+  montoPago     Float
+  concepto  String
+  fechaPago DateTime
+  stripeId String?
+  stripe_session_id                  String?                           @unique
+  stripe_payment_id                String?                           @unique  
+  fechaDepositoStripe                 String?                           @unique
+  montoDepositoStripe Float?
+  status    String   @default("pendiente")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model metodoPago{
+  id        String   @id @default(cuid())
+  orden     Int?
+  nombre    String
+  comisionPorcentajeStripe Float?
+  comisionFijaStripe Float?
+  comisionPorcentajePromedia Float?
+  msi      Int?
+  comisionMsi Float?
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Pago      Pago[] @relation("MetodoPagoToPago")
+}
+
+//! Cotizacion
+model Cotizacion{
+  id        String   @id @default(cuid())
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+  leadId    String?
+  lead      Lead? @relation(fields: [leadId], references: [id])
+  nombre    String
+  descripcion String?
+  precio    Float
+  descuento Float?
+  contratos Contrato[] @relation("CotizacionToContrato")
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  CotizacionAsistenteVirtual CotizacionAsistenteVirtual[]
+}
+
+model CotizacionAsistenteVirtual{
+  id        String   @id @default(cuid())
+  cotizacionId String
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id])
+  asistenteVirtualId String
+  asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AsistenteVirtual{
+  id        String   @id @default(cuid())
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id])
+  urlImagen String?
+  nombre    String
+  origen String? // sistema, cliente
+  whatsappBusiness String? //Telefono de WhatsApp Business
+  phoneNumberId String? //API de WhatsApp Business
+  token String? //Identificador de acceso a la API de WhatsApp Business
+  nombreHITL String? //Nombre responsable del Human in the loop
+  whatsappHITL String? //telefono para consultas human in the loop
+  emailHITL String?//email String? asociado al asistente virtual
+  emailCalendario String? //email para agendar citas
+  version   Float
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  CotizacionAsistenteVirtual CotizacionAsistenteVirtual[]
+  // ConfiguracionAsistente ConfiguracionAsistente[] // Added opposite relation field
+  // AsistenteHabilidad AsistenteHabilidad[]
+  ParametroAsistenteConfiguracion ParametroAsistenteConfiguracion[]
+  AsistenteHabilidad AsistenteHabilidad[]
+}
+
+// model ConfiguracionAsistente{ //! Reemplazada por asistenteHabilidad
+//   id        String   @id @default(cuid())
+//   asistenteVirtualId String
+//   asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+//   habilidadId String
+//   habilidad   Habilidad @relation(fields: [habilidadId], references: [id])
+//   status    String   @default("activo")
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+//   ParametroAsistenteInstruccion ParametroAsistenteInstruccion[]
+// }
+
+// model Instruccion{ //! Reemplazada por Tarea
+//   id        String   @id @default(cuid())
+//   habilidadId String?
+//   habilidad   Habilidad? @relation(fields: [habilidadId], references: [id])
+//   orden     Int?
+//   nombre    String
+//   descripcion String?
+//   instruccion String?
+//   trigger String? // palabra clave para activar la instrucción
+//   automatizacion String? // JSON con la automatización
+//   version   Float
+//   status    String   @default("activo")
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+//   ParametroAsistenteInstruccion ParametroAsistenteInstruccion[]
+// }
+
+model Habilidad{ //? se mantiene
+  id        String   @id @default(cuid())
+  origen String? // sistema, cliente
+  orden     Int?
+  nombre    String   @unique
+  descripcion String?
+  rol     String? // admin, cliente, supervisor
+  personalidad String? // introvertido, extrovertido, analitico, creativo
+  precio    Float
+  palabraClave String? // palabra clave para activar la habilidad
+  version   Float
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // ConfiguracionAsistente ConfiguracionAsistente[]
+  // Instruccion Instruccion[]
+  AsistenteHabilidad AsistenteHabilidad[]
+  ParametroRequerido ParametroRequerido[]
+  ParametroAsistenteConfiguracion ParametroAsistenteConfiguracion[]
+  HabilidadTarea HabilidadTarea[]
+}
+
+
+//??????? NUEVAS TABLAS
+model AsistenteHabilidad{ //? nueva tabla
+  id        String   @id @default(cuid())
+  asistenteVirtualId String
+  asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  habilidadId String
+  habilidad   Habilidad @relation(fields: [habilidadId], references: [id])
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Tarea{
+  id        String   @id @default(cuid())
+  orden     Int?
+  nombre    String
+  descripcion String?
+  instruccion String?
+  trigger String? // palabra clave para activar la instrucción
+  automatizacion String? // JSON con la automatización
+  precio    Float?
+  rol     String? // admin, cliente, supervisor
+  personalidad String? // introvertido, extrovertido, analitico, creativo
+  version   Float
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  HabilidadTarea HabilidadTarea[]
+}
+model HabilidadTarea{
+  id        String   @id @default(cuid())
+  habilidadId String
+  habilidad   Habilidad @relation(fields: [habilidadId], references: [id])
+  tareaId    String
+  tarea      Tarea @relation(fields: [tareaId], references: [id])
+  orden     Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ParametroAsistenteConfiguracion ParametroAsistenteConfiguracion[]
+}
+
+model ParametroRequerido{
+  id        String   @id @default(cuid())
+  habilidadId String
+  habilidad   Habilidad @relation(fields: [habilidadId], references: [id])
+  orden     Int?
+  tipoDato String // texto, numero, fecha, booleano
+  nombre    String
+  descripcion String? // Descripción del parámetro de lo que va a recibir
+  esRequerido Boolean @default(false) // si es requerido o no
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ParametroAsistenteConfiguracion ParametroAsistenteConfiguracion[]
+}
+
+model ParametroAsistenteConfiguracion{
+  id        String   @id @default(cuid())
+  asistenteVirtualId String
+  asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  habilidadId String
+  habilidad   Habilidad @relation(fields: [habilidadId], references: [id])
+  habilidadTareaId String
+  habilidadTarea   HabilidadTarea @relation(fields: [habilidadTareaId], references: [id])
+  parametroRequeridoId String
+  parametroRequerido   ParametroRequerido @relation(fields: [parametroRequeridoId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+//??????? NUEVAS TABLAS
+
+// model ParametroAsistenteInstruccion{
+//   id        String   @id @default(cuid())
+//   ordenInstruccion     Int?//numero de instruccion
+//   instruccionId String
+//   instruccion   Instruccion @relation(fields: [instruccionId], references: [id])
+//   configuracionAsistenteId String
+//   configuracionAsistente   ConfiguracionAsistente @relation(fields: [configuracionAsistenteId], references: [id])
+//   formatoEntradaJSON String? // JSON con el formato de entrada
+//   formatoSalidaJSON String? // JSON con el formato de salida
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }
+
+// model MetricasAsistente{
+  // id        String   @id @default(cuid())
+  // asistenteVirtualId String
+  // asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  // tareaAsistenteVirtualId String
+  // tareaAsistenteVirtual TareaAsistenteVirtual @relation(fields: [tareaAsistenteVirtualId], references: [id])
+  // fecha     DateTime
+  // status    String   @default("activo")
+  // createdAt DateTime @default(now())
+  // updatedAt DateTime @updatedAt
+// }
+
+
+//! Negocio 
+model Negocio{
+  id        String   @id @default(cuid())
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+  logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
+  nombre    String
+  descripcion String? //Resumen Ejecutivo, Misión, Visión, Filosofía, Valores, Antecedentes.
+  telefonoLlamadas String?
+  telefonoWhatsapp String?
+  email     String?
+  direccion String?
+  googleMaps String?
+  paginaWeb String?
+  redesSociales String? //Facebook, Instagram, Twitter, LinkedIn, TikTok, Pinterest, YouTube.
+  horarioAtencion String?
+  garantias String? //Garantías, 
+  politicas String? //Políticas de Privacidad, Términos y Condiciones, Políticas de Devolución, Políticas de Reembolso, Políticas de Cancelación.
+  avisoPrivacidad String? //Aviso de Privacidad, Aviso de Cookies, Aviso de Seguridad.
+  compentencia String? //Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
+  clienteIdeal String? //Rango de Edad, Rango de Ingresos, Distribución de Género, Distribución Geográfica, Nivel Educativo, Ocupación, Sector, Motivaciones Principales, Factores de Influencia, Personalidad, Intereses, Lenguaje, Tono de Comunicación Preferido, Canal de Comunicación Preferido.
+  terminologia String? //Terminología del Negocio, Glosario de Términos, Jerga del Sector.
+  preguntasFrecuentes String? //Preguntas Frecuentes, Preguntas Comunes, Preguntas Recurrentes.
+  objeciones String? //Respuestas a Objeciones, Respuestas a Preguntas Frecuentes, Respuestas a Preguntas Comunes.
+  catalogoDescriptivo String?
+  promocionesDescriptivas String?
+  descuentosDescriptivos String?
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  CRM       CRM[]   // Added opposite relation field
+  Catalogo   Catalogo[]
+  Promocion   Promocion[]
+  Descuento    Descuento[]
+}
+
+//! Calálogo
+model Catalogo{
+  id        String   @id @default(cuid())
+  negocioId String
+  negocio   Negocio @relation(fields: [negocioId], references: [id])
+  tipo String // producto, servicio
+  nombre    String
+  descripcion String?
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ItemCatalogo ItemCatalogo[]
+  
+}
+
+model ItemCatalogo{
+  id        String   @id @default(cuid())
+  catalogoId String
+  catalogo   Catalogo @relation(fields: [catalogoId], references: [id])
+  nombre    String
+  descripcion String?
+  precio    Float
+  imagen    String?
+  linkPago String?
+  funcionPrincipal String? 
+  promocionActiva String?
+  AquienVaDirigido String?
+  nivelDePopularidad String?
+  galeriaJSON String?
+  video String?
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ItemCatalogoPromocion ItemCatalogoPromocion[]
+  ItemCatalogoDescuento ItemCatalogoDescuento[]
+}
+
+model Promocion{
+  id        String   @id @default(cuid())
+  negocioId String
+  negocio   Negocio @relation(fields: [negocioId], references: [id])
+  nombre    String
+  descripcion String?
+  fechaInicio DateTime
+  fechaFin   DateTime
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ItemCatalogoPromocion ItemCatalogoPromocion[]
+}
+
+model Descuento{
+  id        String   @id @default(cuid())
+  negocioId String
+  negocio   Negocio @relation(fields: [negocioId], references: [id])
+  nombre    String
+  descripcion String?
+  porcentaje Float
+  monto     Float
+  fechaInicio DateTime
+  fechaFin   DateTime
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ItemCatalogoDescuento ItemCatalogoDescuento[]
+}
+
+model ItemCatalogoPromocion{
+  id        String   @id @default(cuid())
+  itemCatalogoId String
+  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id])
+  promocionId String
+  promocion   Promocion @relation(fields: [promocionId], references: [id])
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ItemCatalogoDescuento{
+  id        String   @id @default(cuid())
+  itemCatalogoId String
+  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id])
+  descuentoId String
+  descuento   Descuento @relation(fields: [descuentoId], references: [id])
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//!CRM
+model Canal{
+  id        String   @id @default(cuid())
+  orden     Int?
+  nombre    String //facebook, google, instagram, email, whatsapp
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+  Agente    Agente[]
+  crmId     String
+  crm       CRM @relation(fields: [crmId], references: [id])
+}
+
+model CRM{
+  id        String   @id @default(cuid())
+  negocioId String
+  negocio   Negocio @relation(fields: [negocioId], references: [id])
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+  Agente    Agente[]
+  Etiqueta  Etiqueta[]
+  // Conversacion Conversacion[]
+  Pipeline  Pipeline[]
+  Canal     Canal[]
+}
+
+model Pipeline{
+  id        String   @id @default(cuid())
+  crmId     String
+  crm       CRM @relation(fields: [crmId], references: [id])
+  orden     Int?
+  nombre    String //nuevo, seguimiento, promesa, ganado, perdido
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+}
+
+model Etiqueta{
+  id        String   @id @default(cuid())
+  crmId     String
+  crm       CRM @relation(fields: [crmId], references: [id])
+  orden     Int?
+  nombre    String
+  Lead      Lead[] @relation("EtiquetaToLead")
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+}
+
+
+model Lead{
+  id        String   @id @default(cuid())
+  crmId     String?
+  crm       CRM? @relation(fields: [crmId], references: [id])
+  agenteId  String?
+  agente    Agente? @relation(fields: [agenteId], references: [id])
+  canalId   String?
+  Canal     Canal? @relation(fields: [canalId], references: [id])
+  nombre    String
+  email     String
+  telefono  String
+  jsonParams Json?
+  pilelineId String?
+  Pipeline  Pipeline? @relation(fields: [pilelineId], references: [id])
+  etiquetaId String?
+  Etiqueta  Etiqueta? @relation(fields: [etiquetaId], references: [id], name: "EtiquetaToLead")
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Bitacora  Bitacora[]
+  Agenda    Agenda[]
+  Cotizacion Cotizacion[]
+}
+
+model Agente{
+  id        String   @id @default(cuid())
+  crmId     String
+  crm       CRM @relation(fields: [crmId], references: [id])
+  username    String
+  email     String
+  telefono  String
+  password  String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+  Bitacora  Bitacora[]
+  Agenda    Agenda[]
+  Canal     Canal[]
+}
+
+
+model Bitacora{
+  id        String   @id @default(cuid())
+  agenteId  String
+  agente    Agente @relation(fields: [agenteId], references: [id])
+  leadId    String
+  lead      Lead @relation(fields: [leadId], references: [id])
+  descripcion String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Agenda{
+  id        String   @id @default(cuid())
+  agenteId  String
+  leadId    String
+  lead      Lead @relation(fields: [leadId], references: [id])
+  agente    Agente @relation(fields: [agenteId], references: [id])
+  fecha     DateTime
+  asunto    String
+  descripcion String?
+  objetivo  String?
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//!Conversaciones
+model Conversacion{
+  id        String   @id @default(cuid())
+  whatsappId String?
+  phoneNumberId String
+  // numeroWhatsappBusinessId String
+  // numeroWhatsappBusiness   NumeroWhatsappBusiness? @relation(fields: [numeroWhatsappBusinessId], references: [id])
+  // crmId     String?
+  // crm       CRM? @relation(fields: [crmId], references: [id])
+  status String  @default("abierta") // abierta, cerrada, en espera, seguimiento
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  Interaccion Interaccion[]
+  intencion String? // Agregado: intención de la conversación
+  interes     String? // Agregado: nivel de interés
+}
+
+model Interaccion{
+  id        String   @id @default(cuid())
+  conversacionId String
+  conversacion Conversacion @relation(fields: [conversacionId], references: [id])
+  messageId String? //de whatsapp
+  role      String? //user, bot
+  mensaje  String?
+  intencion String?
+  entidad   String? // Agregado: entidad de la interacción
+  interes     String? // Agregado: nivel de interés en la interacción
+  sentimiento String?
+  mediaType      String? //imagen, audio, video, document.
+  createdAt DateTime @default(now())
+}

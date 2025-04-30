@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import TipoServicioFormEditar from './TipoServicioFormEditar'
 import HeaderPage from '@/app/admin/_components/HeaderPage'
 import { TipoServicio } from '@/app/admin/_lib/types'
-import { obtenerTipoServicio, actualizarTipoServicio, eliminarTipoServicio } from '@/app/admin/_lib/tipoServicio.actions'
+import { obtenerTipoServicio, actualizarTipoServicio, eliminarTipoServicio } from '@/app/admin/_lib/x tipoServicio.actions'
 
 
 interface Props {

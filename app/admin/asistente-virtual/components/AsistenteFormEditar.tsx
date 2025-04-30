@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { obtenerAsistenteVirtual } from '@/app/admin/_lib/asistenteVirtuai.actions';
+import { obtenerAsistenteVirtual } from '@/app/admin/_lib/asistenteVirtual.actions';
 import { AsistenteVirtual } from '@/app/admin/_lib/types';
 
 interface AsistenteFormEditarProps {

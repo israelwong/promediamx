@@ -1,12 +1,12 @@
 import React from 'react'
 import { Metadata } from 'next'
-import AIPanel from './components/AIPanel'
+import IADashboard from './components/IADashboard'
 
 export const metadata: Metadata = {
-    title: 'IA',
-    description: 'IA',
+    title: 'IA Dashboard',
+    description: 'Dashboard de IA',
 }
 
 export default function page() {
-    return <AIPanel />
+    return <IADashboard />
 }

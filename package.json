@@ -44,12 +44,14 @@
     "react-hook-form": "^7.54.2",
     "react-spring-lightbox": "^1.8.0",
     "react-type-animation": "^3.2.0",
+    "recharts": "^2.15.3",
     "stripe": "^17.6.0",
     "yet-another-react-lightbox": "^3.21.7",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@types/dom-speech-recognition": "^0.0.6",
     "@types/facebook-nodejs-business-sdk": "^20.0.2",
     "@types/glidejs__glide": "^3.6.6",
     "@types/jsonwebtoken": "^9.0.8",

@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Servicio } from '@/app/admin/_lib/types';
 import LoadingPage from '@/app/admin/_components/LoadingPage';
-import { obtenerServicios, actualizarPosicionesSevicios } from '@/app/admin/_lib/servicios.actions';
+import { obtenerServicios, actualizarPosicionesSevicios } from '@/app/admin/_lib/x servicios.actions';
 import { useDragAndDrop } from '@/app/admin/_lib/dragAndDrop';
 
 export default function Servicios() {

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 
 import { TipoServicio } from '@/app/admin/_lib/types'
-import { obtenerTiposServicios } from '@/app/admin/_lib/tipoServicio.actions'
+import { obtenerTiposServicios } from '@/app/admin/_lib/x tipoServicio.actions'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import LoadingPage from '@/app/admin/_components/LoadingPage'

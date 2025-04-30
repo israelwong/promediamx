@@ -15,12 +15,17 @@ export async function login(email: string, password: string) {
         const usuario = await prisma.usuario.findFirst({
             where: {
                 email
+            },
+            include: {
+                rol: {
+                    select: {
+                        nombre: true // Seleccionar solo el nombre del rol
+                    }
+                }
             }
         });
 
         if (!usuario) {
-            // response.error = 'Credenciales inválidas';
-            // console.log('Usuario no encontrado');
             return response;
         }
 
@@ -33,11 +38,11 @@ export async function login(email: string, password: string) {
         }
 
         // console.log('Contraseña correcta, generando JWT');
-        const jwt = await new SignJWT({ email: usuario.email, username: usuario.username, id: usuario.id, rol: usuario.rol })
+        const jwt = await new SignJWT({ email: usuario.email, username: usuario.username, id: usuario.id, rol: usuario.rol?.nombre })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
             .setIssuer('israelwong')
-            .setAudience('prosocial')
+            .setAudience('ProMedia')
             .setExpirationTime('5d')
             .sign(new TextEncoder().encode(process.env.JWT_SECRET));
 

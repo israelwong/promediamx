@@ -18,7 +18,7 @@ const generationConfig = {
 
 /**
  *
- * Necesoto pasar el mensaje y el phoneNumberId
+ * Necesito pasar el mensaje y el phoneNumberId
  * phoneNumberId <- está asociado con el numero de whatsapp del cliente
  * tendria que obtener el id del cliente
  */

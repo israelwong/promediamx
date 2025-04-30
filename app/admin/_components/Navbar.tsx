@@ -4,11 +4,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Usuario } from '@/app/admin/_lib/types';
+import { Usuario, Rol } from '@/app/admin/_lib/types';
 import { verifyToken, cerrarSesion } from '@/app/lib/auth';
 import { Bell } from 'lucide-react'
 // import { supabase } from '@/app/lib/supabase';
 
+interface UsuarioExtendido extends Usuario {
+    rol: Rol;
+}
 
 function Navbar() {
 
@@ -55,10 +58,12 @@ function Navbar() {
                 try {
                     const response = await verifyToken(token);
                     if (response.payload) {
-                        const userData: Usuario = response.payload as unknown as Usuario;
+                        const userData: UsuarioExtendido = { ...response.payload, rol: (response.payload.rol || '') as unknown as Rol } as UsuarioExtendido;
                         userData.token = token;
                         setUser(userData);
-                        // console.log('Usuario:', userData);
+
+                        console.log('Usuario:', userData.rol);
+
                         Cookies.set('user', JSON.stringify(userData));
                     } else {
                         router.push('/admin');
@@ -92,10 +97,11 @@ function Navbar() {
         { href: '/admin/dashboard', label: 'Dashboard' },
     ];
 
-    if (user && user.rol == 'admin') {
+    if (user?.rol && user.rol === ('Administrador' as unknown as Rol)) {
         links.push(
-            { href: '/admin/IA', label: 'IA' },
             { href: '/admin/clientes', label: 'Clientes' },
+            { href: '/admin/marketplace', label: 'Marketplace' },
+            { href: '/admin/tareas', label: 'Tareas IA' },
             { href: '/admin/configurar', label: 'Configurar' },
         );
     }

@@ -1,5 +1,5 @@
 import React from 'react'
-import DashboardClientes from './componentes/DashboardClientes'
+import ClientesLista from './componentes/ClientesLista'
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 }
 
 export default function page() {
-    return <DashboardClientes />
+    return <ClientesLista />
 }
