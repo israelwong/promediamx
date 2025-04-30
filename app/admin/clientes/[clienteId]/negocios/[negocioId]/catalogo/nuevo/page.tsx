@@ -10,7 +10,7 @@ interface Props {
     negocioId: string
 }
 
-export default function Page({ params }: { params: Props }) {
-    const negocioId = params.negocioId;
+export default async function page({ params }: { params: Promise<Props> }) {
+    const { negocioId } = await params;
     return <CatalogoNuevoForm negocioId={negocioId} />
 }

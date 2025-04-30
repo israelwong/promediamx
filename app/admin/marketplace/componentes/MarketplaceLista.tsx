@@ -58,10 +58,12 @@ export default function MarketplaceLista({ asistenteId }: Props) {
         const fetchBaseData = async () => {
             try {
                 const [tareasData, categoriasData] = await Promise.all([obtenerTareasActivas(), obtenerCategorias()]);
-                const tareasMapped = tareasData.map((item: Tarea) => ({
-                    id: item.id, nombre: item.nombre || 'Sin nombre',
-                    descripcion: item.descripcion ?? '', precio: item.precio,
-                    categoriaTareaId: item.categoriaTareaId,
+                const tareasMapped = tareasData.map((item) => ({
+                    id: item.id,
+                    nombre: item.nombre || 'Sin nombre',
+                    descripcion: item.descripcion ?? '',
+                    precio: item.precio ?? null,
+                    categoriaTareaId: item.categoriaTareaId ?? undefined,
                 }));
                 setTareas(tareasMapped);
                 setCategorias(categoriasData);

@@ -7,10 +7,11 @@ export const metadata: Metadata = {
     description: 'Gestión de CRM',
 }
 
-export default function page({ params }: { params: { negocioId: string } }) {
+export default async function page({ params }: { params: Promise<{ negocioId: string }> }) {
+    const { negocioId } = await params
     return (
         <div>
-            <NegocioCRMPanel negocioId={params.negocioId} />
+            <NegocioCRMPanel negocioId={negocioId} />
         </div>
     )
 }

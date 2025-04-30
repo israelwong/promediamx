@@ -7,15 +7,8 @@ export const metadata: Metadata = {
     title: 'Detalles de la Tarea', // Título para la pestaña del navegador
 };
 
-// Tipado para los parámetros de la página dinámica
-interface PageProps {
-    params: {
-        tareaId: string;
-    };
-}
-
-export default function TareaDetallePage({ params }: PageProps) {
-    const { tareaId } = params; // Extraer tareaId de los parámetros
+export default async function page({ params }: { params: Promise<{ tareaId: string }> }) {
+    const { tareaId } = await params; // Extraer tareaId de los parámetros
 
     // Clases para el contenedor principal de la página
     // Aplicamos aquí el fondo, padding, borde, sombra y redondeo general

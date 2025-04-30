@@ -11,9 +11,8 @@ interface Props {
     catalogoId: string
 }
 
-export default function Page({ params }: { params: Props }) {
-    const negocioId = params.negocioId;
-    const catalogoId = params.catalogoId;
-    console.log("params", params)
+export default async function page({ params }: { params: Promise<Props> }) {
+    const { negocioId, catalogoId } = await params
+    // console.log("params", params)
     return <ItemNuevoForm negocioId={negocioId} catalogoId={catalogoId} />
 }

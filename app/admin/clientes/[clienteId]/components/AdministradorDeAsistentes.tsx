@@ -1,5 +1,5 @@
 import React from 'react'
-import { AsistenteVirtual } from '@/app/admin/_lib/types'
+// import { AsistenteVirtual } from '@/app/admin/_lib/types'
 
 interface Props {
     clienteId: string

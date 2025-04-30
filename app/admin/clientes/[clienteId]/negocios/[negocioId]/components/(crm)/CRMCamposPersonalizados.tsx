@@ -48,7 +48,7 @@ interface CampoConOrden extends CRMCampoPersonalizado {
     requerido: boolean;
     status: string;
     crmId: string;
-    crm?: CRM | null; // Reemplazar 'any' con tipo CRM real si se importa
+    crm?: CRM; // Reemplazar 'any' con tipo CRM real si se importa
     createdAt: Date;
     updatedAt: Date;
 }

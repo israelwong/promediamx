@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, ChangeEvent, FormEvent, useCallback } from 'react';
-import { useRouter } from 'next/navigation'; // Importar si se necesita para alguna navegación futura
+import React, { useState, useEffect, ChangeEvent } from 'react';
+// import { useRouter } from 'next/navigation'; // Importar si se necesita para alguna navegación futura
 
 // Importar Acciones
 import {
@@ -11,17 +11,17 @@ import {
 import { actualizarInstruccionTarea } from '@/app/admin/_lib/tareas.actions';
 
 // Importar Tipos
-import { AsistenteVirtual, AsistenteTareaSuscripcion, Tarea, ParametroRequerido } from '@/app/admin/_lib/types'; // Asumiendo tipos aquí
+import { AsistenteVirtual, AsistenteTareaSuscripcion, Tarea } from '@/app/admin/_lib/types'; // Asumiendo tipos aquí
 
 // Importar Componentes Hijos
 import ChatIA from './ChatIA'; // Asumiendo en la misma carpeta
 import ParametrosLista from './ParametrosLista'; // Ajusta la ruta según tu estructura
 
 // Importar Iconos
-import { Loader2, AlertTriangle, CheckCircle, Save } from 'lucide-react';
+import { Loader2, CheckCircle, Save } from 'lucide-react';
 
 export default function ConfiguracionConversacion() {
-    const router = useRouter(); // Mantener por si se añade navegación
+    // const router = useRouter(); // Mantener por si se añade navegación
 
     // Estados para Asistentes
     const [asistentes, setAsistentes] = useState<AsistenteVirtual[]>([]);
@@ -81,7 +81,14 @@ export default function ConfiguracionConversacion() {
                 .then(data => {
                     // Ordenar tareas (opcional, por nombre o por orden si existe)
                     const sortedData = data.sort((a, b) => a.tarea.nombre.localeCompare(b.tarea.nombre));
-                    setTareasAsistente(sortedData);
+                    setTareasAsistente(sortedData.map(item => ({
+                        ...item,
+                        tarea: {
+                            ...item.tarea,
+                            categoriaTareaId: item.tarea.categoriaTareaId ?? undefined,
+                            iconoUrl: item.tarea.iconoUrl ?? undefined, // Convert null to undefined
+                        },
+                    })));
                 })
                 .catch(err => {
                     console.error('Error fetching tareas del asistente:', err);

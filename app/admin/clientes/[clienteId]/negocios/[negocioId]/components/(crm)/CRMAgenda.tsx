@@ -5,6 +5,7 @@ interface Props {
 }
 
 export default function CRMAgenda({ crmId }: Props) {
+    console.log(crmId)
     return (
         <div>
             Agenda

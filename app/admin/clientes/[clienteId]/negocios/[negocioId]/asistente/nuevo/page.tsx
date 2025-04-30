@@ -12,7 +12,7 @@ interface Props {
     clienteId: string
 }
 
-export default async function Page({ params }: { params: Props }) {
-    const { negocioId, clienteId } = await Promise.resolve(params); // Simulate async if needed
+export default async function page({ params }: { params: Promise<Props> }) {
+    const { negocioId, clienteId } = await params; // Simulate async if needed
     return <AsistenteNuevoForm negocioId={negocioId} clienteId={clienteId} />
 }

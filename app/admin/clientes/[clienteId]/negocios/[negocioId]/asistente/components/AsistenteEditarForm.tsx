@@ -14,6 +14,8 @@ import {
 import { AsistenteVirtual, Negocio, Cliente } from '@/app/admin/_lib/types';
 import { Loader2, Trash2, UserCircle, Camera, Save } from 'lucide-react';
 
+import Image from 'next/image';
+
 interface Props {
     asistenteId: string;
     negocioId?: string; // Opcional, si se necesita para otras acciones
@@ -226,7 +228,9 @@ export default function AsistenteEditarForm({ asistenteId, negocioId, clienteId 
                         <label htmlFor="urlImagen" className={`${labelBaseClasses} text-center`}>Imagen Avatar</label>
                         <div className="relative">
                             <button type="button" onClick={() => setEditingImagen(true)} className={`${avatarContainerSize} rounded-full bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center overflow-hidden cursor-pointer relative group border-2 border-zinc-600 hover:border-blue-500 transition-all`} title="Clic para editar URL de imagen">
-                                {formData.urlImagen ? (<img src={formData.urlImagen} alt="Avatar" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; const placeholder = e.currentTarget.nextElementSibling; if (placeholder) (placeholder as HTMLElement).style.display = 'flex'; }} />) : null}
+                                {formData.urlImagen ? (
+                                    <Image src={formData.urlImagen} alt="Avatar" className="w-full h-full object-cover" width={224} height={224} onError={() => { const placeholder = inputImagenRef.current?.nextElementSibling; if (placeholder) (placeholder as HTMLElement).style.display = 'flex'; }} />
+                                ) : null}
                                 <div className={`absolute inset-0 flex items-center justify-center ${formData.urlImagen ? 'hidden' : 'flex'}`} style={{ display: formData.urlImagen ? 'none' : 'flex' }}> <UserCircle className={`text-zinc-500 ${avatarIconSize}`} /> </div>
                                 {!editingImagen && (<div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"><Camera className={`text-white ${cameraIconSize}`} /></div>)}
                             </button>

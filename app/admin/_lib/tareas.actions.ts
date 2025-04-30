@@ -51,8 +51,16 @@ export async function obtenerTareasActivas() {
             where: { status: 'activo' },
             orderBy: {
                 orden: 'asc'
+            },
+            select: {
+                id: true,
+                nombre: true,
+                descripcion: true,
+                precio: true,
+                categoriaTareaId: true
             }
         });
+
         return tareas;
     } catch (error) {
         console.error('Error al obtener las tareas activas:', error);

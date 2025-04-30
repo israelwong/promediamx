@@ -101,7 +101,7 @@ function Navbar() {
         links.push(
             { href: '/admin/clientes', label: 'Clientes' },
             { href: '/admin/marketplace', label: 'Marketplace' },
-            { href: '/admin/tareas', label: 'Tareas IA' },
+            { href: '/admin/tareas', label: 'Tareas' },
             { href: '/admin/configurar', label: 'Configurar' },
         );
     }

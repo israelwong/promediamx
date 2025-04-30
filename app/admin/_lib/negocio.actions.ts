@@ -113,6 +113,7 @@ export async function obtenerNegocios() {
         include: {
             cliente: {
                 select: {
+                    id: true,
                     nombre: true
                 }
             },

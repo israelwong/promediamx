@@ -305,6 +305,9 @@ export interface Tarea {
 
     iconoUrl?: string; // URL para el ícono principal de la tarea
     TareaGaleria?: TareaGaleria[]; // Relación a la galería
+
+    //!!!! sabe
+    automatizacion?: string; // Opcional: Descripción de la automatización
 }
 
 //! Galería
@@ -560,7 +563,7 @@ export interface NegocioEtiqueta {
     createdAt: Date;
     updatedAt: Date;
 
-    itemEtiquetas?: ItemCatalogoEtiqueta[];
+    itemEtiquetas?: ItemCatalogoEtiqueta[] | null; // Added opposite relation field
 }
 
 //! CATÁLOGO

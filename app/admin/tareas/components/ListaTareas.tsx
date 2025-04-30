@@ -1,17 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link'; // Para enlazar a la edición
-import { useRouter } from 'next/navigation'; // Para navegación en row click
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-    obtenerTareasConDetalles, // Acción actualizada con _count.TareaGaleria
+    obtenerTareasConDetalles,
     obtenerCategorias,
-    // obtenerFuncionesTareaDisponibles, // Ya no se necesita para filtrar
     actualizarOrdenTareas
-} from '@/app/admin/_lib/tareas.actions'; // Ajusta ruta
-import { TareaConDetalles, CategoriaTarea } from '@/app/admin/_lib/types'; // Ajusta ruta
-import { Loader2, Search, ListFilter, GripVertical, Image as ImageIcon, GalleryHorizontal, Check } from 'lucide-react'; // Iconos actualizados
-// Dnd Imports (sin cambios)
+} from '@/app/admin/_lib/tareas.actions';
+import { TareaConDetalles, CategoriaTarea } from '@/app/admin/_lib/types';
+import { Loader2, Search, ListFilter, GripVertical, Image as ImageIcon, GalleryHorizontal, Check } from 'lucide-react';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
 } from '@dnd-kit/core';
@@ -20,30 +18,23 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// --- Componente para cada FILA de la tabla (Sortable) ---
+// --- Componente SortableTableRow (sin cambios) ---
 function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaConDetalles; onRowClick: (id: string) => void }) {
     const {
-        attributes, // Para el handle
-        listeners,  // Para el handle
-        setNodeRef, // Para el <tr>
-        transform,
-        transition,
-        isDragging,
+        attributes, listeners, setNodeRef, transform, transition, isDragging,
     } = useSortable({ id: id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.7 : 1,
-        zIndex: isDragging ? 10 : undefined, // Asegura que esté por encima al arrastrar
+        zIndex: isDragging ? 10 : undefined,
     };
 
-    // Clases reutilizables para celdas y tags
-    const tdClasses = "px-2 py-1.5 text-xs border-b border-zinc-700"; // Padding reducido
-    const tagClasses = "text-[0.65rem] px-1.5 py-0.5 rounded-full inline-block mr-1 mb-1"; // Tags más pequeños
+    const tdClasses = "px-2 py-1.5 text-xs border-b border-zinc-700";
+    const tagClasses = "text-[0.65rem] px-1.5 py-0.5 rounded-full inline-block mr-1 mb-1";
 
     const handleRowClickInternal = (e: React.MouseEvent<HTMLTableRowElement>) => {
-        // Evitar navegación si se hizo clic en el botón de arrastre
         if ((e.target as HTMLElement).closest('button[data-dnd-handle="true"]')) {
             return;
         }
@@ -55,87 +46,43 @@ function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaC
             ref={setNodeRef}
             style={style}
             className={`bg-zinc-800 hover:bg-zinc-700/50 transition-colors duration-100 cursor-pointer ${isDragging ? 'shadow-lg ring-1 ring-blue-500' : ''}`}
-            onClick={handleRowClickInternal} // Navegar al hacer clic en la fila
+            onClick={handleRowClickInternal}
         >
-            {/* Celda Handle DnD */}
             <td className={`${tdClasses} text-center w-10`}>
                 <button
-                    {...attributes}
-                    {...listeners}
-                    data-dnd-handle="true" // Identificador para el chequeo en onRowClickInternal
+                    {...attributes} {...listeners} data-dnd-handle="true"
                     className="p-1 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     aria-label="Arrastrar para reordenar"
-                    onClick={(e) => e.stopPropagation()} // Detener propagación para no activar onRowClick
+                    onClick={(e) => e.stopPropagation()}
                 >
                     <GripVertical size={14} />
                 </button>
             </td>
-            {/* Celda Icono */}
             <td className={`${tdClasses} text-center w-8`}>
-                {tarea.iconoUrl ? (
-                    <span title="Tiene icono">
-                        <ImageIcon size={12} className="text-blue-400 mx-auto" />
-                    </span>
-                ) : (
-                    <span className="text-zinc-600">-</span>
-                )}
+                {tarea.iconoUrl ? <span title="Tiene icono"><ImageIcon size={12} className="text-blue-400 mx-auto" /></span> : <span className="text-zinc-600">-</span>}
             </td>
-            {/* Celda Galería */}
             <td className={`${tdClasses} text-center w-8`}>
-                {(tarea._count?.TareaGaleria ?? 0) > 0 ? (
-                    <span title={`Tiene ${tarea._count?.TareaGaleria} imágenes`}>
-                        <GalleryHorizontal size={12} className="text-purple-400 mx-auto" />
-                    </span>
-                ) : (
-                    <span className="text-zinc-600">-</span>
-                )}
+                {(tarea._count?.TareaGaleria ?? 0) > 0 ? <GalleryHorizontal size={12} className="text-purple-400 mx-auto" /> : <span className="text-zinc-600">-</span>}
             </td>
-            {/* Celda Nombre Tarea */}
             <td className={`${tdClasses} font-medium text-zinc-100`}>
                 {tarea.nombre}
-                {tarea.tareaFuncion && (
-                    <span className="block text-[0.7rem] text-blue-400/80 font-normal" title={`Función: ${tarea.tareaFuncion.nombreVisible}`}>
-                        Fn: {tarea.tareaFuncion.nombreVisible}
-                    </span>
-                )}
+                {tarea.tareaFuncion && <span className="block text-[0.7rem] text-blue-400/80 font-normal" title={`Función: ${tarea.tareaFuncion.nombreVisible}`}>Fn: {tarea.tareaFuncion.nombreVisible}</span>}
             </td>
-            {/* Celda Categoría */}
             <td className={tdClasses}>
-                {tarea.CategoriaTarea ? (
-                    <span className={`${tagClasses} bg-gray-700 text-gray-200`}>{tarea.CategoriaTarea.nombre}</span>
-                ) : (
-                    <span className="text-zinc-600 italic">N/A</span>
-                )}
+                {tarea.CategoriaTarea ? <span className={`${tagClasses} bg-gray-700 text-gray-200`}>{tarea.CategoriaTarea.nombre}</span> : <span className="text-zinc-600 italic">N/A</span>}
             </td>
-            {/* Celda Etiquetas */}
             <td className={tdClasses}>
                 {tarea.etiquetas && tarea.etiquetas.length > 0 ? (
                     <div className="flex flex-wrap">
-                        {tarea.etiquetas.map(({ etiquetaTarea }) => etiquetaTarea ? (
-                            <span key={etiquetaTarea.id} className={`${tagClasses} bg-teal-900/70 text-teal-300`}>
-                                {etiquetaTarea.nombre}
-                            </span>
-                        ) : null)}
+                        {tarea.etiquetas.map(({ etiquetaTarea }) => etiquetaTarea ? <span key={etiquetaTarea.id} className={`${tagClasses} bg-teal-900/70 text-teal-300`}>{etiquetaTarea.nombre}</span> : null)}
                     </div>
-                ) : (
-                    <span className="text-zinc-600 italic">Ninguna</span>
-                )}
+                ) : <span className="text-zinc-600 italic">Ninguna</span>}
             </td>
-            {/* Celda Precio */}
             <td className={`${tdClasses} text-right w-16`}>
-                {tarea.precio != null && tarea.precio > 0 ? (
-                    <span className="font-semibold text-emerald-400">
-                        ${tarea.precio.toFixed(2)}
-                    </span>
-                ) : (
-                    <span className="text-zinc-600">-</span>
-                )}
+                {tarea.precio != null && tarea.precio > 0 ? <span className="font-semibold text-emerald-400">${tarea.precio.toFixed(2)}</span> : <span className="text-zinc-600">-</span>}
             </td>
-            {/* Celda Status */}
             <td className={`${tdClasses} text-center w-20`}>
-                <span className={`font-medium px-2 py-0.5 rounded-full ${tarea.status === 'activo' ? 'bg-green-500/20 text-green-300' : 'bg-zinc-600/50 text-zinc-400'}`}>
-                    {tarea.status === 'activo' ? 'Activa' : 'Inactiva'}
-                </span>
+                <span className={`font-medium px-2 py-0.5 rounded-full ${tarea.status === 'activo' ? 'bg-green-500/20 text-green-300' : 'bg-zinc-600/50 text-zinc-400'}`}>{tarea.status === 'activo' ? 'Activa' : 'Inactiva'}</span>
             </td>
         </tr>
     );
@@ -147,12 +94,8 @@ export default function ListaTareas() {
     const [todasLasTareas, setTodasLasTareas] = useState<TareaConDetalles[]>([]);
     const [tareasFiltradas, setTareasFiltradas] = useState<TareaConDetalles[]>([]);
     const [categorias, setCategorias] = useState<CategoriaTarea[]>([]);
-
-    // Estados de Filtro
     const [filtroNombre, setFiltroNombre] = useState('');
     const [filtroCategoriaId, setFiltroCategoriaId] = useState('');
-
-    // Estados de UI
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -162,16 +105,14 @@ export default function ListaTareas() {
     const categoryButtonBase = "px-2.5 py-1 text-xs font-medium rounded-full border transition-colors duration-150 flex items-center gap-1";
     const categoryButtonInactive = "bg-zinc-700/50 border-zinc-600 text-zinc-300 hover:bg-zinc-600/50 hover:border-zinc-500";
     const categoryButtonActive = "bg-blue-600 border-blue-500 text-white ring-2 ring-blue-400 ring-offset-1 ring-offset-zinc-900";
-    const primaryButtonClasses = "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md flex items-center gap-1 whitespace-nowrap"; // Para botón Nueva Tarea
+    const primaryButtonClasses = "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md flex items-center gap-1 whitespace-nowrap";
 
-    // --- Carga inicial de datos ---
+    // Carga inicial de datos
     const fetchData = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+        setLoading(true); setError(null);
         try {
             const [tareasData, categoriasData] = await Promise.all([
-                obtenerTareasConDetalles(),
-                obtenerCategorias()
+                obtenerTareasConDetalles(), obtenerCategorias()
             ]);
             const tareasTyped = tareasData as TareaConDetalles[] || [];
             setTodasLasTareas(tareasTyped);
@@ -180,22 +121,16 @@ export default function ListaTareas() {
         } catch (err) {
             console.error("Error fetching data:", err);
             setError("Error al cargar las tareas o categorías.");
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     }, []);
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
-    // --- Lógica de Filtrado ---
+    // Lógica de Filtrado
     useEffect(() => {
         let tareasResult = todasLasTareas;
         if (filtroNombre.trim()) {
-            tareasResult = tareasResult.filter(t =>
-                t.nombre.toLowerCase().includes(filtroNombre.toLowerCase())
-            );
+            tareasResult = tareasResult.filter(t => t.nombre.toLowerCase().includes(filtroNombre.toLowerCase()));
         }
         if (filtroCategoriaId) {
             tareasResult = tareasResult.filter(t => t.categoriaTareaId === filtroCategoriaId);
@@ -203,7 +138,7 @@ export default function ListaTareas() {
         setTareasFiltradas(tareasResult);
     }, [filtroNombre, filtroCategoriaId, todasLasTareas]);
 
-    // --- DnD Handlers ---
+    // DnD Handlers
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -219,10 +154,7 @@ export default function ListaTareas() {
             const reorderedTareas = arrayMove(tareasFiltradas, oldIndex, newIndex);
             setTareasFiltradas(reorderedTareas);
 
-            const tareasParaActualizar = reorderedTareas.map((tarea, index) => ({
-                id: tarea.id,
-                orden: index
-            }));
+            const tareasParaActualizar = reorderedTareas.map((tarea, index) => ({ id: tarea.id, orden: index }));
 
             setIsSavingOrder(true); setError(null);
             try {
@@ -240,30 +172,22 @@ export default function ListaTareas() {
             } catch (err) {
                 setError(`Error al guardar orden: ${err instanceof Error ? err.message : 'Error desconocido'}`);
                 setTareasFiltradas(arrayMove(reorderedTareas, newIndex, oldIndex));
-            } finally {
-                setIsSavingOrder(false);
-            }
+            } finally { setIsSavingOrder(false); }
         }
     };
 
-    // --- Navegación al hacer clic en fila ---
-    const handleRowClick = (tareaId: string) => {
-        router.push(`/admin/tareas/${tareaId}`);
-    };
+    // Navegación
+    const handleRowClick = (tareaId: string) => { router.push(`/admin/tareas/${tareaId}`); };
 
-    // --- Renderizado ---
+    // Renderizado
     return (
         <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg shadow-md flex flex-col h-full">
             {/* Cabecera */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4 border-b border-zinc-700 pb-3">
-                <h3 className="text-base font-semibold text-white whitespace-nowrap">
-                    Marketplace de Tareas
-                </h3>
+                <h3 className="text-base font-semibold text-white whitespace-nowrap">Marketplace de Tareas</h3>
                 <div className="flex items-center gap-2">
                     {isSavingOrder && <span className='text-xs text-blue-400 flex items-center gap-1'><Loader2 size={12} className='animate-spin' /> Guardando orden...</span>}
-                    <Link href="/admin/tareas/nueva" className={`${primaryButtonClasses} !px-2.5 !py-1`}>
-                        + Nueva Tarea
-                    </Link>
+                    <Link href="/admin/tareas/nueva" className={`${primaryButtonClasses} !px-2.5 !py-1`}>+ Nueva Tarea</Link>
                 </div>
             </div>
 
@@ -271,29 +195,16 @@ export default function ListaTareas() {
             <div className="mb-4 space-y-3">
                 <div className="relative">
                     <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre..."
-                        value={filtroNombre}
-                        onChange={(e) => setFiltroNombre(e.target.value)}
-                        className={`${inputBaseClasses} pl-7`}
-                    />
+                    <input type="text" placeholder="Buscar por nombre..." value={filtroNombre} onChange={(e) => setFiltroNombre(e.target.value)} className={`${inputBaseClasses} pl-7`} />
                 </div>
                 <div>
                     <label className="text-xs font-medium text-zinc-400 block mb-1.5">Filtrar por Categoría:</label>
                     <div className="flex flex-wrap gap-1.5">
-                        <button
-                            onClick={() => setFiltroCategoriaId('')}
-                            className={`${categoryButtonBase} ${filtroCategoriaId === '' ? categoryButtonActive : categoryButtonInactive}`}
-                        >
+                        <button onClick={() => setFiltroCategoriaId('')} className={`${categoryButtonBase} ${filtroCategoriaId === '' ? categoryButtonActive : categoryButtonInactive}`}>
                             {filtroCategoriaId === '' && <Check size={12} className="-ml-0.5" />} Todas
                         </button>
                         {categorias.map(cat => (
-                            <button
-                                key={cat.id}
-                                onClick={() => setFiltroCategoriaId(cat.id)}
-                                className={`${categoryButtonBase} ${filtroCategoriaId === cat.id ? categoryButtonActive : categoryButtonInactive}`}
-                            >
+                            <button key={cat.id} onClick={() => setFiltroCategoriaId(cat.id)} className={`${categoryButtonBase} ${filtroCategoriaId === cat.id ? categoryButtonActive : categoryButtonInactive}`}>
                                 {filtroCategoriaId === cat.id && <Check size={12} className="-ml-0.5" />} {cat.nombre}
                             </button>
                         ))}
@@ -303,35 +214,30 @@ export default function ListaTareas() {
 
             {error && <p className="mb-3 text-center text-xs text-red-400 bg-red-900/30 p-1.5 rounded border border-red-600">{error}</p>}
 
-            {/* Tabla de Tareas */}
-            <div className="flex-grow overflow-auto -mx-4 -mb-4">
-                {loading ? (
-                    <div className="flex items-center justify-center py-10 text-zinc-400"><Loader2 className="h-5 w-5 animate-spin mr-2" /><span>Cargando tareas...</span></div>
-                ) : (
-                    <table className="min-w-full divide-y divide-zinc-700 border-t border-zinc-700">
-                        <thead className="bg-zinc-800 sticky top-0 z-10">{/* Añadido z-10 */}
-                            <tr>
-                                <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider w-10"></th>
-                                <th scope="col" className="px-1 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-8" title="Icono">I</th>
-                                <th scope="col" className="px-1 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-8" title="Galería">G</th>
-                                <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Nombre Tarea</th>
-                                <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Categoría</th>
-                                <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Etiquetas</th>
-                                <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider w-16">Precio</th>
-                                <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-20">Status</th>
-                            </tr>
-                        </thead>
-                        {/* --- CORRECCIÓN: Mover DnDContext y SortableContext para envolver tbody --- */}
-                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            {/* --- CORRECCIÓN: Mover DndContext para envolver la tabla --- */}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <div className="flex-grow overflow-auto -mx-4 -mb-4">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-10 text-zinc-400"><Loader2 className="h-5 w-5 animate-spin mr-2" /><span>Cargando tareas...</span></div>
+                    ) : (
+                        <table className="min-w-full divide-y divide-zinc-700 border-t border-zinc-700">
+                            <thead className="bg-zinc-800 sticky top-0 z-10">
+                                <tr>
+                                    <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider w-10"></th>
+                                    <th scope="col" className="px-1 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-8" title="Icono">I</th>
+                                    <th scope="col" className="px-1 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-8" title="Galería">G</th>
+                                    <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Nombre Tarea</th>
+                                    <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Categoría</th>
+                                    <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Etiquetas</th>
+                                    <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider w-16">Precio</th>
+                                    <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-20">Status</th>
+                                </tr>
+                            </thead>
+                            {/* --- CORRECCIÓN: SortableContext envuelve solo tbody --- */}
                             <SortableContext items={tareasFiltradas.map(t => t.id)} strategy={verticalListSortingStrategy}>
                                 <tbody className="divide-y divide-zinc-700">
                                     {tareasFiltradas.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="text-center py-10 text-sm text-zinc-500 italic">
-                                                <ListFilter className="h-8 w-8 mx-auto text-zinc-600 mb-2" />
-                                                No se encontraron tareas con los filtros aplicados.
-                                            </td>
-                                        </tr>
+                                        <tr><td colSpan={8} className="text-center py-10 text-sm text-zinc-500 italic"><ListFilter className="h-8 w-8 mx-auto text-zinc-600 mb-2" />No se encontraron tareas...</td></tr>
                                     ) : (
                                         tareasFiltradas.map((tarea) => (
                                             <SortableTableRow key={tarea.id} id={tarea.id} tarea={tarea} onRowClick={handleRowClick} />
@@ -339,13 +245,13 @@ export default function ListaTareas() {
                                     )}
                                 </tbody>
                             </SortableContext>
-                        </DndContext>
-                    </table>
-                )}
-                {!loading && todasLasTareas.length > 0 && tareasFiltradas.length > 0 && (
-                    <p className="text-xs text-center text-zinc-500 mt-3 px-4 pb-2 italic">Arrastra <GripVertical size={12} className='inline align-text-bottom -mt-1' /> para reordenar las tareas.</p>
-                )}
-            </div>
+                        </table>
+                    )}
+                    {!loading && todasLasTareas.length > 0 && tareasFiltradas.length > 0 && (
+                        <p className="text-xs text-center text-zinc-500 mt-3 px-4 pb-2 italic">Arrastra <GripVertical size={12} className='inline align-text-bottom -mt-1' /> para reordenar.</p>
+                    )}
+                </div>
+            </DndContext> {/* Fin de DndContext */}
         </div>
     );
 }

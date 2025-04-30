@@ -204,7 +204,12 @@ export default function NegocioEtiquetas({ negocioId }: Props) {
             if (modalMode === 'create') {
                 // Asignar orden inicial (ej: al final de la lista)
                 const nuevoOrden = etiquetas.length + 1;
-                await crearNegocioEtiqueta({ ...dataToSend, negocioId: negocioId, orden: nuevoOrden } as NegocioEtiqueta);
+                await crearNegocioEtiqueta({
+                    ...dataToSend,
+                    negocioId: negocioId,
+                    orden: nuevoOrden,
+                    // Removed itemEtiquetas as it does not exist on dataToSend
+                });
             } else if (modalMode === 'edit' && etiquetaParaEditar?.id) {
                 await actualizarNegocioEtiqueta(etiquetaParaEditar.id, dataToSend);
             }

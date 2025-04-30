@@ -1,5 +1,5 @@
 import React from 'react'
-import { Contrato } from '@/app/admin/_lib/types'
+// import { Contrato } from '@/app/admin/_lib/types'
 
 interface Props {
     clienteId: string
