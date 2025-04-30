@@ -88,6 +88,7 @@ export type TareaConDetalles = Tarea & {
     _count?: {
         AsistenteTareaSuscripcion?: number;
         TareaGaleria?: number; // <-- AÑADIR ESTA LÍNEA
+        TareaEjecutada?: number; // <-- AÑADIR ESTA LÍNEA
     };
 };
 
@@ -206,7 +207,7 @@ export interface Contrato {
 export interface AsistenteVirtual {
     id: string;
     clienteId?: string | null;
-    // cliente?: Cliente | null;//! revisar si fuera necesario
+    cliente?: Cliente | null;//! para asociar a cliente 
     negocioId?: string | null;
     negocio?: Negocio | null;
     urlImagen?: string | null;

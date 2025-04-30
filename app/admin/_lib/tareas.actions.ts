@@ -4,11 +4,6 @@ import { Prisma } from '@prisma/client'
 import { mejorarTareaConGemini } from '@/scripts/gemini/mejorarTarea' // Ajusta la ruta según tu estructura
 import {
     Tarea,
-    // CategoriaTarea,
-    // EtiquetaTarea as TareaEtiqueta,
-    // EtiquetaTarea,
-    // TareaCanal as TareaCanal,
-    // CanalConversacional,
     TareaFuncion,
     ParametroRequerido,
     CrearTareaBasicaInput,
@@ -17,22 +12,6 @@ import {
     SugerenciasTarea,
     // TareaConDetalles
 } from './types'
-
-
-// --- Tipo específico para el retorno de obtenerTareasConDetalles ---
-// type TareaConDetalles = Tarea & {
-//     CategoriaTarea: Pick<CategoriaTarea, 'nombre'> | null; // Solo nombre o null
-//     tareaFuncion: Pick<TareaFuncion, 'id' | 'nombreVisible'> | null; // Solo id y nombreVisible o null
-//     etiquetas: (TareaEtiqueta & { // Unión TareaEtiqueta
-//         etiquetaTarea: Pick<EtiquetaTarea, 'id' | 'nombre'>; // Detalles de EtiquetaTarea
-//     })[];
-//     canalesSoportados: (TareaCanal & { // Unión TareaCanal
-//         canalConversacional: Pick<CanalConversacional, 'id' | 'nombre' | 'icono'>; // Detalles de CanalConversacional
-//     })[];
-//     _count?: { // Conteo opcional
-//         AsistenteTareaSuscripcion?: number;
-//     };
-// };
 
 /************************************ */
 
@@ -529,7 +508,8 @@ export async function obtenerTareasConDetalles() {
                 _count: {
                     select: {
                         AsistenteTareaSuscripcion: true,
-                        TareaGaleria: true // <-- AÑADIR ESTA LÍNEA
+                        TareaGaleria: true, // <-- AÑADIR ESTA LÍNEA
+                        TareaEjecutada: true // <-- AÑADIR ESTA LÍNEA
                     }
                 }
             }

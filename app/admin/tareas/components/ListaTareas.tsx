@@ -7,9 +7,11 @@ import {
     obtenerTareasConDetalles,
     obtenerCategorias,
     actualizarOrdenTareas
-} from '@/app/admin/_lib/tareas.actions';
-import { TareaConDetalles, CategoriaTarea } from '@/app/admin/_lib/types';
-import { Loader2, Search, ListFilter, GripVertical, Image as ImageIcon, GalleryHorizontal, Check } from 'lucide-react';
+} from '@/app/admin/_lib/tareas.actions'; // Ajusta ruta
+import { TareaConDetalles, CategoriaTarea } from '@/app/admin/_lib/types'; // Ajusta ruta
+import { Loader2, Search, ListFilter, GripVertical, Image as ImageIcon, GalleryHorizontal, Check } from 'lucide-react'; // Añadido PlayCircle
+
+// Dnd Imports
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
 } from '@dnd-kit/core';
@@ -18,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// --- Componente SortableTableRow (sin cambios) ---
+// --- Componente SortableTableRow (con nueva columna) ---
 function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaConDetalles; onRowClick: (id: string) => void }) {
     const {
         attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -31,15 +33,15 @@ function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaC
         zIndex: isDragging ? 10 : undefined,
     };
 
-    const tdClasses = "px-2 py-1.5 text-xs border-b border-zinc-700";
+    const tdClasses = "px-2 py-1.5 text-xs border-b border-zinc-700 align-middle";
     const tagClasses = "text-[0.65rem] px-1.5 py-0.5 rounded-full inline-block mr-1 mb-1";
 
     const handleRowClickInternal = (e: React.MouseEvent<HTMLTableRowElement>) => {
-        if ((e.target as HTMLElement).closest('button[data-dnd-handle="true"]')) {
-            return;
-        }
+        if ((e.target as HTMLElement).closest('button[data-dnd-handle="true"]')) return;
         onRowClick(tarea.id);
     };
+
+    const ejecucionesCount = tarea._count?.TareaEjecutada ?? 0; // Obtener conteo
 
     return (
         <tr
@@ -48,6 +50,7 @@ function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaC
             className={`bg-zinc-800 hover:bg-zinc-700/50 transition-colors duration-100 cursor-pointer ${isDragging ? 'shadow-lg ring-1 ring-blue-500' : ''}`}
             onClick={handleRowClickInternal}
         >
+            {/* Celda Handle DnD */}
             <td className={`${tdClasses} text-center w-10`}>
                 <button
                     {...attributes} {...listeners} data-dnd-handle="true"
@@ -58,19 +61,24 @@ function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaC
                     <GripVertical size={14} />
                 </button>
             </td>
+            {/* Celda Icono */}
             <td className={`${tdClasses} text-center w-8`}>
-                {tarea.iconoUrl ? <span title="Tiene icono"><ImageIcon size={12} className="text-blue-400 mx-auto" /></span> : <span className="text-zinc-600">-</span>}
+                {tarea.iconoUrl ? <ImageIcon size={12} className="text-blue-400 mx-auto" /> : <span className="text-zinc-600">-</span>}
             </td>
+            {/* Celda Galería */}
             <td className={`${tdClasses} text-center w-8`}>
                 {(tarea._count?.TareaGaleria ?? 0) > 0 ? <GalleryHorizontal size={12} className="text-purple-400 mx-auto" /> : <span className="text-zinc-600">-</span>}
             </td>
+            {/* Celda Nombre Tarea */}
             <td className={`${tdClasses} font-medium text-zinc-100`}>
                 {tarea.nombre}
                 {tarea.tareaFuncion && <span className="block text-[0.7rem] text-blue-400/80 font-normal" title={`Función: ${tarea.tareaFuncion.nombreVisible}`}>Fn: {tarea.tareaFuncion.nombreVisible}</span>}
             </td>
+            {/* Celda Categoría */}
             <td className={tdClasses}>
                 {tarea.CategoriaTarea ? <span className={`${tagClasses} bg-gray-700 text-gray-200`}>{tarea.CategoriaTarea.nombre}</span> : <span className="text-zinc-600 italic">N/A</span>}
             </td>
+            {/* Celda Etiquetas */}
             <td className={tdClasses}>
                 {tarea.etiquetas && tarea.etiquetas.length > 0 ? (
                     <div className="flex flex-wrap">
@@ -78,9 +86,15 @@ function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaC
                     </div>
                 ) : <span className="text-zinc-600 italic">Ninguna</span>}
             </td>
+            {/* Celda Precio */}
             <td className={`${tdClasses} text-right w-16`}>
                 {tarea.precio != null && tarea.precio > 0 ? <span className="font-semibold text-emerald-400">${tarea.precio.toFixed(2)}</span> : <span className="text-zinc-600">-</span>}
             </td>
+            {/* --- NUEVA CELDA: Ejecuciones --- */}
+            <td className={`${tdClasses} text-center w-16 ${ejecucionesCount > 0 ? 'text-cyan-300' : 'text-zinc-500'}`}>
+                {ejecucionesCount}
+            </td>
+            {/* Celda Status */}
             <td className={`${tdClasses} text-center w-20`}>
                 <span className={`font-medium px-2 py-0.5 rounded-full ${tarea.status === 'activo' ? 'bg-green-500/20 text-green-300' : 'bg-zinc-600/50 text-zinc-400'}`}>{tarea.status === 'activo' ? 'Activa' : 'Inactiva'}</span>
             </td>
@@ -112,7 +126,8 @@ export default function ListaTareas() {
         setLoading(true); setError(null);
         try {
             const [tareasData, categoriasData] = await Promise.all([
-                obtenerTareasConDetalles(), obtenerCategorias()
+                obtenerTareasConDetalles(), // Esta acción ahora debe incluir _count.TareaEjecutada
+                obtenerCategorias()
             ]);
             const tareasTyped = tareasData as TareaConDetalles[] || [];
             setTodasLasTareas(tareasTyped);
@@ -214,7 +229,7 @@ export default function ListaTareas() {
 
             {error && <p className="mb-3 text-center text-xs text-red-400 bg-red-900/30 p-1.5 rounded border border-red-600">{error}</p>}
 
-            {/* --- CORRECCIÓN: Mover DndContext para envolver la tabla --- */}
+            {/* Tabla de Tareas */}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <div className="flex-grow overflow-auto -mx-4 -mb-4">
                     {loading ? (
@@ -223,21 +238,23 @@ export default function ListaTareas() {
                         <table className="min-w-full divide-y divide-zinc-700 border-t border-zinc-700">
                             <thead className="bg-zinc-800 sticky top-0 z-10">
                                 <tr>
-                                    <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider w-10"></th>
+                                    {/* --- Cabeceras Actualizadas --- */}
+                                    <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider w-10"></th>{/* Handle */}
                                     <th scope="col" className="px-1 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-8" title="Icono">I</th>
                                     <th scope="col" className="px-1 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-8" title="Galería">G</th>
                                     <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Nombre Tarea</th>
                                     <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Categoría</th>
                                     <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Etiquetas</th>
                                     <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider w-16">Precio</th>
+                                    {/* --- NUEVA CABECERA: Ejecuciones --- */}
+                                    <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-16" title="Ejecuciones">Ejec.</th>
                                     <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider w-20">Status</th>
                                 </tr>
                             </thead>
-                            {/* --- CORRECCIÓN: SortableContext envuelve solo tbody --- */}
                             <SortableContext items={tareasFiltradas.map(t => t.id)} strategy={verticalListSortingStrategy}>
                                 <tbody className="divide-y divide-zinc-700">
                                     {tareasFiltradas.length === 0 ? (
-                                        <tr><td colSpan={8} className="text-center py-10 text-sm text-zinc-500 italic"><ListFilter className="h-8 w-8 mx-auto text-zinc-600 mb-2" />No se encontraron tareas...</td></tr>
+                                        <tr><td colSpan={9} className="text-center py-10 text-sm text-zinc-500 italic"><ListFilter className="h-8 w-8 mx-auto text-zinc-600 mb-2" />No se encontraron tareas...</td></tr>
                                     ) : (
                                         tareasFiltradas.map((tarea) => (
                                             <SortableTableRow key={tarea.id} id={tarea.id} tarea={tarea} onRowClick={handleRowClick} />
@@ -251,7 +268,7 @@ export default function ListaTareas() {
                         <p className="text-xs text-center text-zinc-500 mt-3 px-4 pb-2 italic">Arrastra <GripVertical size={12} className='inline align-text-bottom -mt-1' /> para reordenar.</p>
                     )}
                 </div>
-            </DndContext> {/* Fin de DndContext */}
+            </DndContext>
         </div>
     );
 }
