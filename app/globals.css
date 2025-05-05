@@ -109,3 +109,5 @@ body {
   list-style-type: disc;
   padding-left: 20px;
 }
+
+@import "react-big-calendar/lib/css/react-big-calendar.css";
