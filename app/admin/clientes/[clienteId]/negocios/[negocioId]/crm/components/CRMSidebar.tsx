@@ -3,16 +3,16 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation'; // Importar useRouter también
+import { usePathname, useRouter } from 'next/navigation';
 import {
     MessageSquareText,
     Users,
     CalendarClock,
     Settings,
     Filter,
-    LogOut // Icono para Cerrar
+    LogOut
 } from 'lucide-react';
-import CRMNegocioLogo from './CRMNegocioLogo'; // Asegúrate que la ruta sea correcta
+import CRMNegocioLogo from './CRMNegocioLogo';
 
 interface NavLink {
     hrefSuffix: string;
@@ -37,18 +37,16 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
     const router = useRouter();
     const pathname = usePathname();
 
-    // --- Clases de Tailwind Revisadas ---
-    // El contenedor principal <aside> ya tiene estilos en LayoutCRM.
-    // Estas clases son para los elementos *dentro* del sidebar.
-    const logoContainerClasses = "p-4 border-b border-zinc-700"; // Contenedor del logo
-    const navListClasses = "flex-grow p-3 space-y-1"; // Lista de navegación principal
-    const navLinkBaseClasses = "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out w-full text-left"; // Estilo base para links
-    const navLinkInactiveClasses = "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100"; // Estilo inactivo
-    const navLinkActiveClasses = "bg-sky-600 text-white shadow-inner"; // Estilo activo
-    const footerContainerClasses = "mt-auto p-3 border-t border-zinc-700"; // Contenedor del footer
-    const closeButtonClasses = "w-full flex items-center justify-center gap-2 text-sm text-zinc-400 hover:text-red-400 hover:bg-red-900/30 py-2 px-3 rounded-md transition-colors duration-150 ease-in-out mt-auto"; // Botón cerrar
+    // Clases de Tailwind
+    const logoContainerClasses = "p-4 border-b border-zinc-700";
+    const navListClasses = "flex-grow p-3 space-y-1";
+    const navLinkBaseClasses = "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out w-full text-left";
+    const navLinkInactiveClasses = "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100";
+    const navLinkActiveClasses = "bg-sky-600 text-white shadow-inner";
+    const footerContainerClasses = "mt-auto p-3 border-t border-zinc-700";
+    const closeButtonClasses = "w-full flex items-center justify-center gap-2 text-sm text-zinc-400 hover:text-red-400 hover:bg-red-900/30 py-2 px-3 rounded-md transition-colors duration-150 ease-in-out";
 
-    // --- Lógica de Navegación (Sin cambios respecto a la versión funcional) ---
+    // Lógica de Navegación
     const getBasePath = (): string | null => {
         if (!pathname) return null;
         const crmIndex = pathname.indexOf('/crm');
@@ -58,17 +56,30 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
 
     const basePath = getBasePath();
 
+    // --- Función isActive Corregida ---
     const isActive = (hrefSuffix: string) => {
         if (!pathname || !basePath) return false;
+
         const expectedPath = `${basePath}${hrefSuffix}`;
-        if (hrefSuffix === '/configuracion') {
-            return pathname.startsWith(expectedPath);
-        }
+
+        // Caso 1: Raíz del CRM (hrefSuffix es '')
         if (hrefSuffix === '') {
+            // Coincidencia exacta o con slash final
             return pathname === basePath || pathname === `${basePath}/`;
         }
+
+        // Caso 2: Secciones con subrutas (Leads, Configuración)
+        if (hrefSuffix === '/leads' || hrefSuffix === '/configuracion') {
+            // Debe ser la ruta exacta O comenzar con la ruta + un slash
+            return pathname === expectedPath || pathname.startsWith(`${expectedPath}/`);
+        }
+
+        // Caso 3: Secciones sin subrutas esperadas (Pipeline, Agenda)
+        // Coincidencia exacta
         return pathname === expectedPath;
     };
+    // --- Fin Corrección ---
+
 
     const buildHref = (hrefSuffix: string): string => {
         if (!basePath) return '#';
@@ -79,21 +90,15 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
         router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}`);
     }
 
-    // --- Renderizado ---
-    // No se necesita un div contenedor aquí, ya que el <aside> del layout lo envuelve
     return (
-        <div>
-            {/* Usar Fragment para evitar div extra */}
-            {/* Contenedor del Logo/Nombre */}
+        <>
             <div className={logoContainerClasses}>
                 <CRMNegocioLogo negocioId={negocioId} />
             </div>
-
-            {/* Lista de Navegación */}
             <nav className={navListClasses}>
                 <ul>
                     {navLinks.map((link) => {
-                        const active = isActive(link.hrefSuffix);
+                        const active = isActive(link.hrefSuffix); // Usa lógica corregida
                         const href = buildHref(link.hrefSuffix);
                         return (
                             <li key={link.hrefSuffix}>
@@ -109,8 +114,6 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
                     })}
                 </ul>
             </nav>
-
-            {/* Footer con Botón Cerrar */}
             <div className={footerContainerClasses}>
                 <button
                     onClick={handleCloseCRM}
@@ -121,6 +124,6 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
                     <span>Cerrar CRM</span>
                 </button>
             </div>
-        </div>
+        </>
     );
 }

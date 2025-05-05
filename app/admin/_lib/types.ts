@@ -1,3 +1,106 @@
+
+// Tipo para mostrar una cita existente en la lista
+export type CitaExistente = Pick<
+    Agenda,
+    'id' | 'tipo' | 'asunto' | 'fecha' | 'status' | 'descripcion' | 'meetingUrl' | 'fechaRecordatorio'
+> & {
+    agente?: Pick<Agente, 'id' | 'nombre'> | null;
+    agenteId?: string | null;
+};
+
+// Tipo para los datos del formulario de nueva cita
+export type NuevaCitaFormData = Pick<
+    Agenda,
+    'tipo' | 'asunto' | 'descripcion' | 'agenteId'
+> & {
+    fecha: string;
+    meetingUrl?: string | null;
+    fechaRecordatorio?: string | null;
+};
+
+// Tipo para datos del formulario de EDICIÓN
+export type EditarCitaFormData = Pick<
+    Agenda,
+    'tipo' | 'asunto' | 'descripcion' | 'agenteId' | 'status'
+> & {
+    fecha: string;
+    meetingUrl?: string | null;
+    fechaRecordatorio?: string | null;
+};
+
+// Tipo de retorno para la acción que obtiene las citas de un lead
+export interface ObtenerCitasLeadResult {
+    success: boolean;
+    data?: CitaExistente[] | null;
+    error?: string;
+}
+
+// Tipo de retorno para la acción que crea una cita
+export interface CrearCitaResult {
+    success: boolean;
+    data?: CitaExistente | null;
+    error?: string;
+}
+
+// Tipo de retorno para la acción que edita una cita
+export interface EditarCitaResult {
+    success: boolean;
+    data?: CitaExistente | null;
+    error?: string;
+}
+
+// Tipo de retorno para la acción que elimina una cita
+export interface EliminarCitaResult {
+    success: boolean;
+    error?: string;
+}
+
+// --- TIPO AJUSTADO ---
+// Tipo para los datos necesarios para el formulario (agentes Y crmId)
+export interface DatosFormularioCita {
+    crmId: string | null; // <-- Añadido crmId
+    agentes: Pick<Agente, 'id' | 'nombre'>[];
+}
+// --- FIN AJUSTE ---
+
+// --- TIPO AJUSTADO ---
+// El tipo de retorno ahora usa el DatosFormularioCita actualizado
+export interface ObtenerDatosFormularioCitaResult {
+    success: boolean;
+    data?: DatosFormularioCita | null; // <-- Usa el tipo que incluye crmId
+    error?: string;
+}
+// --- FIN AJUSTE ---
+
+
+// Tipo para un evento formateado para react-big-calendar
+// Necesita al menos 'title', 'start', 'end'. 'resource' es opcional para info extra.
+export interface CalendarEvent {
+    id: string;         // ID del registro Agenda original
+    title: string;      // Título del evento (ej. "Llamada: Juan Perez")
+    start: Date;        // Fecha y hora de inicio
+    end: Date;          // Fecha y hora de fin (puede ser igual a start si no hay duración)
+    allDay?: boolean;   // Opcional: si es un evento de todo el día
+    resource?: {        // Opcional: Objeto para pasar datos adicionales
+        tipo: string;     // Tipo de evento (ej. 'Llamada', 'Reunion')
+        descripcion?: string | null;
+        status: string;
+        lead?: Pick<Lead, 'id' | 'nombre'> | null; // Info del Lead asociado
+        agente?: Pick<Agente, 'id' | 'nombre'> | null; // Info del Agente asociado
+    };
+}
+
+// Tipo de retorno para la acción que obtiene los eventos
+export interface ObtenerEventosAgendaResult {
+    success: boolean;
+    data?: {
+        crmId: string | null;
+        eventos: CalendarEvent[];
+    } | null;
+    error?: string;
+}
+
+
 // Tipo para los datos completos de un Lead para edición
 // Incluye relaciones necesarias para mostrar y pre-seleccionar
 export type LeadDetallesEditar = Pick<
@@ -44,14 +147,7 @@ export interface EditarLeadResult {
 
 // Tipo para los datos del formulario de nuevo lead
 // Incluye campos opcionales para la asignación inicial
-export type NuevoLeadFormData = Pick<Lead, 'nombre' | 'email' | 'telefono' | 'valorEstimado'> & {
-    pipelineId?: string | null; // Etapa inicial opcional
-    canalId?: string | null;    // Canal de origen opcional
-    agenteId?: string | null;   // Agente asignado opcional
-    etiquetaIds?: string[];     // Etiquetas iniciales opcionales
-    // Podrías añadir campos personalizados aquí si los quieres en el form inicial
-    // [key: string]: any; // Para campos personalizados dinámicos (más complejo)
-};
+export type NuevoLeadFormData = Pick<Lead, 'nombre' | 'email' | 'telefono' | 'valorEstimado'>;
 
 // Tipo de retorno para la acción de crear lead
 export interface CrearLeadResult {
@@ -60,24 +156,21 @@ export interface CrearLeadResult {
     error?: string;
 }
 
-// Reutilizamos DatosFiltros de crm_leads_types si ya existe,
-// o lo definimos aquí si es necesario para los selects del formulario.
+// Tipo para los datos necesarios para los selects (se usará en el form de edición)
 export interface DatosFormularioLead {
     pipelines: Pick<PipelineCRM, 'id' | 'nombre'>[];
     canales: Pick<CanalCRM, 'id' | 'nombre'>[];
     etiquetas: Pick<EtiquetaCRM, 'id' | 'nombre' | 'color'>[];
     agentes: Pick<Agente, 'id' | 'nombre'>[];
-    crmId: string | null; // ID del CRM asociado
-    // Incluir campos personalizados si se añaden al formulario
-    // camposPersonalizados: Pick<CRMCampoPersonalizado, 'id' | 'nombre' | 'tipo' | 'requerido'>[];
+    // camposPersonalizados?: Pick<CRMCampoPersonalizado, 'id' | 'nombre' | 'tipo' | 'requerido'>[];
 }
 
 export interface ObtenerDatosFormularioLeadResult {
     success: boolean;
-    data?: DatosFormularioLead | null;
+    // Ajustar el tipo de data para incluir crmId
+    data?: (DatosFormularioLead & { crmId: string | null }) | null;
     error?: string;
 }
-
 
 
 // Tipo para representar un Lead en la lista (con datos relacionados)
@@ -1205,6 +1298,10 @@ export interface Agenda {
     tipo: string;
     asunto: string;
     descripcion?: string | null;
+
+    meetingUrl?: string | null; // URL para una reunión asociada a la cita
+    fechaRecordatorio?: Date | null; // Fecha y hora del recordatorio
+
     status: string; // No opcional en schema
     createdAt: Date; // No opcional en schema
     updatedAt: Date; // No opcional en schema

@@ -7,10 +7,11 @@ export const metadata: Metadata = {
 }
 
 interface Props {
+    clienteId: string
     negocioId: string
 }
 
 export default async function page({ params }: { params: Promise<Props> }) {
-    const { negocioId } = await params;
-    return <LeadLista negocioId={negocioId} />
+    const { negocioId, clienteId } = await params;
+    return <LeadLista negocioId={negocioId} clienteId={clienteId} />
 }

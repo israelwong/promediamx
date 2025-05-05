@@ -13,24 +13,24 @@ import {
 } from '@/app/admin/_lib/types';
 
 // Importar componentes UI
-import { Input } from "../../components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { Button } from "../../components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
+import { Button } from "@/app/components/ui/button";
+
 // --- DropdownMenu ya no se importa ---
-// import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu";
-import { Loader2, Search, ArrowUpDown, Eye, PlusCircle, MessageSquare, X } from 'lucide-react'; // Añadido X para quitar filtro
-import { Badge } from "../../components/ui/badge";
+// import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/app/components/ui/dropdown-menu";
+import { Loader2, Search, ArrowUpDown, PlusCircle, MessageSquare, X } from 'lucide-react'; // Añadido X para quitar filtro
+import { Badge } from "@/app/components/ui/badge";
 
 interface Props {
     negocioId: string;
-    // Opcional: Pasar clienteId si lo necesitas para la navegación
-    // clienteId: string;
+    clienteId: string;
 }
 
 const DEBOUNCE_DELAY = 300; // ms
 
-export default function LeadLista({ negocioId }: Props) {
+export default function LeadLista({ clienteId, negocioId }: Props) {
     const router = useRouter();
     const [leads, setLeads] = useState<LeadListaItem[]>([]);
     const [crmId, setCrmId] = useState<string | null>(null);
@@ -121,7 +121,7 @@ export default function LeadLista({ negocioId }: Props) {
         setSort(prev => ({ campo, direccion: prev.campo === campo && prev.direccion === 'desc' ? 'asc' : 'desc' }));
     };
     const handleViewDetails = (leadId: string) => {
-        router.push(`/admin/clientes/dummy/negocios/${negocioId}/crm/leads/${leadId}`);
+        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads/${leadId}`);
     };
 
     // --- Renderizado ---
@@ -133,14 +133,14 @@ export default function LeadLista({ negocioId }: Props) {
 
     const tableColumns: TableColumn[] = useMemo(() => [
         { key: 'nombre', label: 'Nombre', sortable: true },
-        { key: 'pipeline', label: 'Etapa', sortable: true },
+        { key: 'pipeline', label: 'Etapa', sortable: false },
         { key: 'status', label: 'Estado', sortable: false },
         { key: 'etiquetas', label: 'Etiquetas', sortable: false },
-        { key: 'agente', label: 'Agente', sortable: true },
+        { key: 'agente', label: 'Agente', sortable: false },
         { key: 'valorEstimado', label: 'Valor Estimado', sortable: true },
-        { key: 'ultimaConversacion', label: 'Última Conversación', sortable: false },
+        { key: 'ultimaConversacion', label: 'Última actualización', sortable: false },
         { key: 'createdAt', label: 'Creado', sortable: true },
-        { key: 'acciones', label: 'Acciones', sortable: false },
+        // { key: 'acciones', label: 'Acciones', sortable: false },
     ], []);
     const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
         switch (status) {
@@ -177,6 +177,11 @@ export default function LeadLista({ negocioId }: Props) {
     }, [filtros, datosFiltros]);
     // --- FIN Lógica Filtros Activos ---
 
+    // --- NUEVO: Manejador para crear nuevo lead ---
+    const handleCrearNuevoLead = () => {
+        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads/nuevo`);
+    };
+
 
     return (
         <div className="space-y-4 h-full flex flex-col">
@@ -184,7 +189,7 @@ export default function LeadLista({ negocioId }: Props) {
             <div className="flex items-center justify-between gap-4">
                 <h2 className="text-xl font-semibold text-white flex-shrink-0">Leads</h2>
                 {/* Botón Nuevo Lead (movido aquí para mejor flujo) */}
-                <Button onClick={() => router.push(`/admin/clientes/dummy/negocios/${negocioId}/crm/leads/nuevo`)} className="bg-blue-600 hover:bg-blue-700 ml-auto">
+                <Button onClick={() => handleCrearNuevoLead()} className="bg-blue-600 hover:bg-blue-700 ml-auto">
                     <PlusCircle className="h-4 w-4 mr-2" /> Nuevo Lead
                 </Button>
             </div>
@@ -297,7 +302,8 @@ export default function LeadLista({ negocioId }: Props) {
                         ) : leads.length === 0 ? (<TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-zinc-500">No se encontraron leads.</TableCell></TableRow>
                         ) : (
                             leads.map((lead) => (
-                                <TableRow key={lead.id} className="hover:bg-zinc-800/50">
+                                <TableRow key={lead.id} className="hover:bg-zinc-800/50 cursor-pointer"
+                                    onClick={() => handleViewDetails(lead.id)}>
                                     <TableCell className="font-medium text-zinc-100 px-4 py-2"><p className="truncate max-w-[200px]" title={lead.nombre}>{lead.nombre}</p><p className="text-xs text-zinc-400 truncate max-w-[200px]" title={lead.email || ''}>{lead.email || '-'}</p></TableCell>
                                     <TableCell className="px-4 py-2 text-zinc-300 text-xs"><div className="flex items-center gap-2">
                                         <span className={`w-2 h-2 rounded-full ${getPipelineColor()} flex-shrink-0`}></span>
@@ -315,7 +321,7 @@ export default function LeadLista({ negocioId }: Props) {
                                         {lead.ultimaConversacion?.updatedAt ? new Date(lead.ultimaConversacion.updatedAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }) : (lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }) : '-')}
                                     </span></div></TableCell>
                                     <TableCell className="px-4 py-2 text-zinc-400 text-xs">{new Date(lead.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' })}</TableCell>
-                                    <TableCell className="px-4 py-2 text-right"><Button variant="ghost" size="sm" onClick={() => handleViewDetails(lead.id)} className="h-7 px-2 hover:bg-zinc-700"><Eye className="h-4 w-4 text-zinc-400" /></Button></TableCell>
+                                    {/* <TableCell className="px-4 py-2 text-right"><Button variant="ghost" size="sm" onClick={() => handleViewDetails(lead.id)} className="h-7 px-2 hover:bg-zinc-700"><Eye className="h-4 w-4 text-zinc-400" /></Button></TableCell> */}
                                 </TableRow>
                             ))
                         )}

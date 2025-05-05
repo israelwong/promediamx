@@ -9,8 +9,8 @@ import { crearLeadManual, obtenerDatosParaFormularioLead } from '@/app/admin/_li
 import { NuevoLeadFormData, DatosFormularioLead } from '@/app/admin/_lib/types'; // Ajusta ruta!
 
 // Importar componentes UI
-import { Input } from "../../components/ui/input";
-import { Button } from "../../components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Button } from "@/app/components/ui/button";
 // --- MultiSelect ya no se importa ---
 // import { MultiSelect } from "@/components/ui/multi-select";
 import { Loader2, Save, ArrowLeft } from 'lucide-react';
@@ -29,15 +29,10 @@ export default function LeadFormNuevo({ negocioId, clienteId }: Props) {
         email: '',
         telefono: '',
         valorEstimado: undefined,
-        pipelineId: undefined,
-        canalId: undefined,
-        agenteId: undefined,
-        etiquetaIds: [], // Sigue siendo un array de IDs
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [crmId, setCrmId] = useState<string | null>(null);
-    const [datosFiltros, setDatosFiltros] = useState<DatosFormularioLead | null>(null);
     const [loadingData, setLoadingData] = useState(true);
 
     // useEffect para cargar crmId y datos de filtros (sin cambios)
@@ -56,7 +51,6 @@ export default function LeadFormNuevo({ negocioId, clienteId }: Props) {
                         throw new Error("CRM no configurado para este negocio.");
                     }
                     setCrmId(dataWithCrmId.crmId);
-                    setDatosFiltros(dataWithCrmId);
                 } else {
                     throw new Error(result.error || "Error cargando datos para el formulario.");
                 }
@@ -65,7 +59,6 @@ export default function LeadFormNuevo({ negocioId, clienteId }: Props) {
                     console.error("Error fetching data for new lead form:", err);
                     setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
                     setCrmId(null);
-                    setDatosFiltros(null);
                 }
             } finally {
                 if (isMounted) {
@@ -87,28 +80,7 @@ export default function LeadFormNuevo({ negocioId, clienteId }: Props) {
         setError(null);
     };
 
-    // Manejador para botones tipo radio (sin cambios)
-    const handleOptionButtonClick = (name: keyof NuevoLeadFormData, value: string | null) => {
-        setFormData(prev => ({
-            ...prev,
-            [name]: prev[name] === value ? null : value,
-        }));
-        setError(null);
-    };
 
-    // --- NUEVO: Manejador para click en badge de etiqueta ---
-    const handleEtiquetaToggle = (etiquetaId: string) => {
-        setFormData(prev => {
-            const currentEtiquetas = prev.etiquetaIds || [];
-            const isSelected = currentEtiquetas.includes(etiquetaId);
-            const newEtiquetas = isSelected
-                ? currentEtiquetas.filter(id => id !== etiquetaId) // Quitar si ya estaba
-                : [...currentEtiquetas, etiquetaId]; // Añadir si no estaba
-            return { ...prev, etiquetaIds: newEtiquetas };
-        });
-        setError(null); // Limpiar error al interactuar
-    }
-    // --- FIN NUEVO MANEJADOR ---
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -119,10 +91,10 @@ export default function LeadFormNuevo({ negocioId, clienteId }: Props) {
         setError(null);
         setIsSubmitting(true);
         try {
-            const dataToSubmit = { ...formData, etiquetaIds: formData.etiquetaIds || [] };
+            const dataToSubmit = { ...formData };
             const result = await crearLeadManual(crmId, dataToSubmit);
             if (result.success && result.data) {
-                router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads`);
+                router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads/${result.data.id}`);
             } else {
                 throw new Error(result.error || "Error desconocido al crear el lead.");
             }
@@ -141,16 +113,7 @@ export default function LeadFormNuevo({ negocioId, clienteId }: Props) {
     // Clases comunes
     const labelClasses = "block text-sm font-medium text-zinc-300 mb-1";
     const inputClasses = "block w-full rounded-md border-zinc-700 bg-zinc-900 text-zinc-100 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm p-2 disabled:opacity-50";
-    const optionButtonContainerClasses = "flex flex-wrap gap-2 pt-1";
-    const optionButtonBaseClasses = "px-3 py-1.5 rounded-md text-xs font-medium border transition-colors duration-150 ease-in-out disabled:opacity-50";
-    const optionButtonInactiveClasses = "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:border-zinc-600";
-    const optionButtonActiveClasses = "bg-sky-600 border-sky-500 text-white ring-2 ring-sky-500 ring-offset-2 ring-offset-zinc-900";
-    // --- Nuevas clases para etiquetas clickeables ---
-    const etiquetaButtonContainerClasses = "flex flex-wrap gap-2 pt-1";
-    const etiquetaButtonBaseClasses = "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-150 ease-in-out cursor-pointer disabled:opacity-50";
-    const etiquetaButtonInactiveClasses = "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:border-zinc-600";
-    const etiquetaButtonActiveClasses = "bg-blue-600 border-blue-500 text-white ring-2 ring-blue-500 ring-offset-1 ring-offset-zinc-900"; // Estilo activo diferente
-    const colorDotClasses = "w-2 h-2 rounded-full inline-block mr-1.5 border border-zinc-500";
+
 
 
     if (loadingData) {
@@ -196,65 +159,7 @@ export default function LeadFormNuevo({ negocioId, clienteId }: Props) {
                 </div>
             </div>
 
-            {/* Selects como Botones y Etiquetas como Badges Clickeables */}
-            <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                {/* Etapa Inicial (Botones) */}
-                <div className="sm:col-span-3">
-                    <label className={labelClasses}>Etapa Inicial</label>
-                    <div className={optionButtonContainerClasses}>
-                        <button type="button" onClick={() => handleOptionButtonClick('pipelineId', null)} disabled={isSubmitting || !datosFiltros} className={`${optionButtonBaseClasses} ${formData.pipelineId === null ? optionButtonActiveClasses : optionButtonInactiveClasses}`}>Ninguna</button>
-                        {datosFiltros?.pipelines.map(p => (<button key={p.id} type="button" onClick={() => handleOptionButtonClick('pipelineId', p.id)} disabled={isSubmitting || !datosFiltros} className={`${optionButtonBaseClasses} ${formData.pipelineId === p.id ? optionButtonActiveClasses : optionButtonInactiveClasses}`}>{p.nombre}</button>))}
-                    </div>
-                </div>
 
-                {/* Canal Origen (Botones) */}
-                <div className="sm:col-span-3">
-                    <label className={labelClasses}>Canal Origen</label>
-                    <div className={optionButtonContainerClasses}>
-                        <button type="button" onClick={() => handleOptionButtonClick('canalId', null)} disabled={isSubmitting || !datosFiltros} className={`${optionButtonBaseClasses} ${formData.canalId === null ? optionButtonActiveClasses : optionButtonInactiveClasses}`}>Ninguno</button>
-                        {datosFiltros?.canales.map(c => (<button key={c.id} type="button" onClick={() => handleOptionButtonClick('canalId', c.id)} disabled={isSubmitting || !datosFiltros} className={`${optionButtonBaseClasses} ${formData.canalId === c.id ? optionButtonActiveClasses : optionButtonInactiveClasses}`}>{c.nombre}</button>))}
-                    </div>
-                </div>
-
-                {/* Agente Asignado (Botones) */}
-                <div className="sm:col-span-3">
-                    <label className={labelClasses}>Agente Asignado</label>
-                    <div className={optionButtonContainerClasses}>
-                        <button type="button" onClick={() => handleOptionButtonClick('agenteId', null)} disabled={isSubmitting || !datosFiltros} className={`${optionButtonBaseClasses} ${formData.agenteId === null ? optionButtonActiveClasses : optionButtonInactiveClasses}`}>Ninguno</button>
-                        {datosFiltros?.agentes.map(a => (<button key={a.id} type="button" onClick={() => handleOptionButtonClick('agenteId', a.id)} disabled={isSubmitting || !datosFiltros} className={`${optionButtonBaseClasses} ${formData.agenteId === a.id ? optionButtonActiveClasses : optionButtonInactiveClasses}`}>{a.nombre}</button>))}
-                    </div>
-                </div>
-
-                {/* --- ETIQUETAS COMO BADGES CLICKEABLES --- */}
-                <div className="sm:col-span-3">
-                    <label className={labelClasses}>Etiquetas Iniciales</label>
-                    <div className={etiquetaButtonContainerClasses}>
-                        {datosFiltros?.etiquetas && datosFiltros.etiquetas.length > 0 ? (
-                            datosFiltros.etiquetas.map(etiqueta => {
-                                const isSelected = formData.etiquetaIds?.includes(etiqueta.id);
-                                return (
-                                    <button
-                                        key={etiqueta.id}
-                                        type="button" // Importante: type="button" para no enviar el form
-                                        onClick={() => handleEtiquetaToggle(etiqueta.id)}
-                                        disabled={isSubmitting || !datosFiltros}
-                                        className={`${etiquetaButtonBaseClasses} ${isSelected ? etiquetaButtonActiveClasses : etiquetaButtonInactiveClasses}`}
-                                        title={etiqueta.nombre} // Tooltip
-                                    >
-                                        {etiqueta.color && (
-                                            <span className={colorDotClasses} style={{ backgroundColor: etiqueta.color }}></span>
-                                        )}
-                                        {etiqueta.nombre}
-                                    </button>
-                                );
-                            })
-                        ) : (
-                            <span className="text-xs text-zinc-500 italic">No hay etiquetas definidas.</span>
-                        )}
-                    </div>
-                </div>
-                {/* --- FIN ETIQUETAS --- */}
-            </div>
 
             {/* Botones de Acción */}
             <div className="pt-5 flex justify-end gap-3">

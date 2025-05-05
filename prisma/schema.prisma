@@ -839,6 +839,8 @@ model Agenda {
   tipo        String   // Ej: 'Llamada', 'Reunion', 'Email', 'Tarea'
   asunto      String
   descripcion String?
+  meetingUrl String? // URL de la reunión (ej: Zoom, Google Meet)
+  fechaRecordatorio DateTime? // Fecha y hora del recordatorio
   status      String   @default("pendiente") // pendiente, completada, cancelada
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

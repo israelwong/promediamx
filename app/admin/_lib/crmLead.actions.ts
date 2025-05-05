@@ -265,21 +265,29 @@ export async function crearLeadManual(
             telefono: data.telefono?.trim() || null,
             valorEstimado: data.valorEstimado ?? null, // Usar ?? para manejar 0 correctamente
             status: 'nuevo', // Status inicial
-            // Conectar relaciones opcionales solo si tienen un valor
-            ...(data.pipelineId && { Pipeline: { connect: { id: data.pipelineId } } }),
-            ...(data.canalId && { Canal: { connect: { id: data.canalId } } }), // Asegúrate que la relación se llame 'Canal' en Lead
-            ...(data.agenteId && { agente: { connect: { id: data.agenteId } } }),
-            // Conectar etiquetas
-            ...(data.etiquetaIds && data.etiquetaIds.length > 0 && {
-                Etiquetas: { // <-- VERIFICA este nombre en tu schema Lead
-                    create: data.etiquetaIds.map(etiquetaId => ({
-                        // Asegúrate que el campo en LeadEtiqueta que apunta a EtiquetaCRM se llame 'etiqueta'
-                        etiqueta: { connect: { id: etiquetaId } }
-                    }))
-                }
-            })
         };
         // --- FIN CORRECCIONES ---
+
+        // Verificar si ya existe un lead con el mismo correo o teléfono en el CRM
+        if (data.email || data.telefono) {
+            const existingLead = await prisma.lead.findFirst({
+                where: {
+                    crmId,
+                    OR: [
+                        { email: data.email?.trim() || undefined },
+                        { telefono: data.telefono?.trim() || undefined },
+                    ],
+                },
+                select: { id: true, nombre: true },
+            });
+
+            if (existingLead) {
+                return {
+                    success: false,
+                    error: `Ya existe un lead con el mismo correo o teléfono: ${existingLead.nombre}.`,
+                };
+            }
+        }
 
         const newLead = await prisma.lead.create({
             data: leadData, // Usar el objeto construido
@@ -435,5 +443,30 @@ export async function editarLead(
             return { success: false, error: `Error al actualizar: No se encontró un registro relacionado.` };
         }
         return { success: false, error: 'No se pudo actualizar el lead.' };
+    }
+}
+
+/**
+ * Elimina un Lead existente por su ID.
+ * @param leadId - El ID del Lead a eliminar.
+ * @returns Objeto con el resultado de la operación.
+ */
+export async function eliminarLead(leadId: string): Promise<{ success: boolean; error?: string }> {
+    if (!leadId) {
+        return { success: false, error: "ID de Lead no proporcionado." };
+    }
+
+    try {
+        await prisma.lead.delete({
+            where: { id: leadId },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error(`Error deleting lead ${leadId}:`, error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return { success: false, error: "El Lead no existe o ya fue eliminado." };
+        }
+        return { success: false, error: "No se pudo eliminar el Lead." };
     }
 }

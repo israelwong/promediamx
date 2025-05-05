@@ -5,16 +5,14 @@ import React, { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 // Importar acciones y tipos
-import { editarLead } from '@/app/admin/_lib/crmLead.actions'; // Ajusta ruta!
+import { editarLead, eliminarLead } from '@/app/admin/_lib/crmLead.actions'; // Ajusta ruta!
 import { EditarLeadFormData, DatosFormularioLead, LeadDetallesEditar } from '@/app/admin/_lib/types'; // Ajusta ruta!
 
 // Importar componentes UI
-import { Input } from "../../components/ui/input";
-import { Button } from "../../components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-// --- MultiSelect ya no se importa ---
-// import { MultiSelect } from "@/components/ui/multi-select";
-import { Loader2, Save, ArrowLeft } from 'lucide-react';
+import { Input } from "@/app/components/ui/input";
+import { Button } from "@/app/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import { Loader2, Save, ArrowLeft, Trash } from 'lucide-react';
 
 interface Props {
     leadInicial: LeadDetallesEditar;
@@ -98,6 +96,26 @@ export default function LeadFormEditar({ leadInicial, datosSelects, negocioId, c
         router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads`);
     }
 
+    const handleDeleteLead = async (leadId: string) => {
+        // Confirmar antes de eliminar el lead
+        if (confirm("¿Estás seguro de que deseas eliminar este lead? Esta acción no se puede deshacer.")) {
+            try {
+                setIsSubmitting(true);
+                const result = await eliminarLead(leadId);
+                if (result.success) {
+                    router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads`);
+                } else {
+                    throw new Error(result.error || "Error desconocido al eliminar el lead.");
+                }
+            } catch (err) {
+                console.error("Error deleting lead:", err);
+                setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
+            } finally {
+                setIsSubmitting(false);
+            }
+        }
+    }
+
     // Clases comunes
     const labelClasses = "block text-sm font-medium text-zinc-300 mb-1";
     const inputClasses = "block w-full rounded-md border-zinc-700 bg-zinc-900 text-zinc-100 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm p-2 disabled:opacity-50";
@@ -112,7 +130,7 @@ export default function LeadFormEditar({ leadInicial, datosSelects, negocioId, c
 
 
     return (
-        <div className="bg-zinc-800/50 p-6 rounded-lg shadow-md max-w-2xl">
+        <div className="bg-zinc-800/50 p-6 rounded-lg shadow-md">
 
             <div>
                 <h2 className="text-lg font-semibold text-zinc-200 mb-4">Editar Lead</h2>
@@ -225,14 +243,26 @@ export default function LeadFormEditar({ leadInicial, datosSelects, negocioId, c
                 </div>
 
                 {/* Botones de Acción */}
-                <div className="pt-5 flex justify-end gap-3">
-                    <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting} className="bg-transparent hover:bg-zinc-700">
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Cancelar
+                <div className="pt-5 flex justify-between gap-3">
+
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => handleDeleteLead(leadInicial.id)} disabled={isSubmitting}
+                        className="text-red-800">
+                        <Trash className="mr-2 h-4 w-4" />
+                        Eliminar
                     </Button>
-                    <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700">
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Guardar Cambios
-                    </Button>
+
+                    <div className="flex gap-3">
+                        <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting} className="bg-transparent hover:bg-zinc-700">
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Cancelar
+                        </Button>
+                        <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700">
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Guardar Cambios
+                        </Button>
+                    </div>
                 </div>
             </form>
         </div>

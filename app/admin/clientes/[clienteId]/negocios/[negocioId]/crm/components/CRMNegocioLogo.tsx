@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { obtenerLogoYNombreNegocio, NegocioLogoNombre } from '@/app/admin/_lib/negocio.actions'; // Ajusta la ruta!
 import Image from 'next/image';
-import { SkeletonLogo } from '../components/ui/SkeletonLogo';
+import { SkeletonLogo } from '@/app/components/ui/SkeletonLogo';
 
 interface Props {
     negocioId: string;
