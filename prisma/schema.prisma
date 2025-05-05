@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//! Sistema
+//! SISTEMA
 model Usuario {
   id        String    @id @default(cuid())
   // rol       String // admin, cliente, supervisor
@@ -42,7 +42,7 @@ model Sesion {
   updatedAt DateTime @updatedAt
 }
 
-//! Cliente
+//! CLIENTE
 model Cliente{
   id        String   @id @default(cuid())
   nombre    String?
@@ -63,7 +63,7 @@ model Cliente{
   Notificacion Notificacion[]
 }
 
-//! Contrato 
+//! CONTRATO 
 model Contrato{ 
   id        String   @id @default(cuid())
   clienteId String
@@ -78,6 +78,7 @@ model Contrato{
   updatedAt DateTime @updatedAt
 }
 
+//! ASISTENTE VIRTUAL
 model AsistenteVirtual{
   id        String   @id @default(cuid())
   clienteId String?
@@ -99,14 +100,11 @@ model AsistenteVirtual{
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // CotizacionAsistenteVirtual CotizacionAsistenteVirtual[]
   AsistenteTareaSuscripcion AsistenteTareaSuscripcion[]
   TareaEjecutada TareaEjecutada[]
-  // AsistenteVirtualTarea AsistenteVirtualTarea[]
   Conversacion Conversacion[]
-  FacturaItem          FacturaItem[] // Opcional: Link a items de factura donde se cobró su base
-
+  FacturaItem          FacturaItem[] 
+  ItemInteraccion ItemInteraccion[] 
 }
 
 model CanalConversacional {
@@ -118,38 +116,30 @@ model CanalConversacional {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   orden     Int? // Orden de aparición en la UI
-
-  // Relación inversa con tabla de unión
   tareasSoportadas TareaCanal[]
 }
 
-//! --- NUEVO: Modelo para definir las funciones/automatizaciones ---
-model TareaFuncion {
-  id                   String                         @id @default(cuid())
-  nombreInterno        String                         @unique // Identificador único para la lógica interna (e.g., "agendarCita", "consultarProducto")
-  nombreVisible        String // Nombre descriptivo para la UI (e.g., "Agendar Cita", "Consultar Producto")
-  descripcion          String? // Descripción de lo que hace la función
-  orden              Int? // Orden de aparición en la UI
-  parametrosRequeridos TareaFuncionParametroRequerido[] // Relación M-N con parámetros estándar
-  tareas               Tarea[] // Relación 1-N con Tarea (Tareas que usan esta función)
-  createdAt            DateTime                       @default(now())
-  updatedAt            DateTime                       @updatedAt
+model AsistenteTareaSuscripcion{
+  id        String   @id @default(cuid())
+  asistenteVirtualId String
+  asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  tareaId    String
+  tarea      Tarea @relation(fields: [tareaId], references: [id])
+  fechaSuscripcion DateTime @default(now())
+  fechaDesuscripcion DateTime?
+  montoSuscripcion     Float?    // Costo mensual de esta tarea específica (puede ser 0 o null para incluidas)
+  status    String   @default("activo") //Activo, Inactivo, Cancelado
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Opcional: Link a los items de factura donde se cobró esta suscripción
+  FacturaItem          FacturaItem[]
+  @@unique([asistenteVirtualId, tareaId])
+  @@index([asistenteVirtualId])
 }
 
-//! --- NUEVO: Tabla de unión para TareaFuncion y ParametroRequerido ---
-model TareaFuncionParametroRequerido {
-  tareaFuncionId       String
-  parametroRequeridoId String
-  esObligatorio        Boolean          @default(true) // Indica si este parámetro estándar es obligatorio para esta función específica
 
-  tareaFuncion         TareaFuncion     @relation(fields: [tareaFuncionId], references: [id], onDelete: Cascade)
-  parametroRequerido   ParametroRequerido @relation(fields: [parametroRequeridoId], references: [id], onDelete: Cascade) // Si se borra un parámetro, se quita de las funciones
-
-  @@id([tareaFuncionId, parametroRequeridoId])
-  @@index([parametroRequeridoId]) // Índice para buscar funciones por parámetro
-}
-
-//! Tarea
+//! TAREAS
 model Tarea{
   id        String   @id @default(cuid())
   categoriaTareaId String?
@@ -159,12 +149,8 @@ model Tarea{
   descripcion String?
   instruccion String?
   trigger String? @unique
-
-  // --- CAMBIO: Se reemplaza 'automatizacion' por la relación con TareaFuncion ---
-  // automatizacion String? // JSON con la automatización
   tareaFuncionId     String? // ID de la función de automatización asociada
   tareaFuncion       TareaFuncion? @relation(fields: [tareaFuncionId], references: [id], onDelete: SetNull) // Si se borra la función, la tarea queda sin automatización definida
-
   precio    Float?
   rol     String? // admin, cliente, supervisor
   personalidad String? // introvertido, extrovertido, analitico, creativo
@@ -172,20 +158,11 @@ model Tarea{
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // --- CAMBIO: Se elimina la relación directa con ParametroRequerido ---
-  // parametroRequerido ParametroRequerido[] // Ya no se vinculan directamente aquí
   AsistenteTareaSuscripcion AsistenteTareaSuscripcion[]
   TareaEjecutada TareaEjecutada[]
-
-  // **NUEVO: Relación con Etiquetas (a través de tabla de unión)**
   etiquetas          TareaEtiqueta[]
   canalesSoportados  TareaCanal[]
-
-  // --- NUEVO: Relación con campos personalizados requeridos para esta tarea ---
   camposPersonalizadosRequeridos TareaCampoPersonalizado[]
-
-  // --- NUEVOS CAMPOS VISUALES ---
   iconoUrl           String?   // URL para el ícono principal de la tarea
   TareaGaleria TareaGaleria[] // Relación a la galería
 }
@@ -195,15 +172,11 @@ model TareaCanal {
   tarea                 Tarea               @relation(fields: [tareaId], references: [id], onDelete: Cascade)
   canalConversacionalId String
   canalConversacional   CanalConversacional @relation(fields: [canalConversacionalId], references: [id], onDelete: Cascade)
-  // Opcional: Campos específicos de la combinación Tarea-Canal
-  // instruccionEspecifica String? @db.Text
-  // configuracionJson     Json?
-
+  
   @@id([tareaId, canalConversacionalId]) // Clave primaria compuesta
   @@index([tareaId])
   @@index([canalConversacionalId])
 }
-
 
 model TareaEtiqueta {
   tareaId         String
@@ -221,6 +194,7 @@ model CategoriaTarea{
   orden     Int?
   nombre    String @unique 
   descripcion String?
+  color String? // Opcional: color para UI
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   Tarea     Tarea[]
@@ -257,32 +231,34 @@ model TareaCampoPersonalizado {
   tareaId                 String
   crmCampoPersonalizadoId String
   esRequerido             Boolean               @default(true) // Indica si este campo personalizado es obligatorio para la IA en esta tarea específica
-
   tarea                   Tarea                 @relation(fields: [tareaId], references: [id], onDelete: Cascade) // Si se borra la tarea, se borra el vínculo
   crmCampoPersonalizado   CRMCampoPersonalizado @relation(fields: [crmCampoPersonalizadoId], references: [id], onDelete: Restrict) // Evita borrar un campo personalizado si está siendo usado por una tarea
-
   @@id([tareaId, crmCampoPersonalizadoId])
   @@index([crmCampoPersonalizadoId]) // Índice para buscar tareas por campo personalizado
 }
 
+model TareaFuncion {
+  id                   String                         @id @default(cuid())
+  nombreInterno        String                         @unique // Identificador único para la lógica interna (e.g., "agendarCita", "consultarProducto")
+  nombreVisible        String // Nombre descriptivo para la UI (e.g., "Agendar Cita", "Consultar Producto")
+  descripcion          String? // Descripción de lo que hace la función
+  orden              Int? // Orden de aparición en la UI
+  parametrosRequeridos TareaFuncionParametroRequerido[] // Relación M-N con parámetros estándar
+  tareas               Tarea[] // Relación 1-N con Tarea (Tareas que usan esta función)
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+}
 
-model AsistenteTareaSuscripcion{
-  id        String   @id @default(cuid())
-  asistenteVirtualId String
-  asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
-  tareaId    String
-  tarea      Tarea @relation(fields: [tareaId], references: [id])
-  fechaSuscripcion DateTime @default(now())
-  fechaDesuscripcion DateTime?
-  montoSuscripcion     Float?    // Costo mensual de esta tarea específica (puede ser 0 o null para incluidas)
-  status    String   @default("activo") //Activo, Inactivo, Cancelado
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model TareaFuncionParametroRequerido {
+  tareaFuncionId       String
+  parametroRequeridoId String
+  esObligatorio        Boolean          @default(true) // Indica si este parámetro estándar es obligatorio para esta función específica
 
-  // Opcional: Link a los items de factura donde se cobró esta suscripción
-  FacturaItem          FacturaItem[]
-  @@unique([asistenteVirtualId, tareaId])
-  @@index([asistenteVirtualId])
+  tareaFuncion         TareaFuncion     @relation(fields: [tareaFuncionId], references: [id], onDelete: Cascade)
+  parametroRequerido   ParametroRequerido @relation(fields: [parametroRequeridoId], references: [id], onDelete: Cascade) // Si se borra un parámetro, se quita de las funciones
+
+  @@id([tareaFuncionId, parametroRequeridoId])
+  @@index([parametroRequeridoId]) // Índice para buscar funciones por parámetro
 }
 
 model TareaEjecutada{
@@ -341,30 +317,25 @@ model FacturaItem {
   descripcion          String    // Descripción clara del concepto (ej: "Asistente 'X' - Base", "Tarea 'Y'", "Prorrateo Tarea 'Z'")
   monto                Float     // Monto de este item específico
   cantidad             Int       @default(1)
-  // Opcional: Periodo específico si es prorrateo
   periodoInicio        DateTime?
   periodoFin           DateTime?
-
-  // Opcional: Links al origen del cobro para trazabilidad
   asistenteVirtualId   String?   // Si es el cobro base del asistente
   asistenteVirtual     AsistenteVirtual? @relation(fields: [asistenteVirtualId], references: [id], onDelete: SetNull)
   asistenteTareaSuscripcionId String? // Si es el cobro de una tarea suscrita
   asistenteTareaSuscripcion AsistenteTareaSuscripcion? @relation(fields: [asistenteTareaSuscripcionId], references: [id], onDelete: SetNull)
-  // landingPageSuscripcionId String? // Futuro
-
   @@index([facturaId])
   @@index([asistenteVirtualId])
   @@index([asistenteTareaSuscripcionId])
 }
 
-
-//! Negocio 
+//! NEGOCIO 
 model Negocio{
   id        String   @id @default(cuid())
   clienteId String?
   cliente   Cliente? @relation(fields: [clienteId], references: [id])
   logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
   nombre    String
+  slogan   String? //Lema, Tagline, Frase de Impacto.
   descripcion String? //Resumen Ejecutivo, Misión, Visión, Filosofía, Valores, Antecedentes.
   telefonoLlamadas String?
   telefonoWhatsapp String?
@@ -372,28 +343,25 @@ model Negocio{
   direccion String?
   googleMaps String?
   paginaWeb String?
-  redesSociales String? //Facebook, Instagram, Twitter, LinkedIn, TikTok, Pinterest, YouTube.
   horarioAtencion String?
   garantias String? //Garantías, 
   politicas String? //Políticas de Privacidad, Términos y Condiciones, Políticas de Devolución, Políticas de Reembolso, Políticas de Cancelación.
   avisoPrivacidad String? //Aviso de Privacidad, Aviso de Cookies, Aviso de Seguridad.
-  compentencia String? //Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
+  competencia String? //Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
   clienteIdeal String? //Rango de Edad, Rango de Ingresos, Distribución de Género, Distribución Geográfica, Nivel Educativo, Ocupación, Sector, Motivaciones Principales, Factores de Influencia, Personalidad, Intereses, Lenguaje, Tono de Comunicación Preferido, Canal de Comunicación Preferido.
   terminologia String? //Terminología del Negocio, Glosario de Términos, Jerga del Sector.
   preguntasFrecuentes String? //Preguntas Frecuentes, Preguntas Comunes, Preguntas Recurrentes.
   objeciones String? //Respuestas a Objeciones, Respuestas a Preguntas Frecuentes, Respuestas a Preguntas Comunes.
   catalogoDescriptivo String?
-  promocionesDescriptivas String?//! eliminar
-  descuentosDescriptivos String?//! eliminar
+  // promocionesDescriptivas String?//! eliminar
+  // descuentosDescriptivos String?//! eliminar
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   Catalogo   Catalogo[]
   categorias    NegocioCategoria[] // <-- RENOMBRADO
   etiquetas     NegocioEtiqueta[]  // <-- RENOMBRADO
-  Promocion   Promocion[]
-  Descuento    Descuento[]
+  ofertas      Oferta[]
 
   AsistenteVirtual AsistenteVirtual[]
   CRM       CRM?   // Added opposite relation field
@@ -402,6 +370,23 @@ model Negocio{
   itemsCatalogo ItemCatalogo[] // Relación a la galería
 
   Notificacion Notificacion[]
+  redesSociales NegocioRedSocial[] // Relación a redes sociales
+
+  GaleriaNegocio GaleriaNegocio[] // Relación a galerías de negocio
+}
+
+model NegocioRedSocial {
+  id          String   @id @default(cuid())
+  negocioId   String
+  negocio     Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra negocio, se borran sus redes
+  nombreRed   String   // Nombre de la red (Ej: "Facebook", "Instagram", "TikTok", "LinkedIn", "Sitio Web", "Otro") - Podría ser un Enum si prefieres limitar opciones
+  url         String   // La URL completa del perfil o página
+  icono       String?  // Nombre o clase del icono a usar (ej. 'facebook', 'instagram', 'globe')
+  orden       Int?     // Para ordenar la visualización de los iconos/links
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([negocioId, nombreRed]) // Evitar duplicados de la misma red para un negocio
+  @@index([negocioId])
 }
 
 // --- Categoría del Catálogo --- // <-- RENOMBRADO
@@ -435,63 +420,208 @@ model NegocioEtiqueta { // <-- RENOMBRADO
   itemEtiquetas ItemCatalogoEtiqueta[] // <-- RENOMBRADO: Ahora usa ItemCatalogoEtiqueta
 }
 
-//! Calálogo
+// --- NUEVA ENTIDAD: GaleriaNegocio ---
+// Representa una galería específica (ej: "Local", "Eventos")
+model GaleriaNegocio {
+  id            String   @id @default(cuid())
+  negocioId     String
+  negocio       Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra negocio, se borran sus galerías
+  nombre        String   // Nombre de la galería (ej: "Fotos del Local")
+  descripcion   String?  // Descripción opcional
+  orden         Int?     // Para ordenar las galerías entre sí
+  status        String   @default("activo") // activo, inactivo
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relación uno-a-muchos con las imágenes de esta galería
+  imagenes      ImagenGaleriaNegocio[]
+
+
+  @@unique([negocioId, nombre]) // Nombre de galería único por negocio
+  @@index([negocioId])
+}
+
+// --- NUEVA ENTIDAD: ImagenGaleriaNegocio ---
+// Representa una imagen dentro de una GaleriaNegocio
+model ImagenGaleriaNegocio {
+  id               String         @id @default(cuid())
+  galeriaNegocioId String
+  galeriaNegocio   GaleriaNegocio @relation(fields: [galeriaNegocioId], references: [id], onDelete: Cascade) // Si se borra la galería, se borran sus imágenes
+  imageUrl         String         // URL de Supabase Storage
+  altText          String?
+  descripcion      String?
+  orden            Int?
+  tamañoBytes      Int?
+  createdAt        DateTime       @default(now())
+  // No se necesita updatedAt aquí generalmente
+
+  @@index([galeriaNegocioId]) // Índice para buscar imágenes por galería
+}
+
+//! OFERTA
+model Oferta {
+  id            String    @id @default(cuid())
+  negocioId     String
+  negocio       Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borran sus ofertas
+  nombre        String    // Ej: "Descuento Primera Compra", "Promo Día Padre", "Cupón BIENVENIDO10"
+  descripcion   String?
+
+  // --- Campo Clave: Tipo de Oferta ---
+  tipoOferta    String    // Ej: 'DESCUENTO_PORCENTAJE', 'DESCUENTO_MONTO', 'CODIGO_PROMOCIONAL', 'ENVIO_GRATIS', 'COMPRA_X_LLEVA_Y', 'GENERAL'
+  valor         Float?    // Valor numérico asociado (ej: 10.0 para 10%, 50.0 para $50) - Nulo si no aplica (ej: GENERAL)
+  codigo        String?   @unique // Código promocional único si tipoOferta = 'CODIGO_PROMOCIONAL'
+  
+  // --- Vigencia ---
+  fechaInicio   DateTime
+  fechaFin      DateTime
+
+  // --- Estado y Condiciones ---
+  status        String    @default("activo") // activo, inactivo, programada, finalizada
+  condiciones   String?   // Texto libre para describir condiciones adicionales (ej: "Compra mínima $500", "Solo nuevos clientes")
+  
+  // --- Timestamps ---
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // --- Relaciones ---
+  // Relación M-N con Items (si la oferta aplica a items específicos)
+  ItemCatalogoOferta ItemCatalogoOferta[]
+  // Galería para la oferta
+  OfertaGaleria      OfertaGaleria[]
+
+  @@index([negocioId, status, fechaFin]) // Índice útil para buscar ofertas activas por negocio
+  @@index([tipoOferta])
+  @@index([codigo]) // Índice para buscar por código
+}
+
+// --- NUEVA Tabla Intermedia: Item <-> Oferta ---
+model ItemCatalogoOferta {
+  id            String @id @default(cuid()) // Usar ID propio es buena práctica
+  itemCatalogoId String
+  itemCatalogo  ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Si se borra item, se borra vínculo
+  ofertaId      String
+  oferta        Oferta       @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Si se borra oferta, se borra vínculo
+
+  // Opcional: añadir campos específicos de esta relación si es necesario en el futuro
+
+  @@unique([itemCatalogoId, ofertaId]) // Asegurar que un item solo se vincule una vez a la misma oferta
+  @@index([itemCatalogoId])
+  @@index([ofertaId])
+}
+
+// --- NUEVA Entidad: Galería de Oferta ---
+model OfertaGaleria {
+  id          String   @id @default(cuid())
+  ofertaId    String
+  oferta      Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Si se borra oferta, se borran imágenes
+  imageUrl    String   // URL de la imagen (ej: Supabase Storage)
+  altText     String?  // Texto alternativo
+  descripcion String?  // Descripción opcional
+  orden       Int?     // Orden visual
+  tamañoBytes Int?     // Opcional: Tamaño
+  createdAt   DateTime @default(now())
+
+  @@index([ofertaId]) // Índice para buscar imágenes por oferta
+}
+
+//! CATALOGO
 // --- Catálogo ---
 model Catalogo {
   id            String   @id @default(cuid())
   negocioId     String
   negocio       Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   nombre        String   // Considerar @@unique([negocioId, nombre])
-  descripcion   String?
-  precio        Float?
+  descripcion   String? 
+  imagenPortadaUrl String? // URL de la imagen de portada del catálogo
   status        String   @default("activo")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   ItemCatalogo  ItemCatalogo[]
-  catalogoNivelId String? // Foreign key for CatalogoNivel //!eliminar
-  catalogoNivel CatalogoNivel? @relation(fields: [catalogoNivelId], references: [id], onDelete: SetNull)
+  CatalogoGaleria CatalogoGaleria[]
 }
 
-model CatalogoNivel {
+model CatalogoGaleria{
   id            String   @id @default(cuid())
-  nombre        String   // Considerar @@unique([negocioId, nombre])
+  catalogoId    String
+  catalogo      Catalogo @relation(fields: [catalogoId], references: [id], onDelete: Cascade) // Correcto: onDelete Cascade
+  imageUrl      String   // URL en Supabase Storage
+  altText       String?
   descripcion   String?
-  precio        Float?
-  status        String   @default("activo")
+  orden         Int?
+  tamañoBytes   Int?     // Tamaño en bytes, guardado al subir
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  Catalogo Catalogo[]
+  @@index([catalogoId]) // Correcto: Índice para eficiencia
 }
 
-// --- Item del Catálogo ---
+// --- Item del Catálogo (Refinado) ---
 model ItemCatalogo {
   id            String     @id @default(cuid())
   catalogoId    String
   catalogo      Catalogo   @relation(fields: [catalogoId], references: [id], onDelete: Cascade)
-  categoriaId   String?    // <-- RENOMBRADO: Nombre del campo FK
-  categoria     NegocioCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull) // <-- RENOMBRADO: Tipo y relación
-  negocioId     String?    // Added opposite relation field
-  negocio       Negocio?   @relation(fields: [negocioId], references: [id], onDelete: SetNull) // Added opposite relation
+  categoriaId   String?
+  categoria     NegocioCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  negocioId     String?
+  negocio       Negocio?    @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
   nombre        String
-  descripcion   String?
+  descripcion   String?    @db.Text
   precio        Float
-  imagen        String?
+  tipoItem      String?    @default("PRODUCTO") // PRODUCTO, SERVICIO
+  sku           String?    @unique // Considerar unicidad por negocio si es necesario
+  stock         Int?
+  stockMinimo   Int?
+  unidadMedida  String?    // pieza, kg, hora, sesión
   linkPago      String?
-  funcionPrincipal String?
-  promocionActiva String?
-  AquienVaDirigido String?
-  nivelDePopularidad String?
-  video String?
-  orden     Int?
-  status        String     @default("activo")
+  funcionPrincipal String? // Para IA
+  esPromocionado Boolean   @default(false) // Para IA/Promoción activa
+  AquienVaDirigido String? // Para IA
+  palabrasClave String?    // Comma-separated keywords for search/SEO/IA
+
+  videoUrl         String?
+  orden         Int?
+  status        String     @default("activo") // activo, inactivo, agotado, proximamente
+
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  // Relaciones Muchos-a-Muchos
-  ItemCatalogoPromocion ItemCatalogoPromocion[]
-  ItemCatalogoDescuento ItemCatalogoDescuento[]
-  itemEtiquetas         ItemCatalogoEtiqueta[] // <-- RENOMBRADO: Ahora usa ItemCatalogoEtiqueta
-  galeria     ItemCatalogoGaleria[] // Relación a la galería
+  // Relaciones
+  // ItemCatalogoPromocion ItemCatalogoPromocion[]
+  // ItemCatalogoDescuento ItemCatalogoDescuento[]
+  itemEtiquetas         ItemCatalogoEtiqueta[]
+  galeria               ItemCatalogoGaleria[]
+  // --- NUEVA RELACIÓN INVERSA ---
+  interacciones         ItemInteraccion[]
+
+  itemCatalogoOfertas ItemCatalogoOferta[] // Relación a la tabla intermedia de ofertas
+
+  @@index([catalogoId])
+  @@index([categoriaId])
+  @@index([negocioId])
+  @@index([status])
+  @@index([esPromocionado])
+}
+
+// Registra eventos específicos relacionados con un ItemCatalogo
+model ItemInteraccion {
+  id              String    @id @default(cuid())
+  itemCatalogoId  String    // A qué ítem se refiere
+  itemCatalogo    ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Si se borra ítem, se borran interacciones
+
+  tipoInteraccion String    // Ej: "CHAT_QUERY", "LANDING_CLICK", "PURCHASE", "FAQ_LINK_CLICK"
+  timestamp       DateTime  @default(now()) // Cuándo ocurrió
+
+  // Campos opcionales para dar contexto
+  asistenteId     String?   // Qué asistente estuvo involucrado (si aplica)
+  asistente       AsistenteVirtual? @relation(fields: [asistenteId], references: [id], onDelete: SetNull)
+  conversacionId  String?   // En qué conversación ocurrió (si aplica)
+  conversacion    Conversacion? @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
+  // podrías añadir sessionId, userId (del cliente final), etc. si tienes esa info
+  metadata        Json?     // Para guardar detalles adicionales específicos de la interacción
+
+  @@index([itemCatalogoId, timestamp]) // Índice común
+  @@index([tipoInteraccion])
+  @@index([asistenteId])
+  @@index([conversacionId])
 }
 
 model ItemCatalogoGaleria {
@@ -516,59 +646,6 @@ model ItemCatalogoEtiqueta { // <-- RENOMBRADO
   etiqueta       NegocioEtiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade) // <-- RENOMBRADO: Tipo y relación
 
   @@unique([itemCatalogoId, etiquetaId])
-}
-
-// --no modificadas
-model Promocion{
-  id        String   @id @default(cuid())
-  negocioId String
-  negocio   Negocio @relation(fields: [negocioId], references: [id])
-  nombre    String
-  descripcion String?
-  fechaInicio DateTime
-  fechaFin   DateTime
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ItemCatalogoPromocion ItemCatalogoPromocion[]
-}
-
-model Descuento{
-  id        String   @id @default(cuid())
-  negocioId String
-  negocio   Negocio @relation(fields: [negocioId], references: [id])
-  nombre    String
-  descripcion String?
-  porcentaje Float
-  monto     Float
-  fechaInicio DateTime
-  fechaFin   DateTime
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ItemCatalogoDescuento ItemCatalogoDescuento[]
-}
-
-model ItemCatalogoPromocion{
-  id        String   @id @default(cuid())
-  itemCatalogoId String
-  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id])
-  promocionId String
-  promocion   Promocion @relation(fields: [promocionId], references: [id])
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ItemCatalogoDescuento{
-  id        String   @id @default(cuid())
-  itemCatalogoId String
-  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id])
-  descuentoId String
-  descuento   Descuento @relation(fields: [descuentoId], references: [id])
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 //!CRM
@@ -654,6 +731,7 @@ model EtiquetaCRM{
 
 }
 
+//! LEAD
 model Lead{
   id         String    @id @default(cuid())
 
@@ -710,7 +788,7 @@ model LeadEtiqueta {
   @@index([etiquetaId]) 
 }
 
-
+//! AGENTE
 model Agente{
   id        String   @id @default(cuid())
   crmId     String   // Agente pertenece a un CRM
@@ -733,7 +811,7 @@ model Agente{
   Notificacion Notificacion[]
 }
 
-
+//! BITÁCORA
 model Bitacora {
   id          String   @id @default(cuid())
   agenteId    String?  // Puede ser una acción del sistema (null) o de un agente
@@ -750,6 +828,7 @@ model Bitacora {
   @@index([agenteId])
 }
 
+//! AGENDA
 model Agenda {
   id          String   @id @default(cuid())
   agenteId    String   // Quién agendó/realizará la acción
@@ -769,7 +848,7 @@ model Agenda {
   @@index([fecha])
 }
 
-//!Conversaciones
+//!CONVERSACIONES
 model Conversacion {
   id                 String    @id @default(cuid())
   // Datos del canal específico (ej: WhatsApp)
@@ -788,6 +867,7 @@ model Conversacion {
   updatedAt          DateTime  @updatedAt // Corregido
 
   Interaccion        Interaccion[]
+  itemInteracciones  ItemInteraccion[] // <-- AÑADIDO: Interacciones relacionadas con ítems del catálogo
 
   @@index([leadId])
   @@index([asistenteVirtualId])

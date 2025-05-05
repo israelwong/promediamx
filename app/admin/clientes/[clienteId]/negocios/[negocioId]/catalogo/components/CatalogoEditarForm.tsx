@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import CatalogoPortada from './CatalogoPortada';
 // Ajusta las rutas si es necesario
 import {
     obtenerCatalogoPorId,
@@ -14,6 +15,8 @@ import { Loader2, Trash2, Save } from 'lucide-react'; // Iconos
 
 interface Props {
     catalogoId: string;
+    clienteId: string;
+    negocioId: string;
 }
 
 // Tipo para los datos editables (sin catalogoNivelId)
@@ -21,16 +24,12 @@ type CatalogoEditFormData = Partial<Pick<Catalogo,
     'nombre' | 'descripcion' | 'status'
 >>;
 
-export default function CatalogoEditarForm({ catalogoId }: Props) {
+export default function CatalogoEditarForm({ clienteId, negocioId, catalogoId }: Props) {
     const router = useRouter();
 
     const [catalogoOriginal, setCatalogoOriginal] = useState<Catalogo | null>(null);
-    // Estado para los datos del formulario
     const [formData, setFormData] = useState<CatalogoEditFormData>({});
-    // Ya no necesitamos estado para niveles ni su carga
-    // const [catalogoNiveles, setCatalogoNiveles] = useState<CatalogoNivel[]>([]);
     const [loading, setLoading] = useState(true); // Carga principal del catálogo
-    // const [loadingNiveles, setLoadingNiveles] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false); // Para guardar o eliminar
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -71,7 +70,7 @@ export default function CatalogoEditarForm({ catalogoId }: Props) {
                         }))
                     });
                     setNegocioIdContext(data.negocioId);
-                    // Poblar formData con campos editables (sin nivel)
+
                     setFormData({
                         nombre: data.nombre,
                         descripcion: data.descripcion,
@@ -91,8 +90,7 @@ export default function CatalogoEditarForm({ catalogoId }: Props) {
         fetchDatos();
     }, [catalogoId]);
 
-    // --- Ya no necesitamos cargar Niveles de Catálogo ---
-    // useEffect(() => { ... }, []);
+
 
     // --- Manejadores ---
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -138,7 +136,7 @@ export default function CatalogoEditarForm({ catalogoId }: Props) {
 
     const handleCancel = () => {
         if (negocioIdContext) {
-            router.push(`/admin/negocios/${negocioIdContext}`); // Volver al panel del negocio
+            router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}`); // Volver al panel del negocio
         } else {
             router.back(); // Fallback
         }
@@ -152,7 +150,7 @@ export default function CatalogoEditarForm({ catalogoId }: Props) {
                 setSuccessMessage("Catálogo eliminado.");
                 setTimeout(() => {
                     if (negocioIdContext) {
-                        router.push(`/admin/negocios/${negocioIdContext}`);
+                        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}`); // Volver al panel del negocio
                     } else {
                         router.back();
                     }
@@ -203,6 +201,11 @@ export default function CatalogoEditarForm({ catalogoId }: Props) {
             {/* Mensajes */}
             {error && <p className="mb-4 text-center text-red-400 bg-red-900/30 p-2 rounded border border-red-600 text-sm">{error}</p>}
             {successMessage && <p className="mb-4 text-center text-green-400 bg-green-900/30 p-2 rounded border border-green-600 text-sm">{successMessage}</p>}
+
+            <CatalogoPortada
+                catalogoId={catalogoId}
+                initialImageUrl={catalogoOriginal.imagenPortadaUrl || null}
+            />
 
             {/* Formulario */}
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>

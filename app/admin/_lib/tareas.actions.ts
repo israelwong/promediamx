@@ -10,7 +10,7 @@ import {
     ActualizarTareaConRelacionesInput,
     TareaParaEditar,
     SugerenciasTarea,
-    // TareaConDetalles
+    TareaParaMarketplace
 } from './types'
 
 /************************************ */
@@ -280,8 +280,7 @@ export async function obtenerTareaPorId(tareaId: string): Promise<TareaParaEdita
 
 
 // --- Mejorar Tarea con Gemini ---
-// (Sin cambios funcionales aquí, pero la obtención de parámetros ya está actualizada)
-// Interfaz auxiliar para las sugerencias (sin cambios)
+// Interfaz auxiliar para las sugerencias
 
 // --- Tipo para los parámetros (Añadir a types.ts si no existe) ---
 // Definición necesaria para el mapeo
@@ -522,42 +521,75 @@ export async function obtenerTareasConDetalles() {
     }
 }
 
+type TareaBaseInfo = Pick<Tarea, 'id' | 'nombre' | 'descripcion'>;
+export async function obtenerTareasBase(): Promise<TareaBaseInfo[]> {
+    try {
+        // Encontrar todas las Tareas base (precio 0 o null)
+        const tareasBase = await prisma.tarea.findMany({
+            where: {
+                OR: [
+                    { precio: null },
+                    { precio: 0 }
+                ],
+                status: 'activo' // Asegurarse de suscribir solo a tareas activas
+            },
+            orderBy: {
+                orden: 'asc' // Ordenar por el campo 'orden' en orden ascendente
+            },
+            select: {
+                id: true,
+                nombre: true,
+                descripcion: true
+            }
+        });
 
-// --- Obtener Tareas con detalles (Categoría, Función, Etiquetas, Canales) ---
-// ACTUALIZADO: Usa el tipo de retorno específico TareaConDetalles[]
-// export async function obtenerTareasConDetalles(): Promise<TareaConDetalles[]> {
-//     try {
-//         const tareas = await prisma.tarea.findMany({
-//             orderBy: {
-//                 // Ordenar por 'orden' si existe, si no por 'nombre' o 'createdAt'
-//                 orden: 'asc',
-//             },
-//             include: {
-//                 CategoriaTarea: { select: { nombre: true } }, // Solo nombre
-//                 tareaFuncion: { select: { id: true, nombreVisible: true } }, // Solo id y nombreVisible
-//                 etiquetas: { // Incluir la tabla de unión
-//                     include: {
-//                         etiquetaTarea: { // Incluir la etiqueta real
-//                             select: { id: true, nombre: true } // Solo id y nombre de la etiqueta
-//                         }
-//                     }
-//                 },
-//                 canalesSoportados: { // Incluir la tabla de unión
-//                     include: {
-//                         canalConversacional: { // Incluir el canal real
-//                             select: { id: true, nombre: true, icono: true } // id, nombre e icono del canal
-//                         }
-//                     }
-//                 },
-//                 // Contar suscripciones para validación de borrado
-//                 _count: { select: { AsistenteTareaSuscripcion: true } }
-//             }
-//         });
-//         // El tipo devuelto por Prisma ahora debería coincidir con TareaConDetalles
-//         // Ya no es necesario un casteo inseguro 'as Tarea[]'
-//         return tareas as TareaConDetalles[];
-//     } catch (error) {
-//         console.error('Error al obtener tareas con detalles:', error);
-//         throw new Error('Error al obtener las tareas');
-//     }
-// }
+        return tareasBase;
+
+    } catch (error) {
+        console.error('Error al obtener las tareas base:', error);
+        throw new Error('No se pudieron obtener las tareas base.');
+    }
+}
+
+
+export async function obtenerTareasParaMarketplace(): Promise<TareaParaMarketplace[]> {
+    try {
+        const tareas = await prisma.tarea.findMany({
+            where: {
+                status: 'activo' // Solo mostrar tareas activas en el marketplace
+            },
+            select: {
+                id: true,
+                nombre: true,
+                descripcion: true,
+                precio: true,
+                categoriaTareaId: true,
+                CategoriaTarea: { // Incluir nombre de categoría
+                    select: { nombre: true }
+                },
+                etiquetas: { // Incluir etiquetas asociadas
+                    select: {
+                        etiquetaTarea: {
+                            select: { id: true, nombre: true }
+                        }
+                    }
+                },
+                _count: { // Incluir conteos
+                    select: {
+                        AsistenteTareaSuscripcion: true, // Contar suscripciones activas? O todas? (Considerar)
+                        TareaGaleria: true
+                    }
+                }
+            },
+            orderBy: [ // Ordenar
+                { orden: 'asc' },
+                { nombre: 'asc' }
+            ]
+        });
+        // Asegurarse que el tipo devuelto coincida
+        return tareas as TareaParaMarketplace[];
+    } catch (error) {
+        console.error("Error fetching tasks for marketplace:", error);
+        throw new Error("No se pudieron obtener las tareas para el marketplace.");
+    }
+}

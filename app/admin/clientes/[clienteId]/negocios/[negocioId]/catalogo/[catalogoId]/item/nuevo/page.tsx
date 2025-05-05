@@ -7,12 +7,12 @@ export const metadata: Metadata = {
 };
 
 interface Props {
+    clienteId: string
     negocioId: string
     catalogoId: string
 }
 
 export default async function page({ params }: { params: Promise<Props> }) {
-    const { negocioId, catalogoId } = await params
-    // console.log("params", params)
-    return <ItemNuevoForm negocioId={negocioId} catalogoId={catalogoId} />
+    const { negocioId, catalogoId, clienteId } = await params
+    return <ItemNuevoForm negocioId={negocioId} catalogoId={catalogoId} clienteId={clienteId} />
 }

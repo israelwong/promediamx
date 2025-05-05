@@ -7,11 +7,13 @@ export const metadata: Metadata = {
     description: 'Gestión de CRM',
 }
 
-export default async function page({ params }: { params: Promise<{ negocioId: string }> }) {
-    const { negocioId } = await params
-    return (
-        <div>
-            <NegocioCRMPanel negocioId={negocioId} />
-        </div>
-    )
+interface Props {
+    clienteId: string
+    negocioId: string
+}
+
+export default async function page({ params }: { params: Promise<Props> }) {
+    const { clienteId, negocioId } = await params
+    return <NegocioCRMPanel clienteId={clienteId} negocioId={negocioId} />
+
 }

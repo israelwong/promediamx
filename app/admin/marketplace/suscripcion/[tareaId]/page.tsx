@@ -7,7 +7,13 @@ export const metadata: Metadata = {
     description: 'Suscripción a una nueva tarea'
 }
 
-export default async function page({ params }: { params: Promise<{ tareaId: string }> }) {
+interface Props {
+    tareaId: string;
+}
+
+export default async function page({ params }: { params: Promise<Props> }) {
     const { tareaId } = await params
-    return <SuscripcionTareaDetalle tareaId={tareaId} />
+    return <SuscripcionTareaDetalle
+        tareaId={tareaId}
+    />
 }

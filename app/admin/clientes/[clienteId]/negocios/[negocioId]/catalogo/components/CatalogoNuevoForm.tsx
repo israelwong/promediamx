@@ -10,13 +10,14 @@ import { Loader2 } from 'lucide-react'; // Icono
 
 interface Props {
     negocioId: string; // ID del negocio al que pertenece el catálogo
+    clienteId: string; // ID del cliente (opcional)
 }
 
 // Tipo para los datos de este formulario
 // Quitado 'nombre', 'status' se maneja internamente
 type CatalogoNuevaFormData = Pick<Catalogo, 'nombre' | 'descripcion'>;
 
-export default function CatalogoNuevoForm({ negocioId }: Props) {
+export default function CatalogoNuevoForm({ clienteId, negocioId }: Props) {
     const router = useRouter();
 
     // Estado inicial del formulario (sin nombre, sin status)
@@ -65,12 +66,6 @@ export default function CatalogoNuevoForm({ negocioId }: Props) {
             return;
         }
 
-        // Validar que se haya seleccionado un nivel si hay múltiples opciones
-        // if (catalogoNiveles.length > 1 && !formData.catalogoNivelId) {
-        //     setError("Debes seleccionar un nivel de catálogo.");
-        //     return;
-        // }
-
         setIsSubmitting(true);
         setError(null);
         setSuccessMessage(null);
@@ -78,17 +73,16 @@ export default function CatalogoNuevoForm({ negocioId }: Props) {
         try {
             // Preparar datos para enviar (sin nombre, status fijo)
             const dataToSend = {
-                nombre: formData.nombre?.trim() || null, // Ya no se envía nombre
-                descripcion: formData.descripcion?.trim() || null,
-                status: 'activo', // Status fijo
-                // catalogoNivelId: formData.catalogoNivelId || null,
+                nombre: formData.nombre?.trim().charAt(0).toUpperCase() + formData.nombre?.trim().slice(1) || null,
+                descripcion: (formData.descripcion?.trim() || '').charAt(0).toUpperCase() + (formData.descripcion?.trim() || '').slice(1) || null,
+                status: 'activo'
             };
 
             // Llamar a la acción
             await crearCatalogoNegocio(negocioId, dataToSend as Catalogo).then((res) => {
                 setSuccessMessage("Catálogo creado exitosamente.");
                 setIsSubmitting(false);
-                setTimeout(() => router.push(`/admin/negocios/${negocioId}/catalogo/${res.id}`), 1500);
+                setTimeout(() => router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/catalogo/${res.id}`), 1500);
             });
 
         } catch (err) {
@@ -102,11 +96,6 @@ export default function CatalogoNuevoForm({ negocioId }: Props) {
 
     // Manejador para Cancelar
     const handleCancel = () => { router.back(); };
-
-    // Encontrar el nombre del nivel único si existe
-    // const nombreNivelUnico = unicoNivelId
-    //     ? catalogoNiveles.find(n => n.id === unicoNivelId)?.nombre
-    //     : null;
 
     return (
         <div className={containerClasses}>

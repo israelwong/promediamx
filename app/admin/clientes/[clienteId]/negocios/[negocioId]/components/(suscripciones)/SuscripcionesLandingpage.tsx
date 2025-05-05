@@ -14,7 +14,7 @@ export default function SuscripcionesLandingpage({ negocioId, clienteId }: Props
     // const router = useRouter();
 
     // Clases de Tailwind consistentes con otros componentes del panel
-    const containerClasses = "p-4 md:p-5 bg-zinc-800 border border-zinc-700 rounded-lg shadow-md h-full flex flex-col";
+    const containerClasses = "p-4 md:p-5 bg-zinc-800  flex flex-col";
     const headerClasses = "flex flex-row items-center justify-between gap-2 mb-4 border-b border-zinc-600 pb-3";
     const contentContainerClasses = "flex-grow flex flex-col items-center justify-center text-center text-zinc-500";
     // Botón desactivado

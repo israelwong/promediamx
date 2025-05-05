@@ -2,6 +2,10 @@
 import prisma from './prismaClient'
 import { Negocio, AsistenteVirtual } from './types'; // Ajusta ruta a tus tipos
 import { Prisma } from '@prisma/client';
+import { EstadoConfiguracionNegocio, ActionResult } from './types'; // O importa desde donde definas los tipos
+import { llamarGeminiParaMejorarTexto } from '@/scripts/gemini/gemini.actions'; // Ajusta la ruta a tu función de IA
+import { revalidatePath } from 'next/cache';
+
 
 interface AsistenteTareaSuscripcion {
     montoSuscripcion: number;
@@ -40,53 +44,6 @@ export async function crearNegocio(
                 },
             });
 
-            // 2. Crear el CRM asociado al nuevo Negocio
-            const nuevoCRM = await tx.cRM.create({
-                data: {
-                    negocioId: nuevoNegocio.id, // Usar el ID del negocio recién creado
-                    status: 'activo',
-                },
-            });
-
-            // 3. Poblar Canales por defecto para el nuevo CRM
-            const canalesDefault = [
-                { nombre: 'WhatsApp', orden: 1 },
-                { nombre: 'Facebook Lead Form', orden: 2 },
-                { nombre: 'Instagram', orden: 3 },
-                { nombre: 'Landing Page Form', orden: 4 },
-                { nombre: 'Directo', orden: 5 },
-                { nombre: 'Referido', orden: 6 },
-            ];
-            await tx.canalCRM.createMany({
-                data: canalesDefault.map(c => ({ ...c, crmId: nuevoCRM.id })),
-            });
-
-            // 4. Poblar Pipeline por defecto para el nuevo CRM
-            const pipelineDefault = [
-                { nombre: 'Nuevo', orden: 1 },
-                { nombre: 'Seguimiento', orden: 2 },
-                { nombre: 'Propuesta', orden: 3 }, // Añadir más etapas si quieres
-                { nombre: 'Negociación', orden: 4 },
-                { nombre: 'Ganado', orden: 5 },
-                { nombre: 'Perdido', orden: 6 },
-            ];
-            await tx.pipelineCRM.createMany({
-                data: pipelineDefault.map(p => ({ ...p, crmId: nuevoCRM.id })),
-            });
-
-            // 5. Poblar Etiquetas por defecto para el nuevo CRM
-            const etiquetasDefault = [
-                { nombre: 'Muy Interesado', color: '#10b981', orden: 1 }, // Emerald-500
-                { nombre: 'Interesado', color: '#3b82f6', orden: 2 }, // Blue-500
-                { nombre: 'Poco Interesado', color: '#f97316', orden: 3 }, // Orange-500
-                { nombre: 'No Interesado', color: '#64748b', orden: 4 }, // Slate-500
-                { nombre: 'Seguimiento Posterior', color: '#a855f7', orden: 5 }, // Purple-500
-            ];
-            await tx.etiquetaCRM.createMany({
-                data: etiquetasDefault.map(e => ({ ...e, crmId: nuevoCRM.id })),
-            });
-
-            // Devolver el negocio creado (sin relaciones complejas si no se necesitan aquí)
             return nuevoNegocio;
         });
 
@@ -172,7 +129,7 @@ export async function obtenerNegociosPorClienteId(clienteId: string) {
                 select: {
                     id: true,
                     descripcion: true,
-                    precio: true
+                    // precio: true
                 }
             }
         }
@@ -238,6 +195,7 @@ export async function actualizarNegocio(negocioId: string, negocio: Negocio) {
         data: {
             logo: negocio.logo,
             nombre: negocio.nombre,
+            slogan: negocio.slogan,
             descripcion: negocio.descripcion,
             telefonoLlamadas: negocio.telefonoLlamadas,
             telefonoWhatsapp: negocio.telefonoWhatsapp,
@@ -245,12 +203,11 @@ export async function actualizarNegocio(negocioId: string, negocio: Negocio) {
             direccion: negocio.direccion,
             googleMaps: negocio.googleMaps,
             paginaWeb: negocio.paginaWeb,
-            redesSociales: negocio.redesSociales,
             horarioAtencion: negocio.horarioAtencion,
             garantias: negocio.garantias,
             politicas: negocio.politicas,
             avisoPrivacidad: negocio.avisoPrivacidad,
-            compentencia: negocio.compentencia,
+            competencia: negocio.competencia,
             clienteIdeal: negocio.clienteIdeal,
             terminologia: negocio.terminologia,
             preguntasFrecuentes: negocio.preguntasFrecuentes,
@@ -311,9 +268,7 @@ export async function generarPrompt(negocioId: string, palabrasClave: string) {
     if (!keywords || (negocio.paginaWeb && (keywords.includes('pagina_web') || keywords.includes('pagina') || keywords.includes('web') || keywords.includes('sitio web') || keywords.includes('internet')))) {
         presenciaEnLinea.push(`- **Página Web:** ${negocio.paginaWeb}`);
     }
-    if (!keywords || (negocio.redesSociales && (keywords.includes('redes_sociales') || keywords.includes('facebook') || keywords.includes('instagram') || keywords.includes('linkedin') || keywords.includes('youtube') || keywords.includes('tiktok')))) {
-        presenciaEnLinea.push(`- **Redes Sociales:** ${negocio.redesSociales}`);
-    }
+
     if (presenciaEnLinea.length > 0) {
         sections.push(`## Presencia en Línea\n${presenciaEnLinea.join('\n')}`);
     }
@@ -334,23 +289,14 @@ export async function generarPrompt(negocioId: string, palabrasClave: string) {
             informacionAdicional.push(`- **Catálogo Descriptivo:** ${negocio.catalogoDescriptivo}`);
         }
     }
-    if (!keywords || (negocio.promocionesDescriptivas && (keywords.includes('informacion_promocion') || keywords.includes('promociones') || keywords.includes('descriptivas')))) {
-        if (negocio.promocionesDescriptivas && negocio.promocionesDescriptivas.trim() !== '') {
-            informacionAdicional.push(`- **Promociones Descriptivas:** ${negocio.promocionesDescriptivas}`);
-        }
-    }
-    if (!keywords || (negocio.descuentosDescriptivos && (keywords.includes('informacion_descuentos') || keywords.includes('descuentos') || keywords.includes('descriptivos')))) {
-        if (negocio.descuentosDescriptivos && negocio.descuentosDescriptivos.trim() !== '') {
-            informacionAdicional.push(`- **Descuentos Descriptivos:** ${negocio.descuentosDescriptivos}`);
-        }
-    }
+
     if (informacionAdicional.length > 0) {
         sections.push(`## Información Adicional\n${informacionAdicional.join('\n')}`);
     }
 
     const analisisEstrategia = [];
-    if (!keywords || (negocio.compentencia && (keywords.includes('competencia') || keywords.includes('comparación') || keywords.includes('comparativa')))) {
-        analisisEstrategia.push(`- **Competencia:** ${negocio.compentencia}`);
+    if (!keywords || (negocio.competencia && (keywords.includes('competencia') || keywords.includes('comparación') || keywords.includes('comparativa')))) {
+        analisisEstrategia.push(`- **Competencia:** ${negocio.competencia}`);
     }
     if (negocio.clienteIdeal && negocio.clienteIdeal.trim() !== '') {
         analisisEstrategia.push(`- **Cliente Ideal:** ${negocio.clienteIdeal}`);
@@ -428,11 +374,6 @@ export async function obtenerDatosHeaderNegocio(negocioId: string): Promise<Nego
                 cliente: {
                     select: { nombre: true }
                 }
-                // Seleccionar los nuevos campos de suscripción/pago
-                // Ejemplo: Asegúrate que estos campos existan en tu schema Negocio
-                // suscripcionStatus: true,
-                // estadoPago: true,
-                // fechaProximoPago: true,
             }
         });
 
@@ -504,5 +445,256 @@ export async function obtenerNegociosPorClienteIdConDetalles(clienteId: string):
     } catch (error) {
         console.error(`Error fetching negocios for cliente ${clienteId}:`, error);
         throw new Error("Error al obtener los negocios del cliente.");
+    }
+}
+
+
+// Tipo para el input de actualización completo
+// Incluye todos los campos editables del modelo Negocio
+// Incluye slogan, EXCLUYE redesSociales
+export type ActualizarNegocioInput = Partial<Omit<Negocio,
+    'id' | 'clienteId' | 'createdAt' | 'updatedAt' | 'cliente' |
+    'ofertas' | 'Catalogo' | 'categorias' | 'etiquetas' |
+    'AsistenteVirtual' | 'CRM' | 'itemsCatalogo' | 'Notificacion' |
+    '_count' | 'redesSociales' // Excluir redesSociales del tipo base
+>>;
+
+// --- ACCIÓN PARA OBTENER DATOS COMPLETOS DEL NEGOCIO (ACTUALIZADA) ---
+/**
+ * @description Obtiene todos los detalles de un negocio por su ID para el formulario de edición.
+ * @param {string} negocioId - El ID del negocio.
+ * @returns {Promise<Negocio | null>} - El objeto Negocio completo o null si no se encuentra o hay error.
+ */
+export async function obtenerDetallesNegocioParaEditar(negocioId: string): Promise<Negocio | null> {
+    if (!negocioId) {
+        console.warn("obtenerDetallesNegocioParaEditar: negocioId no proporcionado.");
+        return null;
+    }
+    try {
+        const negocio = await prisma.negocio.findUnique({
+            where: { id: negocioId },
+            // Seleccionar todos los campos necesarios para el formulario, incluyendo slogan
+            // No es necesario 'select' explícito si queremos todos los campos escalares.
+        });
+        return negocio;
+    } catch (error) {
+        console.error(`Error obteniendo detalles del negocio ${negocioId}:`, error);
+        return null;
+    }
+}
+
+export async function actualizarDetallesNegocio(
+    negocioId: string,
+    data: ActualizarNegocioInput
+): Promise<ActionResult> {
+    if (!negocioId) return { success: false, error: "ID de negocio no proporcionado." };
+    // Quitar explícitamente redesSociales si aún viniera en data por error
+    if ('redesSociales' in data) {
+        delete data.redesSociales;
+    }
+
+    try {
+        const negocioActualizado = await prisma.negocio.update({
+            where: { id: negocioId },
+            data: {
+                ...data,
+                status: data.status ? { set: data.status } : undefined, // Map 'status' to Prisma's update input type
+                GaleriaNegocio: data.GaleriaNegocio
+                    ? {
+                        set: data.GaleriaNegocio.map((item) => ({ id: item.id })),
+                    }
+                    : undefined, // Map GaleriaNegocio to Prisma nested input type
+            }, // Pasar directamente los datos parciales (sin redesSociales)
+            select: { clienteId: true } // Para revalidación
+        });
+
+        // Revalidar rutas
+        const basePath = negocioActualizado.clienteId
+            ? `/admin/clientes/${negocioActualizado.clienteId}/negocios/${negocioId}`
+            : `/admin/negocios/${negocioId}`;
+        revalidatePath(basePath); // Dashboard negocio
+        revalidatePath(`${basePath}/editar`); // Página de edición
+
+        return { success: true };
+    } catch (error) {
+        console.error(`Error actualizando negocio ${negocioId}:`, error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return { success: false, error: "Negocio no encontrado para actualizar." };
+        }
+        return { success: false, error: "No se pudo actualizar la información del negocio." };
+    }
+}
+
+
+/**
+ * @description Mejora la descripción general del negocio usando IA.
+ * @param {string} negocioId - ID del negocio para contexto.
+ * @param {string} descripcionActual - Descripción a mejorar.
+ * @returns {Promise<ActionResult<{ sugerencia: string }>>} - Sugerencia de texto.
+ */
+
+
+export type NivelCreatividadIA = 'bajo' | 'medio' | 'alto'; // 'bajo' is already part of the type
+
+
+// --- ACCIONES DE IA (EJEMPLOS - Prompt de descripción actualizado) ---
+
+/**
+ * @description Mejora la descripción general del negocio usando IA, enfocándose en un tono profesional y claro,
+ * con parámetros de creatividad y longitud definidos internamente.
+ * @param {string} negocioId - ID del negocio para contexto.
+ * @param {string} descripcionActual - Descripción a mejorar.
+ * @returns {Promise<ActionResult<{ sugerencia: string }>>} - Sugerencia de texto.
+ */
+export async function mejorarDescripcionNegocioIA(
+    negocioId: string,
+    descripcionActual: string | null | undefined
+    // Ya no recibe nivelCreatividad ni maxCaracteres
+): Promise<ActionResult<{ sugerencia: string }>> {
+    if (!negocioId || !descripcionActual?.trim()) {
+        return { success: false, error: "Faltan datos para mejorar la descripción." };
+    }
+
+    // --- Parámetros Fijos para este caso de uso ---
+    const nivelCreatividadFijo: NivelCreatividadIA = 'medio'; // O 'bajo' para ser más conservador
+    const maxCaracteresFijo = 1000; // Límite para resumen ejecutivo
+    // --------------------------------------------
+
+    try {
+        // 1. Obtener contexto del ítem (incluyendo slogan)
+        const negocio = await prisma.negocio.findUnique({
+            where: { id: negocioId },
+            select: { nombre: true, slogan: true, clienteIdeal: true, terminologia: true, descripcion: true }
+        });
+        if (!negocio) return { success: false, error: "Negocio no encontrado." };
+
+        // 2. Preparar datos y construir prompt (ACTUALIZADO)
+        const promptContexto = `Negocio: ${negocio.nombre}${negocio.slogan ? ` (Eslogan: ${negocio.slogan})` : ''}. Se dirige a: ${negocio.clienteIdeal || 'Público general'}. Usa terminología como: ${negocio.terminologia || 'Estándar'}.`;
+        // --- Prompt Refinado para MEJORAR REDACCIÓN como Resumen Ejecutivo ---
+        const promptMejora = `Eres un consultor de negocios y redactor experto con un nivel de creatividad ${nivelCreatividadFijo}. Revisa y **mejora la redacción** de la siguiente descripción para que funcione como un **resumen ejecutivo profesional** del negocio.\n`
+            + `**Objetivo:** Crear un texto claro, descriptivo, conciso (máximo ${maxCaracteresFijo} caracteres aprox.), sin ambigüedades y que refleje profesionalismo, manteniendo la información esencial sobre qué hace el negocio y su propuesta de valor.\n`
+            + `**Contexto adicional:** ${promptContexto}\n`
+            + `**Descripción actual a mejorar/reescribir:** "${descripcionActual.trim()}"\n`
+            + `**Instrucciones de Formato:**\n`
+            + `- Estructura en párrafos coherentes usando saltos de línea (\\n) para separar ideas principales.\n`
+            + `- Usa un lenguaje formal y profesional.\n`
+            + `- Corrige posibles errores gramaticales o de estilo.\n`
+            + `- NO incluyas el precio si se menciona en el contexto.\n\n`
+            + `Resumen Ejecutivo Mejorado:`;
+        // ---------------------------------------------------------------------
+
+        console.log("Enviando a llamarGeminiParaMejorarTexto con prompt fijo...");
+
+        // 3. Determinar temperatura basada en creatividad FIJA
+        const temperature: number = .7;
+        // switch (nivelCreatividadFijo) {
+        //     case 'bajo': temperature = 0.2; break;
+        //     case 'alto': temperature = 0.7; break; // No tan alto como antes
+        //     case 'medio': default: temperature = 0.4; break;
+        // }
+
+        // 4. Llamar a Gemini (pasando la configuración fija)
+        const sugerencia = await llamarGeminiParaMejorarTexto(
+            promptMejora,
+            { temperature: temperature, maxOutputTokens: maxCaracteresFijo + 100 } // Dar margen
+        );
+
+        if (!sugerencia) throw new Error("La IA no generó sugerencia.");
+
+        // 5. Devolver resultado
+        // Truncar si excede (aunque el prompt lo pide)
+        const sugerenciaFinal = sugerencia.trim().slice(0, maxCaracteresFijo);
+        return { success: true, data: { sugerencia: sugerenciaFinal } };
+
+    } catch (error) {
+        console.error(`Error mejorando descripción negocio ${negocioId}:`, error);
+        return { success: false, error: `Error IA: ${error instanceof Error ? error.message : 'Desconocido'}` };
+    }
+}
+
+/**
+ * @description Genera un borrador de políticas de privacidad/términos usando IA.
+ */
+export async function generarPoliticasNegocioIA(
+    negocioId: string,
+    tipoPolitica: 'privacidad' | 'terminos',
+    politicaActual?: string | null
+): Promise<ActionResult<{ sugerencia: string }>> {
+    // ... (código sin cambios) ...
+    if (!negocioId || !tipoPolitica) { return { success: false, error: "Faltan datos para generar políticas." }; }
+    try {
+        const negocio = await prisma.negocio.findUnique({ where: { id: negocioId }, select: { nombre: true, slogan: true, descripcion: true, paginaWeb: true } });
+        if (!negocio) return { success: false, error: "Negocio no encontrado." };
+        const tipoTexto = tipoPolitica === 'privacidad' ? 'Política de Privacidad' : 'Términos y Condiciones';
+        const accionPrompt = politicaActual?.trim() ? `Mejora la siguiente ${tipoTexto}: "${politicaActual.trim()}"` : `Genera un borrador inicial para la ${tipoTexto}.`;
+        const promptContexto = `Negocio: ${negocio.nombre}${negocio.slogan ? ` (${negocio.slogan})` : ''}. Descripción: ${negocio.descripcion || 'N/A'}. Sitio Web: ${negocio.paginaWeb || 'N/A'}.`;
+        const prompt = `Eres un asistente legal especializado en documentos web. ${accionPrompt} Basándote en el contexto del negocio, asegúrate de incluir cláusulas estándar relevantes y usa un lenguaje claro y formal. Contexto: ${promptContexto}\n\nBorrador ${tipoTexto}:`;
+        const sugerencia = await llamarGeminiParaMejorarTexto(prompt, { temperature: 0.3 }); // Temp baja para legales
+        if (!sugerencia) throw new Error("La IA no generó sugerencia.");
+        return { success: true, data: { sugerencia: sugerencia.trim() } };
+    } catch (error) {
+        console.error(`Error generando ${tipoPolitica} negocio ${negocioId}:`, error);
+        return { success: false, error: `Error IA: ${error instanceof Error ? error.message : 'Desconocido'}` };
+    }
+}
+
+// --- Acción para obtener estado de configuración ---
+export async function obtenerEstadoConfiguracionNegocio(negocioId: string): Promise<EstadoConfiguracionNegocio | null> {
+    // ... (código sin cambios) ...
+    if (!negocioId) { console.warn("obtenerEstadoConfiguracionNegocio: negocioId no proporcionado."); return null; }
+    try {
+        const negocio = await prisma.negocio.findUnique({
+            where: { id: negocioId },
+            select: { id: true, logo: true, nombre: true, slogan: true, descripcion: true, telefonoLlamadas: true, telefonoWhatsapp: true, email: true, direccion: true, politicas: true, avisoPrivacidad: true, clienteIdeal: true, terminologia: true, preguntasFrecuentes: true, objeciones: true, }
+        });
+        if (!negocio) { console.warn(`Negocio ${negocioId} no encontrado.`); return null; }
+        const seccionesCompletas: { [key: string]: boolean } = {
+            logo: !!negocio.logo?.trim(), descripcion: !!(negocio.descripcion?.trim() || negocio.slogan?.trim()),
+            contacto: !!(negocio.telefonoLlamadas?.trim() || negocio.telefonoWhatsapp?.trim() || negocio.email?.trim()),
+            politicas: !!(negocio.politicas?.trim() || negocio.avisoPrivacidad?.trim()),
+            marketing: !!(negocio.clienteIdeal?.trim() || negocio.terminologia?.trim()),
+            faqObjeciones: !!(negocio.preguntasFrecuentes?.trim() || negocio.objeciones?.trim()),
+        };
+        const totalSecciones = Object.keys(seccionesCompletas).length;
+        const seccionesCompletadas = Object.values(seccionesCompletas).filter(Boolean).length;
+        const progresoGeneral = totalSecciones > 0 ? Math.round((seccionesCompletadas / totalSecciones) * 100) : 0;
+        const estado: EstadoConfiguracionNegocio = {
+            progresoGeneral: progresoGeneral,
+            secciones: {
+                logo: { completo: seccionesCompletas.logo }, descripcion: { completo: seccionesCompletas.descripcion }, contacto: { completo: seccionesCompletas.contacto },
+                politicas: { completo: seccionesCompletas.politicas }, marketing: { completo: seccionesCompletas.marketing }, faqObjeciones: { completo: seccionesCompletas.faqObjeciones },
+            }
+        };
+        return estado;
+    } catch (error) { console.error(`Error obteniendo estado de configuración para negocio ${negocioId}:`, error); return null; }
+}
+
+// --- Definición del tipo NivelCreatividadIA (si no está global) ---
+// --- Tipo para el retorno de la nueva acción ---
+export type NegocioLogoNombre = {
+    logo: string | null;
+    nombre: string;
+} | null; // Puede devolver null si no se encuentra
+
+/**
+ * @description Obtiene únicamente el logo y el nombre de un negocio por su ID.
+ * @param {string} negocioId - El ID del negocio.
+ * @returns {Promise<NegocioLogoNombre>} - Objeto con logo y nombre, o null.
+ */
+export async function obtenerLogoYNombreNegocio(negocioId: string): Promise<NegocioLogoNombre> {
+    if (!negocioId) return null;
+    try {
+        const negocio = await prisma.negocio.findUnique({
+            where: { id: negocioId },
+            select: {
+                logo: true,
+                nombre: true,
+            }
+        });
+        // Devuelve los datos o null si no se encontró el negocio
+        return negocio ? { logo: negocio.logo, nombre: negocio.nombre } : null;
+    } catch (error) {
+        console.error(`Error obteniendo logo y nombre para negocio ${negocioId}:`, error);
+        return null; // Devolver null en caso de error
     }
 }

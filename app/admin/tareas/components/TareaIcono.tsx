@@ -84,6 +84,7 @@ export default function TareaIcono({ tareaId, iconoUrl: initialIconoUrl }: Props
             setIsDeleting(true);
             setError(null);
             setSuccessMessage(null);
+            setTimeout(() => setSuccessMessage(null), 3000);
             const urlToDelete = currentIconoUrl;
 
             try {
@@ -97,6 +98,7 @@ export default function TareaIcono({ tareaId, iconoUrl: initialIconoUrl }: Props
                 }
                 setCurrentIconoUrl(null);
                 setSuccessMessage("Icono eliminado.");
+                setTimeout(() => setSuccessMessage(null), 3000);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
                 console.error("Error al eliminar icono:", err);

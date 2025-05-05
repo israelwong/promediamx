@@ -22,7 +22,7 @@ export default function ClientesLista() {
     const [filtroStatus, setFiltroStatus] = useState<'todos' | 'activo' | 'inactivo'>('todos');
 
     // Clases de Tailwind
-    const containerClasses = "p-4 md:p-6 bg-zinc-900 min-h-screen";
+    const containerClasses = "bg-zinc-900 min-h-screen";
     const headerClasses = "mb-6";
     const summaryCardClasses = "bg-zinc-800 p-4 rounded-lg shadow-md border border-zinc-700 flex items-center gap-3";
     const filterContainerClasses = "mb-6 p-4 bg-zinc-800 rounded-lg shadow-sm border border-zinc-700 flex flex-col sm:flex-row gap-4 items-center";

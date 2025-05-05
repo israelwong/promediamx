@@ -2,124 +2,176 @@
 'use server';
 import prisma from './prismaClient'; // Ajusta ruta
 import { Promocion } from './types'; // Ajusta ruta
-import { Prisma } from '@prisma/client';
+import { revalidatePath } from 'next/cache'; // Importar revalidatePath para revalidar rutas
 
-// --- Obtener Promociones (Ordenadas por fecha inicio DESC) ---
-export async function obtenerPromocionesNegocio(negocioId: string): Promise<Promocion[]> {
-    if (!negocioId) return [];
+
+// --- NUEVO TIPO: Promoción con Imagen de Portada ---
+export type PromocionConPortada = Promocion & {
+    imagenPortadaUrl?: string | null; // URL de la primera imagen de la galería
+};
+
+// --- ACCIÓN ACTUALIZADA ---
+
+/**
+ * Obtiene las promociones de un negocio, incluyendo la URL de la primera imagen de su galería.
+ * @param negocioId - El ID del negocio.
+ * @returns Array de PromocionConPortada o null si hay error.
+ */
+export async function obtenerPromocionesNegocio(negocioId: string): Promise<PromocionConPortada[] | null> {
+    if (!negocioId) return null;
     try {
         const promociones = await prisma.promocion.findMany({
             where: { negocioId: negocioId },
+            include: {
+                // Incluir la primera imagen de la galería asociada
+                PromocionGaleria: {
+                    orderBy: { orden: 'asc' }, // Ordenar para obtener la primera
+                    take: 1,                   // Tomar solo una
+                    select: {
+                        imageUrl: true        // Seleccionar solo la URL
+                    }
+                }
+            },
             orderBy: { fechaInicio: 'desc' }, // Más recientes primero
-            // Seleccionar solo campos necesarios si quieres optimizar
-            // select: { id: true, nombre: true, ... }
         });
-        return promociones as Promocion[]; // Castear si usas select parcial
+
+        // Mapear para añadir la URL de la imagen de portada directamente
+        const promocionesConPortada = promociones.map(promo => {
+            const { PromocionGaleria, ...rest } = promo; // Exclude PromocionGaleria
+            return {
+                ...rest,
+                imagenPortadaUrl: PromocionGaleria?.[0]?.imageUrl || null,
+            };
+        });
+
+        return promocionesConPortada;
+
     } catch (error) {
         console.error(`Error fetching promociones for negocio ${negocioId}:`, error);
-        throw new Error('No se pudieron obtener las promociones.');
+        // Devolver null o array vacío según prefieras manejar errores en el frontend
+        return null;
+        // throw new Error('No se pudieron obtener las promociones.'); // O lanzar error
     }
 }
 
-// --- Crear Promoción ---
-export async function crearPromocion(
-    // Recibir solo los datos necesarios para crear
-    data: Pick<Promocion, 'negocioId' | 'nombre' | 'descripcion' | 'fechaInicio' | 'fechaFin' | 'status'>
-): Promise<{ success: boolean; data?: Promocion; error?: string }> {
-    try {
-        // Validaciones
-        if (!data.negocioId) return { success: false, error: "ID de negocio es requerido." };
-        if (!data.nombre?.trim()) return { success: false, error: "Nombre es requerido." };
-        if (!data.fechaInicio) return { success: false, error: "Fecha de inicio es requerida." };
-        if (!data.fechaFin) return { success: false, error: "Fecha de fin es requerida." };
-        if (new Date(data.fechaInicio) >= new Date(data.fechaFin)) return { success: false, error: "Fecha fin debe ser posterior a fecha inicio." };
+// --- OTRAS ACCIONES (crear, editar, eliminar) ---
+// Estas acciones probablemente se moverán a archivos específicos para
+// PromocionNuevaForm y PromocionEditarForm, pero las dejamos aquí como referencia por ahora.
 
-        const newPromocion = await prisma.promocion.create({
-            data: {
-                negocioId: data.negocioId,
-                nombre: data.nombre.trim(),
-                descripcion: data.descripcion?.trim() || null,
-                fechaInicio: new Date(data.fechaInicio), // Asegurar objeto Date
-                fechaFin: new Date(data.fechaFin),       // Asegurar objeto Date
-                status: data.status || 'activo',
-            },
-        });
-        return { success: true, data: newPromocion as Promocion };
-    } catch (error) {
-        console.error('Error creating promocion:', error);
-        // Manejar errores específicos si es necesario (ej: nombre duplicado si fuera unique)
-        return { success: false, error: (error as Error).message || "Error desconocido al crear promoción." };
-    }
-}
-
-// --- Editar Promoción ---
-export async function editarPromocion(
-    id: string,
-    data: Partial<Pick<Promocion, 'nombre' | 'descripcion' | 'fechaInicio' | 'fechaFin' | 'status'>>
-): Promise<{ success: boolean; data?: Promocion; error?: string }> {
-    try {
-        if (!id) return { success: false, error: "ID de promoción no proporcionado." };
-
-        const dataToUpdate: Prisma.PromocionUpdateInput = {};
-        if (data.nombre !== undefined && data.nombre !== null) dataToUpdate.nombre = data.nombre.trim();
-        if (data.descripcion !== undefined) dataToUpdate.descripcion = data.descripcion?.trim() || null;
-        if (data.fechaInicio !== undefined && data.fechaInicio) dataToUpdate.fechaInicio = new Date(data.fechaInicio);
-        if (data.fechaFin !== undefined && data.fechaFin) dataToUpdate.fechaFin = new Date(data.fechaFin);
-        if (data.status !== undefined && data.status !== null) dataToUpdate.status = data.status;
-
-        if (Object.keys(dataToUpdate).length === 0) {
-            return { success: false, error: "No hay datos para actualizar." };
-        }
-        // Validar fechas si ambas se proporcionan
-        const currentData = await prisma.promocion.findUnique({ where: { id }, select: { fechaInicio: true, fechaFin: true } });
-        const finalFechaInicio = data.fechaInicio ? new Date(data.fechaInicio) : currentData?.fechaInicio;
-        const finalFechaFin = data.fechaFin ? new Date(data.fechaFin) : currentData?.fechaFin;
-        if (finalFechaInicio && finalFechaFin && finalFechaInicio >= finalFechaFin) {
-            return { success: false, error: "Fecha fin debe ser posterior a fecha inicio." };
-        }
-
-
-        const updatedPromocion = await prisma.promocion.update({
-            where: { id },
-            data: dataToUpdate,
-        });
-        return { success: true, data: updatedPromocion as Promocion };
-    } catch (error) {
-        console.error(`Error updating promocion ${id}:`, error);
-        return { success: false, error: (error as Error).message || "Error desconocido al editar promoción." };
-    }
-}
-
-// --- Eliminar Promoción ---
-export async function eliminarPromocion(id: string): Promise<{ success: boolean; error?: string }> {
-    try {
-        if (!id) return { success: false, error: "ID de promoción no proporcionado." };
-        // Considerar ItemCatalogoPromocion: ¿Borrar asociaciones o impedir borrado?
-        // Por simplicidad, asumimos que se puede borrar (o que onDelete está configurado)
-        await prisma.promocion.delete({ where: { id } });
-        return { success: true };
-    } catch (error) {
-        console.error(`Error deleting promocion ${id}:`, error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2003' || error.code === 'P2014')) {
-            return { success: false, error: "No se puede eliminar porque está asociada a ítems del catálogo." };
-        }
-        return { success: false, error: (error as Error).message || "Error desconocido al eliminar promoción." };
-    }
-}
-
-// --- Tipos (Asegúrate que coincidan con tu schema) ---
-/*
-export interface Promocion {
-    id: string;
+interface CrearPromocionInput {
     negocioId: string;
-    negocio?: Negocio | null;
     nombre: string;
     descripcion?: string | null;
     fechaInicio: Date;
     fechaFin: Date;
-    status: string;
-    createdAt: Date;
-    updatedAt: Date;
-    ItemCatalogoPromocion?: ItemCatalogoPromocion[];
+    status?: string;
 }
-*/
+
+interface ActionResult<T = null> {
+    success: boolean;
+    error?: string | null;
+    data?: T;
+}
+
+export async function crearPromocion(data: CrearPromocionInput): Promise<ActionResult<{ id: string }>> {
+    // ... (Lógica de validación y creación) ...
+    try {
+        const nuevaPromo = await prisma.promocion.create({
+            data: {
+                negocio: { connect: { id: data.negocioId } },
+                nombre: data.nombre,
+                descripcion: data.descripcion,
+                fechaInicio: data.fechaInicio,
+                fechaFin: data.fechaFin,
+                status: data.status || 'activo',
+            },
+            select: { id: true }
+        });
+        // Revalidar ruta del dashboard de negocios
+        revalidatePath(`/admin/negocios/${data.negocioId}`); // Ajusta la ruta
+        // Si tienes ruta por cliente:
+        // const negocio = await prisma.negocio.findUnique({where: {id: data.negocioId}, select: {clienteId: true}});
+        // if (negocio?.clienteId) revalidatePath(`/admin/clientes/${negocio.clienteId}/negocios/${data.negocioId}`);
+        return { success: true, data: { id: nuevaPromo.id } };
+    } catch (error) {
+        console.error("Error creando promoción:", error);
+        return { success: false, error: "No se pudo crear la promoción." };
+    }
+}
+
+export async function editarPromocion(promocionId: string, data: Omit<CrearPromocionInput, 'negocioId'>): Promise<ActionResult> {
+    // ... (Lógica de validación y actualización) ...
+    try {
+        const promo = await prisma.promocion.update({
+            where: { id: promocionId },
+            data: {
+                nombre: data.nombre,
+                descripcion: data.descripcion,
+                fechaInicio: data.fechaInicio,
+                fechaFin: data.fechaFin,
+                status: data.status || 'activo',
+            },
+            select: { negocioId: true, negocio: { select: { clienteId: true } } } // Obtener IDs para revalidar
+        });
+        // Revalidar rutas relevantes
+        const basePath = promo.negocio?.clienteId
+            ? `/admin/clientes/${promo.negocio.clienteId}/negocios/${promo.negocioId}`
+            : `/admin/negocios/${promo.negocioId}`;
+        revalidatePath(basePath); // Dashboard negocio
+        revalidatePath(`${basePath}/promocion/${promocionId}/editar`); // Página editar (si existe)
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error editando promoción:", error);
+        return { success: false, error: "No se pudo editar la promoción." };
+    }
+}
+
+export async function eliminarPromocion(promocionId: string): Promise<ActionResult> {
+    // ... (Lógica de eliminación) ...
+    try {
+        const promo = await prisma.promocion.findUnique({ where: { id: promocionId }, select: { negocioId: true, negocio: { select: { clienteId: true } } } });
+        if (!promo) return { success: true }; // O error si no se encontró
+
+        await prisma.promocion.delete({
+            where: { id: promocionId },
+        });
+
+        // Revalidar ruta del dashboard de negocios
+        const basePath = promo.negocio?.clienteId
+            ? `/admin/clientes/${promo.negocio.clienteId}/negocios/${promo.negocioId}`
+            : `/admin/negocios/${promo.negocioId}`;
+        revalidatePath(basePath);
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error eliminando promoción:", error);
+        return { success: false, error: "No se pudo eliminar la promoción." };
+    }
+}
+
+export async function obtenerPromocionPorId(promocionId: string): Promise<Promocion | null> {
+    if (!promocionId) {
+        console.error("obtenerPromocionPorId: ID no proporcionado.");
+        return null;
+    }
+    try {
+        const promocion = await prisma.promocion.findUnique({
+            where: { id: promocionId },
+            // No necesitamos incluir relaciones para el formulario actual,
+            // pero podrías añadir 'include' si fuera necesario.
+            // include: { negocio: true } // Ejemplo
+        });
+
+        if (!promocion) {
+            console.warn(`Promoción con ID ${promocionId} no encontrada.`);
+            return null;
+        }
+
+        return promocion; // Prisma devuelve el tipo Promocion directamente
+
+    } catch (error) {
+        console.error(`Error en obtenerPromocionPorId (${promocionId}):`, error);
+        return null; // Devolver null en caso de error de base de datos
+    }
+}

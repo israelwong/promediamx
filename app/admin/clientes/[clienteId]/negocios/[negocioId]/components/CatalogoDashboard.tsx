@@ -1,25 +1,23 @@
-// src/app/admin/negocios/[negocioId]/components/CatalogoPanel.tsx (o donde corresponda)
 'use client';
 
 import React, { useState } from 'react';
 
 import NegocioCatalogos from './(catalogo)/NegocioCatalogos';
-import NegocioDescuentos from './(catalogo)/NegocioDescuentos';
-import NegocioPromociones from './(catalogo)/NegocioPromociones';
 import NegocioEtiquetas from './(catalogo)/NegocioEtiquetas';
 import NegocioCategorias from './(catalogo)/NegocioCategorias';
 
 // Importar iconos para las pestañas
-import { Package, Tag, LayoutGrid, Tags as EtiquetasIcon } from 'lucide-react';
+import { Package, LayoutGrid, Tags as EtiquetasIcon } from 'lucide-react';
 
 interface Props {
     negocioId: string;
+    clienteId?: string; // Opcional, dependiendo de si lo necesitas
 }
 
 // Definir los IDs posibles para las pestañas
-type TabId = 'catalogos' | 'promociones' | 'descuentos' | 'categorias' | 'etiquetas';
+type TabId = 'catalogos' | 'categorias' | 'etiquetas';
 
-export default function CatalogoDashboard({ negocioId }: Props) {
+export default function CatalogoDashboard({ clienteId, negocioId }: Props) {
     // Estado para controlar la pestaña activa
     const [activeTab, setActiveTab] = useState<TabId>('catalogos'); // Iniciar con 'catalogos'
 
@@ -33,16 +31,7 @@ export default function CatalogoDashboard({ negocioId }: Props) {
 
     // Mapeo de pestañas para renderizado
     const tabs: { id: TabId; label: string; icon: React.ElementType; component: React.ReactNode }[] = [
-        { id: 'catalogos', label: 'Catálogos', icon: Package, component: <NegocioCatalogos negocioId={negocioId} /> },
-        {
-            id: 'promociones', label: 'Promociones', icon: Tag, component: (
-                <div className="flex flex-col gap-4">
-                    <NegocioPromociones negocioId={negocioId} />
-                    <NegocioDescuentos negocioId={negocioId} />
-                </div>
-
-            )
-        },
+        { id: 'catalogos', label: 'Catálogos', icon: Package, component: <NegocioCatalogos negocioId={negocioId} clienteId={clienteId} /> },
         { id: 'categorias', label: 'Categorías', icon: LayoutGrid, component: <NegocioCategorias negocioId={negocioId} /> },
         { id: 'etiquetas', label: 'Etiquetas', icon: EtiquetasIcon, component: <NegocioEtiquetas negocioId={negocioId} /> },
     ];

@@ -1,3 +1,289 @@
+// Tipo para los datos completos de un Lead para edición
+// Incluye relaciones necesarias para mostrar y pre-seleccionar
+export type LeadDetallesEditar = Pick<
+    Lead,
+    'id' | 'nombre' | 'email' | 'telefono' | 'valorEstimado' | 'status' | // Incluir status
+    'pipelineId' | 'canalId' | 'agenteId' | 'createdAt' | 'updatedAt'
+// Añadir jsonParams si vas a editar campos personalizados aquí
+// 'jsonParams'
+> & {
+    // Incluir objetos relacionados completos o parciales
+    pipeline?: Pick<PipelineCRM, 'id' | 'nombre'> | null;
+    canal?: Pick<CanalCRM, 'id' | 'nombre'> | null;
+    agente?: Pick<Agente, 'id' | 'nombre'> | null;
+    etiquetas?: { etiqueta: Pick<EtiquetaCRM, 'id' | 'nombre' | 'color'> }[];
+    // Podrías incluir historial de conversaciones, bitácora, etc. si se muestran aquí
+};
+
+// Tipo para los datos que se envían al editar (solo campos modificables)
+export type EditarLeadFormData = Pick<
+    Lead,
+    'nombre' | 'telefono' | 'valorEstimado' | 'status' // Email usualmente no se edita
+> & {
+    pipelineId?: string | null;
+    canalId?: string | null;
+    agenteId?: string | null;
+    etiquetaIds?: string[]; // Array de IDs de etiquetas seleccionadas
+    // Incluir campos personalizados si son editables
+    // [key: string]: any;
+};
+
+// Tipo de retorno para la acción que obtiene los detalles del lead
+export interface ObtenerDetallesLeadResult {
+    success: boolean;
+    data?: LeadDetallesEditar | null;
+    error?: string;
+}
+
+// Tipo de retorno para la acción de editar lead
+export interface EditarLeadResult {
+    success: boolean;
+    data?: Pick<Lead, 'id' | 'nombre'> | null; // Devolver ID y nombre actualizado
+    error?: string;
+}
+
+// Tipo para los datos del formulario de nuevo lead
+// Incluye campos opcionales para la asignación inicial
+export type NuevoLeadFormData = Pick<Lead, 'nombre' | 'email' | 'telefono' | 'valorEstimado'> & {
+    pipelineId?: string | null; // Etapa inicial opcional
+    canalId?: string | null;    // Canal de origen opcional
+    agenteId?: string | null;   // Agente asignado opcional
+    etiquetaIds?: string[];     // Etiquetas iniciales opcionales
+    // Podrías añadir campos personalizados aquí si los quieres en el form inicial
+    // [key: string]: any; // Para campos personalizados dinámicos (más complejo)
+};
+
+// Tipo de retorno para la acción de crear lead
+export interface CrearLeadResult {
+    success: boolean;
+    data?: Pick<Lead, 'id' | 'nombre'> | null; // Devolver ID y nombre del lead creado
+    error?: string;
+}
+
+// Reutilizamos DatosFiltros de crm_leads_types si ya existe,
+// o lo definimos aquí si es necesario para los selects del formulario.
+export interface DatosFormularioLead {
+    pipelines: Pick<PipelineCRM, 'id' | 'nombre'>[];
+    canales: Pick<CanalCRM, 'id' | 'nombre'>[];
+    etiquetas: Pick<EtiquetaCRM, 'id' | 'nombre' | 'color'>[];
+    agentes: Pick<Agente, 'id' | 'nombre'>[];
+    crmId: string | null; // ID del CRM asociado
+    // Incluir campos personalizados si se añaden al formulario
+    // camposPersonalizados: Pick<CRMCampoPersonalizado, 'id' | 'nombre' | 'tipo' | 'requerido'>[];
+}
+
+export interface ObtenerDatosFormularioLeadResult {
+    success: boolean;
+    data?: DatosFormularioLead | null;
+    error?: string;
+}
+
+
+
+// Tipo para representar un Lead en la lista (con datos relacionados)
+export type LeadListaItem = Pick<
+    Lead,
+    'id' | 'nombre' | 'email' | 'telefono' | 'createdAt' | 'updatedAt' | 'status' | 'valorEstimado'
+> & {
+    pipeline?: Pick<PipelineCRM, 'id' | 'nombre'> | null;
+    canal?: Pick<CanalCRM, 'id' | 'nombre'> | null;
+    agente?: Pick<Agente, 'id' | 'nombre'> | null;
+    etiquetas?: { etiqueta: Pick<EtiquetaCRM, 'id' | 'nombre' | 'color'> }[];
+    // Datos de la última conversación/interacción (simplificado)
+    ultimaConversacion?: Pick<Conversacion, 'id' | 'updatedAt' | 'status'> | null;
+    // Podrías añadir _count de conversaciones o tareas si es útil
+};
+
+// Tipo para los filtros aplicados a la lista de leads
+export interface FiltrosLeads {
+    searchTerm?: string;
+    pipelineId?: string | 'all'; // 'all' para mostrar todos
+    canalId?: string | 'all';
+    etiquetaId?: string | 'all';
+    agenteId?: string | 'all';
+    // Podrías añadir filtros por fecha, status, etc.
+}
+
+// Tipo para las opciones de ordenamiento
+export interface OpcionesSortLeads {
+    campo: 'createdAt' | 'updatedAt' | 'nombre' | 'valorEstimado';
+    direccion: 'asc' | 'desc';
+}
+
+// Tipo de retorno para la acción que obtiene los leads
+export interface ObtenerLeadsResult {
+    success: boolean;
+    data?: {
+        crmId: string | null;
+        leads: LeadListaItem[];
+        // Opcional: Información de paginación si la implementas
+        // totalCount?: number;
+        // currentPage?: number;
+        // totalPages?: number;
+    } | null;
+    error?: string;
+}
+
+// Tipo para los datos necesarios para los filtros (obtenidos por separado)
+export interface DatosFiltros {
+    pipelines: Pick<PipelineCRM, 'id' | 'nombre'>[];
+    canales: Pick<CanalCRM, 'id' | 'nombre'>[];
+    etiquetas: Pick<EtiquetaCRM, 'id' | 'nombre' | 'color'>[];
+    agentes: Pick<Agente, 'id' | 'nombre'>[];
+}
+
+export interface ObtenerDatosFiltrosResult {
+    success: boolean;
+    data?: DatosFiltros | null;
+    error?: string;
+}
+
+export interface UsuarioExtendido extends Omit<Usuario, 'rol'> { // Omitir 'rol' de Usuario base
+    rolNombre?: string | null; // Almacenar el NOMBRE del rol como string
+    token?: string;
+}
+
+// Tipo para una tarjeta Lead simplificada para el Kanban
+export type LeadCardData = Pick<Lead, 'id' | 'nombre' | 'createdAt' | 'updatedAt' | 'pipelineId'> & {
+    // Opcional: Añadir más datos si los quieres mostrar en la tarjeta
+    agente?: Pick<Agente, 'id' | 'nombre'> | null;
+    valorEstimado?: number | null;
+    Etiquetas?: { etiqueta: Pick<EtiquetaCRM, 'id' | 'nombre' | 'color'> }[];
+    // Puedes añadir _count de tareas o notas si es relevante
+};
+
+// Tipo para una columna del Kanban (Etapa del Pipeline)
+export type PipelineColumnData = Pick<PipelineCRM, 'id' | 'nombre' | 'orden'> & {
+    leads: LeadCardData[]; // Array de leads en esta etapa
+};
+
+// Tipo para el estado completo del tablero Kanban
+export type KanbanBoardData = {
+    crmId: string | null;
+    columns: PipelineColumnData[];
+};
+
+// Tipo de retorno para la acción que obtiene los datos del Kanban
+export interface ObtenerKanbanResult {
+    success: boolean;
+    data?: KanbanBoardData | null;
+    error?: string;
+}
+
+// Tipo para la acción de actualizar la etapa de un lead
+export interface ActualizarEtapaLeadResult {
+    success: boolean;
+    // Opcional: devolver el lead actualizado si es necesario
+    // data?: Lead;
+    error?: string;
+}
+
+
+
+export type EstadisticasCRMResumen = {
+    crmConfigurado: boolean;
+    totalLeads?: number | null;
+    totalConversaciones?: number | null;
+    // Podríamos añadir más detalles después si es necesario
+    // leadsPorPipeline?: { pipelineId: string | null; nombre?: string; conteo: number }[] | null;
+    // leadsPorEtiqueta?: { etiquetaId: string | null; nombre?: string; color?: string | null; conteo: number }[] | null;
+};
+
+// Tipo de retorno estándar para acciones (si no lo tienes global)
+export interface ActionResult<T = null> {
+    success: boolean;
+    error?: string | null;
+    data?: T;
+}
+
+// Tipo para representar el estado de completitud de cada sección
+export type EstadoSeccionNegocio = {
+    completo: boolean; // Indica si la sección se considera completa (ej. campo principal no vacío)
+    // podrías añadir más detalles si es necesario, como campos específicos pendientes
+};
+
+// Tipo para el objeto que devolverá la acción
+export type EstadoConfiguracionNegocio = {
+    progresoGeneral: number; // Porcentaje de 0 a 100
+    secciones: {
+        descripcion: EstadoSeccionNegocio;
+        contacto: EstadoSeccionNegocio;
+        politicas: EstadoSeccionNegocio;
+        marketing: EstadoSeccionNegocio;
+        faqObjeciones: EstadoSeccionNegocio;
+        // Añadir más secciones si es necesario (ej. logo)
+        logo: EstadoSeccionNegocio;
+    };
+};
+
+// No necesitamos un tipo nuevo complejo, pero sí para los datos del formulario de edición de detalles
+export type ImagenGaleriaDetallesInput = Partial<Pick<ItemCatalogoGaleria, 'altText' | 'descripcion'>>;
+
+// Podríamos necesitar un tipo para la acción de reordenar si no existe
+export interface ImagenOrdenData {
+    id: string;
+    orden: number;
+}
+
+// Similar a ItemFormData pero asegurando tipos de Prisma
+export type ActualizarItemDataInput = Partial<{
+    nombre: string;
+    descripcion: string | null;
+    precio: number; // Asegurar que sea número
+    tipoItem: string | null;
+    sku: string | null;
+    stock: number | null; // Asegurar número o null
+    stockMinimo: number | null; // Asegurar número o null
+    unidadMedida: string | null;
+    linkPago: string | null;
+    funcionPrincipal: string | null;
+    esPromocionado: boolean;
+    AquienVaDirigido: string | null;
+    palabrasClave: string | null;
+    videoUrl: string | null;
+    status: string;
+    categoriaId: string | null;
+}>;
+
+
+// En types.ts
+export interface AsistenteEnLista {
+    id: string;
+    nombre: string;
+    urlImagen: string | null;
+    precioBase: number | null;
+    costoTotalTareasAdicionales: number; // Calculado en el backend
+    // Opcionales (si decides incluirlos y la consulta los devuelve)
+    totalConversaciones?: number;
+    totalTareasSuscritas?: number;
+    status?: string; // Podría ser útil mostrar el status
+}
+
+export interface TareaSuscripcionDetalles {
+    tarea: Pick<Tarea, 'id' | 'nombre' | 'descripcion' | 'precio' | 'iconoUrl'> & {
+        TareaGaleria?: Pick<TareaGaleria, 'id' | 'imageUrl' | 'altText' | 'descripcion'>[];
+        CategoriaTarea?: Pick<CategoriaTarea, 'nombre' | 'color'> | null;
+        etiquetas?: Pick<EtiquetaTarea, 'id' | 'nombre'>[];
+    };
+    suscripcion?: Pick<AsistenteTareaSuscripcion, 'id' | 'status' | 'montoSuscripcion' | 'fechaSuscripcion' | 'fechaDesuscripcion'> | null;
+    // --- NUEVOS CAMPOS OPCIONALES ---
+    clienteId?: string | null;
+    negocioId?: string | null;
+    // ------------------------------
+}
+
+// Actualizar TareaParaMarketplace para incluir imagen portada
+export type TareaParaMarketplace = Pick<Tarea, 'id' | 'nombre' | 'descripcion' | 'precio' | 'categoriaTareaId'> & {
+    // Incluir color desde la categoría
+    CategoriaTarea?: (Pick<CategoriaTarea, 'nombre'> & { color?: string | null }) | null;
+    etiquetas: { etiquetaTarea: Pick<EtiquetaTarea, 'id' | 'nombre'> }[];
+    _count: {
+        AsistenteTareaSuscripcion: number;
+        TareaGaleria: number;
+    };
+    // Añadir URL de imagen de portada (opcional)
+    imagenPortadaUrl?: string | null; // <-- NUEVO
+};
 
 // --- Tipo Ultra-Simplificado para Datos de Entrada de Crear Tarea ---
 export type CrearTareaBasicaInput = Pick<Tarea, 'nombre' | 'categoriaTareaId'> & {
@@ -15,7 +301,6 @@ export interface TareaFuncionParametroRequerido {
 }
 
 // --- Tipo para Actualizar Tarea (Datos del Formulario + IDs de Relaciones) ---
-// Define los campos editables de Tarea más los arrays de IDs para canales y etiquetas
 export type ActualizarTareaConRelacionesInput = Partial<Pick<Tarea,
     'nombre' |
     'descripcion' |
@@ -69,11 +354,9 @@ export interface NegocioConDetalles extends Omit<Negocio, 'AsistenteVirtual'> {
 }
 
 // --- Tipo para el estado del Formulario de Nueva Tarea ---
-// Similar a CrearTareaData pero puede tener todos los campos opcionales inicialmente
 export type TareaNuevaFormData = Partial<Omit<Tarea, 'id' | 'orden' | 'createdAt' | 'updatedAt' | 'version' | 'status' | 'CategoriaTarea' | 'tareaFuncion' | 'etiquetas' | 'canalesSoportados' | 'camposPersonalizadosRequeridos' | 'AsistenteTareaSuscripcion' | 'TareaEjecutada' | '_count'>> & {
     canalConversacionalId?: string; // Para el select de canal
     etiquetaIds?: string[]; // Para el multi-select de etiquetas
-    // No incluimos campos de relaciones complejas aquí
 };
 
 export type TareaConDetalles = Tarea & {
@@ -99,10 +382,10 @@ export interface SugerenciasTarea {
     sugerencia_instruccion?: string | '';
 }
 
-
 //! *****************************************************
 //! *****************************************************
-
+//! *****************************************************
+//! *****************************************************
 
 //! USUARIO
 export interface Usuario {
@@ -221,7 +504,7 @@ export interface AsistenteVirtual {
     whatsappHITL?: string | null; // Teléfono para consultas human in the loop.
     emailHITL?: string | null; // Email asociado al asistente virtual.
     emailCalendario?: string | null; // Email para agendar citas.
-    precioBase?: number | null; // Precio base del asistente virtual.
+    precioBase?: number | null; //! Precio base del asistente virtual.
     version?: number | null; // Version del asistente virtual.
     status?: string | null; // Default: "activo".
     createdAt?: Date | null; // Default: now().
@@ -232,7 +515,8 @@ export interface AsistenteVirtual {
     TareaEjecutada?: TareaEjecutada[];
     Conversacion?: Conversacion[];
     FacturaItem?: FacturaItem[]; // Relación inversa opcional
-    //CRM?: CRM | null; // Added opposite relation field.
+    ItemInteraccion?: ItemInteraccion[]; // Opcional: Interacciones relacionadas con este asistente
+
 }
 
 export interface AsistenteTareaSuscripcion {
@@ -271,7 +555,7 @@ export interface CanalConversacional {
 export interface Tarea {
     id: string; // Requerido
     categoriaTareaId?: string;
-    CategoriaTarea?: CategoriaTarea | null; // Relación opcional
+    // CategoriaTarea?: CategoriaTarea | null; // Relación opcional
     orden?: number | null;
     nombre: string;
     descripcion?: string | null;
@@ -309,6 +593,8 @@ export interface Tarea {
 
     //!!!! sabe
     automatizacion?: string; // Opcional: Descripción de la automatización
+
+    CategoriaTarea?: Pick<CategoriaTarea, 'id' | 'nombre' | 'color'> | null; // Relación opcional con la categoría
 }
 
 //! Galería
@@ -342,7 +628,7 @@ export interface CategoriaTarea {
     descripcion?: string | null;
     createdAt?: Date; // Default: now()
     updatedAt?: Date; // Automatically updated
-
+    color?: string | null; // Color opcional para la categoría
     // Relaciones (opcionales según la consulta)
     Tarea?: Tarea[];
 }
@@ -485,6 +771,7 @@ export interface Negocio {
     cliente?: Cliente | null;
     logo?: string | null; // Logo, Imagen de Portada, Imágenes de Productos/Servicios.
     nombre: string;
+    slogan?: string | null; // Lema, Tagline, Frase de Impacto.
     descripcion?: string | null; // Resumen Ejecutivo, Misión, Visión, Filosofía, Valores, Antecedentes.
     telefonoLlamadas?: string | null;
     telefonoWhatsapp?: string | null;
@@ -492,12 +779,11 @@ export interface Negocio {
     direccion?: string | null;
     googleMaps?: string | null;
     paginaWeb?: string | null;
-    redesSociales?: string | null; // Facebook, Instagram, Twitter, LinkedIn, TikTok, Pinterest, YouTube.
     horarioAtencion?: string | null;
     garantias?: string | null; // Garantías.
     politicas?: string | null; // Políticas de Privacidad, Términos y Condiciones, Políticas de Devolución, Políticas de Reembolso, Políticas de Cancelación.
     avisoPrivacidad?: string | null; // Aviso de Privacidad, Aviso de Cookies, Aviso de Seguridad.
-    compentencia?: string | null; // Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
+    competencia?: string | null; // Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
     clienteIdeal?: string | null; // Rango de Edad, Rango de Ingresos, Distribución de Género, Distribución Geográfica, Nivel Educativo, Ocupación, Sector, Motivaciones Principales, Factores de Influencia, Personalidad, Intereses, Lenguaje, Tono de Comunicación Preferido, Canal de Comunicación Preferido.
     terminologia?: string | null; // Terminología del Negocio, Glosario de Términos, Jerga del Sector.
     preguntasFrecuentes?: string | null; // Preguntas Frecuentes, Preguntas Comunes, Preguntas Recurrentes.
@@ -509,13 +795,10 @@ export interface Negocio {
     updatedAt?: Date | null; // Automatically updated.
     status?: string | null; // Default: "activo".
     almacenamientoUsadoBytes?: bigint | null; // Contador total
-
     // Relaciones (opcionales según la consulta)
     Catalogo?: Catalogo[] | null; // Added opposite relation field.
     categorias?: NegocioCategoria[]
     etiquetas?: NegocioEtiqueta[]
-    Promocion?: Promocion[] | null;
-    Descuento?: Descuento[] | null;
     AsistenteVirtual?: (AsistenteVirtual & {
         precioBase?: number | null;
         AsistenteTareaSuscripcion?: AsistenteTareaSuscripcion[];
@@ -523,7 +806,7 @@ export interface Negocio {
     CRM?: CRM | null; // Added opposite relation field.
     ItemCatalogo?: ItemCatalogo[] | null; // Relación con los items del catálogo
     Notificacion?: Notificacion[]; // Relación opcional con notificaciones
-
+    redesSociales?: NegocioRedSocial[] | null; // Relación a redes sociales
     _count?: {
         AsistenteVirtual?: number;
         Catalogo?: number;
@@ -534,9 +817,47 @@ export interface Negocio {
         itemsCatalogo?: number;
         Notificacion?: number;
     };
-
+    GaleriaNegocio?: GaleriaNegocio[]; // Relación a galerías de negocio
 }
 
+export interface GaleriaNegocio {
+    id: string;
+    negocioId: string;
+    negocio?: Negocio; // Relación con Negocio
+    nombre: string; // Nombre de la galería (ej: "Fotos del Local")
+    descripcion?: string | null; // Descripción opcional
+    orden?: number | null; // Para ordenar las galerías entre sí
+    status?: string; // Default: "activo"
+    createdAt: Date; // Fecha de creación
+    updatedAt: Date; // Fecha de última actualización
+
+    // Relación uno-a-muchos con las imágenes de esta galería
+    imagenes?: ImagenGaleriaNegocio[]; // Relación con las imágenes de la galería
+}
+
+export interface ImagenGaleriaNegocio {
+    id: string;
+    galeriaNegocioId: string;
+    galeriaNegocio?: GaleriaNegocio; // Relación con GaleriaNegocio
+    imageUrl: string; // URL de Supabase Storage
+    altText?: string | null; // Texto alternativo
+    descripcion?: string | null; // Descripción opcional
+    orden?: number | null; // Orden de la imagen
+    tamañoBytes?: number | null; // Tamaño en bytes
+    createdAt: Date; // Fecha de creación
+}
+
+export interface NegocioRedSocial {
+    id: string;
+    negocioId: string;
+    negocio?: Negocio; // Relación con Negocio
+    nombreRed: string; // Nombre de la red (Ej: "Facebook", "Instagram", "TikTok", etc.)
+    url: string; // URL completa del perfil o página
+    icono?: string | null; // Opcional: Nombre o clase del icono a usar
+    orden?: number | null; // Opcional: Orden para visualización
+    createdAt: Date; // Fecha de creación
+    updatedAt: Date; // Fecha de última actualización
+}
 
 export interface NegocioCategoria {
     id: string;
@@ -574,62 +895,91 @@ export interface Catalogo {
     negocio?: Negocio;
     nombre: string;
     descripcion?: string | null;
-    precio?: number | null;
     status: string; // Default: "activo"
     createdAt?: Date; // Default: now()
     updatedAt?: Date; // Automatically updated
-
     ItemCatalogo?: ItemCatalogo[] | null; // Added opposite relation field
-    // **Añadir _count si lo usas**
     _count?: {
         ItemCatalogo: number;
     };
+    imagenPortadaUrl?: string | null; // URL de la imagen de portada del catálogo
+    CatalogoGaleria?: CatalogoGaleria[]; // Relación con la galería del catálogo
 }
 
-// --- Item del Catálogo --- //
+export interface CatalogoGaleria {
+    id: string;
+    catalogoId: string;
+    catalogo?: Catalogo; // Relación con Catalogo
+    imageUrl: string; // URL en Supabase Storage
+    altText?: string | null; // Texto alternativo para accesibilidad
+    descripcion?: string | null; // Descripción opcional
+    orden?: number | null; // Orden de la imagen
+    tamañoBytes?: number | null; // Tamaño en bytes
+    createdAt: Date; // Fecha de creación
+}
+
 export interface ItemCatalogo {
     id: string;
     catalogoId: string;
     catalogo?: Catalogo; // Added relation to Catalogo
     categoriaId?: string | null; // Renamed field
     categoria?: NegocioCategoria | null; // Renamed type and relation
-    negocioId?: string | null; // Added opposite relation field
+    negocioId?: string | null; // Made negocioId required
     negocio?: Negocio | null; // Added opposite relation
     nombre: string;
     descripcion?: string | null;
     precio: number; // Changed type to Float equivalent
-    imagen?: string | null;
+    tipoItem?: string | null; // PRODUCTO, SERVICIO
+    sku?: string | null; // Unique identifier
+    stock?: number | null;
+    stockMinimo?: number | null;
+    unidadMedida?: string | null; // pieza, kg, hora, sesión
     linkPago?: string | null;
-    funcionPrincipal?: string | null;
-    promocionActiva?: string | null;
-    AquienVaDirigido?: string | null;
-    nivelDePopularidad?: string | null;
-    video?: string | null;
+    funcionPrincipal?: string | null; // For AI
+    esPromocionado?: boolean; // For AI/Active promotion
+    AquienVaDirigido?: string | null; // For AI
+    palabrasClave?: string | null; // Comma-separated keywords for search/SEO/AI
+    videoUrl?: string | null; // URL for video
     orden?: number | null;
-    status?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
+    status?: string; // activo, inactivo, agotado, proximamente
+    createdAt?: Date | null; // Default: now()
+    updatedAt?: Date | null; // Automatically updated
 
-    // Relaciones M-N
-    ItemCatalogoPromocion?: ItemCatalogoPromocion[];
-    ItemCatalogoDescuento?: ItemCatalogoDescuento[];
-    itemEtiquetas?: ItemCatalogoEtiqueta[];//
-    galeria?: ItemCatalogoGaleria[]; // Relación con galería
+    itemEtiquetas?: ItemCatalogoEtiqueta[];
+    galeria?: ItemCatalogoGaleria[];
+    interacciones?: ItemInteraccion[]; // New inverse relation
+    itemCatalogoOfertas?: ItemCatalogoOferta[]; // Relación con las ofertas asociadas al item
+}
+
+export interface ItemInteraccion {
+    id: string;
+    itemCatalogoId: string; // A qué ítem se refiere
+    itemCatalogo: ItemCatalogo; // Relación con ItemCatalogo
+
+    tipoInteraccion: string; // Ej: "CHAT_QUERY", "LANDING_CLICK", "PURCHASE", "FAQ_LINK_CLICK"
+    timestamp: Date; // Cuándo ocurrió
+
+    // Campos opcionales para dar contexto
+    asistenteId?: string | null; // Qué asistente estuvo involucrado (si aplica)
+    asistente?: AsistenteVirtual | null; // Relación con AsistenteVirtual
+    conversacionId?: string | null; // En qué conversación ocurrió (si aplica)
+    conversacion?: Conversacion | null; // Relación con Conversacion
+
+    metadata?: JSON | null; // Para guardar detalles adicionales específicos de la interacción
 }
 
 export interface ItemCatalogoGaleria {
     id: string;
     itemCatalogoId: string;
-    itemCatalogo: ItemCatalogo; // Relation to ItemCatalogo
+    itemCatalogo?: ItemCatalogo; // Relation to ItemCatalogo
     imageUrl: string; // URL en Supabase Storage
-    altText?: string; // Texto alternativo para la imagen
-    descripcion?: string; // Descripción de la imagen
-    orden?: number; // Orden de la imagen
-    tamañoBytes?: number; // Tamaño en bytes, guardado al subir
+    altText?: string | null; // Texto alternativo para la imagen
+    descripcion?: string | null; // Descripción de la imagen
+    orden?: number | null; // Orden de la imagen
+    tamañoBytes?: number | null; // Tamaño en bytes, guardado al subir
     createdAt: Date; // Fecha de creación
 }
 
-// --- Tabla Intermedia Item-Etiqueta (Muchos-a-Muchos) --- //
 export interface ItemCatalogoEtiqueta {
     id: string;
     itemCatalogoId: string;
@@ -638,56 +988,48 @@ export interface ItemCatalogoEtiqueta {
     etiqueta?: NegocioEtiqueta;
 }
 
-export interface Promocion {
-    id?: string;
-    negocioId?: string | null;
-    negocio?: Negocio | null;
-    nombre?: string | null;
-    descripcion?: string | null;
-    fechaInicio?: Date | null;
-    fechaFin?: Date | null;
-    status?: string | null;
-    createdAt?: Date | null;
-    updatedAt?: Date | null;
-    ItemCatalogoPromocion?: ItemCatalogoPromocion[] | null;
-}
-
-export interface Descuento {
+// --- NUEVA Entidad Unificada: Oferta ---
+export interface Oferta {
     id: string;
     negocioId: string;
-    negocio?: Negocio | null;
-    nombre: string;
+    negocio?: Negocio; // Relación con Negocio
+    nombre: string; // Ej: "Descuento Primera Compra", "Promo Día Padre", "Cupón BIENVENIDO10"
     descripcion?: string | null;
-    porcentaje?: number | null;
-    monto?: number | null;
-    fechaInicio: Date | null;
-    fechaFin: Date | null;
-    status: string;
-    createdAt?: Date | null;
-    updatedAt?: Date | null;
-    ItemCatalogoDescuento?: ItemCatalogoDescuento[] | null;
-}
-
-export interface ItemCatalogoPromocion {
-    id: string;
-    itemCatalogoId: string;
-    itemCatalogo: ItemCatalogo;
-    promocionId: string;
-    promocion: Promocion;
-    status: string;
+    tipoOferta: string; // Ej: 'DESCUENTO_PORCENTAJE', 'DESCUENTO_MONTO', 'CODIGO_PROMOCIONAL', 'ENVIO_GRATIS', 'COMPRA_X_LLEVA_Y', 'GENERAL'
+    valor?: number | null; // Valor numérico asociado (ej: 10.0 para 10%, 50.0 para $50)
+    codigo?: string | null; // Código promocional único si tipoOferta = 'CODIGO_PROMOCIONAL'
+    fechaInicio: Date;
+    fechaFin: Date;
+    status: string; // activo, inactivo, programada, finalizada
+    condiciones?: string | null; // Texto libre para describir condiciones adicionales
     createdAt: Date;
     updatedAt: Date;
+
+    // Relaciones
+    itemCatalogoOfertas?: ItemCatalogoOferta[]; // Relación M-N con Items
+    galeria?: OfertaGaleria[]; // Galería para la oferta
 }
 
-export interface ItemCatalogoDescuento {
+// --- Tabla Intermedia: Item <-> Oferta ---
+export interface ItemCatalogoOferta {
     id: string;
     itemCatalogoId: string;
-    itemCatalogo: ItemCatalogo;
-    descuentoId: string;
-    descuento: Descuento;
-    status: string;
+    itemCatalogo?: ItemCatalogo; // Relación con ItemCatalogo
+    ofertaId: string;
+    oferta?: Oferta; // Relación con Oferta
+}
+
+// --- Entidad: Galería de Oferta ---
+export interface OfertaGaleria {
+    id: string;
+    ofertaId: string;
+    oferta?: Oferta; // Relación con Oferta
+    imageUrl: string; // URL de la imagen
+    altText?: string | null; // Texto alternativo
+    descripcion?: string | null; // Descripción opcional
+    orden?: number | null; // Orden visual
+    tamañoBytes?: number | null; // Tamaño en bytes
     createdAt: Date;
-    updatedAt: Date;
 }
 
 //! CRM
@@ -884,6 +1226,7 @@ export interface Conversacion {
     updatedAt?: Date | null; // No opcional en schema
 
     Interaccion?: Interaccion[]; // Relación inversa opcional
+    itemInteracciones?: ItemInteraccion[]; // <-- AÑADIDO: Interacciones relacionadas con ítems del catálogo
 }
 
 export interface Interaccion {
