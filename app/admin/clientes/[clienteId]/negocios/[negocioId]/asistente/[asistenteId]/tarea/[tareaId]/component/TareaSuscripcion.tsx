@@ -91,8 +91,8 @@ export default function TareaSuscripcionDetallePage({ asistenteId, negocioId, cl
                     detalles.suscripcion.id,
                     clienteId,
                     negocioId,
-                    asistenteId,
-                    tareaId
+                    // asistenteId,
+                    // tareaId
                 );
                 if (!result.success) throw new Error(result.error || "Error desconocido al cancelar.");
                 setSuccessMessage("Suscripción cancelada con éxito.");
@@ -113,8 +113,8 @@ export default function TareaSuscripcionDetallePage({ asistenteId, negocioId, cl
             const result = await crearOreactivarSuscripcionTarea(
                 asistenteId,
                 tareaId,
-                clienteId,
-                negocioId
+                // clienteId,
+                // negocioId
             );
             if (!result.success) throw new Error(result.error || "Error desconocido al suscribir/reactivar.");
             setSuccessMessage("Suscripción activada/reactivada con éxito.");

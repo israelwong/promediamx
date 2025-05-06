@@ -199,6 +199,14 @@ export default function AsistenteNuevoForm({ negocioId, clienteId }: Props) {
                                 'Crear Asistente y Continuar'
                             )}
                         </button>
+                        <button
+                            type="button"
+                            className={`${buttonClasses} mt-3 bg-zinc-600 hover:bg-zinc-700`}
+                            onClick={() => router.back()}
+                            disabled={isSubmitting}
+                        >
+                            Cancelar
+                        </button>
                     </div>
                 </form>
             </div>

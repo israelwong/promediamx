@@ -72,24 +72,6 @@ export interface ObtenerDatosFormularioCitaResult {
 }
 // --- FIN AJUSTE ---
 
-
-// Tipo para un evento formateado para react-big-calendar
-// Necesita al menos 'title', 'start', 'end'. 'resource' es opcional para info extra.
-export interface CalendarEvent {
-    id: string;         // ID del registro Agenda original
-    title: string;      // Título del evento (ej. "Llamada: Juan Perez")
-    start: Date;        // Fecha y hora de inicio
-    end: Date;          // Fecha y hora de fin (puede ser igual a start si no hay duración)
-    allDay?: boolean;   // Opcional: si es un evento de todo el día
-    resource?: {        // Opcional: Objeto para pasar datos adicionales
-        tipo: string;     // Tipo de evento (ej. 'Llamada', 'Reunion')
-        descripcion?: string | null;
-        status: string;
-        lead?: Pick<Lead, 'id' | 'nombre'> | null; // Info del Lead asociado
-        agente?: Pick<Agente, 'id' | 'nombre'> | null; // Info del Agente asociado
-    };
-}
-
 // Tipo de retorno para la acción que obtiene los eventos
 export interface ObtenerEventosAgendaResult {
     success: boolean;
@@ -452,21 +434,6 @@ export type TareaNuevaFormData = Partial<Omit<Tarea, 'id' | 'orden' | 'createdAt
     etiquetaIds?: string[]; // Para el multi-select de etiquetas
 };
 
-export type TareaConDetalles = Tarea & {
-    CategoriaTarea: Pick<CategoriaTarea, 'nombre'> | null;
-    tareaFuncion: Pick<TareaFuncion, 'id' | 'nombreVisible'> | null;
-    etiquetas: {
-        etiquetaTarea: Pick<EtiquetaTarea, 'id' | 'nombre'> | null;
-    }[];
-    canalesSoportados: {
-        canalConversacional: Pick<CanalConversacional, 'id' | 'nombre' | 'icono'> | null;
-    }[];
-    _count?: {
-        AsistenteTareaSuscripcion?: number;
-        TareaGaleria?: number; // <-- AÑADIR ESTA LÍNEA
-        TareaEjecutada?: number; // <-- AÑADIR ESTA LÍNEA
-    };
-};
 
 export interface SugerenciasTarea {
     sugerencia_descripcion?: string | '';
@@ -647,17 +614,15 @@ export interface CanalConversacional {
 //! TAREAS
 export interface Tarea {
     id: string; // Requerido
-    categoriaTareaId?: string;
-    // CategoriaTarea?: CategoriaTarea | null; // Relación opcional
+    categoriaTareaId?: string | null; // ID de la categoría de tarea (opcional)
+    // categoriaTarea?: CategoriaTarea | null; // Relación opcional
     orden?: number | null;
     nombre: string;
     descripcion?: string | null;
     instruccion?: string | null;
     trigger?: string | null;
-
     tareaFuncionId?: string | null; // ID de la función de automatización asociada
     tareaFuncion?: TareaFuncion | null; // Relación con TareaFuncion (opcional)
-
     precio?: number | null; // Float? -> number | null
     rol?: string | null;
     personalidad?: string | null;
@@ -665,28 +630,18 @@ export interface Tarea {
     status: string; // No opcional en schema
     createdAt: Date; // No opcional en schema
     updatedAt: Date; // No opcional en schema
-
-    // Relaciones
     AsistenteTareaSuscripcion?: AsistenteTareaSuscripcion[];
     TareaEjecutada?: TareaEjecutada[];
-
-    // Relaciones M-N (incluir tipos completos o parciales según la acción)
     etiquetas?: TareaEtiqueta[]
     canalesSoportados?: TareaCanal[];
-
-    // --- NUEVO: Relación con campos personalizados requeridos para esta tarea ---
-    // camposPersonalizadosRequeridos?: TareaCampoPersonalizado[]; // Relación opcional con campos personalizados requeridos
     camposPersonalizadosRequeridos?: TareaCampoPersonalizado[]; // Si aplica
     _count?: { // Conteo opcional
         AsistenteTareaSuscripcion?: number;
     };
 
-    iconoUrl?: string; // URL para el ícono principal de la tarea
+    iconoUrl?: string | null; // URL para el ícono principal de la tarea
     TareaGaleria?: TareaGaleria[]; // Relación a la galería
-
-    //!!!! sabe
     automatizacion?: string; // Opcional: Descripción de la automatización
-
     CategoriaTarea?: Pick<CategoriaTarea, 'id' | 'nombre' | 'color'> | null; // Relación opcional con la categoría
 }
 
@@ -1358,3 +1313,142 @@ export interface Notificacion {
     urlDestino?: string | null; // Opcional: Link para llevar al usuario a la sección relevante
     createdAt: Date; // Fecha de creación
 }
+
+// En @/app/admin/_lib/types.ts
+export type CategoriaTareaSimple = {
+    id: string;
+    nombre: string;
+    // Podrías añadir color si lo usas en los botones de filtro también
+    color?: string | null;
+};
+
+export interface CategoriaTarea {
+    id: string;
+    orden?: number | null;
+    nombre?: string;
+    descripcion?: string | null;
+    createdAt?: Date;
+    updatedAt?: Date;
+    color?: string | null;
+    Tarea?: Tarea[];
+}
+
+
+export type SetTodasLasTareasInput = {
+    id: string;
+    categoriaTareaId?: string;
+    orden?: number | null;
+    nombre: string;
+    descripcion?: string | null;
+    instruccion?: string | null;
+    trigger?: string | null;
+    tareaFuncionId?: string | null;
+    tareaFuncion?: TareaFuncion & Pick<TareaFuncion, "id" | "nombreVisible"> | null;
+    precio?: number | null;
+    rol?: string | null;
+    personalidad?: string | null;
+    version: number;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+    AsistenteTareaSuscripcion?: AsistenteTareaSuscripcion[];
+    TareaEjecutada?: TareaEjecutada[];
+    etiquetas: {
+        etiquetaTarea: Pick<EtiquetaTarea, "id" | "nombre">;
+    }[];
+    canalesSoportados: {
+        canalConversacional: Pick<CanalConversacional, "id" | "nombre" | "icono">;
+    }[];
+    camposPersonalizadosRequeridos?: TareaCampoPersonalizado[];
+    iconoUrl?: string;
+    TareaGaleria?: TareaGaleria[];
+    automatizacion?: string;
+    CategoriaTarea?: Pick<CategoriaTarea, "id" | "nombre" | "color"> | null;
+};
+
+export type TodasLasTareas = (
+    value:
+        | SetTodasLasTareasInput[]
+        | ((prevState: SetTodasLasTareasInput[]) => SetTodasLasTareasInput[])
+) => void;
+
+// --- Tipo para Datos de Reordenamiento (Explícito) ---
+export type OrdenarTareasInput = {
+    id: string;
+    orden: number; // Índice 0-based
+}[];
+
+// --- Tipo Detallado para la Lista de Tareas (Explícito) ---
+// Define la estructura que la UI necesita y que la acción debe devolver
+export type TareaConDetalles = {
+    // Campos base de Tarea (ajusta según tu modelo Tarea real si es necesario)
+    id: string;
+    nombre: string;
+    status: string;
+    precio: number | null;
+    orden: number | null;
+    iconoUrl: string | null;
+    categoriaTareaId: string | null; // Importante: string | null según schema
+    tareaFuncionId: string | null; // Importante: string | null según schema
+    // Añade otros campos base de Tarea si los usas directamente
+
+    // Relaciones incluidas
+    CategoriaTarea: {
+        nombre: string;
+        color: string | null;
+    } | null; // La relación puede ser null si categoriaTareaId es null
+
+    tareaFuncion: {
+        id: string;
+        nombreVisible: string;
+    } | null; // La relación puede ser null si tareaFuncionId es null
+
+    etiquetas: {
+        // Viene de TareaEtiqueta
+        etiquetaTarea: {
+            // Viene de EtiquetaTarea
+            id: string;
+            nombre: string;
+        } | null; // La etiqueta podría ser null teóricamente
+    }[]; // Array de la relación M-N
+
+    // Conteos incluidos
+    _count: {
+        TareaGaleria: number;   // Puede ser 0 si no hay
+        TareaEjecutada: number; // Puede ser 0 si no hay
+    };
+};
+
+
+export type CanalConversacionalSimple = {
+    id: string;
+    nombre: string;
+    // icono?: string | null; // Opcional si lo necesitaras mostrar
+};
+
+
+export type CalendarEvent = {
+    id: string;             // ID del registro de Agenda
+    title: string;          // Título mostrado en el calendario
+    start: Date;            // Fecha/Hora de inicio (objeto Date)
+    end: Date;              // Fecha/Hora de fin (objeto Date)
+    allDay?: boolean;       // Opcional: si es evento de todo el día
+    resource?: {            // Opcional: datos adicionales asociados al evento
+        tipo: string;
+        asunto: string;
+        descripcion: string | null;
+        status: string;
+        meetingUrl: string | null;
+        lead: { id: string; nombre: string | null } | null; // Info básica del lead
+        agente: { id: string; nombre: string | null } | null; // Info básica del agente
+        // Puedes añadir más campos de Agenda aquí si los necesitas en el modal
+    };
+};
+
+// --- Tipo para la Respuesta de obtenerEventosAgenda ---
+export type AgendaData = {
+    crmId: string | null;      // ID del CRM asociado al negocio (o null si no existe)
+    eventos: CalendarEvent[]; // Array de eventos para el calendario
+};
+
+
