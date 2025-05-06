@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // Añadido useSearchParams
+import { useRouter } from 'next/navigation'; // Añadido useSearchParams
 // Ajusta rutas
 import { obtenerTareasParaMarketplace } from '@/app/admin/_lib/tareas.actions'; // Usar nueva acción y tipo
 import { obtenerCategorias } from '@/app/admin/_lib/categoriaTarea.actions';
@@ -106,7 +106,7 @@ const TareaCard = ({ tarea, isSuscrito, isLoadingAction, onSuscribirClick, onCar
 
 
 // --- Componente Principal MarketplaceLista ---
-export default function MarketplaceLista({ asistenteId: asistenteIdProp }: Props) { // Renombrar prop para claridad
+export default function MarketplaceLista({ asistenteId }: Props) { // Renombrar prop para claridad
     const [tareas, setTareas] = useState<TareaParaMarketplace[]>([]);
     const [categorias, setCategorias] = useState<CategoriaTarea[]>([]);
     const [suscritoTaskIds, setSuscritoTaskIds] = useState<Set<string>>(new Set());
@@ -119,11 +119,11 @@ export default function MarketplaceLista({ asistenteId: asistenteIdProp }: Props
     const [filtroTexto, setFiltroTexto] = useState('');
     const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('all');
     const router = useRouter();
-    const searchParams = useSearchParams(); // Hook para leer params de URL
+    // const searchParams = useSearchParams(); // Hook para leer params de URL
 
     // --- Obtener asistenteId de la URL si no se pasa como prop ---
     // Esto permite que el componente funcione en ambos contextos
-    const asistenteId = asistenteIdProp ?? (searchParams ? searchParams.get('asistenteId') : null);
+    // const asistenteId = asistenteIdProp ?? (searchParams ? searchParams.get('asistenteId') : null);
 
     // Clases de Tailwind
     const containerClasses = "p-4 bg-zinc-800 rounded-lg shadow-md h-full flex flex-col";
@@ -279,3 +279,5 @@ export default function MarketplaceLista({ asistenteId: asistenteIdProp }: Props
         </div>
     );
 }
+
+
