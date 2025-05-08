@@ -1,0 +1,202 @@
+// Ruta sugerida: app/admin/_lib/funciones/funcionesEjecucion.actions.ts
+'use server';
+
+// import { Prisma } from '@prisma/client';
+import prisma from '../prismaClient'; // Ajusta la ruta si es necesario
+import { ActionResult } from '../types'; // Ajusta la ruta si es necesario
+// Importar tipos específicos para argumentos y resultados
+import { AgendarCitaArgs, ResultadoAgendamiento } from './agendarCitaPresencial.type'; // Ajusta ruta
+import { BrindarInfoArgs, BrindarInfoData } from './brindarInformacionDelNegocio.type'; // Ajusta ruta
+import { InformarHorarioArgs, InformarHorarioData } from './informarHorarioDeAtencion.type'; // Ajusta ruta
+// Importar el tipo ChatMessageItem para el tipo de retorno de enviarMensajeInternoAction
+import { ChatMessageItem } from '../crmConversacion.types'; // Ajusta ruta
+
+// Importar las funciones de ejecución específicas
+import { ejecutarAgendarCitaAction } from './agendarCitaPresencial.actions'; // Ajusta ruta
+import { ejecutarBrindarInfoNegocioAction } from './brindarInformacionDelNegocio.actions'; // Ajusta ruta
+import { ejecutarInformarHorarioAction } from './informarHorarioDeAtencion.actions'; // Ajusta ruta
+
+
+// --- Implementación REAL de enviarMensajeInternoAction ---
+async function enviarMensajeInternoAction(input: {
+    conversacionId: string;
+    mensaje: string;
+    role: 'assistant' | 'system';
+}): Promise<ActionResult<ChatMessageItem>> {
+    try {
+        if (!input.conversacionId || !input.mensaje || !input.role) {
+            return { success: false, error: 'Faltan datos para enviar el mensaje interno.' };
+        }
+        const nuevaInteraccion = await prisma.interaccion.create({
+            data: {
+                conversacionId: input.conversacionId,
+                mensaje: input.mensaje,
+                role: input.role,
+            },
+            select: {
+                id: true, conversacionId: true, role: true, mensaje: true,
+                mediaUrl: true, mediaType: true, createdAt: true,
+            }
+        });
+        await prisma.conversacion.update({
+            where: { id: input.conversacionId },
+            data: { updatedAt: new Date() }
+        });
+        const data: ChatMessageItem = {
+            id: nuevaInteraccion.id,
+            conversacionId: nuevaInteraccion.conversacionId,
+            role: nuevaInteraccion.role as ChatMessageItem['role'],
+            mensaje: nuevaInteraccion.mensaje,
+            mediaUrl: nuevaInteraccion.mediaUrl,
+            mediaType: nuevaInteraccion.mediaType,
+            createdAt: nuevaInteraccion.createdAt,
+            agenteCrm: null,
+        };
+        console.log(`[Mensaje Interno] Mensaje ${data.role} guardado en BD para conv ${data.conversacionId}, ID: ${data.id}`);
+        return { success: true, data };
+    } catch (error) {
+        console.error(`[Mensaje Interno] Error al guardar mensaje ${input.role} para conv ${input.conversacionId}:`, error);
+        return { success: false, error: 'No se pudo guardar el mensaje interno.' };
+    }
+}
+// --- Fin Implementación REAL ---
+
+
+/**
+ * Lee una TareaEjecutada, identifica la función a llamar desde sus metadatos,
+ * y llama a la Server Action de ejecución correspondiente.
+ * Luego, envía el resultado de vuelta a la conversación como un mensaje del asistente.
+ * @param tareaEjecutadaId El ID del registro TareaEjecutada a procesar.
+ * @returns ActionResult con el mensaje de resultado generado (o null si no hubo).
+ */
+// --- CORRECCIÓN: Cambiar tipo de retorno ---
+export async function dispatchTareaEjecutadaAction(
+    tareaEjecutadaId: string
+): Promise<ActionResult<ChatMessageItem | null>> { // <--- Devolver ChatMessageItem o null
+    // --- FIN CORRECCIÓN ---
+    console.log(`[Dispatcher] Iniciando despacho para TareaEjecutada ${tareaEjecutadaId}`);
+
+    let tareaEjecutada;
+    let mensajeResultadoParaUsuario: string | null = null; // Mover aquí para acceso en return
+    let mensajeEnviado: ChatMessageItem | null = null; // Para guardar el mensaje enviado
+
+    try {
+        // ... (Obtener TareaEjecutada y parsear metadata - sin cambios) ...
+        tareaEjecutada = await prisma.tareaEjecutada.findUnique({ where: { id: tareaEjecutadaId } });
+        if (!tareaEjecutada || !tareaEjecutada.metadata) { /* ... manejo de error ... */
+            return { success: false, error: `TareaEjecutada ${tareaEjecutadaId} no encontrada o sin metadata.` };
+        }
+        let parsedMetadata: unknown;
+        try { parsedMetadata = JSON.parse(tareaEjecutada.metadata); } catch {
+            return { success: false, error: "Metadatos inválidos." };
+        }
+        if (typeof parsedMetadata !== 'object' || parsedMetadata === null) { /* ... manejo de error ... */
+            return { success: false, error: "Metadatos con formato incorrecto." };
+        }
+        const metadataObj = parsedMetadata as Record<string, unknown>;
+        const funcionLlamada = typeof metadataObj.funcionLlamada === 'string' ? metadataObj.funcionLlamada : undefined;
+        const argumentos = typeof metadataObj.argumentos === 'object' && metadataObj.argumentos !== null ? metadataObj.argumentos as Record<string, unknown> : undefined;
+        const conversacionId = typeof metadataObj.conversacionId === 'string' ? metadataObj.conversacionId : undefined;
+        const leadId = typeof metadataObj.leadId === 'string' ? metadataObj.leadId : undefined;
+        const asistenteVirtualId = typeof metadataObj.asistenteVirtualId === 'string' ? metadataObj.asistenteVirtualId : undefined;
+        if (!funcionLlamada || !argumentos || !conversacionId || !leadId || !asistenteVirtualId) { /* ... manejo de error ... */
+            await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Metadata incompleta o inválida.");
+            return { success: false, error: "Metadatos incompletos o inválidos." };
+        }
+
+
+        // 3. Ejecutar la Función Correspondiente (Dispatcher)
+        let resultadoEjecucion: ActionResult<unknown> | null = null;
+
+        console.log(`[Dispatcher] Despachando función: ${funcionLlamada}`);
+        switch (funcionLlamada) {
+            // ... (Casos para agendarCita, brindarInfo, informarHorario - sin cambios en la lógica interna) ...
+            case 'agendarCitaPresencial':
+                const argsAgendar: AgendarCitaArgs = { /* ... construir args ... */
+                    ...argumentos, leadId: leadId,
+                    nombre_contacto: typeof argumentos.nombre_contacto === 'string' ? argumentos.nombre_contacto : undefined,
+                    email_contacto: typeof argumentos.email_contacto === 'string' ? argumentos.email_contacto : undefined,
+                    telefono_contacto: typeof argumentos.telefono_contacto === 'string' ? argumentos.telefono_contacto : undefined,
+                    fecha_hora: typeof argumentos.fecha_hora === 'string' ? argumentos.fecha_hora : undefined,
+                    motivo_de_reunion: typeof argumentos.motivo_de_reunion === 'string' ? argumentos.motivo_de_reunion : undefined,
+                };
+                if (!argsAgendar.fecha_hora) { /* ... manejo error ... */ mensajeResultadoParaUsuario = "Error: Falta fecha/hora."; break; }
+                resultadoEjecucion = await ejecutarAgendarCitaAction(argsAgendar, tareaEjecutadaId);
+                if (resultadoEjecucion.success && resultadoEjecucion.data) mensajeResultadoParaUsuario = (resultadoEjecucion.data as ResultadoAgendamiento).mensajeConfirmacion;
+                else mensajeResultadoParaUsuario = `Error al agendar: ${resultadoEjecucion.error || 'Desconocido.'}`;
+                break;
+
+            case 'brindarInformacionDelNegocio':
+                const asistenteInfo = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
+                if (!asistenteInfo?.negocioId) { /* ... manejo error ... */ mensajeResultadoParaUsuario = "Error interno."; break; }
+                const argsInfo: BrindarInfoArgs = { /* ... construir args ... */
+                    ...argumentos, negocioId: asistenteInfo.negocioId, tema: typeof argumentos.tema === 'string' ? argumentos.tema : undefined,
+                };
+                resultadoEjecucion = await ejecutarBrindarInfoNegocioAction(argsInfo, tareaEjecutadaId);
+                if (resultadoEjecucion.success && resultadoEjecucion.data) mensajeResultadoParaUsuario = (resultadoEjecucion.data as BrindarInfoData).informacionEncontrada;
+                else mensajeResultadoParaUsuario = `Error al obtener info: ${resultadoEjecucion.error || 'Desconocido.'}`;
+                break;
+
+            case 'informarHorarioDeAtencion':
+                const asistenteHorario = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
+                if (!asistenteHorario?.negocioId) { /* ... manejo error ... */ mensajeResultadoParaUsuario = "Error interno."; break; }
+                const argsHorario: InformarHorarioArgs = { /* ... construir args ... */
+                    ...argumentos, negocioId: asistenteHorario.negocioId,
+                    diaEspecifico: typeof argumentos.diaEspecifico === 'string' ? argumentos.diaEspecifico : undefined,
+                    verificarAbiertoAhora: typeof argumentos.verificarAbiertoAhora === 'boolean' ? argumentos.verificarAbiertoAhora : undefined,
+                };
+                resultadoEjecucion = await ejecutarInformarHorarioAction(argsHorario, tareaEjecutadaId);
+                if (resultadoEjecucion.success && resultadoEjecucion.data) mensajeResultadoParaUsuario = (resultadoEjecucion.data as InformarHorarioData).respuestaHorario;
+                else mensajeResultadoParaUsuario = `Error al obtener horario: ${resultadoEjecucion.error || 'Desconocido.'}`;
+                break;
+
+            default:
+                console.warn(`[Dispatcher] Función desconocida: ${funcionLlamada}`);
+                mensajeResultadoParaUsuario = `No sé cómo procesar: ${funcionLlamada}.`;
+                await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, `Función desconocida: ${funcionLlamada}`);
+                break;
+        }
+
+        // 4. Enviar Resultado de Vuelta a la Conversación Y GUARDARLO
+        if (mensajeResultadoParaUsuario) {
+            console.log(`[Dispatcher] Enviando resultado a conversación ${conversacionId}: ${mensajeResultadoParaUsuario}`);
+            const envioMsgResult = await enviarMensajeInternoAction({
+                conversacionId: conversacionId,
+                mensaje: mensajeResultadoParaUsuario,
+                role: 'assistant',
+            });
+            if (envioMsgResult.success && envioMsgResult.data) {
+                mensajeEnviado = envioMsgResult.data; // Guardar el mensaje que se envió
+            } else {
+                console.error(`[Dispatcher] Error al enviar mensaje de resultado: ${envioMsgResult.error}`);
+            }
+        } else {
+            console.log(`[Dispatcher] No se generó mensaje de resultado para TareaEjecutada ${tareaEjecutadaId}.`);
+        }
+
+        // --- CORRECCIÓN: Devolver el mensaje enviado (o null) ---
+        return { success: true, data: mensajeEnviado };
+        // --- FIN CORRECCIÓN ---
+
+    } catch (error) {
+        console.error(`[Dispatcher] Error catastrófico al despachar TareaEjecutada ${tareaEjecutadaId}:`, error);
+        if (tareaEjecutadaId) {
+            await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, error instanceof Error ? error.message : "Error desconocido en dispatcher.");
+        }
+        // --- CORRECCIÓN: Devolver null en data en caso de error ---
+        return { success: false, error: error instanceof Error ? error.message : "Error interno al despachar la tarea.", data: null };
+        // --- FIN CORRECCIÓN ---
+    }
+}
+
+// ... (actualizarTareaEjecutadaFallidaDispatcher sin cambios) ...
+async function actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId: string, mensajeError: string) {
+    try {
+        await prisma.tareaEjecutada.update({
+            where: { id: tareaEjecutadaId },
+            data: { metadata: JSON.stringify({ error_dispatcher: mensajeError }) }
+        });
+    } catch (updateError) {
+        console.error(`[Dispatcher] Error al actualizar TareaEjecutada ${tareaEjecutadaId} como fallida:`, updateError);
+    }
+}

@@ -8,6 +8,7 @@ import {
 import {
     arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
+
 import { CSS } from '@dnd-kit/utilities';
 // --- Fin DnD Imports ---
 
@@ -31,7 +32,7 @@ interface CanalConDetalles extends CanalConversacional {
 }
 
 // Tipo para el formulario modal
-type CanalFormData = Partial<Pick<CanalConversacional, 'nombre' | 'descripcion' | 'icono' | 'status'>>;
+type CanalFormData = Partial<Pick<CanalConversacional, 'id' | 'nombre' | 'descripcion' | 'icono' | 'status'>>;
 
 // --- Componente Sortable Table Row (Estilo Minimalista) ---
 function SortableCanalRow({ id, canal, onEdit }: { id: string; canal: CanalConDetalles; onEdit: () => void }) {
@@ -154,7 +155,7 @@ export default function TareasCanales() {
         setModalMode(mode);
         setCanalParaEditar(mode === 'edit' ? canal || null : null);
         setModalFormData(mode === 'edit' && canal ?
-            { nombre: canal.nombre, descripcion: canal.descripcion, icono: canal.icono, status: canal.status } :
+            { id: canal.id, nombre: canal.nombre, descripcion: canal.descripcion, icono: canal.icono, status: canal.status } :
             { nombre: '', descripcion: '', icono: '', status: 'activo' }
         );
         setIsModalOpen(true); setModalError(null);
@@ -335,7 +336,35 @@ export default function TareasCanales() {
                                         <option value="beta">Beta</option>
                                     </select>
                                 </div>
+
+
+                                <div>
+                                    <label htmlFor="modal-id" className={labelBaseClasses}>Canal Id</label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            id="modal-id"
+                                            name="id"
+                                            value={modalFormData.id || ''}
+                                            readOnly
+                                            className={`${inputBaseClasses} cursor-pointer`}
+                                            onClick={(e) => {
+                                                navigator.clipboard.writeText(modalFormData.id || '');
+                                                const tooltip = e.currentTarget.nextElementSibling;
+                                                if (tooltip) {
+                                                    tooltip.classList.remove('hidden');
+                                                    setTimeout(() => tooltip.classList.add('hidden'), 3000);
+                                                }
+                                            }}
+                                        />
+                                        <span className="absolute top-1/2 right-2 transform -translate-y-1/2 text-xs text-green-400 hidden">
+                                            Copiado
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
+
+
                             <div className={modalFooterClasses}>
                                 {modalMode === 'edit' && (<button type="button" onClick={handleModalDelete} className={`${buttonBaseClassesModal} !w-auto bg-red-600 hover:bg-red-700 focus:ring-red-500 px-3 py-1.5 mr-auto`} disabled={isSubmittingModal}><Trash2 size={14} /> Eliminar</button>)}
                                 <button type="button" onClick={closeModal} className={`${buttonBaseClassesModal} !w-auto bg-gray-600 hover:bg-gray-700 focus:ring-gray-500`} disabled={isSubmittingModal}>Cancelar</button>

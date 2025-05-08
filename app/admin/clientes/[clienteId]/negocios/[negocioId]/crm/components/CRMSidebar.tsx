@@ -21,7 +21,7 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
-    { hrefSuffix: '', icon: MessageSquareText, label: 'Conversaciones' },
+    { hrefSuffix: '/conversaciones', icon: MessageSquareText, label: 'Conversaciones' },
     { hrefSuffix: '/leads', icon: Users, label: 'Leads' },
     { hrefSuffix: '/pipeline', icon: Filter, label: 'Pipeline' },
     { hrefSuffix: '/agenda', icon: CalendarClock, label: 'Agenda' },
@@ -69,7 +69,7 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
         }
 
         // Caso 2: Secciones con subrutas (Leads, Configuración)
-        if (hrefSuffix === '/leads' || hrefSuffix === '/configuracion') {
+        if (hrefSuffix === '/leads' || hrefSuffix === '/configuracion' || hrefSuffix === '/conversaciones') {
             // Debe ser la ruta exacta O comenzar con la ruta + un slash
             return pathname === expectedPath || pathname.startsWith(`${expectedPath}/`);
         }

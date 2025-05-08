@@ -89,7 +89,7 @@ model AsistenteVirtual{
   descripcion String?
   origen String? // sistema, cliente
   whatsappBusiness String? //Telefono de WhatsApp Business
-  phoneNumberId String? //API de WhatsApp Business
+  phoneNumberId String? @unique //API de WhatsApp Business
   token String? //Identificador de acceso a la API de WhatsApp Business
   nombreHITL String? //Nombre responsable del Human in the loop
   whatsappHITL String? //telefono para consultas human in the loop
@@ -100,6 +100,10 @@ model AsistenteVirtual{
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  canalConversacionalId String?
+  canalConversacional CanalConversacional? @relation(fields: [canalConversacionalId], references: [id], onDelete: SetNull) // Si se borra el canal, se quita la relación
+
   AsistenteTareaSuscripcion AsistenteTareaSuscripcion[]
   TareaEjecutada TareaEjecutada[]
   Conversacion Conversacion[]
@@ -117,6 +121,7 @@ model CanalConversacional {
   updatedAt   DateTime @updatedAt
   orden     Int? // Orden de aparición en la UI
   tareasSoportadas TareaCanal[]
+  AsistenteVirtual AsistenteVirtual[]
 }
 
 model AsistenteTareaSuscripcion{
@@ -804,6 +809,14 @@ model Agente{
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  //! --- NUEVAS RELACIONES INVERSAS ---
+  // Relación inversa para las conversaciones que este agente tiene asignadas
+  conversacionesAsignadas Conversacion[] @relation("ConversacionesAsignadas")
+
+  // Relación inversa para las interacciones realizadas por este agente (si decides añadir agenteCrmId a Interaccion)
+  interaccionesRealizadas Interaccion[] @relation("InteraccionesPorAgente")
+  // --- FIN DE NUEVAS RELACIONES ---
+
   // Relaciones: Leads asignados, Bitácora, Agenda
   Lead      Lead[]
   Bitacora  Bitacora[]
@@ -853,14 +866,17 @@ model Agenda {
 //!CONVERSACIONES
 model Conversacion {
   id                 String    @id @default(cuid())
+  
   // Datos del canal específico (ej: WhatsApp)
   whatsappId         String?   @unique // ID de la conversación en WhatsApp
   phoneNumberId      String?   // ID del número de teléfono del negocio que recibió/envió
+
   // Vínculos
   asistenteVirtualId String?   // Puede no estar asociada a un asistente (ej: iniciada por agente)
   asistenteVirtual   AsistenteVirtual? @relation(fields: [asistenteVirtualId], references: [id], onDelete: SetNull)
   leadId             String?   // <-- AÑADIDO: Vínculo al Lead en el CRM
   lead               Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
   // Estado y Metadatos
   status             String    @default("abierta") // abierta, cerrada, en_espera_agente, seguimiento, archivada
   intencion          String?   // Intención general detectada
@@ -868,13 +884,22 @@ model Conversacion {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt // Corregido
 
+  //! --- NUEVOS CAMPOS PARA ASIGNACIÓN DE AGENTE ---
+  agenteCrmActualId  String?   // ID del Agente CRM actualmente asignado a esta conversación
+  agenteCrmActual    Agente?   @relation("ConversacionesAsignadas", fields: [agenteCrmActualId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  // --- FIN DE NUEVOS CAMPOS ---
+
   Interaccion        Interaccion[]
-  itemInteracciones  ItemInteraccion[] // <-- AÑADIDO: Interacciones relacionadas con ítems del catálogo
+  itemInteracciones  ItemInteraccion[] 
+
 
   @@index([leadId])
   @@index([asistenteVirtualId])
   @@index([status])
   @@index([updatedAt]) // Útil para buscar conversaciones recientes
+
+  @@index([agenteCrmActualId]) // !Nuevo índice para búsquedas por agente asignado
+
 }
 
 model Interaccion {
@@ -894,7 +919,16 @@ model Interaccion {
   mediaType      String?   // image, audio, video, document, sticker
   createdAt      DateTime  @default(now())
 
-    @@index([conversacionId, createdAt(sort: Asc)]) // Índice principal para ordenar interacciones
+  //! --- NUEVO CAMPO OPCIONAL PARA TRAZABILIDAD DEL AGENTE EN EL MENSAJE ---
+  // Esto es útil si varios agentes pueden participar en la misma conversación
+  // y quieres saber quién envió cada mensaje de 'agent'.
+  agenteCrmId    String?   // ID del Agente CRM que realizó esta interacción (si role == 'agent')
+  agenteCrm      Agente?   @relation("InteraccionesPorAgente", fields: [agenteCrmId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  // --- FIN DE NUEVO CAMPO OPCIONAL ---
+
+  @@index([conversacionId, createdAt(sort: Asc)], map: "Interaccion_conversacionId_createdAt_unique_idx")
+  @@index([agenteCrmId]) // Nuevo índice si añades agenteCrmId
+  @@index([conversacionId, createdAt(sort: Asc)]) // Índice principal para ordenar interacciones
 
 }
 

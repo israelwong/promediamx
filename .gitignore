@@ -19,7 +19,7 @@
 
 # production
 /build
-/app/bitacora/
+/bitacora/
 
 # misc
 .DS_Store

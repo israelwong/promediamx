@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation';
 // --- Actions and Types ---
 import {
     obtenerEstadisticasResumenCRM,
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function CRMEstadisticas({ negocioId, clienteId }: Props) {
-    const router = useRouter();
+    // const router = useRouter();
     const [stats, setStats] = useState<EstadisticasCRMResumen | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -62,8 +62,12 @@ export default function CRMEstadisticas({ negocioId, clienteId }: Props) {
 
     // --- Navegación y Configuración ---
     const navigateToCRM = () => {
-        const basePath = `/admin/clientes/${clienteId}/negocios/${negocioId}`
-        router.push(`${basePath}/crm`); // Ruta dedicada al CRM completo
+        // const basePath = `/admin/clientes/${clienteId}/negocios/${negocioId}`
+        // router.push(`${basePath}/crm`); // Ruta dedicada al CRM completo
+        const basePath = `/admin/clientes/${clienteId}/negocios/${negocioId}`;
+        const crmUrl = `${basePath}/crm`; // Ruta dedicada al CRM completo
+        // Abrir la URL en una nueva pestaña
+        window.open(crmUrl, '_blank');
     };
 
     const handleConfigurarCRM = async () => {

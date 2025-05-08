@@ -1,3 +1,4 @@
+// Ruta actual del archivo desde app: admin/_lib/types.ts
 
 // Tipo para mostrar una cita existente en la lista
 export type CitaExistente = Pick<
@@ -570,6 +571,10 @@ export interface AsistenteVirtual {
     createdAt?: Date | null; // Default: now().
     updatedAt?: Date | null; // Automatically updated.
 
+    canalConversacionalId?: string | null; // ID del canal conversacional asociado (opcional)
+    canalConversacional?: CanalConversacional | null; // Relación opcional con CanalConversacional
+
+
     // Relaciones
     AsistenteTareaSuscripcion?: AsistenteTareaSuscripcion[];
     TareaEjecutada?: TareaEjecutada[];
@@ -608,6 +613,7 @@ export interface CanalConversacional {
 
     // Relación inversa con la tabla de unión
     tareasSoportadas?: TareaCanal[]; // Relación con las tareas soportadas
+    AsistenteVirtual?: AsistenteVirtual[]; // Relación con AsistenteVirtual
 }
 
 
@@ -866,6 +872,7 @@ export interface Negocio {
         Notificacion?: number;
     };
     GaleriaNegocio?: GaleriaNegocio[]; // Relación a galerías de negocio
+    Agentes?: Agente[]; // Relación a agentes de negocio
 }
 
 export interface GaleriaNegocio {
@@ -1215,7 +1222,7 @@ export interface Agente {
     userId?: string | null;
     nombre?: string | null;
     email: string; // Requerido y único
-    telefono?: string | null;
+    telefono: string | null;
     password?: string | null; // Debería ser solo para creación/actualización
     rol?: string | null;
     status: string; // No opcional en schema
@@ -1227,6 +1234,14 @@ export interface Agente {
     Bitacora?: Bitacora[];
     Agenda?: Agenda[];
     Notificacion?: Notificacion[]; // Relación opcional con notificaciones
+
+    // --- NUEVAS RELACIONES INVERSAS ---
+    // Relación inversa para las conversaciones que este agente tiene asignadas
+    conversacionesAsignadas?: Conversacion[]; // Relación con ConversacionesAsignadas
+
+    // Relación inversa para las interacciones realizadas por este agente (si decides añadir agenteCrmId a Interaccion)
+    interaccionesRealizadas?: Interaccion[]; // Relación con InteraccionesPorAgente
+    // --- FIN DE NUEVAS RELACIONES ---
 }
 
 export interface Bitacora {
@@ -1279,6 +1294,11 @@ export interface Conversacion {
 
     Interaccion?: Interaccion[]; // Relación inversa opcional
     itemInteracciones?: ItemInteraccion[]; // <-- AÑADIDO: Interacciones relacionadas con ítems del catálogo
+
+    // --- NUEVOS CAMPOS PARA ASIGNACIÓN DE AGENTE ---
+    agenteCrmActualId?: string | null; // ID del Agente CRM actualmente asignado a esta conversación
+    agenteCrmActual?: Agente | null;   // Relación con el agente asignado
+    // --- FIN DE NUEVOS CAMPOS ---
 }
 
 export interface Interaccion {
@@ -1295,6 +1315,9 @@ export interface Interaccion {
     mediaUrl?: string | null;
     mediaType?: string | null;
     createdAt: Date; // No opcional en schema
+
+    agenteCrmId?: string | null; // ID del Agente CRM que realizó esta interacción (si role == 'agent')
+    agenteCrm?: Agente | null;   // Relación con el agente CRM que realizó la interacción
 }
 
 //! NOTIFICACIONES
