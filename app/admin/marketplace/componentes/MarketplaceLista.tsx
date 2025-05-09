@@ -107,6 +107,8 @@ const TareaCard = ({ tarea, isSuscrito, isLoadingAction, onSuscribirClick, onCar
 
 // --- Componente Principal MarketplaceLista ---
 export default function MarketplaceLista({ asistenteId }: Props) { // Renombrar prop para claridad
+
+    console.log("MarketplaceLista renderizado con asistenteId:", asistenteId);
     const [tareas, setTareas] = useState<TareaParaMarketplace[]>([]);
     const [categorias, setCategorias] = useState<CategoriaTarea[]>([]);
     const [suscritoTaskIds, setSuscritoTaskIds] = useState<Set<string>>(new Set());

@@ -1,23 +1,30 @@
-// Ruta sugerida: app/admin/_lib/funciones/funcionesEjecucion.actions.ts
+// Ruta sugerida: app/admin/_lib/funciones/ia/funcionesEjecucion.actions.ts
 'use server';
 
 // import { Prisma } from '@prisma/client';
-import prisma from '../prismaClient'; // Ajusta la ruta si es necesario
-import { ActionResult } from '../types'; // Ajusta la ruta si es necesario
+import prisma from '../prismaClient'; //
+import { ActionResult } from '../types'; //
 // Importar tipos específicos para argumentos y resultados
-import { AgendarCitaArgs, ResultadoAgendamiento } from './agendarCitaPresencial.type'; // Ajusta ruta
-import { BrindarInfoArgs, BrindarInfoData } from './brindarInformacionDelNegocio.type'; // Ajusta ruta
-import { InformarHorarioArgs, InformarHorarioData } from './informarHorarioDeAtencion.type'; // Ajusta ruta
+import { AgendarCitaArgs, ResultadoAgendamiento } from '../funciones/agendarCitaPresencial.type';
+import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacionDelNegocio.type';
+import { InformarHorarioArgs, InformarHorarioData } from '../funciones/informarHorarioDeAtencion.type';
+import { ejecutarMostrarOfertasAction } from '../funciones/mostrarOfertas.actions'; // Añadir import
+import { MostrarOfertasArgs, MostrarOfertasData } from '../funciones/mostrarOfertas.type'; // Añadir import
+import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta.type'; // Añadir import
+import { AceptarOfertaArgs, AceptarOfertaData } from '../funciones/aceptarOferta.type'; // Añadir import
+
+
 
 // Importar las funciones de ejecución específicas
-import { ejecutarAgendarCitaAction } from './agendarCitaPresencial.actions'; // Ajusta ruta
-import { ejecutarBrindarInfoNegocioAction } from './brindarInformacionDelNegocio.actions'; // Ajusta ruta
-import { ejecutarInformarHorarioAction } from './informarHorarioDeAtencion.actions'; // Ajusta ruta
+import { ejecutarAgendarCitaAction } from '../funciones/agendarCitaPresencial.actions';
+import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
+import { ejecutarInformarHorarioAction } from '../funciones/informarHorarioDeAtencion.actions';
+import { ChatMessageItem } from '../crmConversacion.types';
+import { ejecutarDarDireccionAction } from '../funciones/darDireccionYUbicacion.actions'; // Añadir import
+import { DarDireccionArgs, DarDireccionData } from '../funciones/darDireccionYUbicacion.type'; // Añadir import
+import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta.actions'; // Añadir import
+import { ejecutarAceptarOfertaAction } from '../funciones/aceptarOferta.actions'; // Añadir import
 
-// Importar el tipo ChatMessageItem para el retorno de la acción de envío
-import { ChatMessageItem } from '../crmConversacion.types'; // Ajusta ruta
-
-// --- Implementación REAL de enviarMensajeInternoAction ---
 /**
  * Guarda un mensaje interno (del asistente o sistema) en la conversación.
  * @param input Datos del mensaje a guardar.
@@ -207,6 +214,132 @@ export async function dispatchTareaEjecutadaAction(
                     mensajeResultadoParaUsuario = `Lo siento, hubo un problema al obtener el horario: ${resultadoEjecucion.error || 'Error desconocido.'}`;
                 }
                 break;
+
+            case 'darDireccionYUbicacion': // <-- NUEVO CASE
+                const asistenteDir = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
+                if (!asistenteDir?.negocioId) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado al asistente.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break;
+                }
+                const argsDir: DarDireccionArgs = {
+                    ...argumentos, // Pasar argumentos extraídos por IA si los hubiera (aunque no se usen directamente)
+                    negocioId: asistenteDir.negocioId,
+                };
+                resultadoEjecucion = await ejecutarDarDireccionAction(argsDir, tareaEjecutadaId);
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as DarDireccionData).mensajeRespuesta;
+                } else {
+                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al obtener la dirección: ${resultadoEjecucion.error || 'Error desconocido.'}`;
+                }
+                break;
+
+            case 'mostrarOfertas': // <-- NUEVO CASE
+                const asistenteOfertas = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
+                if (!asistenteOfertas?.negocioId) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado al asistente para mostrar ofertas.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break;
+                }
+                const argsOfertas: MostrarOfertasArgs = {
+                    // No hay argumentos extraídos de la IA para esta función específica
+                    negocioId: asistenteOfertas.negocioId,
+                };
+                resultadoEjecucion = await ejecutarMostrarOfertasAction(argsOfertas, tareaEjecutadaId);
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as MostrarOfertasData).mensajeRespuesta;
+                } else {
+                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al consultar las ofertas: ${resultadoEjecucion.error || 'Error desconocido.'}`;
+                }
+                break;
+
+            case 'mostrarDetalleOferta':
+
+                const asistenteConCanal = await prisma.asistenteVirtual.findUnique({
+                    where: { id: asistenteVirtualId },
+                    select: {
+                        negocioId: true,
+                        canalConversacional: { // Incluir el canal conversacional
+                            select: { nombre: true }
+                        }
+                    }
+                });
+
+                if (!asistenteConCanal?.negocioId) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado para detallar la oferta.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break;
+                }
+
+                // Extraer el parámetro con el nombre correcto de los args de Gemini
+                const nombreDeLaOfertaExtraido = typeof argumentos.nombre_de_la_oferta === 'string' ? argumentos.nombre_de_la_oferta : undefined;
+
+                if (!nombreDeLaOfertaExtraido) {
+                    mensajeResultadoParaUsuario = "No especificaste claramente qué oferta te interesa. ¿Podrías indicarme el nombre?";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Falta el parámetro 'nombre_de_la_oferta' en los argumentos de IA.");
+                    break;
+                }
+
+                const argsDetalleOferta: MostrarDetalleOfertaArgs = {
+                    negocioId: asistenteConCanal.negocioId,
+                    nombre_de_la_oferta: nombreDeLaOfertaExtraido,
+                    canalNombre: asistenteConCanal.canalConversacional?.nombre, // <-- PASAR EL NOMBRE DEL CANAL
+                };
+
+                resultadoEjecucion = await ejecutarMostrarDetalleOfertaAction(argsDetalleOferta, tareaEjecutadaId);
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as MostrarDetalleOfertaData).mensajeRespuesta;
+                } else {
+                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al obtener los detalles de la oferta: ${resultadoEjecucion.error || 'Error desconocido.'}`;
+                }
+                break;
+
+            case 'aceptarOferta': // Asumiendo que el nombreInterno de la TareaFuncion es "aceptarOferta"
+                // const asistenteAceptarOferta = await prisma.asistenteVirtual.findUnique({
+                //     where: { id: asistenteVirtualId },
+                //     select: { negocioId: true }
+                // });
+                const asistenteAceptarOferta = await prisma.asistenteVirtual.findUnique({
+                    where: { id: asistenteVirtualId },
+                    select: {
+                        negocioId: true,
+                        canalConversacional: { // Incluir el canal
+                            select: { nombre: true }
+                        }
+                    }
+                });
+
+                if (!asistenteAceptarOferta?.negocioId) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado para procesar la oferta.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break;
+                }
+
+                // Extraer 'oferta_id' de los argumentos de Gemini
+                const ofertaIdExtraida = typeof argumentos.oferta_id === 'string' ? argumentos.oferta_id : undefined;
+
+                if (!ofertaIdExtraida) {
+                    mensajeResultadoParaUsuario = "No pude identificar claramente qué oferta deseas aceptar. ¿Podrías intentarlo de nuevo especificando la oferta?";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Falta el parámetro 'oferta_id' en los argumentos de IA para aceptarOferta.");
+                    break;
+                }
+
+                const argsAceptarOferta: AceptarOfertaArgs = {
+                    negocioId: asistenteAceptarOferta.negocioId,
+                    oferta_id: ofertaIdExtraida,
+                    canalNombre: asistenteAceptarOferta.canalConversacional?.nombre, // <-- PASAR EL NOMBRE DEL CANAL
+                };
+
+                resultadoEjecucion = await ejecutarAceptarOfertaAction(argsAceptarOferta, tareaEjecutadaId);
+
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as AceptarOfertaData).mensajeSiguientePaso;
+                } else {
+                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al intentar procesar tu aceptación de la oferta: ${resultadoEjecucion.error || 'Error desconocido.'}`;
+                }
+
+                break;
+
 
             default:
                 console.warn(`[Dispatcher] Función desconocida encontrada en TareaEjecutada ${tareaEjecutadaId}: ${funcionLlamada}`);

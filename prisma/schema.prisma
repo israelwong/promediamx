@@ -488,11 +488,11 @@ model Oferta {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // --- Relaciones ---
-  // Relación M-N con Items (si la oferta aplica a items específicos)
+  linkPago      String? // El que acabas de añadir
+  
   ItemCatalogoOferta ItemCatalogoOferta[]
-  // Galería para la oferta
   OfertaGaleria      OfertaGaleria[]
+  videos        OfertaVideos[]
 
   @@index([negocioId, status, fechaFin]) // Índice útil para buscar ofertas activas por negocio
   @@index([tipoOferta])
@@ -527,6 +527,21 @@ model OfertaGaleria {
   createdAt   DateTime @default(now())
 
   @@index([ofertaId]) // Índice para buscar imágenes por oferta
+}
+
+model OfertaVideos {
+  id          String   @id @default(cuid())
+  ofertaId    String
+  oferta      Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Relación con Oferta
+  videoUrl    String   // URL del video (YouTube, Vimeo, o un archivo directo si lo alojas tú)
+  tipoVideo   String?  // Podría ser 'YOUTUBE', 'VIMEO', 'DIRECTO_MP4' para ayudar al frontend a decidir cómo renderizarlo
+  titulo      String?  // Un título o descripción corta para el video
+  descripcion String?  // Descripción más larga si es necesaria
+  orden       Int?     // Para ordenar los videos si hay varios
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ofertaId])
 }
 
 //! CATALOGO
@@ -891,15 +906,12 @@ model Conversacion {
 
   Interaccion        Interaccion[]
   itemInteracciones  ItemInteraccion[] 
-
-
+  
   @@index([leadId])
   @@index([asistenteVirtualId])
   @@index([status])
   @@index([updatedAt]) // Útil para buscar conversaciones recientes
-
   @@index([agenteCrmActualId]) // !Nuevo índice para búsquedas por agente asignado
-
 }
 
 model Interaccion {

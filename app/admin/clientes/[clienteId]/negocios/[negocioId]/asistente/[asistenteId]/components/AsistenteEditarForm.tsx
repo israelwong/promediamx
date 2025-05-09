@@ -140,7 +140,9 @@ export default function AsistenteEditarForm({ asistenteId, negocioId, clienteId 
         setFormData(prevState => ({ ...prevState, [name]: finalValue }));
         setError(null); setSuccessMessage(null);
     };
-    const handleCancel = () => { router.back(); }; // Volver atrás
+    const handleCancel = () => {
+        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}`);
+    }; // Volver atrás
     const handleDelete = async () => {
         // ... (lógica sin cambios) ...
         if (!confirm("¿Eliminar asistente?")) return;

@@ -30,9 +30,6 @@ export async function ejecutarBrindarInfoNegocioAction(
                 nombre: true,
                 descripcion: true,
                 slogan: true,
-                // Añade otros campos relevantes: mision, vision, valores, etc.
-                // politicas: true, 
-                // garantias: true,
             }
         });
 

@@ -9,13 +9,10 @@ interface LayoutProps {
 
 export default function LayoutDashboard({ children }: LayoutProps) {
     return (
-        <div>
-            <div className="flex flex-1 overflow-hidden">
-                <main className="flex-1 ">
-                    {children}
-                </main>
-
-            </div>
+        <div className="flex flex-1 flex-col h-full overflow-auto min-h-0">
+            <main className="flex-1 flex flex-col overflow-hidden overflow-y-auto">
+                {children}
+            </main>
         </div>
     );
 }

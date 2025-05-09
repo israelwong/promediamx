@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client'; // Asegúrate de importar Prisma
 import { eliminarImagenStorage } from './imageHandler.actions';
 import { llamarGeminiParaMejorarTexto, llamarGeminiMultimodalParaGenerarDescripcion } from '@/scripts/gemini/gemini.actions'; // Ajusta la ruta
-
+import { EditarOfertaInput } from './oferta.type'; // Asegúrate de importar el tipo correcto
 
 
 // --- Tipos existentes (ActionResult, etc.) ---
@@ -153,11 +153,6 @@ export async function crearOferta(data: CrearOfertaBasicaInput): Promise<ActionR
 
 // --- NUEVO TIPO: Input para editar una oferta ---
 // Similar a CrearOfertaInput pero todos los campos son opcionales excepto los IDs
-export type EditarOfertaInput = Partial<Pick<
-    Oferta,
-    'nombre' | 'descripcion' | 'tipoOferta' | 'valor' | 'codigo' | 'fechaInicio' | 'fechaFin' | 'status' | 'condiciones'
->>;
-
 
 /**
  * Actualiza una oferta existente.
@@ -180,11 +175,14 @@ export async function editarOferta(ofertaId: string, data: EditarOfertaInput): P
         if (!data.fechaInicio || !data.fechaFin) {
             return { success: false, error: "Las fechas de inicio y fin son obligatorias." };
         }
+
         const inicio = new Date(data.fechaInicio);
         const fin = new Date(data.fechaFin);
+
         if (isNaN(inicio.getTime()) || isNaN(fin.getTime()) || inicio >= fin) {
             return { success: false, error: "Fechas inválidas o fecha de fin no posterior a inicio." };
         }
+
         // Validación específica por tipo
         const tipoSeleccionado = data.tipoOferta; // Asumiendo que viene en data
         if (tipoSeleccionado === 'CODIGO_PROMOCIONAL' && !data.codigo?.trim()) {
@@ -193,8 +191,10 @@ export async function editarOferta(ofertaId: string, data: EditarOfertaInput): P
         if ((tipoSeleccionado === 'DESCUENTO_PORCENTAJE' || tipoSeleccionado === 'DESCUENTO_MONTO') && (data.valor === null || data.valor === undefined || data.valor < 0)) {
             return { success: false, error: "Se requiere un valor positivo para este tipo de descuento." };
         }
+
         // Limpiar valor si no es descuento
         const valorFinal = (tipoSeleccionado === 'DESCUENTO_PORCENTAJE' || tipoSeleccionado === 'DESCUENTO_MONTO') ? data.valor : null;
+
         // Limpiar código si no es de tipo código
         const codigoFinal = tipoSeleccionado === 'CODIGO_PROMOCIONAL' ? data.codigo?.trim().toUpperCase() : null;
 
@@ -211,6 +211,7 @@ export async function editarOferta(ofertaId: string, data: EditarOfertaInput): P
                 fechaFin: fin,       // Usar fechas validadas
                 status: data.status || 'inactivo',
                 condiciones: data.condiciones?.trim() || null,
+                linkPago: data.linkPago?.trim() || null,
             },
             select: { negocioId: true, negocio: { select: { clienteId: true } } } // Para revalidación
         });

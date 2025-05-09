@@ -1,4 +1,4 @@
-// Ruta actual del archivo desde app: app/admin/_lib/ia.actions.ts
+// Ruta actual del archivo desde app: app/admin/_lib/ia/ia.actions.ts
 'use server';
 
 import {
@@ -75,7 +75,10 @@ function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | u
             const funcion = tarea.funcionHerramienta!;
 
             // Especificar el tipo del objeto properties usando SchemaType
-            const properties: Record<string, { type: SchemaType; description?: string }> = {};
+            const properties: Record<string, {
+                type: SchemaType;
+                description?: string
+            }> = {};
             const requiredParams: string[] = [];
 
             funcion.parametros.forEach(param => {
@@ -106,13 +109,16 @@ function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | u
 
             const funcDecl: FunctionDeclaration = {
                 name: funcion.nombreInterno,
-                description: tarea.descripcion || funcion.descripcion || `Ejecuta la acción ${funcion.nombreVisible}`,
+                description: tarea.descripcion || funcion.descripcion || `Ejecuta la acción ${funcion.nombreInterno}`,
                 parameters: {
                     type: SchemaType.OBJECT, // <-- Usar el enum SchemaType.OBJECT
                     properties: Object.fromEntries(
                         Object.entries(properties).map(([key, value]) => [
                             key,
-                            { ...value, type: value.type as SchemaType } as Schema,
+                            {
+                                ...value,
+                                type: value.type as SchemaType
+                            } as Schema,
                         ])
                     ),
                     required: requiredParams.length > 0 ? requiredParams : undefined,
@@ -138,6 +144,7 @@ function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | u
 export async function generarRespuestaAsistente(
     input: GenerarRespuestaAsistenteConHerramientasInput
 ): Promise<ActionResult<RespuestaAsistenteConHerramientas>> {
+
     console.log("[IA Action] Iniciando generación de respuesta con Gemini SDK (con herramientas)...");
     console.log("[IA Action] Mensaje Usuario:", input.mensajeUsuarioActual);
 
@@ -151,12 +158,21 @@ export async function generarRespuestaAsistente(
         const genAI = new GoogleGenerativeAI(apiKey);
 
         let systemInstructionText = `Eres ${input.contextoAsistente.nombreAsistente}, un asistente virtual amigable y eficiente para ${input.contextoAsistente.nombreNegocio}. `;
+
         if (input.contextoAsistente.descripcionAsistente) {
             systemInstructionText += `${input.contextoAsistente.descripcionAsistente}. `;
         }
-        systemInstructionText += `Tu objetivo es ayudar a los usuarios. Puedes responder directamente o usar las herramientas disponibles si la consulta del usuario coincide con la descripción de una herramienta. Si decides usar una herramienta, responde SOLAMENTE con la llamada a la función necesaria (function call) y los argumentos extraídos. No añadas texto adicional antes o después de la llamada a función. Si necesitas más información para usar una herramienta, solicítala al usuario ANTES de intentar la llamada a la función. Si no puedes ayudar o falta información, indica que consultarás a un agente humano.`;
+
+        systemInstructionText += `
+        Tu objetivo es ayudar a los usuarios. 
+        Puedes responder directamente o usar las herramientas disponibles si la consulta del usuario coincide con la descripción de una herramienta. 
+        Si decides usar una herramienta, responde SOLAMENTE con la llamada a la función necesaria (function call) y los argumentos extraídos.
+        No añadas texto adicional antes o después de la llamada a función. 
+        Si necesitas más información para usar una herramienta, solicítala al usuario ANTES de intentar la llamada a la función.
+        Si no puedes ayudar o falta información, indica que consultarás a un agente humano.`;
 
         const tools = construirHerramientasParaGemini(input.tareasDisponibles);
+        console.log("[IA Action] Herramientas construidas:", tools);
 
         const model = genAI.getGenerativeModel({
             model: "gemini-1.5-flash-latest",
@@ -201,6 +217,7 @@ export async function generarRespuestaAsistente(
                 nombreFuncion: fc.name,
                 argumentos: args,
             };
+
             console.log(`[IA Action] Función a llamar: ${llamadaFuncion.nombreFuncion}, Argumentos:`, llamadaFuncion.argumentos);
 
             respuestaTextual = response.text() || null;

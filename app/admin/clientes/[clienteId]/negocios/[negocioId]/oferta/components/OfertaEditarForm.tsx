@@ -9,9 +9,13 @@ import {
     eliminarOferta,
     mejorarDescripcionOfertaIA, // <-- NUEVA ACCIÓN IA
     generarDescripcionOfertaIA,  // <-- NUEVA ACCIÓN IA
-    EditarOfertaInput
 } from '@/app/admin/_lib/oferta.actions'; // Ajusta la ruta
-import { Oferta } from '@prisma/client';
+import { EditarOfertaInput, OfertaEditFormData } from '@/app/admin/_lib/oferta.type'; // Ajusta la ruta
+
+
+// Extend the Oferta type to include linkPago
+declare module '@prisma/client' {
+}
 // --- Icons ---
 import { Loader2, Save, Trash2, Sparkles, Hash, Wand2, AlertCircle } from 'lucide-react'; // Añadido Wand2, ImageIconLucide
 
@@ -31,11 +35,6 @@ const TIPOS_OFERTA = [
     { value: 'GENERAL', label: 'Promoción General', requiresValue: false, requiresCode: false },
 ];
 
-// Tipo para el estado del formulario (sin cambios)
-type OfertaEditFormData = Partial<Omit<Oferta, 'id' | 'negocioId' | 'createdAt' | 'updatedAt' | 'negocio' | 'ItemCatalogoOferta' | 'OfertaGaleria'>> & {
-    fechaInicio?: string | Date | null; // Acepta string o null
-    fechaFin?: string | Date | null; // Ensure fechaFin is a string
-};
 
 
 export default function OfertaEditarForm({ clienteId, negocioId, ofertaId }: Props) {
@@ -45,6 +44,7 @@ export default function OfertaEditarForm({ clienteId, negocioId, ofertaId }: Pro
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
     // --- NUEVOS ESTADOS PARA BOTONES IA ---
     const [isImprovingDesc, setIsImprovingDesc] = useState(false);
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
@@ -79,9 +79,16 @@ export default function OfertaEditarForm({ clienteId, negocioId, ofertaId }: Pro
             const ofertaData = await obtenerOfertaPorId(ofertaId);
             if (!ofertaData) throw new Error("Oferta no encontrada.");
             setFormData({
-                nombre: ofertaData.nombre || '', descripcion: ofertaData.descripcion || '', tipoOferta: ofertaData.tipoOferta || 'GENERAL',
-                valor: ofertaData.valor ?? null, codigo: ofertaData.codigo || '', fechaInicio: ofertaData.fechaInicio ? new Date(ofertaData.fechaInicio) : undefined,
-                fechaFin: ofertaData.fechaFin ? new Date(ofertaData.fechaFin) : undefined, status: ofertaData.status || 'inactivo', condiciones: ofertaData.condiciones || '',
+                nombre: ofertaData.nombre || '',
+                descripcion: ofertaData.descripcion || '',
+                tipoOferta: ofertaData.tipoOferta || 'GENERAL',
+                valor: ofertaData.valor ?? null,
+                codigo: ofertaData.codigo || '',
+                fechaInicio: ofertaData.fechaInicio ? new Date(ofertaData.fechaInicio) : undefined,
+                fechaFin: ofertaData.fechaFin ? new Date(ofertaData.fechaFin) : undefined,
+                status: ofertaData.status || 'inactivo',
+                condiciones: ofertaData.condiciones || '',
+                linkPago: ofertaData.linkPago || '',
             });
         } catch (err) { console.error("Error al cargar oferta:", err); setError(err instanceof Error ? err.message : "Error al cargar los datos."); setFormData({}); }
         finally { setLoading(false); }
@@ -114,18 +121,36 @@ export default function OfertaEditarForm({ clienteId, negocioId, ofertaId }: Pro
         if (!formData.tipoOferta) { setError("Selecciona un tipo de oferta."); return; }
         if (!formData.fechaInicio) { setError("Fecha de inicio es obligatoria."); return; }
         if (!formData.fechaFin) { setError("Fecha de fin es obligatoria."); return; }
+
+        // Validar si el link de pago es un enlace válido
+        if (formData.linkPago && !/^https?:\/\/[^\s$.?#].[^\s]*$/.test(formData.linkPago)) {
+            setError("El link de pago debe ser una URL válida.");
+            return;
+        }
+
         const selectedTypeInfo = TIPOS_OFERTA.find(t => t.value === formData.tipoOferta);
+
         if (selectedTypeInfo?.requiresValue && (formData.valor === null || formData.valor === undefined || formData.valor < 0)) { setError(`Se requiere un valor positivo para el tipo "${selectedTypeInfo.label}".`); return; }
         if (selectedTypeInfo?.requiresCode && !formData.codigo?.trim()) { setError(`Se requiere un código para el tipo "${selectedTypeInfo.label}".`); return; }
+
         let inicio: Date, fin: Date;
+
         try { inicio = new Date(formData.fechaInicio); fin = new Date(formData.fechaFin); if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) throw new Error(); inicio.setHours(0, 0, 0, 0); fin.setHours(23, 59, 59, 999); if (inicio >= fin) { setError("La fecha de fin debe ser posterior a la de inicio."); return; } }
         catch { setError("Formato de fecha inválido."); return; }
         setIsSubmitting(true); setError(null); setSuccessMessage(null);
+
         try {
             const dataToSend: EditarOfertaInput = {
-                nombre: formData.nombre.trim(), descripcion: formData.descripcion?.trim() || null, tipoOferta: formData.tipoOferta,
-                valor: selectedTypeInfo?.requiresValue ? formData.valor : null, codigo: selectedTypeInfo?.requiresCode ? formData.codigo?.trim().toUpperCase() : null,
-                fechaInicio: inicio, fechaFin: fin, status: formData.status || 'inactivo', condiciones: formData.condiciones?.trim() || null,
+                nombre: formData.nombre.trim(),
+                descripcion: formData.descripcion?.trim() || null,
+                tipoOferta: formData.tipoOferta,
+                valor: selectedTypeInfo?.requiresValue ? formData.valor : null,
+                codigo: selectedTypeInfo?.requiresCode ? formData.codigo?.trim().toUpperCase() : null,
+                fechaInicio: inicio,
+                fechaFin: fin,
+                status: formData.status || 'inactivo',
+                condiciones: formData.condiciones?.trim() || null,
+                linkPago: formData.linkPago?.trim() || null,
             };
             const result = await editarOferta(ofertaId, dataToSend);
             if (result.success) { setSuccessMessage("Oferta actualizada exitosamente."); router.refresh(); }
@@ -295,6 +320,23 @@ export default function OfertaEditarForm({ clienteId, negocioId, ofertaId }: Pro
                         <label htmlFor="fechaFin" className={labelBaseClasses}> Fecha Fin <span className="text-red-500">*</span> </label>
                         <input type="date" id="fechaFin" name="fechaFin" value={formData.fechaFin ? new Date(formData.fechaFin).toISOString().split('T')[0] : ''} onChange={handleChange} required className={inputBaseClasses} disabled={isSubmitting} min={formData.fechaInicio ? new Date(formData.fechaInicio).toISOString().split('T')[0] : ''} />
                     </div>
+                </div>
+
+                {/* Link de Pago */}
+                <div>
+                    <label htmlFor="linkPago" className={labelBaseClasses}>Link de Pago</label>
+                    <input
+                        type="url"
+                        id="linkPago"
+                        name="linkPago"
+                        value={formData.linkPago || ''}
+                        onChange={handleChange}
+                        className={inputBaseClasses}
+                        disabled={isSubmitting}
+                        maxLength={300}
+                        placeholder="Ej: https://www.ejemplo.com/pago"
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">Proporciona un enlace para realizar el pago, si aplica.</p>
                 </div>
 
                 {/* Condiciones */}

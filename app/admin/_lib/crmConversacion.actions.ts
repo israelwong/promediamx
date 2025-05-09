@@ -13,110 +13,24 @@ import {
     EtiquetaCrmItem,
     EnviarMensajeUsuarioInput,
     IniciarConversacionWebchatInput,
-    IniciarConversacionWebchatData,
     EnviarMensajeWebchatInput,
     EnviarMensajeWebchatData,
     TareaCapacidadIA,
     ParametroParaIA,
-    RespuestaAsistenteConHerramientas
+    RespuestaAsistenteConHerramientas,
+    IniciarConversacionWebchatDataConDispatcher
 } from '@/app/admin/_lib/crmConversacion.types';
 
 import { AgenteBasico } from '@/app/admin/_lib/agente.types';
 import { MensajeEntrantePayload } from '@/app/admin/_lib/webhook.types'; // Importar el nuevo tipo
-import { generarRespuestaAsistente } from '@/app/admin/_lib/ia.actions'; // Importar la nueva acción de IA
-import { dispatchTareaEjecutadaAction } from './funciones/funcionesEjecucion.actions'; // Ajusta la ruta si es necesario
+import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions'; // Importar la nueva acción de IA
+import { dispatchTareaEjecutadaAction } from './ia/funcionesEjecucion.actions'; // Ajusta la ruta si es necesario
 
 
-export async function obtenerListaConversacionesAction(
-    negocioId: string,
-    searchTerm?: string
-): Promise<ActionResult<ConversationPreviewItem[]>> {
-    try {
-        if (!negocioId) {
-            return { success: false, error: 'El ID del negocio es requerido.' };
-        }
 
-        const whereClause: Prisma.ConversacionWhereInput = {
-            lead: {
-                crm: {
-                    negocioId: negocioId,
-                },
-            },
-            // status: { notIn: ['cerrada', 'archivada'] } // Opcional
-        };
-
-        if (searchTerm && searchTerm.trim() !== '') {
-            whereClause.OR = [
-                { lead: { nombre: { contains: searchTerm, mode: 'insensitive' } } },
-            ];
-        }
-
-        const conversaciones = await prisma.conversacion.findMany({
-            where: whereClause,
-            select: {
-                id: true,
-                status: true,
-                updatedAt: true,
-                // --- CORRECCIÓN: Incluir Asistente y su Canal ---
-                asistenteVirtual: {
-                    select: {
-                        canalConversacional: { // Incluir el canal asociado al asistente
-                            select: {
-                                nombre: true // Obtener el nombre del canal (ej. "WhatsApp", "Web Chat")
-                            }
-                        }
-                    }
-                },
-                // --- FIN CORRECCIÓN ---
-                lead: {
-                    select: {
-                        id: true,
-                        nombre: true,
-                    },
-                },
-                Interaccion: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 1,
-                    select: { mensaje: true, createdAt: true },
-                },
-            },
-            orderBy: { updatedAt: 'desc' },
-            take: 50,
-        });
-
-        // Mapear los resultados al tipo ConversationPreviewItem
-        const data: ConversationPreviewItem[] = conversaciones.map((conv) => {
-            const ultimaInteraccion = conv.Interaccion[0];
-
-            // --- CORRECCIÓN: Lógica para determinar canalOrigen desde Asistente ---
-            let canal: ConversationPreviewItem['canalOrigen'] = 'otro'; // Default
-            const canalNombre = conv.asistenteVirtual?.canalConversacional?.nombre?.toLowerCase();
-
-            if (canalNombre === 'whatsapp') {
-                canal = 'whatsapp';
-            } else if (canalNombre === 'web chat') { // Asegúrate que coincida con el nombre en tu BD
-                canal = 'webchat';
-            }
-            // Añadir más 'else if' para otros canales si es necesario
-            // --- FIN CORRECCIÓN ---
-
-            return {
-                id: conv.id,
-                leadId: conv.lead?.id,
-                leadName: conv.lead?.nombre ?? 'Contacto desconocido',
-                lastMessagePreview: ultimaInteraccion?.mensaje?.substring(0, 50) ?? '...',
-                lastMessageTimestamp: ultimaInteraccion?.createdAt ?? conv.updatedAt,
-                status: conv.status ?? 'desconocido',
-                canalOrigen: canal, // <-- Asignar canal determinado
-            };
-        });
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('Error en obtenerListaConversacionesAction:', error);
-        return { success: false, error: 'No se pudieron cargar las conversaciones.' };
-    }
-}
+/******************** CRM CHATPANEL ************************ */
+/******************** CRM CHATPANEL ************************ */
+/******************** CRM CHATPANEL ************************ */
 
 async function crearInteraccionSistema(conversacionId: string, mensaje: string) {
     try {
@@ -135,173 +49,6 @@ async function crearInteraccionSistema(conversacionId: string, mensaje: string) 
         console.error("Error al crear interacción de sistema:", logError);
     }
 }
-
-export async function obtenerMensajesConversacionAction(
-    conversationId: string
-): Promise<ActionResult<ChatMessageItem[]>> {
-    try {
-        if (!conversationId) {
-            return { success: false, error: 'El ID de la conversación es requerido.' };
-        }
-        const interacciones = await prisma.interaccion.findMany({
-            where: { conversacionId: conversationId },
-            select: {
-                id: true,
-                conversacionId: true,
-                role: true,
-                mensaje: true,
-                mediaUrl: true,
-                mediaType: true,
-                createdAt: true,
-                agenteCrmId: true,
-                agenteCrm: {
-                    select: {
-                        id: true,
-                        nombre: true,
-                    },
-                },
-            },
-            orderBy: { createdAt: 'asc' },
-        });
-
-        const data: ChatMessageItem[] = interacciones.map((interaccion) => ({
-            id: interaccion.id,
-            conversacionId: interaccion.conversacionId,
-            role: interaccion.role as ChatMessageItem['role'],
-            mensaje: interaccion.mensaje,
-            mediaUrl: interaccion.mediaUrl,
-            mediaType: interaccion.mediaType,
-            createdAt: interaccion.createdAt,
-            agenteCrm: interaccion.agenteCrm ? {
-                id: interaccion.agenteCrm.id,
-                nombre: interaccion.agenteCrm.nombre,
-            } : null,
-        }));
-        return { success: true, data };
-    } catch (error) {
-        console.error('Error en obtenerMensajesConversacionAction:', error);
-        return { success: false, error: 'No se pudieron cargar los mensajes.' };
-    }
-}
-
-// export async function enviarMensajeAction(
-//     input: EnviarMensajeInput
-// ): Promise<ActionResult<ChatMessageItem>> {
-//     try {
-//         if (!input.conversacionId || !input.mensaje || !input.role) {
-//             return { success: false, error: 'Faltan datos para enviar el mensaje.' };
-//         }
-//         const nuevaInteraccion = await prisma.interaccion.create({
-//             data: {
-//                 conversacionId: input.conversacionId,
-//                 mensaje: input.mensaje,
-//                 role: input.role,
-//                 agenteCrmId: input.agenteCrmId,
-//             },
-//             select: {
-//                 id: true, conversacionId: true, role: true, mensaje: true,
-//                 mediaUrl: true, mediaType: true, createdAt: true,
-//                 agenteCrm: { select: { id: true, nombre: true } },
-//             }
-//         });
-//         await prisma.conversacion.update({
-//             where: { id: input.conversacionId },
-//             data: { updatedAt: new Date() }
-//         });
-//         const data: ChatMessageItem = {
-//             id: nuevaInteraccion.id,
-//             conversacionId: nuevaInteraccion.conversacionId,
-//             role: nuevaInteraccion.role as ChatMessageItem['role'],
-//             mensaje: nuevaInteraccion.mensaje,
-//             mediaUrl: nuevaInteraccion.mediaUrl,
-//             mediaType: nuevaInteraccion.mediaType,
-//             createdAt: nuevaInteraccion.createdAt,
-//             agenteCrm: nuevaInteraccion.agenteCrm ? {
-//                 id: nuevaInteraccion.agenteCrm.id,
-//                 nombre: nuevaInteraccion.agenteCrm.nombre,
-//             } : null,
-//         };
-//         return { success: true, data };
-//     } catch (error) {
-//         console.error('Error en enviarMensajeAction:', error);
-//         return { success: false, error: 'No se pudo enviar el mensaje.' };
-//     }
-// }
-
-export async function enviarMensajeAction(
-    input: EnviarMensajeInput
-): Promise<ActionResult<ChatMessageItem>> {
-    try {
-        if (!input.conversacionId || !input.mensaje || !input.role) {
-            return { success: false, error: 'Faltan datos para enviar el mensaje.' };
-        }
-
-        // --- Lógica de Pausa Automática ---
-        let updateConversationStatus = false;
-        if (input.role === 'agent') {
-            // Si envía un agente (humano desde CRM), pausar la IA
-            updateConversationStatus = true;
-            console.log(`[enviarMensajeAction] Mensaje de agente detectado. Pausando conversación ${input.conversacionId}.`);
-        }
-        // --- Fin Lógica de Pausa ---
-
-        // Usar transacción para asegurar que el mensaje y el estado se actualicen juntos
-        const nuevaInteraccion = await prisma.$transaction(async (tx) => {
-            const interaccion = await tx.interaccion.create({
-                data: {
-                    conversacionId: input.conversacionId,
-                    mensaje: input.mensaje,
-                    role: input.role,
-                    agenteCrmId: input.agenteCrmId, // Será null si es propietario/admin
-                },
-                select: {
-                    id: true, conversacionId: true, role: true, mensaje: true,
-                    mediaUrl: true, mediaType: true, createdAt: true,
-                    agenteCrm: { select: { id: true, nombre: true } },
-                }
-            });
-
-            // Actualizar Conversacion (timestamp y status si es necesario)
-            await tx.conversacion.update({
-                where: { id: input.conversacionId },
-                data: {
-                    updatedAt: new Date(),
-                    // Actualizar status solo si es un agente enviando
-                    ...(updateConversationStatus && { status: 'en_espera_agente' })
-                }
-            });
-
-            return interaccion;
-        });
-
-        const data: ChatMessageItem = {
-            id: nuevaInteraccion.id,
-            conversacionId: nuevaInteraccion.conversacionId,
-            role: nuevaInteraccion.role as ChatMessageItem['role'],
-            mensaje: nuevaInteraccion.mensaje,
-            mediaUrl: nuevaInteraccion.mediaUrl,
-            mediaType: nuevaInteraccion.mediaType,
-            createdAt: nuevaInteraccion.createdAt,
-            agenteCrm: nuevaInteraccion.agenteCrm ? {
-                id: nuevaInteraccion.agenteCrm.id,
-                nombre: nuevaInteraccion.agenteCrm.nombre,
-            } : null,
-        };
-        return { success: true, data };
-    } catch (error) {
-        console.error('Error en enviarMensajeAction:', error);
-        // Manejo específico del error de FK si agenteCrmId es inválido
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-            // Comprobar si el error es específicamente en el campo agenteCrmId
-            const fieldNameMatch = error.message.match(/Foreign key constraint failed on the field: `(.*)`/);
-            if (fieldNameMatch && fieldNameMatch[1] === 'agenteCrmId') {
-                return { success: false, error: 'Error: El ID del agente especificado no es válido.' };
-            }
-        }
-        return { success: false, error: 'No se pudo enviar el mensaje.' };
-    }
-}
-
 
 export async function obtenerDetallesConversacionParaPanelAction(
     conversationId: string
@@ -611,6 +358,399 @@ export async function obtenerEtiquetasAsignadasLeadAction(
     }
 }
 
+// --- Función auxiliar para crear interacción de sistema (si no la tienes global) ---
+// Asegúrate que esta función exista y esté accesible, o copia/mueve su lógica aquí.
+// Esta versión es simplificada y asume que existe en este archivo.
+async function crearInteraccionSistemaInterna(conversacionId: string, mensaje: string, tx?: Prisma.TransactionClient) {
+    const db = tx || prisma;
+    try {
+        await db.interaccion.create({
+            data: {
+                conversacionId,
+                role: 'system',
+                mensaje,
+            },
+        });
+        // No actualizamos updatedAt aquí necesariamente, la acción principal lo hará.
+    } catch (logError) {
+        console.error("Error al crear interacción de sistema interna:", logError);
+        // No lanzar error aquí para no detener la acción principal
+    }
+}
+
+export async function obtenerAgenteCrmPorUsuarioAction(
+    usuarioId: string,
+    negocioId: string
+): Promise<ActionResult<AgenteBasico | null>> {
+    console.log(`[Agente Actions] Buscando Agente para Usuario ${usuarioId} en Negocio ${negocioId}`);
+    if (!usuarioId || !negocioId) {
+        return { success: false, error: "Se requiere ID de usuario y negocio." };
+    }
+
+    try {
+        // 1. Encontrar el CRM del negocio
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId: negocioId },
+            select: { id: true }
+        });
+
+        if (!crm) {
+            console.log(`[Agente Actions] No se encontró CRM para Negocio ${negocioId}`);
+            return { success: true, data: null }; // No hay CRM, por lo tanto no hay agente
+        }
+
+        // 2. Buscar al Agente en ese CRM que tenga el userId correspondiente
+        // ASUNCIÓN: El modelo Agente tiene un campo 'userId' que lo vincula al modelo Usuario
+        const agente = await prisma.agente.findFirst({
+            where: {
+                crmId: crm.id,
+                userId: usuarioId, // Busca por el ID del Usuario logueado
+                status: 'activo' // Opcional: Asegurar que el agente esté activo
+            },
+            select: {
+                id: true,
+                nombre: true,
+                // email: true // Podrías devolver el email si lo necesitas
+            }
+        });
+
+        if (!agente) {
+            console.log(`[Agente Actions] No se encontró Agente activo para Usuario ${usuarioId} en CRM ${crm.id}`);
+            return { success: true, data: null }; // El usuario no es un agente activo en este CRM
+        }
+
+        console.log(`[Agente Actions] Agente encontrado: ID=${agente.id}, Nombre=${agente.nombre}`);
+        const agenteBasico: AgenteBasico = {
+            id: agente.id,
+            nombre: agente.nombre // El nombre puede ser null si así está en tu BD
+        };
+
+        return { success: true, data: agenteBasico };
+
+    } catch (error) {
+        console.error("[Agente Actions] Error buscando Agente por Usuario y Negocio:", error);
+        return { success: false, error: "Error al buscar la información del agente.", data: null };
+    }
+}
+
+export async function pausarAutomatizacionAction(
+    conversationId: string,
+    agenteId: string, // Podría ser Agente.id o Usuario.id dependiendo de tu lógica
+    nombreAgente: string | null | undefined
+): Promise<ActionResult<ConversationDetailsForPanel | null>> {
+    console.log(`[Gestion Conv] Pausando automatización para ${conversationId} por ${nombreAgente || agenteId}`);
+    if (!conversationId || !agenteId) {
+        return { success: false, error: "Se requiere ID de conversación y agente." };
+    }
+
+    const estadoPausado = 'en_espera_agente'; // O 'hitl_activo'
+
+    try {
+        const conversacionActualizada = await prisma.$transaction(async (tx) => {
+            const conv = await tx.conversacion.update({
+                where: { id: conversationId },
+                data: {
+                    status: estadoPausado,
+                    updatedAt: new Date(),
+                },
+                select: { // Seleccionar datos para devolver ConversationDetailsForPanel
+                    id: true, status: true, leadId: true,
+                    lead: { select: { nombre: true } },
+                    agenteCrmActual: { select: { id: true, nombre: true } },
+                },
+            });
+
+            // Registrar la acción en el historial (como mensaje de sistema)
+            const mensajeSistema = `Automatización pausada por ${nombreAgente || 'un usuario'}.`;
+            await crearInteraccionSistemaInterna(conversationId, mensajeSistema, tx);
+
+            // Podrías registrar también en Bitacora si lo deseas
+            // await tx.bitacora.create({ data: { leadId: conv.leadId, agenteId: ???, tipoAccion: 'pausa_ia', descripcion: mensajeSistema } });
+
+            return conv;
+        });
+
+        if (!conversacionActualizada) {
+            return { success: false, error: 'No se pudo actualizar la conversación (quizás no existe).', data: null };
+        }
+
+        // Mapear al tipo de retorno esperado
+        const data: ConversationDetailsForPanel = {
+            id: conversacionActualizada.id,
+            status: conversacionActualizada.status,
+            leadId: conversacionActualizada.leadId,
+            leadNombre: conversacionActualizada.lead?.nombre ?? "Desconocido",
+            agenteCrmActual: conversacionActualizada.agenteCrmActual ? {
+                id: conversacionActualizada.agenteCrmActual.id,
+                nombre: conversacionActualizada.agenteCrmActual.nombre,
+            } : null,
+        };
+
+        return { success: true, data: data };
+
+    } catch (error) {
+        console.error(`[Gestion Conv] Error al pausar automatización para ${conversationId}:`, error);
+        return { success: false, error: "Error interno al pausar la automatización.", data: null };
+    }
+}
+
+export async function reanudarAutomatizacionAction(
+    conversationId: string,
+    agenteId: string,
+    nombreAgente: string | null | undefined
+): Promise<ActionResult<ConversationDetailsForPanel | null>> {
+    console.log(`[Gestion Conv] Reanudando automatización para ${conversationId} por ${nombreAgente || agenteId}`);
+    if (!conversationId || !agenteId) {
+        return { success: false, error: "Se requiere ID de conversación y agente." };
+    }
+
+    const estadoActivo = 'abierta'; // Estado al que volverá la conversación
+
+    try {
+        const conversacionActualizada = await prisma.$transaction(async (tx) => {
+            const conv = await tx.conversacion.update({
+                where: { id: conversationId },
+                data: {
+                    status: estadoActivo,
+                    updatedAt: new Date(),
+                },
+                select: { // Seleccionar datos para devolver ConversationDetailsForPanel
+                    id: true, status: true, leadId: true,
+                    lead: { select: { nombre: true } },
+                    agenteCrmActual: { select: { id: true, nombre: true } },
+                },
+            });
+
+            const mensajeSistema = `Automatización reanudada por ${nombreAgente || 'un usuario'}.`;
+            await crearInteraccionSistemaInterna(conversationId, mensajeSistema, tx);
+
+            return conv;
+        });
+
+        if (!conversacionActualizada) {
+            return { success: false, error: 'No se pudo actualizar la conversación (quizás no existe).', data: null };
+        }
+
+        const data: ConversationDetailsForPanel = {
+            id: conversacionActualizada.id,
+            status: conversacionActualizada.status,
+            leadId: conversacionActualizada.leadId,
+            leadNombre: conversacionActualizada.lead?.nombre ?? "Desconocido",
+            agenteCrmActual: conversacionActualizada.agenteCrmActual ? {
+                id: conversacionActualizada.agenteCrmActual.id,
+                nombre: conversacionActualizada.agenteCrmActual.nombre,
+            } : null,
+        };
+
+        return { success: true, data: data };
+
+    } catch (error) {
+        console.error(`[Gestion Conv] Error al reanudar automatización para ${conversationId}:`, error);
+        return { success: false, error: "Error interno al reanudar la automatización.", data: null };
+    }
+}
+
+export async function archivarConversacionAction(
+    conversationId: string,
+    usuarioIdQueArchiva: string, // ID del Usuario
+    agenteCrmIdQueArchiva: string | null, // ID del Agente (o null)
+    nombreUsuarioQueArchiva: string | null | undefined
+): Promise<ActionResult<null>> {
+    const nombreDisplay = nombreUsuarioQueArchiva || `Usuario ${usuarioIdQueArchiva.substring(0, 4)}...`;
+    console.log(`[Gestion Conv] Archivando conversación ${conversationId} por ${nombreDisplay} (Usuario: ${usuarioIdQueArchiva}, AgenteCRM: ${agenteCrmIdQueArchiva ?? 'N/A'})`);
+
+    if (!conversationId || !usuarioIdQueArchiva) { // Validar usuarioId también
+        return { success: false, error: "Se requiere ID de conversación y usuario." };
+    }
+
+    const estadoArchivado = 'archivada';
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            const conversacion = await tx.conversacion.update({ // Guardar resultado para obtener leadId
+                where: { id: conversationId },
+                data: {
+                    status: estadoArchivado,
+                    updatedAt: new Date(),
+                },
+                select: { leadId: true } // Seleccionar leadId para Bitacora
+            });
+
+            // 2. Registrar la acción en el historial del chat
+            const mensajeSistema = `Conversación archivada por ${nombreDisplay}.`;
+            await crearInteraccionSistemaInterna(conversationId, mensajeSistema, tx);
+
+            // 3. (Opcional) Registrar en Bitacora
+            if (conversacion?.leadId) {
+                await tx.bitacora.create({
+                    data: {
+                        leadId: conversacion.leadId,
+                        agenteId: agenteCrmIdQueArchiva, // <-- Usar el ID del Agente CRM (puede ser null)
+                        tipoAccion: 'archivar_conv',
+                        descripcion: mensajeSistema,
+                    }
+                });
+            }
+        });
+
+        console.log(`[Gestion Conv] Conversación ${conversationId} archivada exitosamente.`);
+        return { success: true, data: null };
+
+    } catch (error) {
+        console.error(`[Gestion Conv] Error al archivar conversación ${conversationId}:`, error);
+        // No intentar actualizar TareaEjecutada aquí, no es parte de una tarea IA
+        return { success: false, error: "Error interno al archivar la conversación.", data: null };
+    }
+}
+
+export async function obtenerListaConversacionesAction(
+    negocioId: string,
+    searchTerm?: string | null,
+    filtroStatus: 'activas' | 'archivadas' | 'todas' = 'activas',
+    filtroPipelineId?: string | null
+): Promise<ActionResult<ConversationPreviewItem[]>> {
+
+    console.log(filtroPipelineId); // Debug
+
+    // --- FIN FIRMA ACTUALIZADA ---
+    try {
+        if (!negocioId) {
+            return { success: false, error: 'El ID del negocio es requerido.' };
+        }
+
+        // Construir cláusula Where dinámicamente
+        const whereClause: Prisma.ConversacionWhereInput = {
+            // Filtrar por negocio
+            lead: {
+                crm: {
+                    negocioId: negocioId,
+                },
+                // --- CORRECCIÓN: Aplicar filtro de Pipeline ID ---
+                ...(filtroPipelineId && filtroPipelineId !== 'all' && {
+                    pipelineId: filtroPipelineId // Aplicar el filtro si se proporciona
+                })
+                // --- FIN CORRECCIÓN ---
+            },
+            // Filtrar por Status de Conversación
+            ...(filtroStatus === 'activas' && {
+                status: { notIn: ['archivada', 'cerrada'] }
+            }),
+            ...(filtroStatus === 'archivadas' && {
+                status: 'archivada'
+            }),
+        };
+
+        // Añadir búsqueda por término si existe
+        if (searchTerm && searchTerm.trim() !== '') {
+            // Asegurar que OR exista antes de añadirle condiciones
+            if (!whereClause.OR) {
+                whereClause.OR = [];
+            }
+            whereClause.OR.push(
+                { lead: { nombre: { contains: searchTerm, mode: 'insensitive' } } }
+            );
+            // Podrías añadir más condiciones OR aquí si buscas en más campos
+        }
+
+        const conversaciones = await prisma.conversacion.findMany({
+            where: whereClause, // Usar la cláusula where construida
+            select: {
+                id: true, status: true, updatedAt: true,
+                asistenteVirtual: { select: { canalConversacional: { select: { nombre: true } } } },
+                lead: { select: { id: true, nombre: true } },
+                Interaccion: { orderBy: { createdAt: 'desc' }, take: 1, select: { mensaje: true, createdAt: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: 100, // Considera paginación
+        });
+
+        // Mapear resultados
+        const data: ConversationPreviewItem[] = conversaciones.map((conv) => {
+            const ultimaInteraccion = conv.Interaccion[0];
+            let canal: ConversationPreviewItem['canalOrigen'] = 'otro';
+            const canalNombre = conv.asistenteVirtual?.canalConversacional?.nombre?.toLowerCase();
+            if (canalNombre === 'whatsapp') canal = 'whatsapp';
+            else if (canalNombre === 'web chat') canal = 'webchat';
+
+            return {
+                id: conv.id,
+                leadId: conv.lead?.id,
+                leadName: conv.lead?.nombre ?? 'Contacto desconocido',
+                lastMessagePreview: ultimaInteraccion?.mensaje?.substring(0, 50) ?? '...',
+                lastMessageTimestamp: ultimaInteraccion?.createdAt ?? conv.updatedAt,
+                status: conv.status ?? 'desconocido',
+                canalOrigen: canal,
+            };
+        });
+
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error en obtenerListaConversacionesAction:', error);
+        return { success: false, error: 'No se pudieron cargar las conversaciones.' };
+    }
+}
+
+export async function obtenerUltimosMensajesAction(
+    conversationId: string,
+    limit: number = 50 // Obtener los últimos 50 por defecto
+): Promise<ActionResult<ChatMessageItem[]>> {
+    console.log(`[CRM Actions] obtenerUltimosMensajesAction llamada para conv: ${conversationId}, limite: ${limit}`);
+    try {
+        if (!conversationId) {
+            return { success: false, error: 'El ID de la conversación es requerido.' };
+        }
+        const interacciones = await prisma.interaccion.findMany({
+            where: { conversacionId: conversationId },
+            select: {
+                id: true,
+                conversacionId: true,
+                role: true,
+                mensaje: true,
+                mediaUrl: true,
+                mediaType: true,
+                createdAt: true,
+                agenteCrmId: true,
+                agenteCrm: { // Incluir info básica del agente si está asociado
+                    select: {
+                        id: true,
+                        nombre: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'asc' }, // Obtener en orden cronológico
+            take: limit > 0 ? limit : undefined, // Aplicar límite si es positivo
+            // skip: podrías añadir skip para paginación futura
+        });
+
+        const data: ChatMessageItem[] = interacciones.map((interaccion) => {
+            const role = ['user', 'assistant', 'agent', 'system'].includes(interaccion.role)
+                ? interaccion.role as ChatMessageItem['role']
+                : 'system';
+            const agenteCrmData: AgenteBasico | null = interaccion.agenteCrm
+                ? { id: interaccion.agenteCrm.id, nombre: interaccion.agenteCrm.nombre }
+                : null;
+
+            return {
+                id: interaccion.id,
+                conversacionId: interaccion.conversacionId,
+                role: role,
+                mensaje: interaccion.mensaje,
+                mediaUrl: interaccion.mediaUrl,
+                mediaType: interaccion.mediaType,
+                createdAt: interaccion.createdAt, // Ya es Date
+                agenteCrm: agenteCrmData,
+            };
+        });
+
+        console.log(`[CRM Actions] ${data.length} mensajes obtenidos para conv: ${conversationId}`);
+        return { success: true, data };
+    } catch (error) {
+        console.error(`[CRM Actions] Error en obtenerUltimosMensajesAction para conv ${conversationId}:`, error);
+        return { success: false, error: 'No se pudieron cargar los mensajes.' };
+    }
+}
+
+
 /**
  * Envía un nuevo mensaje (interacción) a una conversación con el rol 'user'.
  * Utilizado por el panel de pruebas para simular un mensaje del cliente final.
@@ -671,8 +811,6 @@ export async function enviarMensajeComoUsuarioAction(
     }
 }
 
-
-// --- Tipo de Retorno Actualizado ---
 // El tipo de retorno ahora es más simple, ya que el dispatcher maneja la respuesta final de la función
 interface ProcesarMensajeEntranteData {
     conversacionId: string;
@@ -683,14 +821,10 @@ interface ProcesarMensajeEntranteData {
     respuestaAsistenteInicial?: string | null; // La respuesta textual inicial de la IA
     llamadaFuncionDetectada?: boolean; // Indicar si se detectó una llamada a función
 }
-// --- Fin Tipo de Retorno ---
-
 
 export async function procesarMensajeEntranteAction(
     payload: MensajeEntrantePayload
-    // --- Usar Tipo de Retorno Actualizado ---
 ): Promise<ActionResult<ProcesarMensajeEntranteData>> {
-    // --- Fin Usar Tipo de Retorno ---
 
     let tareaEjecutadaCreadaId: string | null = null; // Para llamar al dispatcher después
 
@@ -885,12 +1019,140 @@ export async function procesarMensajeEntranteAction(
     }
 }
 
-/*
- * 
- *  //!WEBCHAT 
- * 
- * 
- */
+
+
+
+/***********  WHATSAPP ************/
+/***********  WHATSAPP ************/
+/***********  WHATSAPP ************/
+
+// Obtener el historial de mensajes de una conversación específica
+export async function obtenerMensajesConversacionAction(
+    conversationId: string
+): Promise<ActionResult<ChatMessageItem[]>> {
+    try {
+        if (!conversationId) {
+            return { success: false, error: 'El ID de la conversación es requerido.' };
+        }
+        const interacciones = await prisma.interaccion.findMany({
+            where: { conversacionId: conversationId },
+            select: {
+                id: true,
+                conversacionId: true,
+                role: true,
+                mensaje: true,
+                mediaUrl: true,
+                mediaType: true,
+                createdAt: true,
+                agenteCrmId: true,
+                agenteCrm: {
+                    select: {
+                        id: true,
+                        nombre: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+
+        const data: ChatMessageItem[] = interacciones.map((interaccion) => ({
+            id: interaccion.id,
+            conversacionId: interaccion.conversacionId,
+            role: interaccion.role as ChatMessageItem['role'],
+            mensaje: interaccion.mensaje,
+            mediaUrl: interaccion.mediaUrl,
+            mediaType: interaccion.mediaType,
+            createdAt: interaccion.createdAt,
+            agenteCrm: interaccion.agenteCrm ? {
+                id: interaccion.agenteCrm.id,
+                nombre: interaccion.agenteCrm.nombre,
+            } : null,
+        }));
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error en obtenerMensajesConversacionAction:', error);
+        return { success: false, error: 'No se pudieron cargar los mensajes.' };
+    }
+}
+
+export async function enviarMensajeAction(
+    input: EnviarMensajeInput
+): Promise<ActionResult<ChatMessageItem>> {
+    try {
+        if (!input.conversacionId || !input.mensaje || !input.role) {
+            return { success: false, error: 'Faltan datos para enviar el mensaje.' };
+        }
+
+        // --- Lógica de Pausa Automática ---
+        let updateConversationStatus = false;
+        if (input.role === 'agent') {
+            // Si envía un agente (humano desde CRM), pausar la IA
+            updateConversationStatus = true;
+            console.log(`[enviarMensajeAction] Mensaje de agente detectado. Pausando conversación ${input.conversacionId}.`);
+        }
+        // --- Fin Lógica de Pausa ---
+
+        // Usar transacción para asegurar que el mensaje y el estado se actualicen juntos
+        const nuevaInteraccion = await prisma.$transaction(async (tx) => {
+            const interaccion = await tx.interaccion.create({
+                data: {
+                    conversacionId: input.conversacionId,
+                    mensaje: input.mensaje,
+                    role: input.role,
+                    agenteCrmId: input.agenteCrmId, // Será null si es propietario/admin
+                },
+                select: {
+                    id: true, conversacionId: true, role: true, mensaje: true,
+                    mediaUrl: true, mediaType: true, createdAt: true,
+                    agenteCrm: { select: { id: true, nombre: true } },
+                }
+            });
+
+            // Actualizar Conversacion (timestamp y status si es necesario)
+            await tx.conversacion.update({
+                where: { id: input.conversacionId },
+                data: {
+                    updatedAt: new Date(),
+                    // Actualizar status solo si es un agente enviando
+                    ...(updateConversationStatus && { status: 'en_espera_agente' })
+                }
+            });
+
+            return interaccion;
+        });
+
+        const data: ChatMessageItem = {
+            id: nuevaInteraccion.id,
+            conversacionId: nuevaInteraccion.conversacionId,
+            role: nuevaInteraccion.role as ChatMessageItem['role'],
+            mensaje: nuevaInteraccion.mensaje,
+            mediaUrl: nuevaInteraccion.mediaUrl,
+            mediaType: nuevaInteraccion.mediaType,
+            createdAt: nuevaInteraccion.createdAt,
+            agenteCrm: nuevaInteraccion.agenteCrm ? {
+                id: nuevaInteraccion.agenteCrm.id,
+                nombre: nuevaInteraccion.agenteCrm.nombre,
+            } : null,
+        };
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error en enviarMensajeAction:', error);
+        // Manejo específico del error de FK si agenteCrmId es inválido
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+            // Comprobar si el error es específicamente en el campo agenteCrmId
+            const fieldNameMatch = error.message.match(/Foreign key constraint failed on the field: `(.*)`/);
+            if (fieldNameMatch && fieldNameMatch[1] === 'agenteCrmId') {
+                return { success: false, error: 'Error: El ID del agente especificado no es válido.' };
+            }
+        }
+        return { success: false, error: 'No se pudo enviar el mensaje.' };
+    }
+}
+
+
+/***********  WEBCHAT ************/
+/***********  WEBCHAT ************/
+/***********  WEBCHAT ************/
 
 const WEBCHAT_CRM_CANAL_NOMBRE = "Webchat";
 
@@ -910,121 +1172,40 @@ async function obtenerOCrearCanalWebchat(crmId: string, tx: Prisma.TransactionCl
     return canal.id;
 }
 
-async function obtenerTareasCapacidadParaAsistente(asistenteId: string, tx: Prisma.TransactionClient): Promise<TareaCapacidadIA[]> {
-    const suscripcionesTareas = await tx.asistenteTareaSuscripcion.findMany({
+// --- Función auxiliar para obtener el ID del primer pipeline activo ---
+async function obtenerPrimerPipelineId(crmId: string, tx: Prisma.TransactionClient): Promise<string | null> {
+    const primerPipeline = await tx.pipelineCRM.findFirst({
         where: {
-            asistenteVirtualId: asistenteId,
-            status: 'activo',
-            tarea: { status: 'activo' },
+            crmId: crmId,
+            status: 'activo'
         },
-        include: {
-            tarea: {
-                include: {
-                    tareaFuncion: {
-                        include: {
-                            parametrosRequeridos: {
-                                include: { parametroRequerido: true },
-                            },
-                        },
-                    },
-                    camposPersonalizadosRequeridos: {
-                        include: { crmCampoPersonalizado: true },
-                    },
-                },
-            },
+        orderBy: {
+            orden: 'asc' // Asume que 'orden' define la secuencia
         },
+        select: { id: true }
     });
-
-    const tareasCapacidad: TareaCapacidadIA[] = [];
-
-    for (const suscripcion of suscripcionesTareas) {
-        const tareaDb = suscripcion.tarea;
-        if (!tareaDb) continue;
-
-        let funcionHerramienta: TareaCapacidadIA['funcionHerramienta'] = null;
-        if (tareaDb.tareaFuncion) {
-            const parametrosFuncion: ParametroParaIA[] = tareaDb.tareaFuncion.parametrosRequeridos
-                // Filtrar por si acaso parametroRequerido es null
-                .filter(p => p.parametroRequerido)
-                .map(p => {
-                    // --- CORRECCIÓN AQUÍ ---
-                    // Usar ?? para asegurar que siempre haya un string, incluso si ambos son null/undefined
-                    const nombreParam = (p.parametroRequerido.nombreInterno ?? p.parametroRequerido.nombreVisible) ?? '';
-                    if (nombreParam === '') {
-                        console.warn(`[CRM Actions] Parámetro con ID ${p.parametroRequerido.id} no tiene nombreInterno ni nombreVisible.`);
-                    }
-                    return {
-                        nombre: nombreParam,
-                        tipo: p.parametroRequerido.tipoDato,
-                        descripcion: p.parametroRequerido.descripcion || p.parametroRequerido.nombreVisible,
-                        esObligatorio: p.esObligatorio,
-                    };
-                    // --- FIN CORRECCIÓN ---
-                });
-
-            funcionHerramienta = {
-                nombreInterno: tareaDb.tareaFuncion.nombreInterno,
-                nombreVisible: tareaDb.tareaFuncion.nombreVisible,
-                descripcion: tareaDb.tareaFuncion.descripcion,
-                parametros: parametrosFuncion,
-            };
-        }
-
-        const camposPersonalizadosTarea: ParametroParaIA[] = tareaDb.camposPersonalizadosRequeridos
-            // Filtrar por si acaso crmCampoPersonalizado es null
-            .filter(cp => cp.crmCampoPersonalizado)
-            .map(cp => {
-                // --- CORRECCIÓN AQUÍ ---
-                // Usar ?? para asegurar que siempre haya un string
-                const nombreCampo = (cp.crmCampoPersonalizado.nombreCampo ?? cp.crmCampoPersonalizado.nombre) ?? '';
-                if (nombreCampo === '') {
-                    console.warn(`[CRM Actions] Campo Personalizado con ID ${cp.crmCampoPersonalizado.id} no tiene nombreCampo ni nombre.`);
-                }
-                return {
-                    nombre: nombreCampo,
-                    tipo: cp.crmCampoPersonalizado.tipo,
-                    descripcion: cp.crmCampoPersonalizado.nombre, // Usar siempre el nombre visible como descripción
-                    esObligatorio: cp.esRequerido,
-                };
-                // --- FIN CORRECCIÓN ---
-            });
-
-        tareasCapacidad.push({
-            id: tareaDb.id,
-            nombre: tareaDb.nombre,
-            descripcion: tareaDb.descripcion,
-            instruccionParaIA: tareaDb.instruccion,
-            funcionHerramienta: funcionHerramienta,
-            camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,
-        });
-    }
-    // console.log(`[CRM Actions] Tareas capacidad para Asistente ${asistenteId}:`, JSON.stringify(tareasCapacidad, null, 2)); // Log detallado opcional
-    return tareasCapacidad;
+    return primerPipeline?.id ?? null;
 }
 
-
+//! WEBCHAT PASO 1: Crear lead y conversación
 export async function iniciarConversacionWebchatAction(
     input: IniciarConversacionWebchatInput
-): Promise<ActionResult<IniciarConversacionWebchatData>> {
+): Promise<ActionResult<IniciarConversacionWebchatDataConDispatcher>> {
     let tareaEjecutadaCreadaId: string | null = null;
 
     try {
+        // ... (Validaciones iniciales y obtener asistente - sin cambios) ...
         const { asistenteId, mensajeInicial, remitenteIdWeb, nombreRemitenteSugerido } = input;
 
-        if (!asistenteId || !mensajeInicial || !remitenteIdWeb) {
-            return { success: false, error: 'Datos esenciales incompletos: se requieren asistenteId, mensajeInicial y remitenteIdWeb.' };
-        }
+        if (!asistenteId || !mensajeInicial || !remitenteIdWeb)
+            return { success: false, error: 'Datos esenciales incompletos.' };
 
-        const asistente = await prisma.asistenteVirtual.findUnique({
-            where: { id: asistenteId },
-            include: {
-                negocio: { include: { CRM: true } },
-            },
-        });
+        //! Obtener asistente y negocio
+        const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, include: { negocio: { include: { CRM: true } } } });
 
-        if (!asistente) return { success: false, error: `Asistente virtual con ID ${asistenteId} no encontrado.` };
-        if (!asistente.negocio) return { success: false, error: `El asistente ${asistenteId} no está asociado a ningún negocio.` };
-        if (!asistente.negocio.CRM) return { success: false, error: `El negocio "${asistente.negocio.nombre}" no tiene un CRM configurado.` };
+        if (!asistente || !asistente.negocio || !asistente.negocio.CRM) return {
+            success: false, error: `Asistente o configuración CRM no encontrada.`
+        };
 
         const crmId = asistente.negocio.CRM.id;
         const negocioNombre = asistente.negocio.nombre;
@@ -1044,31 +1225,33 @@ export async function iniciarConversacionWebchatAction(
             let lead = await tx.lead.findFirst({
                 where: { crmId: crmId, jsonParams: { path: ['webchatUserId'], equals: remitenteIdWeb } }
             });
+
             if (!lead) {
+                //! Crear nuevo lead si no existe
+                const primerPipelineId = await obtenerPrimerPipelineId(crmId, tx);
+                if (!primerPipelineId) {
+                    throw new Error(`No se encontró una etapa de pipeline activa inicial para el CRM ${crmId}. Configure el pipeline.`);
+                }
+
                 lead = await tx.lead.create({
                     data: {
                         crmId: crmId,
                         nombre: nombreRemitenteSugerido || `Usuario Webchat ${remitenteIdWeb.substring(0, 8)}`,
                         canalId: canalWebchatId,
                         status: 'nuevo',
+                        pipelineId: primerPipelineId,
                         jsonParams: { webchatUserId: remitenteIdWeb }
                     },
                 });
             }
             leadIdVar = lead.id;
 
-            const nuevaConversacion = await tx.conversacion.create({
-                data: { leadId: lead.id, asistenteVirtualId: asistente.id, status: 'abierta' },
-            });
-            conversationIdVar = nuevaConversacion.id;
+            const nuevaConversacion = await tx.conversacion.create({ data: { leadId: lead.id, asistenteVirtualId: asistente.id, status: 'abierta' } }); conversationIdVar = nuevaConversacion.id;
+            const interaccionUsuario = await tx.interaccion.create({ data: { conversacionId: conversationIdVar, role: 'user', mensaje: mensajeInicial } }); interaccionUsuarioIdVar = interaccionUsuario.id; mensajeUsuarioGuardadoVar = { ...interaccionUsuario, role: 'user', createdAt: interaccionUsuario.createdAt, mensaje: interaccionUsuario.mensaje || "" };
 
-            const interaccionUsuario = await tx.interaccion.create({
-                data: { conversacionId: conversationIdVar, role: 'user', mensaje: mensajeInicial },
-            });
-            interaccionUsuarioIdVar = interaccionUsuario.id;
-            mensajeUsuarioGuardadoVar = { ...interaccionUsuario, role: 'user', createdAt: interaccionUsuario.createdAt, mensaje: interaccionUsuario.mensaje || "" };
-
+            //! Obtener tareas disponibles para el asistente
             const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistente.id, tx);
+            console.log(`Tareas disponibles para el asistente ${asistente.nombre}:`, tareasDisponibles);
 
             const resultadoIA = await generarRespuestaAsistente({
                 historialConversacion: [],
@@ -1076,9 +1259,9 @@ export async function iniciarConversacionWebchatAction(
                 contextoAsistente: {
                     nombreAsistente: asistente.nombre,
                     descripcionAsistente: asistente.descripcion,
-                    nombreNegocio: negocioNombre,
+                    nombreNegocio: negocioNombre
                 },
-                tareasDisponibles: tareasDisponibles,
+                tareasDisponibles: tareasDisponibles
             });
 
             if (resultadoIA.success && resultadoIA.data) {
@@ -1087,92 +1270,106 @@ export async function iniciarConversacionWebchatAction(
                 llamadaFuncionDetectadaVar = respuestaIA.llamadaFuncion;
 
                 if (respuestaAsistenteTextoVar) {
-                    const interaccionAsistente = await tx.interaccion.create({
+                    const i = await tx.interaccion.create({
                         data: {
-                            conversacionId: conversationIdVar,
-                            role: 'assistant',
-                            mensaje: respuestaAsistenteTextoVar,
-                        },
+                            conversacionId: conversationIdVar, role: 'assistant',
+                            mensaje: respuestaAsistenteTextoVar
+                        }
                     });
-                    interaccionAsistenteIdVar = interaccionAsistente.id;
-                    mensajeAsistenteGuardadoVar = { ...interaccionAsistente, role: 'assistant', createdAt: interaccionAsistente.createdAt, mensaje: interaccionAsistente.mensaje || "" };
+                    interaccionAsistenteIdVar = i.id; mensajeAsistenteGuardadoVar = {
+                        ...i, role: 'assistant', createdAt: i.createdAt, mensaje: i.mensaje || ""
+                    };
                 }
-
                 if (llamadaFuncionDetectadaVar) {
-                    const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombreInterno === llamadaFuncionDetectadaVar?.nombreFuncion);
-                    if (tareaCoincidente) {
-                        const tareaEjecutada = await tx.tareaEjecutada.create({
+
+                    const t = tareasDisponibles.find(t => t.funcionHerramienta?.nombreInterno === llamadaFuncionDetectadaVar?.nombreFuncion);
+
+                    if (t) {
+                        const te = await tx.tareaEjecutada.create({
                             data: {
                                 asistenteVirtualId: asistente.id,
-                                tareaId: tareaCoincidente.id,
+                                tareaId: t.id,
                                 fechaEjecutada: new Date(),
                                 metadata: JSON.stringify({
                                     conversacionId: conversationIdVar,
                                     leadId: leadIdVar,
                                     asistenteVirtualId: asistente.id,
                                     funcionLlamada: llamadaFuncionDetectadaVar.nombreFuncion,
-                                    argumentos: llamadaFuncionDetectadaVar.argumentos,
+                                    argumentos: llamadaFuncionDetectadaVar.argumentos
                                 })
                             }
                         });
-                        tareaEjecutadaCreadaId = tareaEjecutada.id;
+                        tareaEjecutadaCreadaId = te.id;
 
                         if (!respuestaAsistenteTextoVar) {
-                            respuestaAsistenteTextoVar = `Entendido. Voy a procesar tu solicitud para ${llamadaFuncionDetectadaVar.nombreFuncion}.`;
+                            respuestaAsistenteTextoVar = `Entendido. Procesando: ${llamadaFuncionDetectadaVar.nombreFuncion}.`;
+
                             if (!interaccionAsistenteIdVar) {
-                                const interaccionAsistenteFuncion = await tx.interaccion.create({
-                                    data: { conversacionId: conversationIdVar, role: 'assistant', mensaje: respuestaAsistenteTextoVar },
+                                const i = await tx.interaccion.create({
+                                    data: {
+                                        conversacionId: conversationIdVar,
+                                        role: 'assistant',
+                                        mensaje: respuestaAsistenteTextoVar
+                                    }
                                 });
-                                interaccionAsistenteIdVar = interaccionAsistenteFuncion.id;
-                                mensajeAsistenteGuardadoVar = { ...interaccionAsistenteFuncion, role: 'assistant', createdAt: interaccionAsistenteFuncion.createdAt, mensaje: interaccionAsistenteFuncion.mensaje || "" };
+                                interaccionAsistenteIdVar = i.id;
+                                mensajeAsistenteGuardadoVar = {
+                                    ...i,
+                                    role: 'assistant',
+                                    createdAt: i.createdAt,
+                                    mensaje: i.mensaje || ""
+                                };
                             }
                         }
                     } else {
-                        console.warn(`[CRM Actions] IA intentó llamar a función desconocida: ${llamadaFuncionDetectadaVar.nombreFuncion}`);
+                        console.warn(`IA intentó llamar a función desconocida: ${llamadaFuncionDetectadaVar.nombreFuncion}`);
                     }
-                }
-
-                await tx.conversacion.update({
-                    where: { id: conversationIdVar }, data: { updatedAt: new Date() }
-                });
+                } await tx.conversacion.update({ where: { id: conversationIdVar }, data: { updatedAt: new Date() } });
             } else {
-                console.warn(`[CRM Actions] IA no generó respuesta para nueva conversación ${conversationIdVar} o hubo error: ${resultadoIA.error}`);
+                console.warn(`IA no generó respuesta o hubo error: ${resultadoIA.error}`);
                 await tx.interaccion.create({
                     data: {
                         conversacionId: conversationIdVar,
                         role: 'system',
-                        mensaje: `Lo siento, tuve un problema interno al procesar tu solicitud (${resultadoIA.error || 'Error desconocido'}). Por favor, intenta de nuevo o contacta a soporte.`,
-                    },
+                        mensaje: `Error interno IA: ${resultadoIA.error || 'Desconocido'}`
+                    }
                 });
             }
-        }); // Fin de la transacción
 
+        });
+
+        let mensajeResultadoDispatcher: ChatMessageItem | null = null;
         if (tareaEjecutadaCreadaId) {
-            console.log(`[CRM Actions] Llamando al dispatcher para TareaEjecutada ID: ${tareaEjecutadaCreadaId}`);
-            dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId).catch(dispatchError => {
-                console.error(`[CRM Actions] Error en dispatchTareaEjecutadaAction para ${tareaEjecutadaCreadaId}:`, dispatchError);
-            });
+            console.log(`Llamando dispatcher para Tarea: ${tareaEjecutadaCreadaId}`);
+
+            //! Aquí llamamos al dispatcher para la tarea ejecutada
+            const dispatchResult = await dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId);
+            if (dispatchResult.success && dispatchResult.data) {
+                mensajeResultadoDispatcher = dispatchResult.data;
+            } else if (!dispatchResult.success) {
+                console.error(`Error dispatcher para ${tareaEjecutadaCreadaId}:`, dispatchResult.error);
+            }
         }
 
         return {
             success: true,
             data: {
-                conversationId: conversationIdVar,
-                interaccionUsuarioId: interaccionUsuarioIdVar,
-                leadId: leadIdVar,
-                respuestaAsistente: respuestaAsistenteTextoVar,
-                interaccionAsistenteId: interaccionAsistenteIdVar,
-                mensajeUsuario: mensajeUsuarioGuardadoVar,
-                mensajeAsistente: mensajeAsistenteGuardadoVar,
+                conversationId: conversationIdVar, interaccionUsuarioId: interaccionUsuarioIdVar, leadId: leadIdVar,
+                respuestaAsistente: respuestaAsistenteTextoVar, interaccionAsistenteId: interaccionAsistenteIdVar,
+                mensajeUsuario: mensajeUsuarioGuardadoVar, mensajeAsistente: mensajeAsistenteGuardadoVar,
+                mensajeResultadoFuncion: mensajeResultadoDispatcher
             }
         };
 
     } catch (error) {
         console.error('[CRM Actions] Error en iniciarConversacionWebchatAction:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Error interno al iniciar la conversación webchat.' };
+        // Devolver el error específico si es por falta de pipeline
+        if (error instanceof Error && error.message.includes("Configure el pipeline")) {
+            return { success: false, error: error.message };
+        }
+        return { success: false, error: error instanceof Error ? error.message : 'Error interno.' };
     }
 }
-
 
 export async function enviarMensajeWebchatAction(
     input: EnviarMensajeWebchatInput
@@ -1193,8 +1390,6 @@ export async function enviarMensajeWebchatAction(
                 lead: true,
             },
         });
-
-
 
         if (!conversacion) return { success: false, error: `Conversación con ID ${conversationId} no encontrada.` };
         if (!conversacion.asistenteVirtual) return { success: false, error: `La conversación ${conversationId} no tiene un asistente.` };
@@ -1220,10 +1415,12 @@ export async function enviarMensajeWebchatAction(
             // --- CORRECCIÓN: Verificar estado ANTES de llamar a IA ---
             if (estadoActual === 'en_espera_agente' || estadoActual === 'hitl_activo') { // Añadir otros estados de pausa si los usas
                 console.log(`[CRM Actions] Conversación ${conversationId} está en estado ${estadoActual}. No se llamará a la IA.`);
+
                 // Actualizar solo el timestamp de la conversación
                 await tx.conversacion.update({
                     where: { id: conversationId }, data: { updatedAt: new Date() },
                 });
+
                 // Salir de la transacción sin llamar a IA ni dispatcher
                 return;
             }
@@ -1240,6 +1437,8 @@ export async function enviarMensajeWebchatAction(
             }));
 
             const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, tx);
+            // console.log(`[CRM Actions] Tareas disponibles para el asistente ${conversacion.asistenteVirtual!.nombre}:`, tareasDisponibles);
+
 
             const resultadoIA = await generarRespuestaAsistente({
                 historialConversacion: historialParaIA.filter(h => h.role !== 'system'),
@@ -1342,280 +1541,96 @@ export async function enviarMensajeWebchatAction(
     }
 }
 
-export async function obtenerUltimosMensajesAction(
-    conversationId: string,
-    limit: number = 50 // Obtener los últimos 50 por defecto
-): Promise<ActionResult<ChatMessageItem[]>> {
-    console.log(`[CRM Actions] obtenerUltimosMensajesAction llamada para conv: ${conversationId}, limite: ${limit}`);
-    try {
-        if (!conversationId) {
-            return { success: false, error: 'El ID de la conversación es requerido.' };
-        }
-        const interacciones = await prisma.interaccion.findMany({
-            where: { conversacionId: conversationId },
-            select: {
-                id: true,
-                conversacionId: true,
-                role: true,
-                mensaje: true,
-                mediaUrl: true,
-                mediaType: true,
-                createdAt: true,
-                agenteCrmId: true,
-                agenteCrm: { // Incluir info básica del agente si está asociado
-                    select: {
-                        id: true,
-                        nombre: true,
+
+
+async function obtenerTareasCapacidadParaAsistente(asistenteId: string, tx: Prisma.TransactionClient): Promise<TareaCapacidadIA[]> {
+    const suscripcionesTareas = await tx.asistenteTareaSuscripcion.findMany({
+        where: {
+            asistenteVirtualId: asistenteId,
+            status: 'activo',
+            tarea: { status: 'activo' },
+        },
+        include: {
+            tarea: {
+                include: {
+                    tareaFuncion: {
+                        include: {
+                            parametrosRequeridos: {
+                                include: { parametroRequerido: true },
+                            },
+                        },
+                    },
+                    camposPersonalizadosRequeridos: {
+                        include: { crmCampoPersonalizado: true },
                     },
                 },
             },
-            orderBy: { createdAt: 'asc' }, // Obtener en orden cronológico
-            take: limit > 0 ? limit : undefined, // Aplicar límite si es positivo
-            // skip: podrías añadir skip para paginación futura
-        });
+        },
+    });
 
-        const data: ChatMessageItem[] = interacciones.map((interaccion) => {
-            const role = ['user', 'assistant', 'agent', 'system'].includes(interaccion.role)
-                ? interaccion.role as ChatMessageItem['role']
-                : 'system';
-            const agenteCrmData: AgenteBasico | null = interaccion.agenteCrm
-                ? { id: interaccion.agenteCrm.id, nombre: interaccion.agenteCrm.nombre }
-                : null;
+    const tareasCapacidad: TareaCapacidadIA[] = [];
 
-            return {
-                id: interaccion.id,
-                conversacionId: interaccion.conversacionId,
-                role: role,
-                mensaje: interaccion.mensaje,
-                mediaUrl: interaccion.mediaUrl,
-                mediaType: interaccion.mediaType,
-                createdAt: interaccion.createdAt, // Ya es Date
-                agenteCrm: agenteCrmData,
+    for (const suscripcion of suscripcionesTareas) {
+        const tareaDb = suscripcion.tarea;
+        if (!tareaDb) continue;
+
+        let funcionHerramienta: TareaCapacidadIA['funcionHerramienta'] = null;
+        if (tareaDb.tareaFuncion) {
+            const parametrosFuncion: ParametroParaIA[] = tareaDb.tareaFuncion.parametrosRequeridos
+                // Filtrar por si acaso parametroRequerido es null
+                .filter(p => p.parametroRequerido)
+                .map(p => {
+                    // --- CORRECCIÓN AQUÍ ---
+                    // Usar ?? para asegurar que siempre haya un string, incluso si ambos son null/undefined
+                    const nombreParam = (p.parametroRequerido.nombreInterno ?? p.parametroRequerido.nombreVisible) ?? '';
+                    if (nombreParam === '') {
+                        console.warn(`[CRM Actions] Parámetro con ID ${p.parametroRequerido.id} no tiene nombreInterno ni nombreVisible.`);
+                    }
+                    return {
+                        nombre: nombreParam,
+                        tipo: p.parametroRequerido.tipoDato,
+                        descripcion: p.parametroRequerido.descripcion || p.parametroRequerido.nombreVisible,
+                        esObligatorio: p.esObligatorio,
+                    };
+                    // --- FIN CORRECCIÓN ---
+                });
+
+            funcionHerramienta = {
+                nombreInterno: tareaDb.tareaFuncion.nombreInterno,
+                nombreVisible: tareaDb.tareaFuncion.nombreVisible,
+                descripcion: tareaDb.tareaFuncion.descripcion,
+                parametros: parametrosFuncion,
             };
-        });
-
-        console.log(`[CRM Actions] ${data.length} mensajes obtenidos para conv: ${conversationId}`);
-        return { success: true, data };
-    } catch (error) {
-        console.error(`[CRM Actions] Error en obtenerUltimosMensajesAction para conv ${conversationId}:`, error);
-        return { success: false, error: 'No se pudieron cargar los mensajes.' };
-    }
-}
-
-
-
-/**
- * Busca el registro Agente correspondiente a un Usuario dentro del CRM de un Negocio específico.
- * @param usuarioId El ID del Usuario logueado.
- * @param negocioId El ID del Negocio cuyo CRM se está viendo.
- * @returns ActionResult con los datos básicos del Agente (id, nombre) o null si no se encuentra.
- */
-export async function obtenerAgenteCrmPorUsuarioAction(
-    usuarioId: string,
-    negocioId: string
-): Promise<ActionResult<AgenteBasico | null>> {
-    console.log(`[Agente Actions] Buscando Agente para Usuario ${usuarioId} en Negocio ${negocioId}`);
-    if (!usuarioId || !negocioId) {
-        return { success: false, error: "Se requiere ID de usuario y negocio." };
-    }
-
-    try {
-        // 1. Encontrar el CRM del negocio
-        const crm = await prisma.cRM.findUnique({
-            where: { negocioId: negocioId },
-            select: { id: true }
-        });
-
-        if (!crm) {
-            console.log(`[Agente Actions] No se encontró CRM para Negocio ${negocioId}`);
-            return { success: true, data: null }; // No hay CRM, por lo tanto no hay agente
         }
 
-        // 2. Buscar al Agente en ese CRM que tenga el userId correspondiente
-        // ASUNCIÓN: El modelo Agente tiene un campo 'userId' que lo vincula al modelo Usuario
-        const agente = await prisma.agente.findFirst({
-            where: {
-                crmId: crm.id,
-                userId: usuarioId, // Busca por el ID del Usuario logueado
-                status: 'activo' // Opcional: Asegurar que el agente esté activo
-            },
-            select: {
-                id: true,
-                nombre: true,
-                // email: true // Podrías devolver el email si lo necesitas
-            }
-        });
-
-        if (!agente) {
-            console.log(`[Agente Actions] No se encontró Agente activo para Usuario ${usuarioId} en CRM ${crm.id}`);
-            return { success: true, data: null }; // El usuario no es un agente activo en este CRM
-        }
-
-        console.log(`[Agente Actions] Agente encontrado: ID=${agente.id}, Nombre=${agente.nombre}`);
-        const agenteBasico: AgenteBasico = {
-            id: agente.id,
-            nombre: agente.nombre // El nombre puede ser null si así está en tu BD
-        };
-
-        return { success: true, data: agenteBasico };
-
-    } catch (error) {
-        console.error("[Agente Actions] Error buscando Agente por Usuario y Negocio:", error);
-        return { success: false, error: "Error al buscar la información del agente.", data: null };
-    }
-}
-
-
-// --- Función auxiliar para crear interacción de sistema (si no la tienes global) ---
-// Asegúrate que esta función exista y esté accesible, o copia/mueve su lógica aquí.
-// Esta versión es simplificada y asume que existe en este archivo.
-async function crearInteraccionSistemaInterna(conversacionId: string, mensaje: string, tx?: Prisma.TransactionClient) {
-    const db = tx || prisma;
-    try {
-        await db.interaccion.create({
-            data: {
-                conversacionId,
-                role: 'system',
-                mensaje,
-            },
-        });
-        // No actualizamos updatedAt aquí necesariamente, la acción principal lo hará.
-    } catch (logError) {
-        console.error("Error al crear interacción de sistema interna:", logError);
-        // No lanzar error aquí para no detener la acción principal
-    }
-}
-// --- Fin Función auxiliar ---
-
-
-/**
- * Cambia manualmente el estado de una conversación para pausar la IA.
- * @param conversationId ID de la conversación a pausar.
- * @param agenteId ID del Agente/Usuario que realiza la acción (para registro).
- * @param nombreAgente Nombre del Agente/Usuario que realiza la acción.
- * @returns ActionResult con los detalles actualizados de la conversación.
- */
-export async function pausarAutomatizacionAction(
-    conversationId: string,
-    agenteId: string, // Podría ser Agente.id o Usuario.id dependiendo de tu lógica
-    nombreAgente: string | null | undefined
-): Promise<ActionResult<ConversationDetailsForPanel | null>> {
-    console.log(`[Gestion Conv] Pausando automatización para ${conversationId} por ${nombreAgente || agenteId}`);
-    if (!conversationId || !agenteId) {
-        return { success: false, error: "Se requiere ID de conversación y agente." };
-    }
-
-    const estadoPausado = 'en_espera_agente'; // O 'hitl_activo'
-
-    try {
-        const conversacionActualizada = await prisma.$transaction(async (tx) => {
-            const conv = await tx.conversacion.update({
-                where: { id: conversationId },
-                data: {
-                    status: estadoPausado,
-                    updatedAt: new Date(),
-                },
-                select: { // Seleccionar datos para devolver ConversationDetailsForPanel
-                    id: true, status: true, leadId: true,
-                    lead: { select: { nombre: true } },
-                    agenteCrmActual: { select: { id: true, nombre: true } },
-                },
+        const camposPersonalizadosTarea: ParametroParaIA[] = tareaDb.camposPersonalizadosRequeridos
+            // Filtrar por si acaso crmCampoPersonalizado es null
+            .filter(cp => cp.crmCampoPersonalizado)
+            .map(cp => {
+                // --- CORRECCIÓN AQUÍ ---
+                // Usar ?? para asegurar que siempre haya un string
+                const nombreCampo = (cp.crmCampoPersonalizado.nombreCampo ?? cp.crmCampoPersonalizado.nombre) ?? '';
+                if (nombreCampo === '') {
+                    console.warn(`[CRM Actions] Campo Personalizado con ID ${cp.crmCampoPersonalizado.id} no tiene nombreCampo ni nombre.`);
+                }
+                return {
+                    nombre: nombreCampo,
+                    tipo: cp.crmCampoPersonalizado.tipo,
+                    descripcion: cp.crmCampoPersonalizado.nombre, // Usar siempre el nombre visible como descripción
+                    esObligatorio: cp.esRequerido,
+                };
+                // --- FIN CORRECCIÓN ---
             });
 
-            // Registrar la acción en el historial (como mensaje de sistema)
-            const mensajeSistema = `Automatización pausada por ${nombreAgente || 'un usuario'}.`;
-            await crearInteraccionSistemaInterna(conversationId, mensajeSistema, tx);
-
-            // Podrías registrar también en Bitacora si lo deseas
-            // await tx.bitacora.create({ data: { leadId: conv.leadId, agenteId: ???, tipoAccion: 'pausa_ia', descripcion: mensajeSistema } });
-
-            return conv;
+        tareasCapacidad.push({
+            id: tareaDb.id,
+            nombre: tareaDb.nombre,
+            descripcion: tareaDb.descripcion,
+            instruccionParaIA: tareaDb.instruccion,
+            funcionHerramienta: funcionHerramienta,
+            camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,
         });
-
-        if (!conversacionActualizada) {
-            return { success: false, error: 'No se pudo actualizar la conversación (quizás no existe).', data: null };
-        }
-
-        // Mapear al tipo de retorno esperado
-        const data: ConversationDetailsForPanel = {
-            id: conversacionActualizada.id,
-            status: conversacionActualizada.status,
-            leadId: conversacionActualizada.leadId,
-            leadNombre: conversacionActualizada.lead?.nombre ?? "Desconocido",
-            agenteCrmActual: conversacionActualizada.agenteCrmActual ? {
-                id: conversacionActualizada.agenteCrmActual.id,
-                nombre: conversacionActualizada.agenteCrmActual.nombre,
-            } : null,
-        };
-
-        return { success: true, data: data };
-
-    } catch (error) {
-        console.error(`[Gestion Conv] Error al pausar automatización para ${conversationId}:`, error);
-        return { success: false, error: "Error interno al pausar la automatización.", data: null };
     }
-}
-
-
-/**
- * Cambia manualmente el estado de una conversación para reanudar la IA.
- * @param conversationId ID de la conversación a reanudar.
- * @param agenteId ID del Agente/Usuario que realiza la acción.
- * @param nombreAgente Nombre del Agente/Usuario que realiza la acción.
- * @returns ActionResult con los detalles actualizados de la conversación.
- */
-export async function reanudarAutomatizacionAction(
-    conversationId: string,
-    agenteId: string,
-    nombreAgente: string | null | undefined
-): Promise<ActionResult<ConversationDetailsForPanel | null>> {
-    console.log(`[Gestion Conv] Reanudando automatización para ${conversationId} por ${nombreAgente || agenteId}`);
-    if (!conversationId || !agenteId) {
-        return { success: false, error: "Se requiere ID de conversación y agente." };
-    }
-
-    const estadoActivo = 'abierta'; // Estado al que volverá la conversación
-
-    try {
-        const conversacionActualizada = await prisma.$transaction(async (tx) => {
-            const conv = await tx.conversacion.update({
-                where: { id: conversationId },
-                data: {
-                    status: estadoActivo,
-                    updatedAt: new Date(),
-                },
-                select: { // Seleccionar datos para devolver ConversationDetailsForPanel
-                    id: true, status: true, leadId: true,
-                    lead: { select: { nombre: true } },
-                    agenteCrmActual: { select: { id: true, nombre: true } },
-                },
-            });
-
-            const mensajeSistema = `Automatización reanudada por ${nombreAgente || 'un usuario'}.`;
-            await crearInteraccionSistemaInterna(conversationId, mensajeSistema, tx);
-
-            return conv;
-        });
-
-        if (!conversacionActualizada) {
-            return { success: false, error: 'No se pudo actualizar la conversación (quizás no existe).', data: null };
-        }
-
-        const data: ConversationDetailsForPanel = {
-            id: conversacionActualizada.id,
-            status: conversacionActualizada.status,
-            leadId: conversacionActualizada.leadId,
-            leadNombre: conversacionActualizada.lead?.nombre ?? "Desconocido",
-            agenteCrmActual: conversacionActualizada.agenteCrmActual ? {
-                id: conversacionActualizada.agenteCrmActual.id,
-                nombre: conversacionActualizada.agenteCrmActual.nombre,
-            } : null,
-        };
-
-        return { success: true, data: data };
-
-    } catch (error) {
-        console.error(`[Gestion Conv] Error al reanudar automatización para ${conversationId}:`, error);
-        return { success: false, error: "Error interno al reanudar la automatización.", data: null };
-    }
+    // console.log(`[CRM Actions] Tareas capacidad para Asistente ${asistenteId}:`, JSON.stringify(tareasCapacidad, null, 2)); // Log detallado opcional
+    return tareasCapacidad;
 }

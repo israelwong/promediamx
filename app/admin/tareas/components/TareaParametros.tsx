@@ -379,7 +379,7 @@ export default function ParametrosRequeridosGestion() {
                                 </div>
                                 <div>
                                     <label htmlFor="modal-descripcion" className={labelBaseClasses}>Descripción</label>
-                                    <textarea id="modal-descripcion" name="descripcion" value={modalFormData.descripcion || ''} onChange={handleModalFormChange} className={textareaBaseClasses} disabled={isSubmittingModal} rows={3} maxLength={250} placeholder="Describe qué información representa..." />
+                                    <textarea id="modal-descripcion" name="descripcion" value={modalFormData.descripcion || ''} onChange={handleModalFormChange} className={textareaBaseClasses} disabled={isSubmittingModal} rows={6} maxLength={400} placeholder="Describe qué información representa..." />
                                 </div>
                             </div>
                             <div className={modalFooterClasses}>

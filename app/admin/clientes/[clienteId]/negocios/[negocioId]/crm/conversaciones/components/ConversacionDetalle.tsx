@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+
 import ChatComponent from '../components/ChatComponent';
 import ToolsPanel from '../components/ToolsPanel';
+
 import { obtenerDetallesConversacionParaPanelAction } from '@/app/admin/_lib/crmConversacion.actions';
 import { ConversationDetailsForPanel } from '@/app/admin/_lib/crmConversacion.types';
 
@@ -19,7 +21,6 @@ export default function ConversacionDetalle({ clienteId, negocioId, conversacion
   const [isTitleDataLoading, setIsTitleDataLoading] = useState(true);
 
   const handleForceChatRefresh = useCallback(() => {
-    // console.log("[ConversationDetailPage] Forzando refresco del chat...");
     setRefreshChatTrigger(prev => prev + 1);
   }, []);
 
@@ -28,14 +29,12 @@ export default function ConversacionDetalle({ clienteId, negocioId, conversacion
     if (conversacionId) {
 
       setIsTitleDataLoading(true); // Indicar que estamos cargando datos para el título
-      // console.log(`[TitleEffect Fetch] Iniciando carga para conversacionId: ${conversacionId}`);
+
       obtenerDetallesConversacionParaPanelAction(conversacionId).then(result => {
         if (isActive) {
           if (result.success && result.data) {
-            // console.log("[TitleEffect Fetch] Datos para título cargados:", result.data);
             setPageTitleData(result.data);
           } else {
-            console.error("[TitleEffect Fetch] Error al cargar detalles para el título:", result.error);
             setPageTitleData(null);
           }
           setIsTitleDataLoading(false);
@@ -47,7 +46,6 @@ export default function ConversacionDetalle({ clienteId, negocioId, conversacion
     }
     return () => {
       isActive = false;
-      // console.log("[TitleEffect Fetch] Cleanup - isActive=false");
     };
   }, [conversacionId]);
 
@@ -56,24 +54,17 @@ export default function ConversacionDetalle({ clienteId, negocioId, conversacion
 
     if (conversacionId) { // Estamos en una página de conversación específica
       if (isTitleDataLoading) {
-        newTitle = "Cargando Chat... - CRM";
+        newTitle = "Cargando Chat...";
       } else if (pageTitleData && pageTitleData.leadNombre) {
-        newTitle = `Chat con ${pageTitleData.leadNombre} - CRM`;
+        newTitle = `Chat con ${pageTitleData.leadNombre}`;
       } else {
-        newTitle = "Chat - CRM"; // Si no hay nombre de lead o falló la carga
+        newTitle = "Chat"; // Si no hay nombre de lead o falló la carga
       }
     }
 
     console.log(`[TitleEffect Set] Estableciendo título a: "${newTitle}" (isTitleDataLoading: ${isTitleDataLoading}, pageTitleData: ${JSON.stringify(pageTitleData)})`);
     document.title = newTitle;
 
-    // Opcional: Limpieza al desmontar el componente.
-    // Esto es útil si quieres que el título vuelva a un estado más general
-    // cuando el usuario navega fuera de esta página específica.
-    // return () => {
-    //   console.log("[TitleEffect Set] Cleanup - Restableciendo título a un valor general (ej. Panel CRM)");
-    //   document.title = "Panel CRM"; // O el título de tu aplicación/layout padre
-    // };
   }, [conversacionId, pageTitleData, isTitleDataLoading]);
 
   return (

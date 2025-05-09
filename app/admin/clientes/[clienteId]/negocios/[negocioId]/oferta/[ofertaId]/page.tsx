@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation'; // Importar notFound
 import OfertaEditarForm from '../components/OfertaEditarForm'; // Asume que existe
 import OfertaGaleria from '../components/OfertaGaleria';     // Asume que existe
+import OfertaVideos from '../components/OfertaVideos';
 
 // Metadata básica
 export const metadata: Metadata = {
@@ -31,7 +32,7 @@ export default async function EditarOfertaPage({ params }: { params: Promise<Pro
         // Contenedor principal con padding
         <div className="p-4 md:p-6 space-y-6">
             {/* --- Grid principal con 5 columnas en pantallas medianas y grandes --- */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 lg:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-6 lg:gap-8">
 
                 {/* Columna 1: Formulario de Edición (Ocupa 2 columnas) */}
                 <div className="md:col-span-2">
@@ -43,10 +44,17 @@ export default async function EditarOfertaPage({ params }: { params: Promise<Pro
                 </div>
 
                 {/* Columna 2: Galería de Imágenes (Ocupa 3 columnas) */}
-                <div className="md:col-span-3">
+                <div className="md:col-span-2">
                     <OfertaGaleria
                         ofertaId={ofertaId}
                     // Podrías pasar negocioId si es necesario para alguna acción dentro de Galeria
+                    />
+                </div>
+
+                {/* Columna 3: Videos (Ocupa 3 columnas) */}
+                <div className="md:col-span-2">
+                    <OfertaVideos
+                        ofertaId={ofertaId}
                     />
                 </div>
 

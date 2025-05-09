@@ -15,7 +15,8 @@ export default function AdminLayout({
             {/* Este div ahora toma el espacio restante */}
             <div className="flex-1 flex overflow-hidden"> {/* <--- CORREGIDO: Añadido flex-1 */}
                 {/* main ahora es un contenedor flex vertical para sus hijos */}
-                <main className="flex-1 flex flex-col overflow-hidden"> {/* <--- CORREGIDO: Añadido flex flex-col overflow-hidden */}
+                {/* <main className="flex-1 flex flex-col overflow-hidden">  */}{/* <--- CORREGIDO: Añadido flex-col */}
+                <main className="flex-1 flex flex-col overflow-hidden overflow-y-auto">
                     {children}
                 </main>
             </div>

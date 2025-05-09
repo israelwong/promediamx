@@ -8,7 +8,7 @@ import Image from 'next/image';
 
 import { Usuario } from '@/app/admin/_lib/types';
 import { verifyToken, cerrarSesion } from '@/app/lib/auth';
-import { Bell, LogOut, Menu, X } from 'lucide-react'; // Iconos
+import { Bell, LogOut, Menu, X, MessageCircle } from 'lucide-react'; // Iconos
 import { UsuarioExtendido } from '@/app/admin/_lib/types'; // Asegúrate de que la ruta sea correcta
 
 
@@ -121,6 +121,21 @@ function Navbar() {
     const mobileLogoutButtonClasses = `${logoutButtonClasses} w-full justify-center mt-auto`;
     const separatorClasses = "h-6 w-px bg-zinc-700";
 
+    const handleOpenChat = () => {
+        const chatWindow = window.open(
+            '/dev-test-chat', // URL a abrir
+            '_blank',         // Nombre del target (_blank para nueva ventana/tab)
+            'width=600,height=1000,scrollbars=no,resizable=no,status=no,toolbar=no,menubar=no,location=no' // Features de la ventana popup
+        );
+        // Enfocar la ventana si se abrió correctamente
+        if (chatWindow) {
+            chatWindow.focus();
+        } else {
+            // Informar al usuario si el popup fue bloqueado
+            alert("El popup del chat fue bloqueado. Por favor, permite popups para este sitio.");
+        }
+    }
+
     return (
         // JSX sin cambios estructurales...
         <div className={navContainerClasses}>
@@ -145,8 +160,21 @@ function Navbar() {
                         );
                     })}
                 </nav>
+
                 {user && links.length > 0 && <div className={separatorClasses}></div>}
+
+
                 <div className={actionsContainerClasses}>
+
+                    <button
+                        className='flex items-center gap-1.5 text-zinc-400'
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
+                        onClick={() => handleOpenChat()}
+                    >
+                        <MessageCircle size={18} />
+                        <span>Chat</span>
+                    </button>
+
                     <button className={iconButtonClasses} title="Notificaciones (Próximamente)">
                         <Bell size={18} />
                     </button>

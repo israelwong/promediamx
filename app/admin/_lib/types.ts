@@ -1063,6 +1063,7 @@ export interface Oferta {
     // Relaciones
     itemCatalogoOfertas?: ItemCatalogoOferta[]; // Relación M-N con Items
     galeria?: OfertaGaleria[]; // Galería para la oferta
+    linkPago?: string | null;
 }
 
 // --- Tabla Intermedia: Item <-> Oferta ---

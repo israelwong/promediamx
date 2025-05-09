@@ -9,7 +9,13 @@ import {
 } from './types'; // Ajusta ruta
 
 import { Prisma } from '@prisma/client';
-import { NuevoLeadFormData, CrearLeadResult, ObtenerDatosFormularioLeadResult, DatosFormularioLead } from './types'; // Ajusta ruta
+import {
+    NuevoLeadFormData,
+    CrearLeadResult,
+    ObtenerDatosFormularioLeadResult,
+    DatosFormularioLead,
+    ActionResult
+} from './types'; // Ajusta ruta
 
 
 /**
@@ -29,6 +35,9 @@ export async function obtenerLeadsCRM(
     if (!negocioId) {
         return { success: false, error: "ID de negocio no proporcionado." };
     }
+
+    console.log('Filtros recibidos:', filtros);
+    console.log('Opciones de ordenamiento recibidas:', sort);
 
     try {
         const crm = await prisma.cRM.findUnique({
@@ -468,5 +477,87 @@ export async function eliminarLead(leadId: string): Promise<{ success: boolean; 
             return { success: false, error: "El Lead no existe o ya fue eliminado." };
         }
         return { success: false, error: "No se pudo eliminar el Lead." };
+    }
+}
+
+export async function obtenerCrmIdPorNegocioAction(
+    negocioId: string
+): Promise<ActionResult<string | null>> {
+    if (!negocioId) {
+        return { success: false, error: "Se requiere ID de negocio." };
+    }
+    try {
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId: negocioId },
+            select: { id: true }
+        });
+        return { success: true, data: crm?.id ?? null };
+    } catch (error) {
+        console.error(`Error obteniendo crmId para negocio ${negocioId}:`, error);
+        return { success: false, error: "Error al buscar CRM." };
+    }
+}
+
+export async function obtenerLeadListaItemAction(
+    leadId: string
+): Promise<ActionResult<LeadListaItem | null>> {
+    if (!leadId) {
+        return { success: false, error: "Se requiere ID de Lead." };
+    }
+    console.log(`[CRM Lead Actions] Obteniendo LeadListaItem para ID: ${leadId}`);
+    try {
+        const lead = await prisma.lead.findUnique({
+            where: { id: leadId },
+            // Incluir exactamente las mismas relaciones y campos que obtenerLeadsCRM
+            select: {
+                id: true,
+                nombre: true,
+                email: true,
+                telefono: true,
+                createdAt: true,
+                updatedAt: true,
+                status: true,
+                valorEstimado: true,
+                Pipeline: { select: { id: true, nombre: true } },
+                Canal: { select: { id: true, nombre: true } },
+                agente: { select: { id: true, nombre: true } },
+                Etiquetas: {
+                    select: { etiqueta: { select: { id: true, nombre: true, color: true } } }
+                },
+                Conversacion: {
+                    orderBy: { updatedAt: 'desc' },
+                    take: 1,
+                    select: { id: true, updatedAt: true, status: true }
+                }
+            }
+        });
+
+        if (!lead) {
+            console.warn(`[CRM Lead Actions] No se encontró Lead con ID: ${leadId}`);
+            return { success: true, data: null }; // No es un error, simplemente no existe
+        }
+
+        // Mapear al formato LeadListaItem (igual que en obtenerLeadsCRM)
+        const leadFormateado: LeadListaItem = {
+            id: lead.id,
+            nombre: lead.nombre,
+            email: lead.email,
+            telefono: lead.telefono,
+            createdAt: lead.createdAt,
+            updatedAt: lead.updatedAt,
+            status: lead.status,
+            valorEstimado: lead.valorEstimado,
+            pipeline: lead.Pipeline,
+            canal: lead.Canal,
+            agente: lead.agente,
+            etiquetas: lead.Etiquetas,
+            ultimaConversacion: lead.Conversacion[0] || null,
+        };
+
+        return { success: true, data: leadFormateado };
+
+    } catch (error) {
+        console.error(`Error obteniendo LeadListaItem para ${leadId}:`, error);
+        return { success: false, error: 'No se pudo obtener el detalle del lead.' };
     }
 }

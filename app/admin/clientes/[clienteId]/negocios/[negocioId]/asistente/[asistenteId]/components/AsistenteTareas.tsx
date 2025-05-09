@@ -129,7 +129,7 @@ export default function AsistenteTareas({ asistenteId, clienteId, negocioId }: P
         router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/asistente/${asistenteId}/tarea/${tareaId}`);
     };
     const handleGoToMarketplace = () => {
-        router.push(`/admin/marketplace?asistenteId=${asistenteId}`);
+        router.push(`/admin/marketplace/${asistenteId}`);
     };
 
     return (

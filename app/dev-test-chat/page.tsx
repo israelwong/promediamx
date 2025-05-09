@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function DevTestChatPage() {
     return (
-        <div className="min-h-screen bg-zinc-900 text-zinc-100 p-4 md:p-8 flex flex-col items-center">
+        <div className="min-h-screen bg-zinc-900 text-zinc-100 p-4 md:p-8 flex flex-col items-center overflow-hidden">
             <div className="w-full max-w-2xl bg-zinc-800 p-6 rounded-lg shadow-xl border border-zinc-700">
                 <header className="mb-6 text-center">
                     <h1 className="text-2xl font-semibold text-white">Panel de Pruebas de Chat</h1>

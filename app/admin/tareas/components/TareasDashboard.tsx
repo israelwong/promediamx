@@ -14,8 +14,8 @@ import { LayoutList, List, Cog, ListTree, Tags } from 'lucide-react';
 // import { X } from 'lucide-react';
 
 // Tipos para las pestañas activas
-type ActiveRightTab = 'tareas' | 'funciones';
-type ActiveSideTab = 'categorias' | 'etiquetas';
+type ActiveRightTab = 'tareas' | 'funciones' | 'parametros';
+type ActiveSideTab = 'categorias' | 'etiquetas' | 'canales';
 
 export default function TareasDashboard() {
     // const router = useRouter();
@@ -24,13 +24,9 @@ export default function TareasDashboard() {
 
     // --- Clases de Tailwind ---
     const panelContainerClasses = "p-4 md:p-6 bg-zinc-900 rounded-lg min-h-screen";
-    // Layout: 2 Columnas Principales (2 + 3 = 5)
-    const gridContainerClasses = "grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8"; // Aumentar gap general opcionalmente
-    // --- Columna Izquierda Combinada ---
-    // Mantenemos flex-col, pero los hijos controlarán su altura
-    const leftCombinedColumnClasses = "lg:col-span-1 flex flex-col gap-6";
-    // --- Columna Derecha ---
-    const rightColumnClasses = "lg:col-span-3 flex flex-col"; // Quitado gap-4, se maneja interno
+    const gridContainerClasses = "grid grid-cols-1 lg:grid-cols-6 gap-6 lg:gap-8"; // Aumentar gap general opcionalmente
+    const leftCombinedColumnClasses = "lg:col-span-2 flex flex-col gap-6";
+    const rightColumnClasses = "lg:col-span-4 flex flex-col"; // Quitado gap-4, se maneja interno
 
     // Clases para pestañas
     const tabButtonBaseClasses = "flex-1 sm:flex-none px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-zinc-800 focus:ring-blue-400 transition-colors duration-150 flex items-center justify-center gap-1.5 whitespace-nowrap";
@@ -72,9 +68,9 @@ export default function TareasDashboard() {
                 <div className={leftCombinedColumnClasses}>
                     {/* Canales (altura automática) */}
                     {/* Envolver en div con h-fit o aplicar directamente si TareasCanales lo soporta */}
-                    <div className="h-fit">
+                    {/* <div className="h-fit">
                         <TareasCanales />
-                    </div>
+                    </div> */}
 
                     {/* Pestañas Categorías/Etiquetas (ocupará espacio restante) */}
                     {/* Usamos sideTabContainerClasses con flex-grow */}
@@ -92,26 +88,28 @@ export default function TareasDashboard() {
                             >
                                 <Tags size={14} /> Etiquetas
                             </button>
+                            <button
+                                onClick={() => setActiveSideTab('canales')}
+                                className={`${tabButtonBaseClasses} ${activeSideTab === 'canales' ? tabButtonActiveClasses : tabButtonInactiveClasses}`}
+                            >
+                                <Tags size={14} /> Canales
+                            </button>
                         </div>
                         {/* El contenedor de contenido ahora tiene flex-col */}
                         <div className={`${sideTabContentContainerClasses}`}>
                             {/* Los componentes hijos (TareasCategorias/Etiquetas) deberían tener flex-grow si necesitan llenar espacio */}
                             {activeSideTab === 'categorias' && <TareasCategorias />}
                             {activeSideTab === 'etiquetas' && <TareasEtiquetas />}
+                            {activeSideTab === 'canales' && <TareasCanales />}
+
                         </div>
                     </div>
 
                 </div>
-                {/* Parámetros Globales (altura automática) */}
-                {/* Envolver en div con h-fit o aplicar directamente */}
-                <div className="">
-                    {/* Opcional: Añadir max-width aquí si es necesario */}
-                    {/* <div className="w-full max-w-lg mx-auto"> */}
-                    <TareaParametros />
-                    {/* </div> */}
-                </div>
-                {/* --- Fin Columna Izquierda Combinada --- */}
 
+                {/* <div className="">
+                    <TareaParametros />
+                </div> */}
 
                 {/* --- Columna Derecha (3/5) --- */}
                 <div className={rightColumnClasses}>
@@ -129,12 +127,17 @@ export default function TareasDashboard() {
                             >
                                 <Cog size={16} /> Funciones Globales
                             </button>
+                            <button
+                                onClick={() => setActiveRightTab('parametros')}
+                                className={`${tabButtonBaseClasses} ${activeRightTab === 'parametros' ? tabButtonActiveClasses : tabButtonInactiveClasses}`}
+                            >
+                                <Cog size={16} /> Parámetros
+                            </button>
                         </div>
-                        {/* Contenedor de contenido ahora tiene flex-col */}
                         <div className={rightTabContentContainerClasses}>
-                            {/* Los componentes hijos (ListaTareas/TareaFunciones) deberían tener flex-grow */}
                             {activeRightTab === 'tareas' && <ListaTareas />}
                             {activeRightTab === 'funciones' && <TareaFunciones />}
+                            {activeRightTab === 'parametros' && <TareaParametros />}
                         </div>
                     </div>
                 </div>

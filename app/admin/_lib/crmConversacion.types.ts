@@ -2,18 +2,6 @@
 
 import { AgenteBasico } from '@/app/admin/_lib/agente.types';
 
-// Tipo para cada ítem en la lista de previsualización de conversaciones
-// export type ConversationPreviewItem = {
-//     id: string; // ID de la Conversacion
-//     leadId?: string | null;
-//     leadName: string; // Nombre del Lead asociado
-//     lastMessagePreview: string; // Preview del último mensaje
-//     lastMessageTimestamp: Date; // Fecha del último mensaje o de la conversación
-//     status: string; // Estado de la conversación (ej: 'abierta', 'cerrada')
-//     avatarUrl?: string | null; // Opcional: URL del avatar del lead
-//     unreadCount?: number; // Opcional: Conteo de mensajes no leídos por el agente
-// };
-
 // Tipo para los detalles de la conversación que podría necesitar el chat o el panel de herramientas
 export type ConversationDetails = {
     id: string;
@@ -51,17 +39,6 @@ export type ChatMessageItem = {
     agenteCrm?: AgenteBasico | null; // Información del Agente CRM si role === 'agent' y agenteCrmId está presente en Interaccion
 };
 
-
-/**
- * Datos de entrada para la acción de enviar un nuevo mensaje.
- * Incluye opcionalmente el ID del agente CRM que envía el mensaje.
- */
-// export type EnviarMensajeInput = {
-//     conversacionId: string;
-//     mensaje: string;
-//     role: 'agent'; // Desde el CRM, el rol siempre será 'agent'
-//     agenteCrmId?: string | null; // ID del Agente CRM que está enviando el mensaje
-// };
 
 /**
  * Tipo para los detalles de la conversación.
@@ -174,7 +151,7 @@ export interface ParametroParaIA {
  */
 export interface FuncionHerramientaIA {
     nombreInterno: string; // nombreInterno de la TareaFuncion (este es el que la IA llamará)
-    nombreVisible: string; // nombreVisible de la TareaFuncion
+    nombreVisible?: string; // nombreVisible de la TareaFuncion
     descripcion?: string | null;
     parametros: ParametroParaIA[]; // Parámetros estándar de la función
 }
@@ -186,7 +163,7 @@ export interface FuncionHerramientaIA {
  */
 export interface TareaCapacidadIA {
     id: string; // ID de la Tarea original
-    nombre: string; // Nombre de la Tarea
+    nombre?: string; // Nombre de la Tarea
     descripcion?: string | null; // Descripción de la Tarea (para IA/OpenAPI)
     instruccionParaIA?: string | null; // La 'instruccion' detallada de la Tarea
     funcionHerramienta?: FuncionHerramientaIA | null; // La función de automatización asociada, si existe
@@ -230,17 +207,12 @@ export interface RespuestaAsistenteConHerramientas {
     pensamientoIA?: string | null; // Opcional: "Pensamiento" o "chain of thought" de la IA
 }
 
-
-
 // --- Tipos para acciones de pausa/reanudación (si no están ya) ---
 export interface PausarReanudarInput {
     conversationId: string;
     agenteId: string;
     nombreAgente: string | null | undefined;
 }
-// ---
-
-// ... resto de tus tipos ...
 
 // --- Tipos para acción de envío de mensajes (asegúrate que esté actualizado) ---
 export type EnviarMensajeInput = {
@@ -263,3 +235,41 @@ export type ConversationPreviewItem = {
     canalOrigen?: 'whatsapp' | 'webchat' | 'otro' | null; // Indica el canal
     // --- FIN NUEVO CAMPO ---
 };
+
+
+export interface IniciarConversacionWebchatData {
+    conversationId: string;
+    interaccionUsuarioId: string;
+    leadId: string;
+    respuestaAsistente?: string | null;
+    interaccionAsistenteId?: string;
+    mensajeUsuario?: ChatMessageItem;
+    mensajeAsistente?: ChatMessageItem;
+}
+
+/**
+ * Datos devueltos por la acción IniciarConversacionWebchatAction (extendido).
+ * Incluye opcionalmente el mensaje resultante de la ejecución de una función por el dispatcher.
+ */
+export interface IniciarConversacionWebchatDataConDispatcher extends IniciarConversacionWebchatData {
+    mensajeResultadoFuncion?: ChatMessageItem | null; // Mensaje devuelto por el dispatcher
+}
+
+/**
+ * Datos devueltos por la acción EnviarMensajeWebchatAction (versión base).
+ */
+export interface EnviarMensajeWebchatData {
+    interaccionUsuarioId: string;
+    respuestaAsistente?: string | null;
+    interaccionAsistenteId?: string;
+    mensajeUsuario?: ChatMessageItem;
+    mensajeAsistente?: ChatMessageItem;
+}
+
+/**
+ * Datos devueltos por la acción EnviarMensajeWebchatAction (extendido).
+ * Incluye opcionalmente el mensaje resultante de la ejecución de una función por el dispatcher.
+ */
+export interface EnviarMensajeWebchatDataConDispatcher extends EnviarMensajeWebchatData {
+    mensajeResultadoFuncion?: ChatMessageItem | null; // Mensaje devuelto por el dispatcher
+}

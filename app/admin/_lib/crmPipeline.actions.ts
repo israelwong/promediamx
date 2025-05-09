@@ -2,7 +2,8 @@
 import prisma from './prismaClient'; // Ajusta ruta
 import { PipelineCRM } from './types'; // Ajusta ruta
 import { Prisma } from '@prisma/client';
-import { PipelineColumnData, LeadCardData, ObtenerKanbanResult, ActualizarEtapaLeadResult } from './types'; // Ajusta ruta a tus tipos
+import { PipelineColumnData, LeadCardData, ObtenerKanbanResult, ActualizarEtapaLeadResult, ActionResult } from './types'; // Ajusta ruta a tus tipos
+
 
 
 // --- Tipo de Retorno para obtenerEtapasPipelineCRM ---
@@ -318,5 +319,41 @@ export async function actualizarEtapaLead(
             return { success: false, error: `El Lead con ID ${leadId} no fue encontrado.` };
         }
         return { success: false, error: 'No se pudo actualizar la etapa del Lead.' };
+    }
+}
+
+
+// Tipo simple para el dropdown
+interface PipelineSimple {
+    id: string;
+    nombre: string;
+}
+
+export async function obtenerPipelinesCrmAction(negocioId: string): Promise<ActionResult<PipelineSimple[]>> {
+    if (!negocioId) return { success: false, error: "ID de negocio requerido." };
+    try {
+        // Buscar el CRM asociado al negocio
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId: negocioId },
+            select: { id: true }
+        });
+
+        // Si no hay CRM, devolver lista vacía
+        if (!crm) return { success: true, data: [] };
+
+        // Obtener pipelines activos de ese CRM
+        const pipelines = await prisma.pipelineCRM.findMany({
+            where: {
+                crmId: crm.id,
+                status: 'activo' // Solo mostrar pipelines activos en el filtro
+            },
+            select: { id: true, nombre: true },
+            orderBy: { orden: 'asc' } // Ordenar por el campo 'orden'
+        });
+
+        return { success: true, data: pipelines };
+    } catch (error) {
+        console.error("Error obteniendo pipelines:", error);
+        return { success: false, error: "Error al obtener etapas del pipeline." };
     }
 }

@@ -24,9 +24,7 @@ import { obtenerAgenteCrmPorUsuarioAction } from '@/app/admin/_lib/crmAgente.act
 const token = Cookies.get('token');
 
 // --- Constante para el Rol de Administrador ---
-// Ajusta este valor al nombre exacto de tu rol de administrador en la BD/token
 const ADMIN_ROLE_NAME = 'Administrador';
-// ---
 
 interface InteraccionRealtimePayload { /* ... */
     id: string; conversacionId: string; role: string; mensaje: string | null; mediaUrl?: string | null; mediaType?: string | null; createdAt: string; agenteCrmId?: string | null;

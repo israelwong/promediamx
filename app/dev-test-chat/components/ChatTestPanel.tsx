@@ -16,6 +16,11 @@ import { Send, Loader2, MessageSquareWarning, CheckCircle2, User, Bot, Trash2 } 
 import { createClient, SupabaseClient, RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
+import Lightbox from "yet-another-react-lightbox"; // Importar Lightbox
+import "yet-another-react-lightbox/styles.css";  // Importar estilos base del Lightbox
+import "yet-another-react-lightbox/plugins/thumbnails.css";
+
+
 interface InteraccionRealtimePayload {
     id: string;
     conversacionId: string;
@@ -45,6 +50,100 @@ export default function ChatTestPanel() {
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
     const [remitenteIdWeb, setRemitenteIdWeb] = useState<string>('');
 
+
+    // --- NUEVOS ESTADOS PARA LIGHTBOX ---
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [lightboxSlides, setLightboxSlides] = useState<{ src: string; alt?: string }[]>([]);
+    const [lightboxIndex, setLightboxIndex] = useState(0); // Necesario si manejas múltiples imágenes en un solo clic o carrusel
+    const messagesContainerRef = useRef<HTMLDivElement>(null); // Ref para el contenedor de mensajes
+
+    // // Efecto para manejar clics en imágenes para el lightbox (Delegación de eventos)
+    // useEffect(() => {
+    //     const container = messagesContainerRef.current;
+    //     if (!container) return;
+
+    //     const handleClick = (event: MouseEvent) => {
+    //         const targetElement = event.target as HTMLElement;
+    //         // Busca el enlace <a> con la clase específica, incluso si se hizo clic en la <img> interna
+    //         const triggerLink = targetElement.closest('a.chat-image-lightbox-trigger') as HTMLAnchorElement | null;
+
+    //         if (triggerLink) {
+    //             event.preventDefault(); // Prevenir la navegación del enlace
+    //             const imageUrl = triggerLink.href;
+    //             const altText = triggerLink.dataset.alt || "Imagen";
+
+    //             setLightboxSlides([{ src: imageUrl, alt: altText }]);
+    //             setLightboxIndex(0); // Si siempre es una imagen a la vez
+    //             setLightboxOpen(true);
+    //         }
+    //     };
+
+    //     container.addEventListener('click', handleClick);
+    //     console.log("Event listener para lightbox añadido al contenedor de mensajes.");
+
+    //     return () => {
+    //         container.removeEventListener('click', handleClick);
+    //         console.log("Event listener para lightbox removido.");
+    //     };
+    // }, []); // Se ejecuta una vez al montar y desmontar el componente. La delegación maneja contenido dinámico.
+
+    // Efecto para manejar clics en imágenes para el lightbox (Delegación de eventos)
+    useEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+
+        const handleClick = (event: MouseEvent) => {
+            const targetElement = event.target as HTMLElement;
+            const triggerLink = targetElement.closest('a.chat-image-lightbox-trigger') as HTMLAnchorElement | null;
+
+            if (triggerLink) {
+                event.preventDefault();
+
+                // 1. Encuentra el contenedor del mensaje específico que contiene la imagen clickeada
+                // Asumimos que el HTML inyectado por dangerouslySetInnerHTML está dentro de un div
+                // con la clase "prose" (o la que hayas usado) directamente bajo la burbuja del mensaje.
+                // Necesitamos encontrar el ancestro que representa el contenido HTML de un solo mensaje.
+                const messageHtmlContentContainer = triggerLink.closest('.prose'); // O la clase del div donde se inyecta el HTML
+
+                if (messageHtmlContentContainer) {
+                    // 2. Encuentra todos los enlaces de imagen lightboxeables DENTRO de ese mensaje
+                    const allImageLinksInMessage = Array.from(
+                        messageHtmlContentContainer.querySelectorAll<HTMLAnchorElement>('a.chat-image-lightbox-trigger')
+                    );
+
+                    // 3. Crea los slides para el lightbox
+                    const slides = allImageLinksInMessage.map(link => ({
+                        src: link.href,
+                        alt: link.dataset.alt || "Imagen"
+                    }));
+
+                    // 4. Determina el índice de la imagen clickeada
+                    const clickedImageIndex = allImageLinksInMessage.findIndex(link => link.href === triggerLink.href);
+
+                    if (slides.length > 0) {
+                        setLightboxSlides(slides);
+                        setLightboxIndex(clickedImageIndex >= 0 ? clickedImageIndex : 0);
+                        setLightboxOpen(true);
+                    }
+                } else {
+                    // Fallback: si no podemos encontrar el contenedor del mensaje,
+                    // simplemente abre la imagen clickeada (comportamiento anterior)
+                    const imageUrl = triggerLink.href;
+                    const altText = triggerLink.dataset.alt || "Imagen";
+                    setLightboxSlides([{ src: imageUrl, alt: altText }]);
+                    setLightboxIndex(0);
+                    setLightboxOpen(true);
+                }
+            }
+        };
+
+        container.addEventListener('click', handleClick);
+        return () => {
+            container.removeEventListener('click', handleClick);
+        };
+    }, []); // El array vacío asegura que el listener se añade/quita solo al montar/desmontar
+
+
     useEffect(() => {
         let storedRemitenteId = localStorage.getItem('chatTestPanel_remitenteIdWeb');
         if (!storedRemitenteId) { storedRemitenteId = uuidv4(); localStorage.setItem('chatTestPanel_remitenteIdWeb', storedRemitenteId); }
@@ -52,7 +151,7 @@ export default function ChatTestPanel() {
     }, []);
 
     const scrollToBottom = useCallback(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, []);
-    useEffect(scrollToBottom, [chatMessages]);
+    useEffect(scrollToBottom, [chatMessages, scrollToBottom]);
 
     const fetchAndSetMessages = useCallback(async (convId: string) => {
         if (!convId) return;
@@ -65,15 +164,11 @@ export default function ChatTestPanel() {
             setChatMessages(result.data.map(m => ({ ...m, createdAt: new Date(m.createdAt) })));
         } else {
             setError(result.error || 'Error al cargar mensajes.');
-            // No limpiar mensajes aquí si ya había, para no perderlos si el fetch falla
-            // setChatMessages([]); 
         }
-        // setIsLoadingConversation(false); // No poner aquí si no se puso arriba
     }, []);
 
-    // --- useEffect para Realtime (SIMPLIFICADO) ---
+
     useEffect(() => {
-        // No limpiar mensajes aquí, se hace en load/reset
 
         if (!supabase || !currentConversationId) {
             console.log("[ChatTestPanel Realtime] No suscrito.");
@@ -210,37 +305,217 @@ export default function ChatTestPanel() {
 
     const handleKeyDownSubmit = (event: React.KeyboardEvent<HTMLTextAreaElement>) => { /* ... */ if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (event.currentTarget.form) { const form = event.currentTarget.form; const submitEvent = new Event('submit', { bubbles: true, cancelable: true }); form.dispatchEvent(submitEvent); } } };
     const getMessageAlignment = (role: ChatMessageItem['role']) => { /* ... */ return role === 'user' ? 'items-end' : 'items-start'; };
-    const getMessageBgColor = (role: ChatMessageItem['role']) => { /* ... */ if (role === 'user') return 'bg-blue-600 text-white'; if (role === 'assistant') return 'bg-zinc-700 text-zinc-200'; if (role === 'system') return 'bg-transparent text-zinc-500 italic text-xs text-center w-full'; return 'bg-gray-500 text-white'; };
+    const getMessageBgColor = (role: ChatMessageItem['role']) => { /* ... */ if (role === 'user') return 'bg-blue-600 text-white'; if (role === 'assistant') return 'bg-zinc-900 text-zinc-200'; if (role === 'system') return 'bg-transparent text-zinc-500 italic text-xs text-center w-full'; return 'bg-gray-500 text-white'; };
     const handleResetConversation = () => { /* ... */ setAsistenteId(''); setCurrentConversationId(''); setInputConversationId(''); setChatMessages([]); setError(null); setSuccessMessage("Panel reiniciado."); };
 
     return (
         <div className="space-y-6">
-            {/* ... (Renderizado sin cambios) ... */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label htmlFor="asistenteId" className="block text-sm font-medium text-zinc-300 mb-1">ID Asistente (nueva):</label><input type="text" id="asistenteId" value={asistenteId} onChange={(e) => setAsistenteId(e.target.value)} placeholder="ID Asistente Virtual" className="w-full p-2.5 rounded-md text-sm bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-zinc-500" disabled={!!currentConversationId} /></div><div><label htmlFor="inputConversationId" className="block text-sm font-medium text-zinc-300 mb-1">ID Conversación (continuar):</label><div className="flex gap-2"><input type="text" id="inputConversationId" value={inputConversationId} onChange={(e) => setInputConversationId(e.target.value)} placeholder="Pega ID existente" className="flex-grow p-2.5 rounded-md text-sm bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-zinc-500" /><button type="button" onClick={handleLoadConversation} className="p-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50" disabled={!inputConversationId.trim() || isLoadingConversation}>{isLoadingConversation ? <Loader2 size={18} className="animate-spin" /> : "Cargar"}</button></div></div></div><button type="button" onClick={handleResetConversation} className="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-zinc-800 mb-4"><Trash2 size={16} /> Reiniciar</button>
-            <div className="h-96 bg-zinc-950 p-4 rounded-lg border border-zinc-700 overflow-y-auto flex flex-col space-y-3">
-                {isLoadingConversation && (<div className="flex-1 flex items-center justify-center"><Loader2 size={32} className="animate-spin text-zinc-400" /><p className="ml-2 text-zinc-500">Cargando mensajes...</p></div>)}
-                {!isLoadingConversation && chatMessages.length === 0 && (<div className="flex-1 flex flex-col items-center justify-center text-zinc-500"><MessageSquareWarning size={40} className="mb-2" /><p>{currentConversationId ? `No hay mensajes para ${currentConversationId}.` : "Inicia o carga conversación."}</p></div>)}
-                {!isLoadingConversation && chatMessages.map((msg) => (
-                    <div key={msg.id} className={`flex flex-col ${getMessageAlignment(msg.role)} ${msg.role === 'system' ? 'items-center' : ''}`}>
-                        {msg.role !== 'system' ? (
-                            <div className={`flex items-end gap-2 max-w-[75%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                {msg.role === 'assistant' && (<span className="flex-shrink-0 text-zinc-400 self-center p-1.5 bg-zinc-700 rounded-full"><Bot size={16} /></span>)}
-                                <div className={`p-2.5 rounded-lg shadow ${getMessageBgColor(msg.role)} ${msg.role === 'user' ? 'rounded-br-none' : 'rounded-bl-none'}`}>
-                                    {msg.mensaje && <p className="text-sm whitespace-pre-wrap">{msg.mensaje}</p>}
-                                </div>
-                                {msg.role === 'user' && (<span className="flex-shrink-0 text-blue-300 self-center p-1.5 bg-blue-800 rounded-full"><User size={16} /></span>)}
-                            </div>
-                        ) : (<div className={getMessageBgColor(msg.role)}>{msg.mensaje}</div>)}
-                        <span className={`text-xs text-zinc-500 mt-1 px-1 ${msg.role === 'user' ? 'self-end' : (msg.role === 'system' ? 'self-center' : 'self-start')}`}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label htmlFor="asistenteId" className="block text-sm font-medium text-zinc-300 mb-1">
+                        ID Asistente (nueva):
+                    </label>
+                    <input
+                        type="text"
+                        id="asistenteId"
+                        value={asistenteId}
+                        onChange={(e) => setAsistenteId(e.target.value)}
+                        placeholder="ID Asistente Virtual"
+                        className="w-full p-2.5 rounded-md text-sm bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-zinc-500"
+                        disabled={!!currentConversationId}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="inputConversationId" className="block text-sm font-medium text-zinc-300 mb-1">
+                        ID Conversación (continuar):
+                    </label>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            id="inputConversationId"
+                            value={inputConversationId}
+                            onChange={(e) => setInputConversationId(e.target.value)}
+                            placeholder="Pega ID existente"
+                            className="flex-grow p-2.5 rounded-md text-sm bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-zinc-500"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleLoadConversation}
+                            className="p-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50"
+                            disabled={!inputConversationId.trim() || isLoadingConversation}
+                        >
+                            {isLoadingConversation ? <Loader2 size={18} className="animate-spin" /> : "Cargar"}
+                        </button>
                     </div>
-                ))}
+                </div>
+            </div>
+            <button
+                type="button"
+                onClick={handleResetConversation}
+                className="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-zinc-800 mb-4"
+            >
+                <Trash2 size={16} /> Reiniciar
+            </button>
+            <div
+                ref={messagesContainerRef}
+                className="h-96 bg-zinc-950 p-4 rounded-lg border border-zinc-700 overflow-y-auto flex flex-col space-y-3"
+            >
+                {isLoadingConversation && (
+                    <div className="flex-1 flex items-center justify-center">
+                        <Loader2 size={32} className="animate-spin text-zinc-400" />
+                        <p className="ml-2 text-zinc-500">Cargando mensajes...</p>
+                    </div>
+                )}
+                {!isLoadingConversation && chatMessages.length === 0 && (
+                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
+                        <MessageSquareWarning size={40} className="mb-2" />
+                        <p>
+                            {currentConversationId
+                                ? `No hay mensajes para ${currentConversationId}.`
+                                : "Inicia o carga conversación."}
+                        </p>
+                    </div>
+                )}
+                {/* //!RENDERIUZAR AQUI */}
+                {!isLoadingConversation &&
+                    chatMessages.map((msg) => (
+                        <div
+
+                            key={msg.id}
+                            className={`flex flex-col ${getMessageAlignment(msg.role)} ${msg.role === "system" ? "items-center" : ""
+                                }`}
+                        >
+                            {msg.role !== "system" ? (
+                                <div
+                                    className={`flex items-end gap-2 max-w-[75%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"
+                                        }`}
+                                >
+                                    {msg.role === "assistant" && (
+                                        <span className="flex-shrink-0 text-zinc-400 self-center p-1.5 bg-zinc-700 rounded-full">
+                                            <Bot size={16} />
+                                        </span>
+                                    )}
+                                    <div
+                                        className={`p-2.5 rounded-lg shadow ${getMessageBgColor(msg.role)} ${msg.role === "user" ? "rounded-br-none" : "rounded-bl-none"
+                                            }`}
+                                    >
+                                        {/* --- INICIO DE LA MODIFICACIÓN --- */}
+                                        {/* {msg.mensaje && (
+                                            msg.role === 'assistant' ? (
+                                                // Para mensajes del asistente, renderizar como HTML
+                                                <div
+                                                    className="text-sm prose prose-sm prose-invert max-w-none" // Clases para estilizar HTML básico con Tailwind Typography
+                                                    dangerouslySetInnerHTML={{ __html: msg.mensaje }}
+                                                />
+                                            ) : (
+                                                //! Para mensajes del usuario (u otros roles por defecto), texto plano
+                                                <p className="text-sm whitespace-pre-wrap">{msg.mensaje}</p>
+                                            )
+                                        )} */}
+                                        {/* --- //! NUEVO CÓDIGO PARA LIGHTBOX --- */}
+                                        {msg.mensaje && (
+                                            msg.role === 'assistant' ? (
+                                                <div
+                                                    className="text-sm prose prose-sm prose-invert max-w-none"
+                                                    dangerouslySetInnerHTML={{ __html: msg.mensaje }}
+                                                />
+                                            ) : (
+                                                <p className="text-sm whitespace-pre-wrap">{msg.mensaje}</p>
+                                            )
+                                        )}
+
+                                        {/* --- FIN DE LA MODIFICACIÓN --- */}
+                                    </div>
+                                    {msg.role === "user" && (
+                                        <span className="flex-shrink-0 text-blue-300 self-center p-1.5 bg-blue-800 rounded-full">
+                                            <User size={16} />
+                                        </span>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className={getMessageBgColor(msg.role)}>{msg.mensaje}</div>
+                            )}
+                            <span
+                                className={`text-xs text-zinc-500 mt-1 px-1 ${msg.role === "user"
+                                    ? "self-end"
+                                    : msg.role === "system"
+                                        ? "self-center"
+                                        : "self-start"
+                                    }`}
+                            >
+                                {new Date(msg.createdAt).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                })}
+                            </span>
+                        </div>
+                    ))}
                 <div ref={messagesEndRef} />
             </div>
-            <form onSubmit={handleSubmit} id="chatTestPanelForm" className="space-y-4 sticky bottom-0 py-2 bg-zinc-800">
-                <div><label htmlFor="mensaje" className="block text-sm font-medium text-zinc-300 mb-1">Tu Mensaje: (Simulado: <span className="font-mono text-xs text-teal-400">{remitenteIdWeb.substring(0, 13)}...</span>)</label><div className="flex items-center gap-2"><textarea id="mensaje" form="chatTestPanelForm" value={mensaje} onKeyDown={handleKeyDownSubmit} onChange={(e) => setMensaje(e.target.value)} placeholder={currentConversationId ? "Respuesta..." : "Primer mensaje..."} rows={2} className="flex-grow p-2.5 rounded-md text-sm bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-zinc-500" /><button type="submit" form="chatTestPanelForm" disabled={isSending || !mensaje.trim() || (!currentConversationId && !asistenteId.trim())} className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" aria-label="Enviar mensaje">{isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}</button></div></div>
-                {error && (<div className="p-3 rounded-md bg-red-900/30 text-red-400 border border-red-700/50 text-sm flex items-center gap-2"><MessageSquareWarning size={18} /> {error}</div>)}
-                {successMessage && (<div className="p-3 rounded-md bg-green-900/30 text-green-400 border border-green-700/50 text-sm flex items-center gap-2"><CheckCircle2 size={18} /> {successMessage}</div>)}
+            <form
+                onSubmit={handleSubmit}
+                id="chatTestPanelForm"
+                className="space-y-4 sticky bottom-0 py-2 bg-zinc-800"
+            >
+                <div>
+                    <label
+                        htmlFor="mensaje"
+                        className="block text-sm font-medium text-zinc-300 mb-1"
+                    >
+                        Tu Mensaje: (Simulado:{" "}
+                        <span className="font-mono text-xs text-teal-400">
+                            {remitenteIdWeb.substring(0, 13)}...
+                        </span>
+                        )
+                    </label>
+                    <div className="flex items-center gap-2">
+                        <textarea
+                            id="mensaje"
+                            form="chatTestPanelForm"
+                            value={mensaje}
+                            onKeyDown={handleKeyDownSubmit}
+                            onChange={(e) => setMensaje(e.target.value)}
+                            placeholder={currentConversationId ? "Respuesta..." : "Primer mensaje..."}
+                            rows={2}
+                            className="flex-grow p-2.5 rounded-md text-sm bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-zinc-500"
+                        />
+                        <button
+                            type="submit"
+                            form="chatTestPanelForm"
+                            disabled={
+                                isSending || !mensaje.trim() || (!currentConversationId && !asistenteId.trim())
+                            }
+                            className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                            aria-label="Enviar mensaje"
+                        >
+                            {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                        </button>
+                    </div>
+                </div>
+                {error && (
+                    <div className="p-3 rounded-md bg-red-900/30 text-red-400 border border-red-700/50 text-sm flex items-center gap-2">
+                        <MessageSquareWarning size={18} /> {error}
+                    </div>
+                )}
+                {successMessage && (
+                    <div className="p-3 rounded-md bg-green-900/30 text-green-400 border border-green-700/50 text-sm flex items-center gap-2">
+                        <CheckCircle2 size={18} /> {successMessage}
+                    </div>
+                )}
             </form>
+
+            {/* --- RENDERIZAR EL LIGHTBOX --- */}
+            {lightboxOpen && (
+                <Lightbox
+                    open={lightboxOpen}
+                    close={() => setLightboxOpen(false)}
+                    slides={lightboxSlides}
+                    index={lightboxIndex} // Descomentar si tienes múltiples slides y manejas un índice
+                // Opcional: Añadir plugins
+                // plugins={[Thumbnails, Zoom]}
+                />
+            )}
+
         </div>
     );
 }
