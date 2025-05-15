@@ -232,6 +232,14 @@ export async function actualizarAsistenteVirtual(asistenteId: string, asistente:
 }
 
 export async function eliminarAsistenteVirtual(asistenteVirtualId: string) {
+
+
+    // await prisma.asistenteTareaSuscripcion.deleteMany({
+    //     where: {
+    //         asistenteVirtualId
+    //     }
+    // });
+
     const tareasAsociadas = await prisma.asistenteTareaSuscripcion.findMany({
         where: {
             asistenteVirtualId
