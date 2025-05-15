@@ -26,8 +26,6 @@ import { MensajeEntrantePayload } from '@/app/admin/_lib/webhook.types'; // Impo
 import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions'; // Importar la nueva acción de IA
 import { dispatchTareaEjecutadaAction } from './ia/funcionesEjecucion.actions'; // Ajusta la ruta si es necesario
 
-
-
 /******************** CRM CHATPANEL ************************ */
 /******************** CRM CHATPANEL ************************ */
 /******************** CRM CHATPANEL ************************ */
@@ -931,6 +929,10 @@ export async function procesarMensajeEntranteAction(
                     nombreAsistente: asistente.nombre,
                     descripcionAsistente: asistente.descripcion,
                     nombreNegocio: negocioNombre,
+                    // configNegocio: {
+                    //     aceptaPresencial: asistente!.negocio?.aceptaCitasPresenciales,
+                    //     aceptaRemoto: asistente!.negocio?.aceptaCitasVirtuales,
+                    // }
                 },
                 // --- PASAR TAREAS A LA IA ---
                 tareasDisponibles: tareasDisponibles,
@@ -1201,6 +1203,8 @@ export async function iniciarConversacionWebchatAction(
             return { success: false, error: 'Datos esenciales incompletos.' };
 
         //! Obtener asistente y negocio
+        //! Obtener asistente y negocio
+        //! Obtener asistente y negocio
         const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, include: { negocio: { include: { CRM: true } } } });
 
         if (!asistente || !asistente.negocio || !asistente.negocio.CRM) return {
@@ -1228,6 +1232,8 @@ export async function iniciarConversacionWebchatAction(
 
             if (!lead) {
                 //! Crear nuevo lead si no existe
+                //! Crear nuevo lead si no existe
+                //! Crear nuevo lead si no existe
                 const primerPipelineId = await obtenerPrimerPipelineId(crmId, tx);
                 if (!primerPipelineId) {
                     throw new Error(`No se encontró una etapa de pipeline activa inicial para el CRM ${crmId}. Configure el pipeline.`);
@@ -1250,9 +1256,14 @@ export async function iniciarConversacionWebchatAction(
             const interaccionUsuario = await tx.interaccion.create({ data: { conversacionId: conversationIdVar, role: 'user', mensaje: mensajeInicial } }); interaccionUsuarioIdVar = interaccionUsuario.id; mensajeUsuarioGuardadoVar = { ...interaccionUsuario, role: 'user', createdAt: interaccionUsuario.createdAt, mensaje: interaccionUsuario.mensaje || "" };
 
             //! Obtener tareas disponibles para el asistente
+            //! Obtener tareas disponibles para el asistente
+            //! Obtener tareas disponibles para el asistente
             const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistente.id, tx);
-            console.log(`Tareas disponibles para el asistente ${asistente.nombre}:`, tareasDisponibles);
+            // console.log(`Tareas disponibles para el asistente ${asistente.nombre}:`, tareasDisponibles);
 
+            //! Llamar a la IA para generar respuesta
+            //! Llamar a la IA para generar respuesta
+            //! Llamar a la IA para generar respuesta
             const resultadoIA = await generarRespuestaAsistente({
                 historialConversacion: [],
                 mensajeUsuarioActual: mensajeInicial,
@@ -1343,6 +1354,8 @@ export async function iniciarConversacionWebchatAction(
             console.log(`Llamando dispatcher para Tarea: ${tareaEjecutadaCreadaId}`);
 
             //! Aquí llamamos al dispatcher para la tarea ejecutada
+            //! Aquí llamamos al dispatcher para la tarea ejecutada
+            //! Aquí llamamos al dispatcher para la tarea ejecutada
             const dispatchResult = await dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId);
             if (dispatchResult.success && dispatchResult.data) {
                 mensajeResultadoDispatcher = dispatchResult.data;
@@ -1374,6 +1387,7 @@ export async function iniciarConversacionWebchatAction(
 export async function enviarMensajeWebchatAction(
     input: EnviarMensajeWebchatInput
 ): Promise<ActionResult<EnviarMensajeWebchatData>> {
+
     let tareaEjecutadaCreadaId: string | null = null;
 
     try {
@@ -1405,14 +1419,16 @@ export async function enviarMensajeWebchatAction(
         let llamadaFuncionDetectadaVar: RespuestaAsistenteConHerramientas['llamadaFuncion'] = null;
 
         const estadoActual = conversacion.status;
+
         await prisma.$transaction(async (tx) => {
+
             const interaccionUsuario = await tx.interaccion.create({
                 data: { conversacionId: conversationId, role: 'user', mensaje: mensaje },
             });
             interaccionUsuarioIdVar = interaccionUsuario.id;
             mensajeUsuarioGuardadoVar = { ...interaccionUsuario, role: 'user', createdAt: interaccionUsuario.createdAt, mensaje: interaccionUsuario.mensaje || "" };
 
-            // --- CORRECCIÓN: Verificar estado ANTES de llamar a IA ---
+            // --- Verificar estado ANTES de llamar a IA ---
             if (estadoActual === 'en_espera_agente' || estadoActual === 'hitl_activo') { // Añadir otros estados de pausa si los usas
                 console.log(`[CRM Actions] Conversación ${conversationId} está en estado ${estadoActual}. No se llamará a la IA.`);
 
@@ -1420,11 +1436,9 @@ export async function enviarMensajeWebchatAction(
                 await tx.conversacion.update({
                     where: { id: conversationId }, data: { updatedAt: new Date() },
                 });
-
                 // Salir de la transacción sin llamar a IA ni dispatcher
                 return;
             }
-            // --- FIN CORRECCIÓN ---
 
             const historialInteracciones = await tx.interaccion.findMany({
                 where: { conversacionId: conversationId },
@@ -1437,8 +1451,10 @@ export async function enviarMensajeWebchatAction(
             }));
 
             const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, tx);
-            // console.log(`[CRM Actions] Tareas disponibles para el asistente ${conversacion.asistenteVirtual!.nombre}:`, tareasDisponibles);
 
+            //! recibo respuesta de IA si texto || llamada a función
+            //! recibo respuesta de IA si texto || llamada a función
+            //! recibo respuesta de IA si texto || llamada a función
 
             const resultadoIA = await generarRespuestaAsistente({
                 historialConversacion: historialParaIA.filter(h => h.role !== 'system'),
@@ -1453,6 +1469,7 @@ export async function enviarMensajeWebchatAction(
 
             if (resultadoIA.success && resultadoIA.data) {
                 const respuestaIA = resultadoIA.data;
+
                 respuestaAsistenteTextoVar = respuestaIA.respuestaTextual;
                 llamadaFuncionDetectadaVar = respuestaIA.llamadaFuncion;
 
@@ -1488,6 +1505,9 @@ export async function enviarMensajeWebchatAction(
                         tareaEjecutadaCreadaId = tareaEjecutada.id;
 
                         if (!respuestaAsistenteTextoVar) {
+                            //! Generar mensaje "procesando" función
+                            //! Generar mensaje "procesando" función
+                            //! Generar mensaje "procesando" función
                             respuestaAsistenteTextoVar = `Entendido. Procesando tu solicitud para ${llamadaFuncionDetectadaVar.nombreFuncion}.`;
                             if (!interaccionAsistenteIdVar) {
                                 const interaccionAsistenteFuncion = await tx.interaccion.create({
@@ -1517,6 +1537,9 @@ export async function enviarMensajeWebchatAction(
             });
         }); // Fin de la transacción
 
+        //! Llamar al Dispatcher si se creó una TareaEjecutada
+        //! Llamar al Dispatcher si se creó una TareaEjecutada
+        //! Llamar al Dispatcher si se creó una TareaEjecutada
         if (tareaEjecutadaCreadaId) {
             console.log(`[CRM Actions] Llamando al dispatcher para TareaEjecutada ID: ${tareaEjecutadaCreadaId}`);
             dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId).catch(dispatchError => {
@@ -1540,8 +1563,6 @@ export async function enviarMensajeWebchatAction(
         return { success: false, error: error instanceof Error ? error.message : 'Error interno al enviar el mensaje en webchat.' };
     }
 }
-
-
 
 async function obtenerTareasCapacidadParaAsistente(asistenteId: string, tx: Prisma.TransactionClient): Promise<TareaCapacidadIA[]> {
     const suscripcionesTareas = await tx.asistenteTareaSuscripcion.findMany({
@@ -1580,7 +1601,6 @@ async function obtenerTareasCapacidadParaAsistente(asistenteId: string, tx: Pris
                 // Filtrar por si acaso parametroRequerido es null
                 .filter(p => p.parametroRequerido)
                 .map(p => {
-                    // --- CORRECCIÓN AQUÍ ---
                     // Usar ?? para asegurar que siempre haya un string, incluso si ambos son null/undefined
                     const nombreParam = (p.parametroRequerido.nombreInterno ?? p.parametroRequerido.nombreVisible) ?? '';
                     if (nombreParam === '') {
@@ -1625,7 +1645,7 @@ async function obtenerTareasCapacidadParaAsistente(asistenteId: string, tx: Pris
         tareasCapacidad.push({
             id: tareaDb.id,
             nombre: tareaDb.nombre,
-            descripcion: tareaDb.descripcion,
+            descripcionTool: tareaDb.descripcion,
             instruccionParaIA: tareaDb.instruccion,
             funcionHerramienta: funcionHerramienta,
             camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,

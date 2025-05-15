@@ -164,7 +164,7 @@ export interface FuncionHerramientaIA {
 export interface TareaCapacidadIA {
     id: string; // ID de la Tarea original
     nombre?: string; // Nombre de la Tarea
-    descripcion?: string | null; // Descripción de la Tarea (para IA/OpenAPI)
+    descripcionTool?: string | null; // Descripción de la Tarea (para IA/OpenAPI)
     instruccionParaIA?: string | null; // La 'instruccion' detallada de la Tarea
     funcionHerramienta?: FuncionHerramientaIA | null; // La función de automatización asociada, si existe
     // NUEVO: Campos personalizados del CRM requeridos específicamente por ESTA TAREA
@@ -181,7 +181,10 @@ export interface GenerarRespuestaAsistenteConHerramientasInput {
         nombreAsistente: string;
         descripcionAsistente?: string | null;
         nombreNegocio: string;
-        // Podrías añadir más contexto del negocio aquí si es necesario
+        // configNegocio: {
+        //     aceptaPresencial: boolean | undefined;
+        //     aceptaRemoto: boolean | undefined;
+        // }
     };
     tareasDisponibles: TareaCapacidadIA[]; // Lista de tareas/herramientas que el asistente puede usar
     // Opcional: Podríamos pasar aquí los datos actuales del Lead (incluyendo jsonParams con campos personalizados ya llenos)

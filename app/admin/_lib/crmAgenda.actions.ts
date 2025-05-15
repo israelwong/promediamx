@@ -7,53 +7,15 @@ import {
     ObtenerCitasLeadResult, CrearCitaResult, EditarCitaResult, EliminarCitaResult,
     ObtenerDatosFormularioCitaResult, DatosFormularioCita, CalendarEvent,
     ActionResult, AgendaData
-} from './types'; // Ajusta ruta
+} from './types';
 import { Prisma } from '@prisma/client';
 
-/**
- * Obtiene las citas (registros de Agenda) asociadas a un Lead específico.
- * @param leadId - El ID del Lead.
- * @returns Objeto con la lista de citas existentes.
- */
-export async function obtenerCitasLead(leadId: string): Promise<ObtenerCitasLeadResult> {
-    if (!leadId) {
-        return { success: false, error: "ID de Lead no proporcionado." };
-    }
-    try {
-        const citas = await prisma.agenda.findMany({
-            where: { leadId: leadId },
-            include: {
-                agente: { select: { id: true, nombre: true, email: true } }
-            },
-            orderBy: { fecha: 'desc' }
-        });
+import {
+    CitaDelDia,
+    ObtenerCitasDelDiaResult,
+    StatusAgenda // Importar el enum
+} from './crmAgenda.type'; // Desde el nuevo archivo de tipos
 
-        // Mapear para asegurar el tipo y formato
-        const citasFormateadas: CitaExistente[] = citas.map(cita => ({
-            id: cita.id,
-            tipo: cita.tipo,
-            asunto: cita.asunto,
-            fecha: cita.fecha,
-            status: cita.status,
-            descripcion: cita.descripcion,
-            meetingUrl: cita.meetingUrl,
-            fechaRecordatorio: cita.fechaRecordatorio, // <-- Incluir fechaRecordatorio
-            agenteId: cita.agenteId,
-            agente: cita.agente ? { id: cita.agente.id, nombre: cita.agente.nombre || cita.agente.email } : null
-        }));
-
-        return { success: true, data: citasFormateadas };
-
-    } catch (error) {
-        console.error(`Error fetching citas for lead ${leadId}:`, error);
-        return { success: false, error: 'No se pudieron obtener las citas.' };
-    }
-}
-/**
- * Obtiene los datos necesarios para el formulario de nueva cita (lista de agentes Y crmId).
- * @param negocioId - El ID del negocio para encontrar el CRM asociado.
- * @returns Objeto con la lista de agentes disponibles y el crmId.
- */
 export async function obtenerDatosParaFormularioCita(negocioId: string): Promise<ObtenerDatosFormularioCitaResult> {
     if (!negocioId) {
         return { success: false, error: "ID de negocio no proporcionado." };
@@ -158,8 +120,8 @@ export async function crearCitaLead(
         });
 
         const citaCreada: CitaExistente = {
-            id: newCita.id, tipo: newCita.tipo, asunto: newCita.asunto, fecha: newCita.fecha, status: newCita.status, descripcion: newCita.descripcion, meetingUrl: newCita.meetingUrl, fechaRecordatorio: newCita.fechaRecordatorio, agenteId: newCita.agenteId,
-            agente: newCita.agente ? { id: newCita.agente.id, nombre: newCita.agente.nombre || newCita.agente.email } : null
+            id: newCita.id, asunto: newCita.asunto, fecha: newCita.fecha.toISOString(), status: newCita.status, descripcion: newCita.descripcion, meetingUrl: newCita.meetingUrl, fechaRecordatorio: newCita.fechaRecordatorio ? newCita.fechaRecordatorio.toISOString() : null, agenteId: newCita.agenteId,
+            // Removed duplicate agenteId property
         };
         return { success: true, data: citaCreada };
 
@@ -228,8 +190,9 @@ export async function editarCitaLead(
         });
 
         const citaActualizada: CitaExistente = {
-            id: updatedCita.id, tipo: updatedCita.tipo, asunto: updatedCita.asunto, fecha: updatedCita.fecha, status: updatedCita.status, descripcion: updatedCita.descripcion, meetingUrl: updatedCita.meetingUrl, fechaRecordatorio: updatedCita.fechaRecordatorio, agenteId: updatedCita.agenteId,
-            agente: updatedCita.agente ? { id: updatedCita.agente.id, nombre: updatedCita.agente.nombre || updatedCita.agente.email } : null
+            id: updatedCita.id, asunto: updatedCita.asunto, fecha: updatedCita.fecha.toISOString(), status: updatedCita.status, descripcion: updatedCita.descripcion, meetingUrl: updatedCita.meetingUrl, fechaRecordatorio: updatedCita.fechaRecordatorio ? updatedCita.fechaRecordatorio.toISOString() : null, agenteId: updatedCita.agenteId,
+            // Remove the agente property to match the CitaExistente type
+            // agente: updatedCita.agente ? { id: updatedCita.agente.id, nombre: updatedCita.agente.nombre || updatedCita.agente.email } : null
         };
         return { success: true, data: citaActualizada };
 
@@ -252,8 +215,6 @@ export async function eliminarCitaLead(citaId: string): Promise<EliminarCitaResu
         return { success: false, error: 'No se pudo eliminar la cita.' };
     }
 }
-
-
 
 
 export async function obtenerEventosAgenda(
@@ -346,5 +307,170 @@ export async function obtenerEventosAgenda(
         console.error(`Error fetching agenda events for negocio ${negocioId}:`, error);
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido.';
         return { success: false, error: `No se pudieron obtener los eventos de la agenda: ${errorMessage}` };
+    }
+}
+
+
+
+// --- NUEVA SERVER ACTION: Obtener Citas del Día por Negocio ID ---
+export async function obtenerCitasDelDiaPorNegocio(
+    negocioId: string,
+    fechaEspecifica: Date // El día para el cual obtener las citas
+): Promise<ObtenerCitasDelDiaResult> {
+    if (!negocioId) {
+        return { success: false, error: "ID de Negocio no proporcionado." };
+    }
+    if (!fechaEspecifica) {
+        return { success: false, error: "Fecha no proporcionada." };
+    }
+
+    try {
+        const inicioDelDia = new Date(fechaEspecifica);
+        inicioDelDia.setHours(0, 0, 0, 0);
+
+        const finDelDia = new Date(fechaEspecifica);
+        finDelDia.setHours(23, 59, 59, 999);
+
+        const citasPrisma = await prisma.agenda.findMany({
+            where: {
+                // Filtramos por las agendas cuyo tipo de cita pertenece al negocioId
+                tipoDeCita: {
+                    negocioId: negocioId,
+                },
+                // Y cuya fecha está dentro del día especificado
+                fecha: {
+                    gte: inicioDelDia,
+                    lte: finDelDia,
+                },
+            },
+            include: {
+                lead: { select: { id: true, nombre: true } },
+                agente: { select: { id: true, nombre: true, email: true } },
+                asistente: { select: { id: true, nombre: true } }, // Asumiendo que AsistenteVirtual tiene 'nombre'
+                tipoDeCita: { select: { nombre: true, limiteConcurrencia: true } },
+            },
+            orderBy: {
+                fecha: 'asc', // Orden cronológico
+            },
+        });
+
+        const citasDelDia: CitaDelDia[] = citasPrisma.map(cita => {
+            let asignadoANombre: string | null = null;
+            let asignadoATipo: 'agente' | 'asistente' | null = null;
+
+            if (cita.agente) {
+                asignadoANombre = cita.agente.nombre || cita.agente.email;
+                asignadoATipo = 'agente';
+            } else if (cita.asistente) {
+                asignadoANombre = cita.asistente.nombre; // Asumiendo que AsistenteVirtual tiene 'nombre'
+                asignadoATipo = 'asistente';
+            }
+
+            return {
+                id: cita.id,
+                fecha: cita.fecha,
+                asunto: cita.asunto,
+                status: cita.status as StatusAgenda, // Castear al enum
+                leadNombre: cita.lead?.nombre || null,
+                leadId: cita.lead?.id,
+                tipoDeCitaNombre: cita.tipoDeCita?.nombre || null,
+                tipoDeCitaLimiteConcurrencia: cita.tipoDeCita?.limiteConcurrencia ?? null,
+                asignadoANombre: asignadoANombre,
+                asignadoATipo: asignadoATipo,
+                descripcion: cita.descripcion,
+                meetingUrl: cita.meetingUrl,
+                fechaRecordatorio: cita.fechaRecordatorio,
+            };
+        });
+
+        return { success: true, data: citasDelDia };
+
+    } catch (error) {
+        console.error(`Error fetching citas del día para negocio ${negocioId}:`, error);
+        return { success: false, error: 'No se pudieron obtener las citas del día.' };
+    }
+}
+
+// ... (el resto de tus funciones existentes como obtenerEventosAgenda, etc., se mantienen aquí abajo)
+// Asegúrate de copiar el resto de tus funciones existentes en este archivo.
+// Por ejemplo, la función obtenerCitasLead:
+export async function obtenerCitasLead(leadId: string): Promise<ObtenerCitasLeadResult> {
+    // ... (código original de esta función)
+    if (!leadId) { return { success: false, error: "ID de Lead no proporcionado." }; }
+    try {
+        const citas = await prisma.agenda.findMany({
+            where: { leadId: leadId },
+            include: { agente: { select: { id: true, nombre: true, email: true } } },
+            orderBy: { fecha: 'desc' }
+        });
+        const citasFormateadas: CitaExistente[] = citas.map(cita => ({
+            id: cita.id, tipo: cita.tipo, asunto: cita.asunto, fecha: cita.fecha.toISOString(), status: cita.status, descripcion: cita.descripcion, meetingUrl: cita.meetingUrl, fechaRecordatorio: cita.fechaRecordatorio ? cita.fechaRecordatorio.toISOString() : null, agenteId: cita.agenteId,
+            agente: cita.agente ? { id: cita.agente.id, nombre: cita.agente.nombre || cita.agente.email } : null
+        }));
+        return { success: true, data: citasFormateadas };
+    } catch (error) {
+        console.error(`Error fetching citas for lead ${leadId}:`, error);
+        return { success: false, error: 'No se pudieron obtener las citas.' };
+    }
+}
+// (Y así con el resto de funciones que ya tenías)
+
+/**
+ * Obtiene todas las citas agendadas de un negocio.
+ * @param negocioId - El ID del negocio.
+ * @returns Objeto con el resultado y las citas agendadas si tuvo éxito.
+ */
+export async function obtenerTodasLasCitasDelNegocio(
+    negocioId: string
+): Promise<ActionResult<CitaExistente[]>> {
+    if (!negocioId) {
+        return { success: false, error: "ID de negocio no proporcionado." };
+    }
+
+    try {
+        // Buscar el CRM asociado al negocio
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId },
+            select: { id: true } // Solo necesitamos el ID del CRM
+        });
+
+        if (!crm) {
+            console.log(`CRM no encontrado para negocioId ${negocioId}.`);
+            return { success: true, data: [] }; // Devolver éxito con lista vacía
+        }
+
+        // Buscar todas las citas asociadas al CRM
+        const citas = await prisma.agenda.findMany({
+            where: {
+                lead: { crmId: crm.id } // Filtrar por crmId a través de la relación con Lead
+            },
+            include: {
+                lead: { select: { id: true, nombre: true } },
+                agente: { select: { id: true, nombre: true, email: true } }
+            },
+            orderBy: { fecha: 'asc' } // Ordenar cronológicamente
+        });
+
+        // Formatear las citas al tipo CitaExistente
+        const citasFormateadas: CitaExistente[] = citas.map(cita => ({
+            id: cita.id,
+            tipo: cita.tipo,
+            asunto: cita.asunto,
+            fecha: cita.fecha.toISOString(), // Convertir a string
+            status: cita.status,
+            descripcion: cita.descripcion,
+            meetingUrl: cita.meetingUrl,
+            fechaRecordatorio: cita.fechaRecordatorio ? cita.fechaRecordatorio.toISOString() : null, // Convertir a string si no es null
+            agenteId: cita.agenteId,
+            agente: cita.agente
+                ? { id: cita.agente.id, nombre: cita.agente.nombre || cita.agente.email }
+                : null
+        }));
+
+        return { success: true, data: citasFormateadas };
+
+    } catch (error) {
+        console.error(`Error fetching all citas for negocio ${negocioId}:`, error);
+        return { success: false, error: 'No se pudieron obtener las citas del negocio.' };
     }
 }

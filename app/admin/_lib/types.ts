@@ -1,13 +1,22 @@
 // Ruta actual del archivo desde app: admin/_lib/types.ts
 
 // Tipo para mostrar una cita existente en la lista
-export type CitaExistente = Pick<
-    Agenda,
-    'id' | 'tipo' | 'asunto' | 'fecha' | 'status' | 'descripcion' | 'meetingUrl' | 'fechaRecordatorio'
-> & {
-    agente?: Pick<Agente, 'id' | 'nombre'> | null;
+export interface CitaExistente {
+    id: string;
+    fecha: string;
+    asunto: string;
+    status: string;
+    descripcion?: string | null;
+    meetingUrl?: string | null;
+    fechaRecordatorio?: string | null;
+    leadId?: string | null;
     agenteId?: string | null;
-};
+    asistenteId?: string | null;
+    tipoDeCitaId?: string | null;
+    leadNombre?: string | null;
+    asignadoANombre?: string | null;
+    tipoDeCitaNombre?: string | null; // Added property
+}
 
 // Tipo para los datos del formulario de nueva cita
 export type NuevaCitaFormData = Pick<
@@ -380,8 +389,8 @@ export interface TareaFuncionParametroRequerido {
 export type ActualizarTareaConRelacionesInput = Partial<Pick<Tarea,
     'nombre' |
     'descripcion' |
+    'descripcionTool' |
     'instruccion' |
-    'trigger' |
     'precio' |
     'rol' |
     'personalidad' |
@@ -626,7 +635,7 @@ export interface Tarea {
     nombre: string;
     descripcion?: string | null;
     instruccion?: string | null;
-    trigger?: string | null;
+    descripcionTool?: string | null; // Descripción para el tooltip
     tareaFuncionId?: string | null; // ID de la función de automatización asociada
     tareaFuncion?: TareaFuncion | null; // Relación con TareaFuncion (opcional)
     precio?: number | null; // Float? -> number | null

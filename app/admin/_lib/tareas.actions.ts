@@ -1,22 +1,36 @@
 'use server'
 import prisma from './prismaClient'
 import { Prisma } from '@prisma/client'
-import { mejorarTareaConGemini } from '@/scripts/gemini/mejorarTarea' // Ajusta la ruta según tu estructura
+// import {
+// Tarea,
+// TareaFuncion,
+// ParametroRequerido,
+// CrearTareaBasicaInput,
+// ActualizarTareaConRelacionesInput,
+// TareaParaEditar,
+// TareaParaMarketplace,
+// ActionResult,
+// TareaConDetalles,
+// CategoriaTareaSimple,
+// OrdenarTareasInput,
+// CanalConversacionalSimple,
+// } from './types'
+
 import {
+    TareaConDetalles,
+    CategoriaTareaSimple,
+    OrdenarTareasInput,
+    ActionResult,
     Tarea,
     TareaFuncion,
     ParametroRequerido,
     CrearTareaBasicaInput,
     ActualizarTareaConRelacionesInput,
     TareaParaEditar,
-    SugerenciasTarea,
     TareaParaMarketplace,
-    ActionResult,
-    TareaConDetalles,
-    CategoriaTareaSimple,
-    OrdenarTareasInput,
     CanalConversacionalSimple,
-} from './types'
+
+} from './tareas.type'
 
 /************************************ */
 
@@ -52,64 +66,6 @@ export async function obtenerTareasActivas() {
     }
 }
 
-
-// --- Crear Tarea (Versión Ultra-Simplificada) ---
-// export async function crearTarea(
-//     inputData: CrearTareaBasicaInput
-// ): Promise<{ success: boolean; data?: Tarea; error?: string }> {
-//     try {
-//         // 1. Validación estricta en el servidor
-//         if (!inputData.nombre?.trim()) return { success: false, error: "Nombre es requerido." };
-//         if (!inputData.categoriaTareaId) return { success: false, error: "Categoría es requerida." };
-//         if (!inputData.canalConversacionalId) return { success: false, error: "Canal principal es requerido." };
-
-//         // 2. Calcular orden (dentro de la categoría)
-//         const ultimoOrden = await prisma.tarea.aggregate({
-//             _max: { orden: true },
-//             where: { categoriaTareaId: inputData.categoriaTareaId }
-//         });
-//         const nuevoOrden = (ultimoOrden._max.orden ?? -1) + 1;
-
-//         // 3. Construir objeto de datos *mínimo* para Prisma.TareaCreateInput
-//         const dataToCreate: Prisma.TareaCreateInput = {
-//             nombre: inputData.nombre.trim(),
-//             CategoriaTarea: { connect: { id: inputData.categoriaTareaId } },
-//             orden: nuevoOrden,
-//             version: 1.0, // Valor inicial por defecto
-//             status: 'activo', // Valor inicial por defecto
-//             // El resto de campos (descripcion, funcion, instruccion, etc.) quedan null/default
-//         };
-
-//         // 4. Ejecutar transacción para crear Tarea y asociar Canal Principal
-//         const nuevaTarea = await prisma.$transaction(async (tx) => {
-//             // Crear la Tarea base
-//             const tareaCreada = await tx.tarea.create({ data: dataToCreate });
-
-//             // Asociar el canal principal (obligatorio)
-//             await tx.tareaCanal.create({
-//                 data: {
-//                     tareaId: tareaCreada.id,
-//                     canalConversacionalId: inputData.canalConversacionalId,
-//                 }
-//             });
-//             // No se asocian etiquetas ni función aquí
-
-//             return tareaCreada;
-//         });
-
-//         // 5. Devolver resultado
-//         return { success: true, data: nuevaTarea as Tarea };
-
-//     } catch (error: unknown) {
-//         console.error('Error al crear la tarea:', error);
-//         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-//             // Asumiendo que 'nombre' es unique
-//             return { success: false, error: `El nombre de tarea '${inputData.nombre}' ya existe.` };
-//         }
-//         return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
-//     }
-// }
-
 // --- Actualizar Tarea (Manejando Relaciones M-N) ---
 export async function actualizarTarea(
     tareaId: string,
@@ -127,8 +83,8 @@ export async function actualizarTarea(
         const dataToUpdateTarea: Prisma.TareaUpdateInput = {
             nombre: data.nombre.trim(),
             descripcion: data.descripcion?.trim() ?? null,
+            descripcionTool: data.descripcionTool?.trim() ?? null,
             instruccion: data.instruccion?.trim() ?? null,
-            trigger: data.trigger?.trim() ?? null,
             precio: data.precio ?? null,
             rol: data.rol?.trim() ?? null,
             personalidad: data.personalidad?.trim() ?? null,
@@ -199,7 +155,7 @@ export async function actualizarTarea(
         console.error(`Error al actualizar la tarea ${tareaId}:`, error);
         if (error instanceof Prisma.PrismaClientKnownRequestError) {
             if (error.code === 'P2002') { // Error de unicidad
-                throw new Error(`El nombre de tarea '${data.nombre}' o el trigger '${data.trigger}' ya existen.`);
+                throw new Error(`El nombre de tarea '${data.nombre}' ya existe.`);
             }
             if (error.code === 'P2025') { // Registro no encontrado para actualizar/conectar
                 throw new Error(`No se encontró la tarea, categoría o función especificada.`);
@@ -213,13 +169,25 @@ export async function eliminarTarea(tareaId: string): Promise<{ success: boolean
     try {
         if (!tareaId) return { success: false, error: "ID de tarea no proporcionado." };
 
-        const suscripcionesCount = await prisma.asistenteTareaSuscripcion.count({
+        //!-- Validación de suscripciones (opcional) --
+        // const suscripcionesCount = await prisma.asistenteTareaSuscripcion.count({
+        //     where: { tareaId: tareaId }
+        // });
+
+        // if (suscripcionesCount > 0) {
+        //     return { success: false, error: `No se puede eliminar: ${suscripcionesCount} asistente(s) están suscritos a esta tarea.` };
+        // }
+
+
+        // Eliminar tareas ejecutadas asociadas antes de eliminar la tarea
+        await prisma.tareaEjecutada.deleteMany({
             where: { tareaId: tareaId }
         });
 
-        if (suscripcionesCount > 0) {
-            return { success: false, error: `No se puede eliminar: ${suscripcionesCount} asistente(s) están suscritos a esta tarea.` };
-        }
+        // Desuscribir tareas de asistentes antes de eliminar
+        await prisma.asistenteTareaSuscripcion.deleteMany({
+            where: { tareaId: tareaId }
+        });
 
         await prisma.tarea.delete({
             where: { id: tareaId }
@@ -283,125 +251,6 @@ export async function obtenerTareaPorId(tareaId: string): Promise<TareaParaEdita
     }
 }
 
-
-// --- Mejorar Tarea con Gemini ---
-// Interfaz auxiliar para las sugerencias
-
-// --- Tipo para los parámetros (Añadir a types.ts si no existe) ---
-// Definición necesaria para el mapeo
-interface ParametroInput {
-    nombre: string;
-    tipoDato: string;
-    descripcion?: string | null;
-    esRequerido: boolean; // Incluir si se necesita enviar a Gemini
-}
-// ---------------------------------------------------------------
-
-// --- Tipo para los parámetros (Añadir a types.ts si no existe) ---
-// Definición necesaria para el mapeo
-interface ParametroInput {
-    nombre: string;
-    tipoDato: string;
-    descripcion?: string | null;
-    esRequerido: boolean; // Incluir si se necesita enviar a Gemini
-}
-// ---------------------------------------------------------------
-
-// Esta es la función que se llama desde el componente TareaEditarForm
-export async function mejorarTareaGemini(tareaId: string): Promise<SugerenciasTarea | null> {
-
-    try {
-        console.log('Inicio de solicitud de mejora para tarea ID:', tareaId);
-
-        // 1. Obtener datos de la tarea y sus relaciones
-        const tarea = await prisma.tarea.findUnique({
-            where: { id: tareaId },
-            include: {
-                CategoriaTarea: { select: { nombre: true } },
-                tareaFuncion: {
-                    include: {
-                        parametrosRequeridos: {
-                            select: {
-                                esObligatorio: true,
-                                parametroRequerido: {
-                                    select: { nombreInterno: true, tipoDato: true, descripcion: true, nombreVisible: true }
-                                }
-                            }
-                        }
-                    }
-                },
-            }
-        });
-
-        if (!tarea) {
-            throw new Error('La tarea no existe');
-        }
-
-        // 2. Mapear parámetros estándar (si existen)
-        const parametrosEstandar: ParametroInput[] = tarea.tareaFuncion?.parametrosRequeridos.map(
-            (p) => ({
-                nombre: p.parametroRequerido?.nombreInterno ?? 'desconocido',
-                tipoDato: p.parametroRequerido?.tipoDato ?? 'texto',
-                descripcion: p.parametroRequerido?.descripcion ?? p.parametroRequerido?.nombreVisible ?? '',
-                esRequerido: p.esObligatorio ?? false,
-            })
-        ) || [];
-
-        const todosLosParametros = parametrosEstandar; // Por ahora solo estándar
-
-        // 3. Preparar datos para la función que llama a Gemini
-        const dataParaGemini = {
-            nombre_tarea: tarea.nombre,
-            descripcion_tarea: tarea.descripcion ?? null,
-            nombre_categoria: tarea.CategoriaTarea?.nombre ?? null,
-            rol_asignado: tarea.rol ?? null,
-            personalidad_asistente: tarea.personalidad ?? null,
-            nombre_funcion_automatizacion: tarea.tareaFuncion?.nombreInterno ?? null,
-            parametros: todosLosParametros,
-            instruccion_a_mejorar: tarea.instruccion?.trim() ?? null
-        };
-
-        console.log('Datos preparados para enviar a mejorarTareaConGemini:', JSON.stringify(dataParaGemini, null, 2));
-
-        // 4. Llamar a la función que interactúa con Gemini
-        // Asumimos que esta función ahora devuelve el OBJETO PARSEADO o null
-        const sugerenciasObjeto = await mejorarTareaConGemini( // Renombrado de sugerenciasString
-            dataParaGemini.nombre_tarea,
-            dataParaGemini.descripcion_tarea,
-            dataParaGemini.nombre_categoria,
-            dataParaGemini.rol_asignado,
-            dataParaGemini.personalidad_asistente,
-            dataParaGemini.nombre_funcion_automatizacion,
-            dataParaGemini.parametros,
-            dataParaGemini.instruccion_a_mejorar
-        );
-
-        // 5. Validar y devolver las sugerencias (ya no se necesita parsear)
-        if (sugerenciasObjeto) {
-            console.log('Sugerencias recibidas (objeto):', sugerenciasObjeto);
-            // Validar estructura básica del objeto recibido
-            if (typeof sugerenciasObjeto.sugerencia_instruccion === 'undefined' ||
-                typeof sugerenciasObjeto.sugerencia_descripcion === 'undefined' || // Añadir checks para otras claves
-                typeof sugerenciasObjeto.sugerencia_rol === 'undefined' ||
-                typeof sugerenciasObjeto.sugerencia_personalidad === 'undefined') {
-                console.error("El objeto recibido de mejorarTareaConGemini no tiene la estructura esperada:", sugerenciasObjeto);
-                throw new Error("La respuesta de mejora no contiene la estructura esperada.");
-            }
-            // El objeto ya es del tipo SugerenciasTarea (o compatible)
-            return sugerenciasObjeto;
-        } else {
-            console.warn("mejorarTareaConGemini devolvió null.");
-            return null; // Devolver null si no hubo respuesta
-        }
-
-    } catch (error: unknown) {
-        // 6. Manejo de errores
-        console.error('Error en el proceso de mejorar tarea (acción intermediaria):', error);
-        // Relanzar el error para que el componente lo capture
-        throw new Error(`Error al solicitar mejora: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-}
-
 // --- Funciones auxiliares (sin cambios) ---
 export async function obtenerCategorias() {
     try { return await prisma.categoriaTarea.findMany({ orderBy: { orden: 'asc' } }); }
@@ -440,23 +289,6 @@ export async function actualizarInstruccionTarea(tareaId: string, nuevaInstrucci
     }
 }
 
-// --- Funciones de validación de Trigger (sin cambios) ---
-export async function validarNombreActivadorTarea(nombreActivador: string) {
-    try { return await prisma.tarea.findFirst({ where: { trigger: nombreActivador } }); }
-    catch (error) { console.error(error); throw new Error('Error al validar el nombre del activador'); }
-}
-export async function validarYActualizarTriggerTarea(tareaId: string, nuevoTrigger: string) {
-    try {
-        const triggerLimpio = nuevoTrigger.trim();
-        if (!triggerLimpio) {
-            return await prisma.tarea.update({ where: { id: tareaId }, data: { trigger: null } });
-        }
-        const tareaExistente = await prisma.tarea.findFirst({ where: { trigger: triggerLimpio, id: { not: tareaId } } });
-        if (tareaExistente) throw new Error('El nombre del trigger ya está en uso.');
-        return await prisma.tarea.update({ where: { id: tareaId }, data: { trigger: triggerLimpio } });
-    } catch (error) { console.error(error); throw error; }
-}
-
 // --- OBTENER FUNCIONES TAREA DISPONIBLES (sin cambios) ---
 export async function obtenerFuncionesTareaDisponibles(): Promise<Pick<TareaFuncion, 'id' | 'nombreVisible' | 'nombreInterno'>[]> {
     try {
@@ -467,8 +299,6 @@ export async function obtenerFuncionesTareaDisponibles(): Promise<Pick<TareaFunc
     } catch (error) { console.error(error); throw new Error('No se pudieron obtener las funciones disponibles.'); }
 }
 
-// --- OBTENER PARÁMETROS DE UNA FUNCIÓN ESPECÍFICA (sin cambios) ---
-// Asegúrate que ParametroRequerido en types.ts está actualizado
 export async function obtenerParametrosPorFuncionId(funcionId: string): Promise<ParametroRequerido[]> {
     if (!funcionId) return [];
     try {
@@ -557,121 +387,180 @@ export async function obtenerTareasParaMarketplace(): Promise<TareaParaMarketpla
 }
 
 // --- Obtener Tareas para la Lista (Adaptada a Tipo Explícito) ---
-export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConDetalles[]>> {
-    try {
-        const tareas = await prisma.tarea.findMany({
-            orderBy: [
-                { orden: 'asc' },
-                { nombre: 'asc' }
-            ],
-            select: { // Seleccionar explícitamente para asegurar la estructura
-                id: true,
-                nombre: true,
-                status: true,
-                precio: true,
-                orden: true,
-                iconoUrl: true,
-                categoriaTareaId: true, // Incluir FK
-                tareaFuncionId: true,   // Incluir FK
-                // Seleccionar relaciones necesarias
-                CategoriaTarea: {
-                    select: {
-                        nombre: true,
-                        color: true
-                    }
-                },
-                tareaFuncion: {
-                    select: {
-                        id: true,
-                        nombreVisible: true
-                    }
-                },
-                etiquetas: {
-                    select: { // Seleccionar la estructura anidada
-                        etiquetaTarea: {
-                            select: {
-                                id: true,
-                                nombre: true
-                            }
-                        }
-                    }
-                },
-                // Seleccionar conteos necesarios
-                _count: {
-                    select: {
-                        TareaGaleria: true,
-                        TareaEjecutada: true
-                    }
-                }
-                // Añade otros campos escalares de Tarea si los necesitas
-            }
-        });
+// export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConDetalles[]>> {
+//     try {
+//         const tareas = await prisma.tarea.findMany({
+//             orderBy: [
+//                 { orden: 'asc' },
+//                 { nombre: 'asc' }
+//             ],
+//             select: { // Seleccionar explícitamente para asegurar la estructura
+//                 id: true,
+//                 nombre: true,
+//                 status: true,
+//                 precio: true,
+//                 orden: true,
+//                 iconoUrl: true,
+//                 categoriaTareaId: true, // Incluir FK
+//                 tareaFuncionId: true,   // Incluir FK
+//                 // Seleccionar relaciones necesarias
+//                 CategoriaTarea: {
+//                     select: {
+//                         nombre: true,
+//                         color: true
+//                     }
+//                 },
+//                 tareaFuncion: {
+//                     select: {
+//                         id: true,
+//                         nombreVisible: true
+//                     }
+//                 },
+//                 etiquetas: {
+//                     select: { // Seleccionar la estructura anidada
+//                         etiquetaTarea: {
+//                             select: {
+//                                 id: true,
+//                                 nombre: true
+//                             }
+//                         }
+//                     }
+//                 },
+//                 // Seleccionar conteos necesarios
+//                 _count: {
+//                     select: {
+//                         TareaGaleria: true,
+//                         TareaEjecutada: true
+//                     }
+//                 }
+//                 // Añade otros campos escalares de Tarea si los necesitas
+//             }
+//         });
 
-        // Prisma devuelve los tipos correctos (con | null), que coinciden
-        // con nuestra definición explícita de TareaConDetalles.
-        // El casteo es seguro si la definición manual y el select coinciden.
-        return { success: true, data: tareas as TareaConDetalles[] };
+//         return { success: true, data: tareas as TareaConDetalles[] };
 
-    } catch (error: unknown) {
-        console.error('Error fetching tasks with details:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Error desconocido al obtener tareas.';
-        return { success: false, error: `No se pudieron obtener las tareas: ${errorMessage}` };
-    }
-}
+//     } catch (error: unknown) {
+//         console.error('Error fetching tasks with details:', error);
+//         const errorMessage = error instanceof Error ? error.message : 'Error desconocido al obtener tareas.';
+//         return { success: false, error: `No se pudieron obtener las tareas: ${errorMessage}` };
+//     }
+// }
 
-// --- Obtener Categorías para Filtro (Adaptada a Tipo Explícito) ---
+// --- Actualizar Orden Tareas (Adaptada a Tipo Explícito) ---
+// export async function actualizarOrdenTareas(tareasOrdenadas: OrdenarTareasInput): Promise<ActionResult> {
+//     if (!Array.isArray(tareasOrdenadas)) {
+//         return { success: false, error: "Datos de ordenamiento inválidos." };
+//     }
+
+//     try {
+//         const actualizaciones = tareasOrdenadas.map(tarea =>
+//             prisma.tarea.update({
+//                 where: { id: tarea.id },
+//                 data: { orden: tarea.orden } // Guarda el orden 0-based
+//             })
+//         );
+//         await prisma.$transaction(actualizaciones);
+
+//         console.log('Orden de tareas actualizado correctamente');
+//         return { success: true, data: null };
+
+//     } catch (error: unknown) {
+//         console.error('Error al actualizar el orden de las tareas:', error);
+//         let errorMessage = 'Error desconocido al actualizar orden.';
+//         if (error instanceof Prisma.PrismaClientKnownRequestError) {
+//             errorMessage = `Error de base de datos: ${error.code}`;
+//         } else if (error instanceof Error) {
+//             errorMessage = error.message;
+//         }
+//         return { success: false, error: `Error al actualizar orden: ${errorMessage}` };
+//     }
+// }
+
+// --- Obtener Categorías para Filtro/Dropdown (Adaptada) ---
 // export async function obtenerCategoriasParaFiltro(): Promise<ActionResult<CategoriaTareaSimple[]>> {
 //     try {
 //         const categorias = await prisma.categoriaTarea.findMany({
 //             select: {
 //                 id: true,
 //                 nombre: true,
-//                 color: true
+//                 color: true // Seleccionar color por si se usa
 //             },
 //             orderBy: {
-//                 orden: 'asc',
+//                 orden: 'asc', // O por nombre si prefieres
 //             }
 //         });
-//         // El tipo devuelto coincide con CategoriaTareaSimple[]
 //         return { success: true, data: categorias };
 //     } catch (error: unknown) {
 //         console.error('Error al obtener categorías para filtro:', error);
 //         const errorMessage = error instanceof Error ? error.message : 'Error desconocido.';
-//         return { success: false, error: `No se pudieron obtener las categorías para el filtro: ${errorMessage}` };
+//         return { success: false, error: `No se pudieron obtener las categorías: ${errorMessage}` };
 //     }
 // }
 
-// --- Actualizar Orden Tareas (Adaptada a Tipo Explícito) ---
-export async function actualizarOrdenTareas(tareasOrdenadas: OrdenarTareasInput): Promise<ActionResult> {
-    if (!Array.isArray(tareasOrdenadas)) {
-        return { success: false, error: "Datos de ordenamiento inválidos." };
-    }
+// --- Crear Tarea (Adaptada) ---
+// Usa CrearTareaBasicaInput y devuelve ActionResult<Tarea>
+// export async function crearTarea(
+//     inputData: CrearTareaBasicaInput
+// ): Promise<ActionResult<Tarea>> { // Devuelve ActionResult con la Tarea creada
+//     try {
+//         // 1. Validación estricta en el servidor (redundante con cliente, pero buena práctica)
+//         if (!inputData.nombre?.trim()) return { success: false, error: "Nombre es requerido." };
+//         if (!inputData.categoriaTareaId) return { success: false, error: "Categoría es requerida." };
+//         if (!inputData.canalConversacionalId) return { success: false, error: "Canal principal es requerido." };
 
-    try {
-        const actualizaciones = tareasOrdenadas.map(tarea =>
-            prisma.tarea.update({
-                where: { id: tarea.id },
-                data: { orden: tarea.orden } // Guarda el orden 0-based
-            })
-        );
-        await prisma.$transaction(actualizaciones);
+//         // 2. Calcular orden (dentro de la categoría)
+//         const ultimoOrden = await prisma.tarea.aggregate({
+//             _max: { orden: true },
+//             where: { categoriaTareaId: inputData.categoriaTareaId }
+//         });
+//         // Usar 0 como base si no hay tareas o el orden es null
+//         const nuevoOrden = (ultimoOrden._max.orden ?? -1) + 1;
 
-        console.log('Orden de tareas actualizado correctamente');
-        return { success: true, data: null };
+//         // 3. Construir objeto de datos *mínimo* para Prisma.TareaCreateInput
+//         const dataToCreate: Prisma.TareaCreateInput = {
+//             nombre: inputData.nombre.trim(),
+//             CategoriaTarea: { connect: { id: inputData.categoriaTareaId } },
+//             orden: nuevoOrden,
+//             version: 1.0, // Valor inicial por defecto
+//             status: 'activo', // Valor inicial por defecto
+//             // El resto de campos (descripcion, funcion, instruccion, etc.) quedan null/default
+//         };
 
-    } catch (error: unknown) {
-        console.error('Error al actualizar el orden de las tareas:', error);
-        let errorMessage = 'Error desconocido al actualizar orden.';
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            errorMessage = `Error de base de datos: ${error.code}`;
-        } else if (error instanceof Error) {
-            errorMessage = error.message;
-        }
-        return { success: false, error: `Error al actualizar orden: ${errorMessage}` };
-    }
-}
+//         // 4. Ejecutar transacción para crear Tarea y asociar Canal Principal
+//         const nuevaTarea = await prisma.$transaction(async (tx) => {
+//             // Crear la Tarea base
+//             const tareaCreada = await tx.tarea.create({ data: dataToCreate });
+
+//             // Asociar el canal principal (obligatorio)
+//             await tx.tareaCanal.create({
+//                 data: {
+//                     tareaId: tareaCreada.id,
+//                     canalConversacionalId: inputData.canalConversacionalId,
+//                 }
+//             });
+//             // No se asocian etiquetas ni función aquí
+
+//             return tareaCreada; // Devuelve la tarea completa creada
+//         });
+
+//         // 5. Devolver resultado exitoso con la tarea creada
+//         return { success: true, data: nuevaTarea }; // No es necesario castear si nuevaTarea es Tarea
+
+//     } catch (error: unknown) {
+//         console.error('Error al crear la tarea:', error);
+//         let errorMessage = 'Error desconocido al crear tarea.';
+//         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+//             // Asumiendo que 'nombre' es unique
+//             errorMessage = `El nombre de tarea '${inputData.nombre}' ya existe.`;
+//         } else if (error instanceof Error) {
+//             errorMessage = error.message;
+//         }
+//         return { success: false, error: errorMessage };
+//     }
+// }
 
 
+// --- Obtener Canales Activos para Dropdown ---
 // export async function obtenerCanalesActivos(): Promise<ActionResult<CanalConversacionalSimple[]>> {
 //     try {
 //         const canales = await prisma.canalConversacional.findMany({
@@ -694,17 +583,116 @@ export async function actualizarOrdenTareas(tareasOrdenadas: OrdenarTareasInput)
 //     }
 // }
 
-// --- Obtener Categorías para Filtro/Dropdown (Adaptada) ---
+
+
+
+
+
+
+
+
+
+
+// --- Obtener Tareas para la Lista (ACTUALIZADA para incluir versión y conteo de asistentes) ---
+export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConDetalles[]>> {
+    try {
+        const tareas = await prisma.tarea.findMany({
+            orderBy: [
+                { orden: 'asc' },
+                { nombre: 'asc' }
+            ],
+            select: {
+                id: true,
+                nombre: true,
+                status: true,
+                precio: true,
+                orden: true,
+                iconoUrl: true,
+                categoriaTareaId: true,
+                tareaFuncionId: true,
+                version: true, // <-- AÑADIDO: Seleccionar versión
+
+                CategoriaTarea: {
+                    select: {
+                        nombre: true,
+                        color: true
+                    }
+                },
+                tareaFuncion: {
+                    select: {
+                        id: true,
+                        nombreVisible: true
+                    }
+                },
+                etiquetas: {
+                    select: {
+                        etiquetaTarea: {
+                            select: {
+                                id: true,
+                                nombre: true
+                            }
+                        }
+                    }
+                },
+                _count: {
+                    select: {
+                        TareaGaleria: true,
+                        TareaEjecutada: true,
+                        AsistenteTareaSuscripcion: true // <-- AÑADIDO: Conteo de asistentes suscritos
+                    }
+                }
+            }
+        });
+
+        // El tipo TareaConDetalles ya debe ser compatible con esta estructura
+        return { success: true, data: tareas as TareaConDetalles[] };
+
+    } catch (error: unknown) {
+        console.error('Error fetching tasks with details:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido al obtener tareas.';
+        return { success: false, error: `No se pudieron obtener las tareas: ${errorMessage}` };
+    }
+}
+
+// ... (el resto de tus funciones en tareas.actions.ts: actualizarOrdenTareas, obtenerCategoriasParaFiltro, crearTarea, etc., se mantienen igual que en tu archivo original)
+// Asegúrate de copiar el resto de tus funciones aquí si este es el archivo completo.
+// Por ejemplo, la función actualizarOrdenTareas:
+export async function actualizarOrdenTareas(tareasOrdenadas: OrdenarTareasInput): Promise<ActionResult> {
+    if (!Array.isArray(tareasOrdenadas)) {
+        return { success: false, error: "Datos de ordenamiento inválidos." };
+    }
+    try {
+        const actualizaciones = tareasOrdenadas.map(tarea =>
+            prisma.tarea.update({
+                where: { id: tarea.id },
+                data: { orden: tarea.orden }
+            })
+        );
+        await prisma.$transaction(actualizaciones);
+        console.log('Orden de tareas actualizado correctamente');
+        return { success: true, data: null };
+    } catch (error: unknown) {
+        console.error('Error al actualizar el orden de las tareas:', error);
+        let errorMessage = 'Error desconocido al actualizar orden.';
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            errorMessage = `Error de base de datos: ${error.code}`;
+        } else if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        return { success: false, error: `Error al actualizar orden: ${errorMessage}` };
+    }
+}
+
 export async function obtenerCategoriasParaFiltro(): Promise<ActionResult<CategoriaTareaSimple[]>> {
     try {
         const categorias = await prisma.categoriaTarea.findMany({
             select: {
                 id: true,
                 nombre: true,
-                color: true // Seleccionar color por si se usa
+                color: true
             },
             orderBy: {
-                orden: 'asc', // O por nombre si prefieres
+                orden: 'asc',
             }
         });
         return { success: true, data: categorias };
@@ -715,60 +703,44 @@ export async function obtenerCategoriasParaFiltro(): Promise<ActionResult<Catego
     }
 }
 
-// --- Crear Tarea (Adaptada) ---
-// Usa CrearTareaBasicaInput y devuelve ActionResult<Tarea>
+// ... (y así sucesivamente para el resto de tus funciones)
 export async function crearTarea(
     inputData: CrearTareaBasicaInput
-): Promise<ActionResult<Tarea>> { // Devuelve ActionResult con la Tarea creada
+): Promise<ActionResult<Tarea>> {
     try {
-        // 1. Validación estricta en el servidor (redundante con cliente, pero buena práctica)
         if (!inputData.nombre?.trim()) return { success: false, error: "Nombre es requerido." };
         if (!inputData.categoriaTareaId) return { success: false, error: "Categoría es requerida." };
         if (!inputData.canalConversacionalId) return { success: false, error: "Canal principal es requerido." };
 
-        // 2. Calcular orden (dentro de la categoría)
         const ultimoOrden = await prisma.tarea.aggregate({
             _max: { orden: true },
             where: { categoriaTareaId: inputData.categoriaTareaId }
         });
-        // Usar 0 como base si no hay tareas o el orden es null
         const nuevoOrden = (ultimoOrden._max.orden ?? -1) + 1;
 
-        // 3. Construir objeto de datos *mínimo* para Prisma.TareaCreateInput
         const dataToCreate: Prisma.TareaCreateInput = {
             nombre: inputData.nombre.trim(),
             CategoriaTarea: { connect: { id: inputData.categoriaTareaId } },
             orden: nuevoOrden,
-            version: 1.0, // Valor inicial por defecto
-            status: 'activo', // Valor inicial por defecto
-            // El resto de campos (descripcion, funcion, instruccion, etc.) quedan null/default
+            version: 1.0,
+            status: 'activo',
         };
 
-        // 4. Ejecutar transacción para crear Tarea y asociar Canal Principal
         const nuevaTarea = await prisma.$transaction(async (tx) => {
-            // Crear la Tarea base
             const tareaCreada = await tx.tarea.create({ data: dataToCreate });
-
-            // Asociar el canal principal (obligatorio)
             await tx.tareaCanal.create({
                 data: {
                     tareaId: tareaCreada.id,
                     canalConversacionalId: inputData.canalConversacionalId,
                 }
             });
-            // No se asocian etiquetas ni función aquí
-
-            return tareaCreada; // Devuelve la tarea completa creada
+            return tareaCreada;
         });
-
-        // 5. Devolver resultado exitoso con la tarea creada
-        return { success: true, data: nuevaTarea }; // No es necesario castear si nuevaTarea es Tarea
-
+        return { success: true, data: nuevaTarea as Tarea };
     } catch (error: unknown) {
         console.error('Error al crear la tarea:', error);
         let errorMessage = 'Error desconocido al crear tarea.';
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            // Asumiendo que 'nombre' es unique
             errorMessage = `El nombre de tarea '${inputData.nombre}' ya existe.`;
         } else if (error instanceof Error) {
             errorMessage = error.message;
@@ -777,22 +749,18 @@ export async function crearTarea(
     }
 }
 
-
-// --- Obtener Canales Activos para Dropdown ---
 export async function obtenerCanalesActivos(): Promise<ActionResult<CanalConversacionalSimple[]>> {
     try {
         const canales = await prisma.canalConversacional.findMany({
-            where: { status: 'activo' }, // Filtrar solo los activos
+            where: { status: 'activo' },
             select: {
                 id: true,
                 nombre: true,
-                // icono: true // Descomentar si necesitas el icono
             },
             orderBy: {
-                orden: 'asc', // O por nombre si prefieres
+                orden: 'asc',
             }
         });
-        // El tipo devuelto coincide con CanalConversacionalSimple[]
         return { success: true, data: canales };
     } catch (error: unknown) {
         console.error('Error al obtener canales activos:', error);
@@ -800,4 +768,3 @@ export async function obtenerCanalesActivos(): Promise<ActionResult<CanalConvers
         return { success: false, error: `No se pudieron obtener los canales activos: ${errorMessage}` };
     }
 }
-

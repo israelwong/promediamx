@@ -82,8 +82,10 @@ model Contrato{
 model AsistenteVirtual{
   id        String   @id @default(cuid())
   clienteId String?
+
   negocioId String?
   negocio   Negocio? @relation(fields: [negocioId], references: [id])
+
   urlImagen String?
   nombre    String
   descripcion String?
@@ -109,6 +111,7 @@ model AsistenteVirtual{
   Conversacion Conversacion[]
   FacturaItem          FacturaItem[] 
   ItemInteraccion ItemInteraccion[] 
+  Agenda Agenda[] // Relación a la agenda
 }
 
 model CanalConversacional {
@@ -151,9 +154,9 @@ model Tarea{
   CategoriaTarea CategoriaTarea? @relation(fields: [categoriaTareaId], references: [id])
   orden     Int?
   nombre    String  @unique
-  descripcion String?
+  descripcion String? // Descripción comercial de la tarea
+  descripcionTool String? //! Descripción de cómo usar la tarea para IA
   instruccion String?
-  trigger String? @unique
   tareaFuncionId     String? // ID de la función de automatización asociada
   tareaFuncion       TareaFuncion? @relation(fields: [tareaFuncionId], references: [id], onDelete: SetNull) // Si se borra la función, la tarea queda sin automatización definida
   precio    Float?
@@ -161,14 +164,15 @@ model Tarea{
   personalidad String? // introvertido, extrovertido, analitico, creativo
   version   Float
   status    String   @default("activo")
+  iconoUrl           String?   // URL para el ícono principal de la tarea
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
   AsistenteTareaSuscripcion AsistenteTareaSuscripcion[]
   TareaEjecutada TareaEjecutada[]
   etiquetas          TareaEtiqueta[]
   canalesSoportados  TareaCanal[]
   camposPersonalizadosRequeridos TareaCampoPersonalizado[]
-  iconoUrl           String?   // URL para el ícono principal de la tarea
   TareaGaleria TareaGaleria[] // Relación a la galería
 }
 
@@ -266,6 +270,7 @@ model TareaFuncionParametroRequerido {
   @@index([parametroRequeridoId]) // Índice para buscar funciones por parámetro
 }
 
+//! TAREA EJECUTADA
 model TareaEjecutada{
   id        String   @id @default(cuid())
   asistenteVirtualId String
@@ -349,35 +354,91 @@ model Negocio{
   googleMaps String?
   paginaWeb String?
   horarioAtencion String?
-  garantias String? //Garantías, 
-  politicas String? //Políticas de Privacidad, Términos y Condiciones, Políticas de Devolución, Políticas de Reembolso, Políticas de Cancelación.
-  avisoPrivacidad String? //Aviso de Privacidad, Aviso de Cookies, Aviso de Seguridad.
   competencia String? //Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
   clienteIdeal String? //Rango de Edad, Rango de Ingresos, Distribución de Género, Distribución Geográfica, Nivel Educativo, Ocupación, Sector, Motivaciones Principales, Factores de Influencia, Personalidad, Intereses, Lenguaje, Tono de Comunicación Preferido, Canal de Comunicación Preferido.
   terminologia String? //Terminología del Negocio, Glosario de Términos, Jerga del Sector.
   preguntasFrecuentes String? //Preguntas Frecuentes, Preguntas Comunes, Preguntas Recurrentes.
   objeciones String? //Respuestas a Objeciones, Respuestas a Preguntas Frecuentes, Respuestas a Preguntas Comunes.
   catalogoDescriptivo String?
-  // promocionesDescriptivas String?//! eliminar
-  // descuentosDescriptivos String?//! eliminar
   status    String   @default("activo")
+
+  avisoPrivacidad String? //Aviso de Privacidad, Aviso de Cookies, Aviso de Seguridad.
+  politicas String? //Políticas de Privacidad, Términos y Condiciones, Políticas de Devolución, Políticas de Reembolso, Políticas de Cancelación.
+  garantias String? //Garantías, 
+
+
+  // agenteParaAgendaId Boolean @default(false) // O el default que prefieras
+  aceptaCitasPresenciales Boolean @default(false) // O el default que prefieras
+  aceptaCitasVirtuales   Boolean @default(false) // O el default que prefieras
+  requiereTelefonoParaCita Boolean @default(false) // O el default que prefieras
+  requiereEmailParaCita Boolean @default(false) // O el default que prefieras
+  requiereNombreParaCita Boolean @default(true) 
+  bufferMinutos Int? // Minutos de buffer entre citas
+
+
+  //!agregar
+  metodosPagoTexto         String?
+  almacenamientoUsadoBytes BigInt? @default(0) // Contador total
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  AsistenteVirtual AsistenteVirtual[]
+
+  CRM       CRM?   // Added opposite relation field
+  itemsCatalogo ItemCatalogo[] // Relación a la galería
   Catalogo   Catalogo[]
   categorias    NegocioCategoria[] // <-- RENOMBRADO
   etiquetas     NegocioEtiqueta[]  // <-- RENOMBRADO
   ofertas      Oferta[]
-
-  AsistenteVirtual AsistenteVirtual[]
-  CRM       CRM?   // Added opposite relation field
-
-  almacenamientoUsadoBytes BigInt? @default(0) // Contador total
-  itemsCatalogo ItemCatalogo[] // Relación a la galería
-
   Notificacion Notificacion[]
   redesSociales NegocioRedSocial[] // Relación a redes sociales
-
   GaleriaNegocio GaleriaNegocio[] // Relación a galerías de negocio
+  agendaTipoCita AgendaTipoCita[] // Relación a tipos de cita
+  horariosAtencion HorarioAtencion[] // Relación a horarios de atención
+  excepcionesHorario ExcepcionHorario[] // Relación a excepciones de horario
+  agenda Agenda[] // Relación a la agenda
+}
+
+// Enum para los días de la semana (más claro que usar números 0-6)
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+model HorarioAtencion {
+  id         String    @id @default(cuid())
+  negocioId  String    // A qué negocio pertenece este horario
+  negocio    Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  dia        DiaSemana // El día de la semana (LUNES, MARTES, etc.)
+  horaInicio String    // Hora de inicio en formato "HH:MM" (ej: "09:00")
+  horaFin    String    // Hora de fin en formato "HH:MM" (ej: "19:00")
+
+  // Asegura que no haya múltiples horarios para el mismo día y negocio (ajusta si permites múltiples bloques por día)
+  @@unique([negocioId, dia])
+  @@index([negocioId])
+}
+
+model ExcepcionHorario {
+  id               String    @id @default(cuid())
+  negocioId        String    // A qué negocio pertenece esta excepción
+  negocio          Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  fecha            DateTime  // La fecha específica de la excepción (solo la parte de la fecha es relevante)
+  esDiaNoLaborable Boolean   // Si es true, el negocio está cerrado TODO ese día.
+  horaInicio       String?   // Opcional: Hora especial de inicio para ESE día (formato "HH:MM")
+  horaFin          String?   // Opcional: Hora especial de fin para ESE día (formato "HH:MM")
+  descripcion      String?   // Motivo de la excepción (ej: "Navidad", "Mantenimiento Anual")
+
+  @@unique([negocioId, fecha]) // Solo una regla de excepción por día/negocio
+  @@index([negocioId])
+  @@index([fecha])
 }
 
 model NegocioRedSocial {
@@ -469,6 +530,7 @@ model Oferta {
   negocioId     String
   negocio       Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borran sus ofertas
   nombre        String    // Ej: "Descuento Primera Compra", "Promo Día Padre", "Cupón BIENVENIDO10"
+  variantesNombre String[] // modismos locales 
   descripcion   String?
 
   // --- Campo Clave: Tipo de Oferta ---
@@ -582,8 +644,8 @@ model ItemCatalogo {
   categoria     NegocioCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   negocioId     String?
   negocio       Negocio?    @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-
   nombre        String
+  variantesNombre String[] // modismos locales 
   descripcion   String?    @db.Text
   precio        Float
   tipoItem      String?    @default("PRODUCTO") // PRODUCTO, SERVICIO
@@ -689,10 +751,9 @@ model CRMCampoPersonalizado{
   id        String   @id @default(cuid())
   crmId     String
   crm       CRM      @relation(fields: [crmId], references: [id], onDelete: Cascade)
-
   nombre    String   // Nombre del campo personalizado
   nombreCampo String?   // Nombre interno para la base de datos
-  
+  descripcionParaIA String? // Descripción para IA para entender el campo
   tipo      String   // Tipo de dato (ej: texto, número, fecha, booleano)
   requerido Boolean  @default(false) // Si es obligatorio o no
   orden     Int?
@@ -857,12 +918,29 @@ model Bitacora {
 }
 
 //! AGENDA
+enum StatusAgenda {
+  PENDIENTE     // La cita/tarea está programada pero no ha ocurrido/completado
+  COMPLETADA    // La cita/tarea ya se realizó/completó
+  CANCELADA     // La cita/tarea fue cancelada
+  REAGENDADA 
+  NO_ASISTIO
+}
+
 model Agenda {
   id          String   @id @default(cuid())
-  agenteId    String   // Quién agendó/realizará la acción
-  agente      Agente   @relation(fields: [agenteId], references: [id], onDelete: Cascade) // Si se borra agente, se borra su agenda? O SetNull?
+  
+  negocioId String? // A qué negocio pertenece esta agenda
+  negocio   Negocio? @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra negocio, se borra su agenda
+  
+  agenteId    String?   // agendamiento manual por un agente
+  agente      Agente?   @relation(fields: [agenteId], references: [id], onDelete: Cascade) // Si se borra agente, se borra su agenda? O SetNull?
+  
+  asistenteId String? // agendamiento por asistente virtual
+  asistente   AsistenteVirtual? @relation(fields: [asistenteId], references: [id], onDelete: SetNull)
+  
   leadId      String
   lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
   fecha       DateTime // Fecha y hora del evento/tarea
   tipo        String   // Ej: 'Llamada', 'Reunion', 'Email', 'Tarea'
   asunto      String
@@ -873,9 +951,60 @@ model Agenda {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  historial AgendaHistorial[] // Relación con el historial de la agenda
+
+  tipoDeCitaId String?   // El ID del TipoDeCita seleccionado
+  tipoDeCita AgendaTipoCita? @relation(fields: [tipoDeCitaId], references: [id], onDelete: SetNull)
+
+  modalidad String? // Presencial, Virtual, Híbrido
+
+  @@index([negocioId])
   @@index([leadId])
   @@index([agenteId])
   @@index([fecha])
+}
+
+model AgendaTipoCita{
+  id              String   @id @default(cuid())
+  nombre          String   @unique // Ej: "Corte de Cabello", "Consulta Virtual"
+  descripcion     String?
+  duracionMinutos Int?     // Duración estimada en minutos
+  esVirtual       Boolean  @default(false)
+  esPresencial    Boolean  @default(false)
+  negocioId       String   // A qué negocio pertenece este tipo de cita
+  negocio         Negocio  @relation(fields: [negocioId], references: [id]) // Asumiendo un modelo Negocio
+  agendas         Agenda[] // Relación inversa
+  orden           Int?     // Para ordenar los tipos de cita en el frontend
+  limiteConcurrencia Int @default(1) // Limite de citas concurrentes para este tipo de cita
+  activo         Boolean @default(true) // Si está activo o no
+  @@index([negocioId])
+}
+
+
+enum ActionType {
+  CREATED      // Creación de la agenda
+  UPDATED      // Modificación general de la agenda (podrías detallar más si quisieras)
+  CANCELED     // Cancelación de la agenda
+  RESCHEDULED  // Reagendamiento específico (cambio de fecha/hora)
+}
+
+enum ChangedByType {
+  AGENT      // Un agente humano
+  ASSISTANT  // Un asistente virtual
+  USER       // El cliente/lead final (si tienen capacidad de modificar/cancelar)
+  SYSTEM     // Un proceso automático del sistema
+}
+
+model AgendaHistorial{
+  id          String   @id @default(cuid())
+  agendaId    String
+  agenda      Agenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade)
+  actionType      String   // CREATED, UPDATED, CANCELED, RESCHEDULED
+  changedByType String? // AGENT, ASSISTANT, USER, SYSTEM
+  changedById String? // ID del agente, asistente o usuario que realizó el cambio
+  reason String?
+  createdAt   DateTime @default(now())
+  @@index([agendaId])
 }
 
 //!CONVERSACIONES
@@ -931,9 +1060,6 @@ model Interaccion {
   mediaType      String?   // image, audio, video, document, sticker
   createdAt      DateTime  @default(now())
 
-  //! --- NUEVO CAMPO OPCIONAL PARA TRAZABILIDAD DEL AGENTE EN EL MENSAJE ---
-  // Esto es útil si varios agentes pueden participar en la misma conversación
-  // y quieres saber quién envió cada mensaje de 'agent'.
   agenteCrmId    String?   // ID del Agente CRM que realizó esta interacción (si role == 'agent')
   agenteCrm      Agente?   @relation("InteraccionesPorAgente", fields: [agenteCrmId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   // --- FIN DE NUEVO CAMPO OPCIONAL ---

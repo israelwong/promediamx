@@ -1,40 +1,60 @@
 // Ruta sugerida: app/admin/_lib/funciones/ia/funcionesEjecucion.actions.ts
 'use server';
 
-// import { Prisma } from '@prisma/client';
 import prisma from '../prismaClient'; //
 import { ActionResult } from '../types'; //
-// Importar tipos específicos para argumentos y resultados
-import { AgendarCitaArgs, ResultadoAgendamiento } from '../funciones/agendarCitaPresencial.type';
-import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacionDelNegocio.type';
-import { InformarHorarioArgs, InformarHorarioData } from '../funciones/informarHorarioDeAtencion.type';
-import { ejecutarMostrarOfertasAction } from '../funciones/mostrarOfertas.actions'; // Añadir import
-import { MostrarOfertasArgs, MostrarOfertasData } from '../funciones/mostrarOfertas.type'; // Añadir import
-import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta.type'; // Añadir import
-import { AceptarOfertaArgs, AceptarOfertaData } from '../funciones/aceptarOferta.type'; // Añadir import
-
-
-
-// Importar las funciones de ejecución específicas
-import { ejecutarAgendarCitaAction } from '../funciones/agendarCitaPresencial.actions';
-import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
-import { ejecutarInformarHorarioAction } from '../funciones/informarHorarioDeAtencion.actions';
 import { ChatMessageItem } from '../crmConversacion.types';
-import { ejecutarDarDireccionAction } from '../funciones/darDireccionYUbicacion.actions'; // Añadir import
-import { DarDireccionArgs, DarDireccionData } from '../funciones/darDireccionYUbicacion.type'; // Añadir import
-import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta.actions'; // Añadir import
-import { ejecutarAceptarOfertaAction } from '../funciones/aceptarOferta.actions'; // Añadir import
+
+import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacionDelNegocio.type';
+import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
+
+import { InformarHorarioArgs, InformarHorarioData } from '../funciones/informarHorarioDeAtencion.type';
+import { ejecutarInformarHorarioAction } from '../funciones/informarHorarioDeAtencion.actions';
+
+import { ejecutarMostrarOfertasAction } from '../funciones/mostrarOfertas.actions';
+import { MostrarOfertasArgs, MostrarOfertasData } from '../funciones/mostrarOfertas.type';
+
+import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta.type';
+import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta.actions';
+
+import { ejecutarDarDireccionAction } from '../funciones/darDireccionYUbicacion.actions';
+import { DarDireccionArgs, DarDireccionData } from '../funciones/darDireccionYUbicacion.type';
+
+import { AceptarOfertaArgs, AceptarOfertaData } from '../funciones/aceptarOferta.type';
+import { ejecutarAceptarOfertaAction } from '../funciones/aceptarOferta.actions';
+
+import { ejecutarAgendarCitaAction } from '../funciones/agendarCita.actions';
+import { AgendarCitaArgs, ConfiguracionAgendaDelNegocio } from '../funciones/agendarCita.type';
+
+import { ListarServiciosAgendaArgs } from '../funciones/listarServiciosAgenda.type';
+import { ejecutarListarServiciosAgendaAction } from '../funciones/listarServiciosAgenda.actions';
+
+import { ListarHorariosDisponiblesArgs } from '../funciones/listarHorariosDisponiblesAgenda.type';
+import { ejecutarListarHorariosDisponiblesAction } from '../funciones/listarHorariosDisponiblesAgenda.actions';
+
+import { ejecutarCancelarCitaAction } from '../funciones/cancelarCita.actions';
+import { CancelarCitaArgs } from '../funciones/cancelarCita.type';
+
+import { ejecutarReagendarCitaAction } from '../funciones/reagendarCita.actions';
+import { ReagendarCitaArgs } from '../funciones/reagendarCita.type';
+
+
+
+
+import { ChangedByType } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
 
 /**
  * Guarda un mensaje interno (del asistente o sistema) en la conversación.
  * @param input Datos del mensaje a guardar.
  * @returns ActionResult con el ChatMessageItem creado.
  */
+
 async function enviarMensajeInternoAction(input: {
     conversacionId: string;
     mensaje: string;
     role: 'assistant' | 'system'; // Roles permitidos
 }): Promise<ActionResult<ChatMessageItem>> {
+
     try {
         if (!input.conversacionId || !input.mensaje || !input.role) {
             return { success: false, error: 'Faltan datos para enviar el mensaje interno.' };
@@ -86,22 +106,14 @@ async function enviarMensajeInternoAction(input: {
         return { success: false, error: 'No se pudo guardar el mensaje interno.' };
     }
 }
-// --- Fin Implementación REAL ---
 
-
-/**
- * Lee una TareaEjecutada, identifica la función a llamar desde sus metadatos,
- * y llama a la Server Action de ejecución correspondiente.
- * Luego, envía el resultado de vuelta a la conversación como un mensaje del asistente.
- * @param tareaEjecutadaId El ID del registro TareaEjecutada a procesar.
- * @returns ActionResult<null> indicando si el despacho se intentó.
- */
 export async function dispatchTareaEjecutadaAction(
     tareaEjecutadaId: string
 ): Promise<ActionResult<null>> {
     console.log(`[Dispatcher] Iniciando despacho para TareaEjecutada ${tareaEjecutadaId}`);
 
     let tareaEjecutada;
+
     try {
         // 1. Obtener la Tarea Ejecutada
         tareaEjecutada = await prisma.tareaEjecutada.findUnique({
@@ -132,12 +144,12 @@ export async function dispatchTareaEjecutadaAction(
         }
 
         const metadataObj = parsedMetadata as Record<string, unknown>;
+
         const funcionLlamada = typeof metadataObj.funcionLlamada === 'string' ? metadataObj.funcionLlamada : undefined;
         const argumentos = typeof metadataObj.argumentos === 'object' && metadataObj.argumentos !== null ? metadataObj.argumentos as Record<string, unknown> : undefined;
         const conversacionId = typeof metadataObj.conversacionId === 'string' ? metadataObj.conversacionId : undefined;
         const leadId = typeof metadataObj.leadId === 'string' ? metadataObj.leadId : undefined;
         const asistenteVirtualId = typeof metadataObj.asistenteVirtualId === 'string' ? metadataObj.asistenteVirtualId : undefined;
-
 
         if (!funcionLlamada || !argumentos || !conversacionId || !leadId || !asistenteVirtualId) {
             console.error(`[Dispatcher] Metadata incompleta o inválida en TareaEjecutada ${tareaEjecutadaId}:`, metadataObj);
@@ -151,29 +163,8 @@ export async function dispatchTareaEjecutadaAction(
 
         console.log(`[Dispatcher] Despachando función: ${funcionLlamada}`);
         switch (funcionLlamada) {
-            case 'agendarCitaPresencial':
-                const argsAgendar: AgendarCitaArgs = {
-                    ...argumentos,
-                    leadId: leadId,
-                    nombre_contacto: typeof argumentos.nombre_contacto === 'string' ? argumentos.nombre_contacto : undefined,
-                    email_contacto: typeof argumentos.email_contacto === 'string' ? argumentos.email_contacto : undefined,
-                    telefono_contacto: typeof argumentos.telefono_contacto === 'string' ? argumentos.telefono_contacto : undefined,
-                    fecha_hora: typeof argumentos.fecha_hora === 'string' ? argumentos.fecha_hora : undefined,
-                    motivo_de_reunion: typeof argumentos.motivo_de_reunion === 'string' ? argumentos.motivo_de_reunion : undefined,
-                };
-                if (!argsAgendar.fecha_hora) {
-                    mensajeResultadoParaUsuario = "Error: Falta la fecha y hora para agendar la cita.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-                resultadoEjecucion = await ejecutarAgendarCitaAction(argsAgendar, tareaEjecutadaId);
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as ResultadoAgendamiento).mensajeConfirmacion;
-                } else {
-                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al intentar agendar tu cita: ${resultadoEjecucion.error || 'Error desconocido.'}`;
-                }
-                break;
 
+            //!ENVIAR INFORMACIN NEGOCIO
             case 'brindarInformacionDelNegocio':
                 const asistenteInfo = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
                 if (!asistenteInfo?.negocioId) {
@@ -194,6 +185,7 @@ export async function dispatchTareaEjecutadaAction(
                 }
                 break;
 
+            //!INFORMAR HORARIO DE ATENCION
             case 'informarHorarioDeAtencion':
                 const asistenteHorario = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
                 if (!asistenteHorario?.negocioId) {
@@ -215,6 +207,7 @@ export async function dispatchTareaEjecutadaAction(
                 }
                 break;
 
+            //!DAR DIRECCION Y UBICACION
             case 'darDireccionYUbicacion': // <-- NUEVO CASE
                 const asistenteDir = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
                 if (!asistenteDir?.negocioId) {
@@ -234,6 +227,7 @@ export async function dispatchTareaEjecutadaAction(
                 }
                 break;
 
+            //!MOSTRAR OFERTAS
             case 'mostrarOfertas': // <-- NUEVO CASE
                 const asistenteOfertas = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
                 if (!asistenteOfertas?.negocioId) {
@@ -253,8 +247,8 @@ export async function dispatchTareaEjecutadaAction(
                 }
                 break;
 
+            //!MOSTRAR DETALLE OFERTA
             case 'mostrarDetalleOferta':
-
                 const asistenteConCanal = await prisma.asistenteVirtual.findUnique({
                     where: { id: asistenteVirtualId },
                     select: {
@@ -294,11 +288,9 @@ export async function dispatchTareaEjecutadaAction(
                 }
                 break;
 
+            //!ACEPTAR OFERTA
             case 'aceptarOferta': // Asumiendo que el nombreInterno de la TareaFuncion es "aceptarOferta"
-                // const asistenteAceptarOferta = await prisma.asistenteVirtual.findUnique({
-                //     where: { id: asistenteVirtualId },
-                //     select: { negocioId: true }
-                // });
+
                 const asistenteAceptarOferta = await prisma.asistenteVirtual.findUnique({
                     where: { id: asistenteVirtualId },
                     select: {
@@ -337,10 +329,284 @@ export async function dispatchTareaEjecutadaAction(
                 } else {
                     mensajeResultadoParaUsuario = `Lo siento, hubo un problema al intentar procesar tu aceptación de la oferta: ${resultadoEjecucion.error || 'Error desconocido.'}`;
                 }
+                break;
+
+            //!AGENDAR CITA
+            case 'agendarCita':
+
+                //saber si negocio cliente tiene más de un negocio
+                const asistenteContext = await prisma.asistenteVirtual.findUnique({
+                    where: { id: asistenteVirtualId },
+                    select: {
+                        negocioId: true,
+                        canalConversacional: {
+                            select: {
+                                id: true,
+                                nombre: true
+                            }
+                        },
+                        negocio: {
+                            select: {
+                                // id: true,
+                                aceptaCitasPresenciales: true,
+                                aceptaCitasVirtuales: true,
+                                requiereEmailParaCita: true,     // Boolean @default(true) o false
+                                requiereTelefonoParaCita: true,  // Boolean @default(false) o true
+                                requiereNombreParaCita: true,   // Boolean @default(false) o true
+                                bufferMinutos: true,          // Deberías añadir este campo (Int) a tu Prisma Schema para Negocio
+                            }
+                        }
+                    }
+                });
+
+                if (!asistenteContext?.negocioId || !asistenteContext.negocio) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio para agendar la cita.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break;
+                }
+
+                // Definir el actor que realiza la acción
+                const actor = {
+                    type: ChangedByType.ASSISTANT, // Ya que esta lógica es para el asistente virtual
+                    id: asistenteVirtualId
+                };
+                // Construir el objeto de configuración del negocio
+                const configAgenda: ConfiguracionAgendaDelNegocio = {
+                    negocioId: asistenteContext.negocioId,
+                    aceptaCitasVirtuales: asistenteContext.negocio.aceptaCitasVirtuales,
+                    aceptaCitasPresenciales: asistenteContext.negocio.aceptaCitasPresenciales,
+                    requiereEmail: asistenteContext.negocio.requiereEmailParaCita,
+                    requiereTelefono: asistenteContext.negocio.requiereTelefonoParaCita,
+                    requiereNombre: true,
+                    bufferMinutos: asistenteContext.negocio.bufferMinutos ?? 0, // Asignar un valor predeterminado si es null
+                };
+
+                // Extraer y preparar los argumentos para ejecutarAgendarCitaAction
+                // Asegúrate que 'leadId' y 'asistenteVirtualId' estén disponibles en este scope
+                const argsAgendarCita: AgendarCitaArgs = {
+                    negocioId: asistenteContext.negocioId,//!
+                    asistenteId: asistenteVirtualId, //! 
+                    leadId: leadId, //!
+                    fecha_hora_deseada: typeof argumentos.fecha_hora_deseada === 'string' ? argumentos.fecha_hora_deseada : undefined, //!
+                    motivo_de_reunion: typeof argumentos.motivo_de_reunion === 'string' ? argumentos.motivo_de_reunion : null,
+                    tipo_cita_modalidad_preferida: typeof argumentos.tipo_cita_modalidad_preferida === 'string' && (argumentos.tipo_cita_modalidad_preferida === 'presencial' || argumentos.tipo_cita_modalidad_preferida === 'virtual') ? argumentos.tipo_cita_modalidad_preferida : undefined,
+                    nombre_contacto: typeof argumentos.nombre_contacto === 'string' ? argumentos.nombre_contacto : undefined,
+                    email_contacto: typeof argumentos.email_contacto === 'string' ? argumentos.email_contacto : null,
+                    telefono_contacto: typeof argumentos.telefono_contacto === 'string' ? argumentos.telefono_contacto : null,
+                    servicio_nombre: typeof argumentos.servicio_nombre === 'string' ? argumentos.servicio_nombre : undefined, // <-- NUEVO y CRUCIAL
+                };
+
+                resultadoEjecucion = await ejecutarAgendarCitaAction(
+                    argsAgendarCita,
+                    tareaEjecutadaId,
+                    configAgenda, // Objeto de configuración del negocio
+                    actor         // Información del actor
+                );
+
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
+                } else {
+                    // Si la acción de negocio falló internamente (ej. error no manejado en ejecutarAgendarCitaAction)
+                    // o si success es false por alguna otra razón, usar el mensaje de error o uno genérico.
+                    mensajeResultadoParaUsuario = resultadoEjecucion.error || 'Lo siento, hubo un problema al procesar tu solicitud de cita.';
+                }
 
                 break;
 
+            //!LISTAR SERVICIOS AGENDA
+            case 'listarServiciosAgenda':
+                // Obtener el negocioId del contexto del asistente (similar a como lo haces para agendarCita)
+                const contextoAsistenteParaListar = await prisma.asistenteVirtual.findUnique({
+                    where: { id: asistenteVirtualId }, // asistenteVirtualId debe estar en scope
+                    select: {
+                        negocioId: true,
+                    }
+                });
 
+                if (!contextoAsistenteParaListar?.negocioId) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo determinar el negocio para listar los servicios.";
+                    // Aquí podrías llamar a tu función 'actualizarTareaEjecutadaFallidaDispatcher'
+                    // await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario, argumentos);
+                    break;
+                }
+
+                const argsListarServicios: ListarServiciosAgendaArgs = {
+                    negocioId: contextoAsistenteParaListar.negocioId,
+                };
+
+                resultadoEjecucion = await ejecutarListarServiciosAgendaAction(
+                    argsListarServicios,
+                    tareaEjecutadaId // El ID de la TareaEjecutada actual
+                );
+
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
+                } else {
+                    mensajeResultadoParaUsuario = resultadoEjecucion.error || 'Lo siento, hubo un problema al obtener la lista de servicios.';
+                }
+                break;
+
+            //! LISTAR HORARIOS DISPONIBLES
+            case 'listarHorariosDisponiblesAgenda':
+                // Obtener el contexto del negocio y su configuración de agenda
+                const contextoNegocioParaListarHorarios = await prisma.asistenteVirtual.findUnique({
+                    where: { id: asistenteVirtualId }, // asistenteVirtualId debe estar en scope
+                    select: {
+                        negocioId: true,
+                        negocio: {
+                            select: {
+                                aceptaCitasPresenciales: true,
+                                aceptaCitasVirtuales: true,
+                                requiereEmailParaCita: true,
+                                requiereTelefonoParaCita: true,
+                                requiereNombreParaCita: true,
+                                bufferMinutos: true,
+                            }
+                        }
+                    }
+                });
+
+                if (!contextoNegocioParaListarHorarios?.negocioId || !contextoNegocioParaListarHorarios.negocio) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo determinar la configuración del negocio para listar horarios.";
+                    // await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario, argumentos);
+                    break;
+                }
+
+                const configAgendaParaListar: ConfiguracionAgendaDelNegocio = {
+                    negocioId: contextoNegocioParaListarHorarios.negocioId,
+                    aceptaCitasVirtuales: contextoNegocioParaListarHorarios.negocio.aceptaCitasVirtuales,
+                    aceptaCitasPresenciales: contextoNegocioParaListarHorarios.negocio.aceptaCitasPresenciales,
+                    requiereEmail: contextoNegocioParaListarHorarios.negocio.requiereEmailParaCita,
+                    requiereTelefono: contextoNegocioParaListarHorarios.negocio.requiereTelefonoParaCita,
+                    requiereNombre: contextoNegocioParaListarHorarios.negocio.requiereNombreParaCita ?? true,
+                    bufferMinutos: contextoNegocioParaListarHorarios.negocio.bufferMinutos ?? 0,
+                };
+
+                // Verificar directamente los argumentos recibidos de Gemini
+                const servicioRecibido = argumentos.servicio_nombre_horario_interes;
+                const fechaRecibida = argumentos.fecha_deseada_horario_servicio_interes;
+                // console.log(`[Dispatcher Debug] Recibido de Gemini para listarHorariosDisponiblesAgenda: servicio_nombre_horario_interes='${servicioRecibido}' (tipo: ${typeof servicioRecibido}), fecha_deseada_horario_servicio_interes='${fechaRecibida}' (tipo: ${typeof fechaRecibida})`);
+
+                if (typeof servicioRecibido !== 'string' || !servicioRecibido.trim() ||
+                    typeof fechaRecibida !== 'string' || !fechaRecibida.trim()) {
+                    mensajeResultadoParaUsuario = "Para buscar horarios disponibles, necesito saber para qué servicio y en qué fecha te gustaría.";
+                    // Opcional: Log más detallado si la validación falla
+                    // await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Faltan servicio_nombre_horario_interes o fecha_deseada_horario_servicio_interes en argumentos de Gemini.", argumentos);
+                    break;
+                }
+
+                // Si pasamos la validación, los argumentos son válidos para construir argsListarHorarios
+                const argsListarHorarios: ListarHorariosDisponiblesArgs = {
+                    negocioId: contextoNegocioParaListarHorarios.negocioId,
+                    servicio_nombre_interes: servicioRecibido.trim(),
+                    fecha_deseada: fechaRecibida.trim(),
+                };
+
+                resultadoEjecucion = await ejecutarListarHorariosDisponiblesAction(
+                    argsListarHorarios,
+                    tareaEjecutadaId,
+                    configAgendaParaListar
+                );
+
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
+                } else {
+                    mensajeResultadoParaUsuario = resultadoEjecucion.error || 'Lo siento, hubo un problema al buscar los horarios disponibles.';
+                }
+                break;
+
+            //! CANCELAR CITA
+            case 'cancelarCita':
+
+                console.log('[Dispatcher Debug] Objeto "argumentos" recibido de IA para cancelarCita:', JSON.stringify(argumentos, null, 2)); // DEBUG VITAL
+
+                const argsCancelar: CancelarCitaArgs = {
+                    cita_id_cancelar: typeof argumentos.cita_id_cancelar === 'string' ? argumentos.cita_id_cancelar : undefined,
+                    detalle_cita_para_cancelar: typeof argumentos.detalle_cita_para_cancelar === 'string' ? argumentos.detalle_cita_para_cancelar : undefined,
+                    confirmacion_usuario_cancelar: typeof argumentos.confirmacion_usuario_cancelar === 'boolean' ? argumentos.confirmacion_usuario_cancelar : undefined,
+                    motivo_cancelacion: typeof argumentos.motivo_cancelacion === 'string' ? argumentos.motivo_cancelacion : undefined,
+                    leadId: leadId,
+                    asistenteVirtualId: asistenteVirtualId,
+                };
+                console.log('[Dispatcher Debug] "argsCancelar" construidos:', JSON.stringify(argsCancelar, null, 2));
+
+                resultadoEjecucion = await ejecutarCancelarCitaAction(argsCancelar, tareaEjecutadaId);
+
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
+                } else {
+                    mensajeResultadoParaUsuario = resultadoEjecucion.error || "Hubo un problema al intentar procesar la cancelación.";
+                }
+                break;
+
+            case 'reagendarCita':
+                // Obtener ConfiguracionAgendaDelNegocio (necesaria para verificarDisponibilidadSlot)
+                // y definir el actor
+                const asistenteCtxReagendar = await prisma.asistenteVirtual.findUnique({
+                    where: { id: asistenteVirtualId },
+                    select: {
+                        negocio: {
+                            select: {
+                                id: true,
+                                aceptaCitasPresenciales: true,
+                                aceptaCitasVirtuales: true,
+                                requiereEmailParaCita: true,
+                                requiereTelefonoParaCita: true,
+                                requiereNombreParaCita: true, // Asegúrate que este campo exista en tu modelo Negocio
+                                bufferMinutos: true
+                            }
+                        }
+                    }
+                });
+
+                if (!asistenteCtxReagendar?.negocio) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo obtener la configuración del negocio para reagendar la cita.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break; // Sale del switch
+                }
+
+                const configAgendaReagendar: ConfiguracionAgendaDelNegocio = {
+                    negocioId: asistenteCtxReagendar.negocio.id,
+                    aceptaCitasVirtuales: asistenteCtxReagendar.negocio.aceptaCitasVirtuales,
+                    aceptaCitasPresenciales: asistenteCtxReagendar.negocio.aceptaCitasPresenciales,
+                    requiereEmail: asistenteCtxReagendar.negocio.requiereEmailParaCita,
+                    requiereTelefono: asistenteCtxReagendar.negocio.requiereTelefonoParaCita,
+                    requiereNombre: asistenteCtxReagendar.negocio.requiereNombreParaCita ?? true, // Default a true si es null/undefined
+                    bufferMinutos: asistenteCtxReagendar.negocio.bufferMinutos ?? 0,
+                };
+
+                const actorReagendar = { type: ChangedByType.ASSISTANT, id: asistenteVirtualId };
+
+                // Construir los argumentos para ejecutarReagendarCitaAction
+                const argsReagendar: ReagendarCitaArgs = {
+                    cita_id_original: typeof argumentos.cita_id_original === 'string' ? argumentos.cita_id_original : undefined,
+                    detalle_cita_original_para_reagendar: typeof argumentos.detalle_cita_original_para_reagendar === 'string' ? argumentos.detalle_cita_original_para_reagendar : undefined,
+                    nueva_fecha_hora_deseada: typeof argumentos.nueva_fecha_hora_deseada === 'string' ? argumentos.nueva_fecha_hora_deseada : undefined,
+                    confirmacion_usuario_reagendar: typeof argumentos.confirmacion_usuario_reagendar === 'boolean' ? argumentos.confirmacion_usuario_reagendar : undefined,
+                    servicio_nombre: typeof argumentos.servicio_nombre === 'string' ? argumentos.servicio_nombre : undefined,
+                    nombre_contacto: typeof argumentos.nombre_contacto === 'string' ? argumentos.nombre_contacto : undefined,
+                    email_contacto: typeof argumentos.email_contacto === 'string' ? argumentos.email_contacto : undefined,
+                    telefono_contacto: typeof argumentos.telefono_contacto === 'string' ? argumentos.telefono_contacto : undefined,
+                    leadId: leadId, // Desde las variables del dispatcher
+                    asistenteVirtualId: asistenteVirtualId, // Desde las variables del dispatcher
+                };
+
+                console.log('[Dispatcher v2.1] "argsReagendar" construidos para la acción:', JSON.stringify(argsReagendar, null, 2));
+                resultadoEjecucion = await ejecutarReagendarCitaAction(argsReagendar, tareaEjecutadaId, configAgendaReagendar, actorReagendar);
+
+                if (resultadoEjecucion.success && resultadoEjecucion.data && typeof (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario === 'string') {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
+                } else if (!resultadoEjecucion.success) {
+                    mensajeResultadoParaUsuario = resultadoEjecucion.error || "Hubo un problema al intentar reagendar tu cita.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, `Error en ejecutarReagendarCitaAction: ${resultadoEjecucion.error}`);
+                } else {
+                    // Success true, pero data no tiene mensajeParaUsuario o es inesperada
+                    mensajeResultadoParaUsuario = "Se procesó tu solicitud de reagendamiento, pero no hay un mensaje de respuesta detallado."; // O null si prefieres
+                    console.warn(`[Dispatcher v2.1] La acción reagendarCita tuvo éxito pero 'data' o 'mensajeParaUsuario' fue inesperado. Data:`, resultadoEjecucion.data);
+                }
+                break;
+
+            //! default
             default:
                 console.warn(`[Dispatcher] Función desconocida encontrada en TareaEjecutada ${tareaEjecutadaId}: ${funcionLlamada}`);
                 mensajeResultadoParaUsuario = `No sé cómo procesar la acción: ${funcionLlamada}. Notificaré a un agente.`;

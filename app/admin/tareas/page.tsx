@@ -1,11 +1,11 @@
-import React from 'react'
+// Ruta actual: /Users/israelwong/Documents/Desarrollo/promedia-app/app/admin/tareas/page.tsx
 import { Metadata } from 'next'
-import TareasDashboard from './components/TareasDashboard'
+import ListaTareas from './components/ListaTareas'
 
 export const metadata: Metadata = {
     title: 'Tareas'
 }
 
 export default function page() {
-    return <TareasDashboard />
+    return <ListaTareas />
 }

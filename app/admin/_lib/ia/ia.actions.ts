@@ -21,7 +21,6 @@ import {
 
 import { ActionResult } from '@/app/admin/_lib/types';
 
-// *** CAMBIO 1: Añadir temperature a generationConfig ***
 const generationConfig: GenerationConfig = {
     temperature: 0.1, // Temperatura baja para respuestas más predecibles y mejor seguimiento de formato
     maxOutputTokens: 2048,
@@ -42,20 +41,16 @@ function mapTipoParametroToSchemaType(tipo: string): SchemaType {
         case 'direccion':
         case 'fecha':
         case 'fechahora':
-        case 'seleccion_unica':
-            return SchemaType.STRING;
+        case 'seleccion_unica': return SchemaType.STRING;
         case 'numero':
         case 'decimal':
-        case 'float':
-            return SchemaType.NUMBER;
-        case 'entero':
-            return SchemaType.INTEGER;
-        case 'booleano':
-            return SchemaType.BOOLEAN;
+        case 'float': return SchemaType.NUMBER;
+        case 'entero': return SchemaType.INTEGER;
+        case 'booleano': return SchemaType.BOOLEAN;
         case 'seleccion_multiple':
             console.warn(`[IA Actions] Tipo 'seleccion_multiple' mapeado a SchemaType.ARRAY.`);
             return SchemaType.ARRAY;
-        case 'fecha_hora': // <-- AÑADIR ESTE CASO
+        case 'fecha_hora':
         default:
             console.warn(`[IA Actions] Tipo de parámetro no mapeado explícitamente: ${tipo}. Usando SchemaType.STRING.`);
             return SchemaType.STRING;
@@ -63,7 +58,7 @@ function mapTipoParametroToSchemaType(tipo: string): SchemaType {
 }
 
 function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | undefined {
-    // ... (sin cambios en esta función auxiliar) ...
+
     const functionDeclarations: FunctionDeclaration[] = tareas
         .filter(tarea => tarea.funcionHerramienta)
         .map(tarea => {
@@ -95,13 +90,15 @@ function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | u
 
             const funcDecl: FunctionDeclaration = {
                 name: funcion.nombreInterno,
-                description: tarea.descripcion || funcion.descripcion || `Ejecuta la acción ${funcion.nombreInterno}`,
+                description: tarea.descripcionTool || funcion.descripcion || `Ejecuta la acción ${funcion.nombreInterno}`,
                 parameters: {
                     type: SchemaType.OBJECT,
                     properties: Object.fromEntries(
                         Object.entries(properties).map(([key, value]) => [key, { ...value, type: value.type as SchemaType } as Schema])
                     ),
-                    required: requiredParams.length > 0 ? requiredParams : undefined,
+                    //! required: requiredParams.length > 0 ? requiredParams : undefined, 
+                    //! omitido por estrategia
+                    required: []
                 },
             };
             return funcDecl;
@@ -121,6 +118,7 @@ export async function generarRespuestaAsistente(
     console.log("[IA Action] Mensaje Usuario:", input.mensajeUsuarioActual);
 
     const apiKey = process.env.GEMINI_API_KEY;
+
     if (!apiKey) {
         console.error("[IA Action] Error: GEMINI_API_KEY no está configurada.");
         return { success: false, error: "Configuración de IA incompleta en el servidor." };
@@ -133,17 +131,31 @@ Evalúa la consulta del usuario contra las herramientas (funciones) disponibles:
 * **SI** la consulta coincide claramente con la descripción de una herramienta específica Y has verificado que tienes (o has obtenido del usuario preguntando ANTES) **todos** los parámetros requeridos por esa herramienta:
     * **DEBES** usar la herramienta. Tu respuesta **COMPLETA Y ÚNICA** debe ser el objeto \`functionCall\` estructurado.
     * **FORMATO ESPERADO DEL OBJETO \`functionCall\` (EJEMPLO):** \`{"functionCall": {"name": "nombreDeLaFuncionCorrecta", "args": {"parametro1": "valor1", "parametro2": "valor2"}}}\`
-    * **REGLAS ESTRICTAS PARA \`functionCall\`:**
+    
+* **REGLAS ESTRICTAS PARA \`functionCall\`:**
         * **NO** incluyas ningún texto explicativo, confirmación, o conversación antes o después de este objeto.
         * **NO** escribas el objeto \`functionCall\` como un string JSON dentro de la parte 'text' de la respuesta.
         * **NO** uses bloques de código Markdown.
         * Simplemente devuelve el objeto \`functionCall\` puro como lo define la API.
+
+* **SI has hecho una pregunta de confirmación al usuario para una acción de una herramienta (ej. '¿Confirmas que deseas X?') y el usuario responde afirmativamente:**
+    * DEBES volver a llamar a la MISMA herramienta que estabas procesando.
+    * Asegúrate de incluir el parámetro de confirmación apropiado (ej. 'confirmacion_usuario_reagendar: true').
+    * También DEBES incluir los identificadores clave que se estaban procesando (ej. 'cita_id_original').
+* **Cuando una herramienta requiere múltiples datos del usuario en varios turnos (ej. primero identificar cita, luego nueva fecha):**
+    * Llama a la herramienta con la información que tengas. El backend te dirá qué falta.
+    * En el siguiente turno, cuando el usuario proporcione la información faltante, vuelve a llamar a la MISMA herramienta, incluyendo tanto la información nueva como la información clave previamente establecida (ej. \`cita_id_original\` Y \`nueva_fecha_hora_deseada\`).
+
 * **EN CUALQUIER OTRO CASO** (si la consulta es general, no coincide con una herramienta, no estás seguro de cuál usar, o no pudiste obtener los parámetros necesarios después de preguntar):
     * **DEBES** responder con un **mensaje de texto** útil y conversacional. No intentes llamar a una función. Si no puedes ayudar, explica la situación e indica que notificarás a un agente humano.
-Mantén siempre un tono amigable y eficiente.`;
+Mantén siempre un tono amigable y eficiente.
+`;
 
+        //! Herramientas para Gemini
+        //! Herramientas para Gemini
+        //! Herramientas para Gemini
         const tools = construirHerramientasParaGemini(input.tareasDisponibles);
-        console.log("[IA Action] Herramientas DEFINITIVAS pasadas a Gemini:", JSON.stringify(tools, null, 2)); // <--- AÑADE ESTE LOG DETALLADO
+        console.log("[IA Action] Herramientas DEFINITIVAS pasadas a Gemini:", JSON.stringify(tools, null, 2));
 
         const model = genAI.getGenerativeModel({
             model: "gemini-1.5-flash-latest",
@@ -172,6 +184,9 @@ Mantén siempre un tono amigable y eficiente.`;
 
         console.log("[IA Action] Respuesta completa de Gemini:", JSON.stringify(response, null, 2));
 
+        //! ***** variables para almacenar la respuesta textual y la llamada a función a devolver
+        //! ***** variables para almacenar la respuesta textual y la llamada a función a devolver
+        //! ***** variables para almacenar la respuesta textual y la llamada a función a devolver
         let respuestaTextual: string | null = null;
         let llamadaFuncion: RespuestaAsistenteConHerramientas['llamadaFuncion'] = null;
 
@@ -188,8 +203,12 @@ Mantén siempre un tono amigable y eficiente.`;
             };
             console.log(`[IA Action] Función a llamar: ${llamadaFuncion.nombreFuncion}, Argumentos:`, llamadaFuncion.argumentos);
             respuestaTextual = response.text() || null;
+
+            //! reemplazar con el texto de respuesta
             if (!respuestaTextual && llamadaFuncion) {
-                respuestaTextual = `Entendido, voy a proceder con la acción: ${llamadaFuncion.nombreFuncion}.`;
+                respuestaTextual = `Entendido, dame un momento.`;
+                // respuestaTextual = `Entendido, dame un momento. voy a proceder con la acción: ${llamadaFuncion.nombreFuncion}.`;
+                console.log(llamadaFuncion.nombreFuncion)
             }
             // --- FIN CASO IDEAL ---
 
@@ -200,6 +219,7 @@ Mantén siempre un tono amigable y eficiente.`;
 
             // *** CAMBIO 3: INICIO WORKAROUND - Parsear JSON desde Texto ***
             if (respuestaTextual && typeof respuestaTextual === 'string') { // Guarda de tipo
+
                 const jsonMatch = respuestaTextual.match(/```json\s*([\s\S]*?)\s*```/);
 
                 if (jsonMatch && jsonMatch[1]) {
@@ -207,7 +227,7 @@ Mantén siempre un tono amigable y eficiente.`;
                     try {
                         const parsedJson = JSON.parse(jsonMatch[1]);
 
-                        // *** INICIO DE CORRECCIÓN PARA JSON ANIDADO ***
+                        // *** JSON ANIDADO ***
                         // Verificar si el JSON parseado contiene la clave 'functionCall'
                         // y si esa clave contiene 'name' y 'args'
                         if (parsedJson.functionCall &&
@@ -218,16 +238,16 @@ Mantén siempre un tono amigable y eficiente.`;
                             parsedJson.functionCall.args !== null) {
 
                             console.warn("[IA Action] Workaround: Función recuperada desde JSON en texto (estructura anidada).");
-                            llamadaFuncion = { // Asigna a llamadaFuncion
+                            llamadaFuncion = {
+                                //! Asigna a llamadaFuncion
                                 nombreFuncion: parsedJson.functionCall.name,
                                 argumentos: parsedJson.functionCall.args as Record<string, unknown>,
                             };
                             // const funcionRecuperada = true; // Asegúrate de tener esta bandera si la usas
-                            // *** NUEVA LÍNEA: Actualizar respuestaTextual ***
+                            //!respuestaTextual
                             console.log(`[IA Action] Workaround - Función recuperada: ${llamadaFuncion.nombreFuncion}, Args:`, llamadaFuncion.argumentos);
                             respuestaTextual = `Entendido. Procesando tu solicitud para: ${llamadaFuncion.nombreFuncion}.`;
                             console.log("[IA Action] Workaround: respuestaTextual actualizada después de recuperar función desde JSON.");
-                            // *** FIN NUEVA LÍNEA ***
 
                         } else {
                             console.warn("[IA Action] Workaround: JSON parseado no tiene la estructura esperada { functionCall: { name, args } }.");

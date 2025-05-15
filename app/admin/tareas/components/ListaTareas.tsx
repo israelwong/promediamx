@@ -24,14 +24,11 @@ import {
 
 // Importar tipos CENTRALIZADOS (¡Ahora son los explícitos!)
 import {
-    TareaConDetalles,       // Tipo explícito para el estado de tareas
-    OrdenarTareasInput,     // Tipo explícito para ordenar
-    CategoriaTareaSimple    // Tipo explícito para filtros
-    // Importa ActionResult si lo necesitas manejar directamente en el componente
-    // import { ActionResult } from '@/app/admin/_lib/types';
-} from '@/app/admin/_lib/types'; // <-- AJUSTA LA RUTA a tu types.ts central
+    TareaConDetalles,
+    OrdenarTareasInput,
+    CategoriaTareaSimple
+} from '@/app/admin/_lib/tareas.type';
 
-// Importar componentes UI y Iconos
 import { Loader2, Search, ListFilter, GripVertical, Image as ImageIcon, GalleryHorizontal, Check, PlusIcon } from 'lucide-react';
 import { Input } from "@/app/components/ui/input"; // Ajusta ruta
 
@@ -61,8 +58,7 @@ function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaC
     // Accede a los campos según la definición explícita de TareaConDetalles
     const ejecucionesCount = tarea._count?.TareaEjecutada ?? 0;
     const galeriaCount = tarea._count?.TareaGaleria ?? 0;
-    // Asegúrate de que CategoriaTarea puede ser null antes de acceder a color
-    const categoriaColor = tarea.CategoriaTarea?.color || '#808080';
+    const categoriaColor = tarea.CategoriaTarea?.color || '#FFFFFF';
 
     return (
         <tr
@@ -164,7 +160,7 @@ export default function ListaTareas() {
     const [isSavingOrder, setIsSavingOrder] = useState(false);
 
     // Clases Tailwind (sin cambios)
-    const inputBaseClasses = "text-sm bg-zinc-900 border border-zinc-700 text-white block w-full rounded-md p-1.5 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70 placeholder-zinc-500 h-8";
+    const inputBaseClasses = "text-sm bg-zinc-900 border border-zinc-700 text-white block w-full p-1.5 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70 placeholder-zinc-500 h-8";
     const categoryButtonBase = "px-2.5 py-1 text-xs font-medium rounded-full border transition-colors duration-150 flex items-center gap-1";
     const categoryButtonInactive = "bg-zinc-700/50 border-zinc-600 text-zinc-300 hover:bg-zinc-600/50 hover:border-zinc-500";
     const categoryButtonActive = "bg-blue-600 border-blue-500 text-white ring-2 ring-blue-400 ring-offset-1 ring-offset-zinc-900";
@@ -394,7 +390,7 @@ export default function ListaTareas() {
             {/* Tabla de Tareas (Contenedor Scrollable y DnD Context) */}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 {/* Contenedor con overflow y estilos */}
-                <div className="flex-grow overflow-auto -mx-4 -mb-4 border border-zinc-700 rounded-lg bg-zinc-900/30">
+                <div className="flex-grow overflow-auto -mx-4 -mb-4 border border-zinc-700 bg-zinc-900/30">
                     {/* Estado de Carga */}
                     {loading ? (
                         <div className="flex items-center justify-center py-10 text-zinc-400 h-60">

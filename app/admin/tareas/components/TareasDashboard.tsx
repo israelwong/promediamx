@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 
 import ListaTareas from './ListaTareas';
-import TareasCategorias from './TareasCategorias';
-import TareasEtiquetas from './TareasEtiquetas';
-import TareasCanales from './TareasCanales';
-import TareaParametros from './TareaParametros';
-import TareaFunciones from './TareaFunciones';
+import TareasCategorias from '../categorias/components/TareasCategorias_no';
+import TareasEtiquetas from '../etiquetas/components/TareasEtiquetas';
+import TareasCanales from '../canales/components/TareasCanales';
+import TareaParametros from '../parametros/components/TareaParametros';
+import TareaFunciones from '../funciones/components/TareaFunciones';
 
 import { LayoutList, List, Cog, ListTree, Tags } from 'lucide-react';
 // import { useRouter } from 'next/navigation';

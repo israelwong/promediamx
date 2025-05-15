@@ -4,38 +4,42 @@ import prisma from './prismaClient'; // Ajusta ruta
 import {
     TareaFuncion,
     ParametroRequerido,
-    CrearFuncionData,
-    EditarFuncionData,
-    TareaFuncionParametroRequerido
-} from './types';
+    // CrearFuncionData, // Eliminamos esta importación del ./types global
+    // EditarFuncionData, // Eliminamos esta importación del ./types global
+    TareaFuncionParametroRequerido,
+} from './types'; // Los tipos base TareaFuncion, ParametroRequerido, etc., se mantienen desde aquí
 import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { FuncionConDetalles } from './tareaFuncion.type'; // Importamos el tipo específico para la función
 
+// --- NUEVAS IMPORTACIONES DE TIPOS ESPECÍFICOS DE LA ENTIDAD ---
+import {
+    CrearTareaFuncionInput,
+    EditarTareaFuncionInput
+} from './tareaFuncion.type'; // Importamos los tipos desde el archivo dedicado
+
+// --- Funciones (Lógica interna sin cambios) ---
 
 export async function obtenerFuncionesTareaConParametros(): Promise<(TareaFuncion & { _count?: { tareas?: number }, parametrosRequeridos?: (TareaFuncionParametroRequerido & { parametroRequerido?: Pick<ParametroRequerido, 'id' | 'nombreVisible' | 'nombreInterno' | 'tipoDato'> | null })[] })[]> {
     try {
         const funciones = await prisma.tareaFuncion.findMany({
-            orderBy: { nombreVisible: 'asc' },
+            orderBy: { nombreVisible: 'asc' }, // En tu código original era 'orden', pero el schema no lo tiene. Usaré 'nombreVisible'.
             include: {
-                parametrosRequeridos: { // Incluir la tabla de unión
+                parametrosRequeridos: {
                     include: {
-                        parametroRequerido: { // Incluir los detalles del parámetro
-                            // Seleccionar los campos necesarios, incluyendo los nuevos nombres
+                        parametroRequerido: {
                             select: {
                                 id: true,
-                                nombreVisible: true, // <-- CAMBIO
-                                nombreInterno: true, // <-- CAMBIO
+                                nombreVisible: true,
+                                nombreInterno: true,
                                 tipoDato: true,
-                                // descripcion: true, // Opcional: incluir si se necesita en la lista
                             }
                         }
                     }
                 },
-                _count: { select: { tareas: true } } // Contar tareas asociadas
+                _count: { select: { tareas: true } }
             }
         });
-        // Es importante asegurar que el tipo devuelto coincida con tu interfaz TareaFuncion/FuncionConDetalles
-        // El casteo ayuda, pero verifica que la estructura coincida.
         return funciones as (TareaFuncion & {
             _count?: { tareas?: number },
             parametrosRequeridos?: (TareaFuncionParametroRequerido & {
@@ -48,13 +52,10 @@ export async function obtenerFuncionesTareaConParametros(): Promise<(TareaFuncio
     }
 }
 
-// --- Obtener todos los Parámetros Estándar disponibles ---
-// (Sin cambios necesarios aquí, asumiendo que devuelve el objeto completo
-// y el tipo ParametroRequerido ya está actualizado)
 export async function obtenerParametrosRequeridosDisponibles(): Promise<ParametroRequerido[]> {
     try {
         const parametros = await prisma.parametroRequerido.findMany({
-            orderBy: { orden: 'asc' }, // Ordenar por el campo 'orden' si existe y es relevante
+            orderBy: { orden: 'asc' },
         });
         return parametros as ParametroRequerido[];
     } catch (error) {
@@ -63,16 +64,15 @@ export async function obtenerParametrosRequeridosDisponibles(): Promise<Parametr
     }
 }
 
-
-// --- Crear Función Tarea ---
-// (Sin cambios funcionales necesarios aquí respecto a los campos de parámetro)
+// --- Crear Función Tarea (Firma actualizada) ---
 export async function crearFuncionTarea(
-    data: CrearFuncionData
+    data: CrearTareaFuncionInput // <-- TIPO ACTUALIZADO
 ): Promise<{ success: boolean; data?: TareaFuncion; error?: string }> {
     try {
         if (!data.nombreInterno?.trim() || !data.nombreVisible?.trim()) {
             return { success: false, error: "Nombre interno y visible son requeridos." };
         }
+        // Comentado según tu código original
         // if (!/^[a-z0-9_]+$/.test(data.nombreInterno)) {
         //     return { success: false, error: "Nombre interno solo puede contener minúsculas, números y guion bajo." };
         // }
@@ -83,6 +83,7 @@ export async function crearFuncionTarea(
                     nombreInterno: data.nombreInterno.trim(),
                     nombreVisible: data.nombreVisible.trim(),
                     descripcion: data.descripcion?.trim() || null,
+                    // 'orden' no se maneja aquí en tu lógica original
                 },
             });
 
@@ -93,27 +94,33 @@ export async function crearFuncionTarea(
                         parametroRequeridoId: p.parametroRequeridoId,
                         esObligatorio: p.esObligatorio,
                     })),
-                    skipDuplicates: true,
+                    skipDuplicates: true, // Mantener según tu lógica original
                 });
             }
             return funcionCreada;
         });
 
+        // Lógica para obtener la función completa después de crearla (original)
         const funcionCompleta = await obtenerFuncionTareaPorId(nuevaFuncion.id);
+        // El casteo a TareaFuncion aquí asume que la estructura de funcionCompleta es compatible.
+        // Los campos createdAt/updatedAt en los parámetros anidados son un detalle de tu casteo original.
         return {
             success: true,
             data: {
                 ...funcionCompleta,
                 parametrosRequeridos: funcionCompleta?.parametrosRequeridos?.map(pr => ({
                     ...pr,
-                    parametroRequerido: {
+                    parametroRequerido: pr.parametroRequerido ? { // Verificar si parametroRequerido existe
                         ...pr.parametroRequerido,
-                        createdAt: new Date(), // Replace with actual value if available
-                        updatedAt: new Date()  // Replace with actual value if available
-                    }
+                        // Los campos createdAt y updatedAt no están en el select de obtenerFuncionTareaPorId para parametroRequerido.
+                        // Si son necesarios, deben añadirse al select o el tipo TareaFuncion debe reflejar que son opcionales.
+                        // Por ahora, se omite para evitar errores si no existen.
+                        // createdAt: new Date(), 
+                        // updatedAt: new Date()  
+                    } : null // Mantener null si no existe
                 }))
             } as TareaFuncion
-        }; // Asegurar casteo correcto
+        };
     } catch (error) {
         console.error('Error creating task function:', error);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -124,11 +131,10 @@ export async function crearFuncionTarea(
 }
 
 
-// --- Editar Función Tarea ---
-// (Sin cambios funcionales necesarios aquí respecto a los campos de parámetro)
+// --- Editar Función Tarea (Firma actualizada) ---
 export async function editarFuncionTarea(
     id: string,
-    data: EditarFuncionData
+    data: EditarTareaFuncionInput // <-- TIPO ACTUALIZADO
 ): Promise<{ success: boolean; data?: TareaFuncion; error?: string }> {
     try {
         if (!id) return { success: false, error: "ID de función no proporcionado." };
@@ -137,7 +143,7 @@ export async function editarFuncionTarea(
         if (data.nombreVisible !== undefined) dataToUpdate.nombreVisible = data.nombreVisible.trim();
         if (data.descripcion !== undefined) dataToUpdate.descripcion = data.descripcion?.trim() || null;
 
-        if (dataToUpdate.nombreVisible === '') {
+        if (dataToUpdate.nombreVisible === '') { // Validación original
             return { success: false, error: "El nombre visible no puede estar vacío." };
         }
 
@@ -149,6 +155,7 @@ export async function editarFuncionTarea(
                 });
             }
 
+            // Manejo de parámetros (lógica original)
             if (data.parametros !== undefined) {
                 await tx.tareaFuncionParametroRequerido.deleteMany({
                     where: { tareaFuncionId: id }
@@ -186,17 +193,17 @@ export async function editarFuncionTarea(
 
     } catch (error) {
         console.error(`Error updating task function ${id}:`, error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            // Podría ser por nombreVisible si tiene restricción unique
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002' && data.nombreVisible) {
             return { success: false, error: `El nombre visible '${data.nombreVisible}' ya está en uso.` };
+        }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return { success: false, error: `Función con ID ${id} no encontrada.` };
         }
         return { success: false, error: (error as Error).message || "Error desconocido al editar función." };
     }
 }
 
-
-// --- Eliminar Función ---
-// (Sin cambios necesarios aquí)
+// --- Eliminar Función (Lógica original) ---
 export async function eliminarFuncionTarea(id: string): Promise<{ success: boolean; error?: string }> {
     try {
         if (!id) return { success: false, error: "ID de función no proporcionado." };
@@ -220,8 +227,7 @@ export async function eliminarFuncionTarea(id: string): Promise<{ success: boole
     }
 }
 
-// Helper para obtener una función por ID (usado internamente)
-// ACTUALIZADO: El select para parametroRequerido ahora incluye nombreVisible y nombreInterno
+// Helper para obtener una función por ID (Lógica original, con select ajustado)
 async function obtenerFuncionTareaPorId(id: string) {
     return await prisma.tareaFuncion.findUnique({
         where: { id },
@@ -229,11 +235,12 @@ async function obtenerFuncionTareaPorId(id: string) {
             parametrosRequeridos: {
                 include: {
                     parametroRequerido: {
-                        select: { // Asegurar que seleccionamos los campos correctos
+                        select: {
                             id: true,
-                            nombreVisible: true, // <-- CAMBIO
-                            nombreInterno: true, // <-- CAMBIO
+                            nombreVisible: true,
+                            nombreInterno: true,
                             tipoDato: true
+                            // 'descripcion' no estaba en tu select original para esta helper
                         }
                     }
                 }
@@ -243,28 +250,27 @@ async function obtenerFuncionTareaPorId(id: string) {
     });
 }
 
-
-// --- NUEVA ACCIÓN: Actualizar Orden de las Funciones ---
+// --- Actualizar Orden de las Funciones (Lógica original) ---
 export async function actualizarOrdenFunciones(
-    funcionesOrdenadas: { id: string; orden: number }[] // Espera un array de {id, nuevoOrden}
+    funcionesOrdenadas: { id: string; orden: number }[]
 ): Promise<{ success: boolean; error?: string }> {
     try {
         if (!funcionesOrdenadas || funcionesOrdenadas.length === 0) {
-            return { success: true }; // Nada que actualizar
+            return { success: true };
         }
 
-        // Usar una transacción para actualizar todos los órdenes
         await prisma.$transaction(
-            funcionesOrdenadas.map((func, index) => // Usar el índice como nuevo orden
+            funcionesOrdenadas.map((func, index) =>
                 prisma.tareaFuncion.update({
                     where: { id: func.id },
-                    data: { orden: index }, // Asignar el índice del array como nuevo orden
+                    // Tu schema de TareaFuncion no tiene 'orden', así que esta parte no haría nada.
+                    // Si 'orden' se añade al schema, esto funcionaría.
+                    // Por ahora, lo dejo como en tu original, aunque 'orden' no exista en el schema que me pasaste.
+                    data: { orden: index },
                 })
             )
         );
-
-        // Opcional: Revalidar la ruta donde se muestra la lista si es necesario
-        // revalidatePath('/admin/tareas'); // Ajusta la ruta según corresponda
+        // revalidatePath('/admin/tareas/funciones'); // Ajusta la ruta según corresponda
 
         return { success: true };
     } catch (error) {
@@ -273,22 +279,21 @@ export async function actualizarOrdenFunciones(
     }
 }
 
-
-// Acción para asociar una TareaFuncion existente a una Tarea
+// --- Asociar/Desasociar Función a Tarea (Lógica original) ---
 export async function asociarFuncionATarea(
     tareaId: string,
-    funcionId: string | null // Permitir null para desasociar
+    funcionId: string | null
 ): Promise<{ success: boolean; error?: string }> {
     try {
         if (!tareaId) return { success: false, error: "ID de tarea no proporcionado." };
 
         await prisma.tarea.update({
             where: { id: tareaId },
-            data: { tareaFuncionId: funcionId }, // Asocia o desasocia
+            data: { tareaFuncionId: funcionId },
         });
 
-        revalidatePath(`/admin/tareas/${tareaId}`); // Revalida la página de edición
-        revalidatePath('/admin/tareas'); // Revalida la lista
+        revalidatePath(`/admin/tareas/${tareaId}`);
+        revalidatePath('/admin/tareas');
 
         return { success: true };
     } catch (error) {
@@ -297,34 +302,31 @@ export async function asociarFuncionATarea(
     }
 }
 
-// Acción para obtener solo la función asociada a una tarea (más ligero que obtenerTareaPorId completo)
-// Asegúrate que el tipo devuelto coincida con FuncionConDetalles que usaremos
-
-
-// Define el tipo esperado aquí o impórtalo si ya existe uno similar
-type FuncionConDetalles = TareaFuncion & {
+// --- Obtener Función de Tarea (Lógica original, con tipo de retorno ajustado) ---
+// El tipo FuncionConDetalles es el que definimos en tareaFuncion.type.ts
+type FuncionConDetallesParaAction = TareaFuncion & {
     parametrosRequeridos?: (TareaFuncionParametroRequerido & {
         parametroRequerido?: Pick<ParametroRequerido, 'id' | 'nombreVisible' | 'nombreInterno' | 'tipoDato' | 'descripcion'> | null
     })[]
 };
 
-export async function obtenerFuncionDeTarea(tareaId: string): Promise<FuncionConDetalles | null> {
+export async function obtenerFuncionDeTarea(tareaId: string): Promise<FuncionConDetallesParaAction | null> {
     try {
         if (!tareaId) return null;
         const tarea = await prisma.tarea.findUnique({
             where: { id: tareaId },
             select: {
-                tareaFuncion: { // Incluye la función relacionada
+                tareaFuncion: {
                     include: {
                         parametrosRequeridos: {
                             include: {
-                                parametroRequerido: { // Incluye los detalles del parámetro
+                                parametroRequerido: {
                                     select: {
                                         id: true,
                                         nombreVisible: true,
                                         nombreInterno: true,
                                         tipoDato: true,
-                                        descripcion: true, // Incluir descripción para mostrarla
+                                        descripcion: true,
                                     }
                                 }
                             }
@@ -333,9 +335,44 @@ export async function obtenerFuncionDeTarea(tareaId: string): Promise<FuncionCon
                 }
             }
         });
-        return tarea?.tareaFuncion as FuncionConDetalles | null; // Devuelve la función o null
+        // El casteo aquí asume que la estructura devuelta por Prisma es compatible.
+        return tarea?.tareaFuncion as FuncionConDetallesParaAction | null;
     } catch (error) {
         console.error(`Error fetching function for tarea ${tareaId}:`, error);
         throw new Error('No se pudo obtener la función asociada a la tarea.');
+    }
+}
+
+
+// --- NUEVA SERVER ACTION EXPORTADA ---
+// Obtiene los detalles de una TareaFuncion específica por su ID
+export async function obtenerFuncionTareaDetallesPorId(id: string): Promise<FuncionConDetalles | null> {
+    try {
+        if (!id) return null;
+        const funcion = await prisma.tareaFuncion.findUnique({
+            where: { id },
+            include: {
+                parametrosRequeridos: {
+                    include: {
+                        parametroRequerido: {
+                            select: {
+                                id: true,
+                                nombreVisible: true,
+                                nombreInterno: true,
+                                tipoDato: true,
+                                descripcion: true // Incluimos descripción para el form de edición
+                            }
+                        }
+                    }
+                },
+                _count: { select: { tareas: true } }
+            }
+        });
+        if (!funcion) return null;
+        // Aseguramos que el tipo de retorno sea compatible con FuncionConDetalles
+        return funcion as unknown as FuncionConDetalles;
+    } catch (error) {
+        console.error(`Error fetching task function details for ID ${id}:`, error);
+        throw new Error('No se pudieron obtener los detalles de la función de tarea.');
     }
 }
