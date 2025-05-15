@@ -7,7 +7,10 @@ import { es } from 'date-fns/locale/es';
 
 // Importar acciones y tipos
 import {
-    obtenerCitasLead, crearCitaLead, editarCitaLead, eliminarCitaLead,
+    obtenerCitasLead,
+    //  crearCitaLead, 
+    //  editarCitaLead,
+    eliminarCitaLead,
     obtenerDatosParaFormularioCita
 } from '@/app/admin/_lib/crmAgenda.actions'; // Ajusta ruta!
 import {
@@ -20,7 +23,7 @@ import { Input } from "@/app/components/ui/input"; // Ajustar ruta si es necesar
 import { Button } from "@/app/components/ui/button"; // Ajustar ruta si es necesario
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select"; // Ajustar ruta si es necesario
 import { Textarea } from "@/app/components/ui/textarea"; // Ajustar ruta si es necesario
-import { Loader2, PlusCircle, Calendar as CalendarIcon, Clock, User, Tag, Trash2, Save, Pencil, Link as LinkIcon, BellRing, AlertTriangle } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Save, Pencil, Link as LinkIcon, BellRing, AlertTriangle } from 'lucide-react';
 import { Badge } from "@/app/components/ui/badge"; // Ajustar ruta si es necesario
 
 interface Props {
@@ -31,7 +34,7 @@ interface Props {
 type DatosFormularioConCrmId = DatosFormularioCita & { crmId: string | null };
 
 const initialFormState: NuevaCitaFormData = {
-    tipo: 'Llamada', asunto: '', fecha: '', descripcion: '', agenteId: '', meetingUrl: '', fechaRecordatorio: '',
+    asunto: '', fecha: '', descripcion: '', agenteId: '', meetingUrl: '', fechaRecordatorio: '',
 };
 
 export default function LeadGestionCitas({ leadId, negocioId }: Props) {
@@ -93,7 +96,7 @@ export default function LeadGestionCitas({ leadId, negocioId }: Props) {
             const fechaParaInput = cita.fecha ? formatISO(new Date(cita.fecha)).slice(0, 16) : '';
             const recordatorioParaInput = cita.fechaRecordatorio ? formatISO(new Date(cita.fechaRecordatorio)).slice(0, 16) : '';
             setFormData({
-                tipo: cita.tipo, asunto: cita.asunto, fecha: fechaParaInput,
+                asunto: cita.asunto, fecha: fechaParaInput,
                 descripcion: cita.descripcion || '', agenteId: cita.agenteId || '',
                 status: cita.status, meetingUrl: cita.meetingUrl || '',
                 fechaRecordatorio: recordatorioParaInput,
@@ -124,12 +127,12 @@ export default function LeadGestionCitas({ leadId, negocioId }: Props) {
             setFormError("La fecha de recordatorio debe ser anterior a la fecha de la cita."); setIsSubmitting(false); return;
         }
         try {
-            let result;
-            if (formMode === 'create') { const dataToCreate: NuevaCitaFormData = { tipo: formData.tipo, asunto: formData.asunto, fecha: formData.fecha, descripcion: formData.descripcion, agenteId: formData.agenteId, meetingUrl: formData.meetingUrl, fechaRecordatorio: formData.fechaRecordatorio, }; result = await crearCitaLead(leadId, dataToCreate); }
-            else if (formMode === 'edit' && citaParaEditar) { const dataToEdit: EditarCitaFormData = { tipo: formData.tipo, asunto: formData.asunto, fecha: formData.fecha, descripcion: formData.descripcion, agenteId: formData.agenteId, status: (formData as EditarCitaFormData).status, meetingUrl: formData.meetingUrl, fechaRecordatorio: formData.fechaRecordatorio, }; result = await editarCitaLead(citaParaEditar.id, dataToEdit); }
-            else { throw new Error("Modo de formulario inválido."); }
-            if (result.success && result.data) { await fetchData(); closeForm(); }
-            else { throw new Error(result.error || "Error desconocido al guardar la cita."); }
+            // let result;
+            // if (formMode === 'create') { const dataToCreate: NuevaCitaFormData = { asunto: formData.asunto, fecha: formData.fecha, descripcion: formData.descripcion, agenteId: formData.agenteId, meetingUrl: formData.meetingUrl, fechaRecordatorio: formData.fechaRecordatorio, }; result = await crearCitaLead(leadId, dataToCreate); }
+            // else if (formMode === 'edit' && citaParaEditar) { const dataToEdit: EditarCitaFormData = { asunto: formData.asunto, fecha: formData.fecha, descripcion: formData.descripcion, agenteId: formData.agenteId, status: (formData as EditarCitaFormData).status, meetingUrl: formData.meetingUrl, fechaRecordatorio: formData.fechaRecordatorio, }; result = await editarCitaLead(citaParaEditar.id, dataToEdit); }
+            // else { throw new Error("Modo de formulario inválido."); }
+            // if (result.success && result.data) { await fetchData(); closeForm(); }
+            // else { throw new Error(result.error || "Error desconocido al guardar la cita."); }
         } catch (err) { console.error(`Error submitting ${formMode} cita:`, err); setFormError(err instanceof Error ? err.message : "Ocurrió un error inesperado."); }
         finally { setIsSubmitting(false); }
     };
@@ -165,7 +168,161 @@ export default function LeadGestionCitas({ leadId, negocioId }: Props) {
             {showForm && (
                 <form onSubmit={handleFormSubmit} className="p-4 border border-zinc-700 rounded-lg bg-zinc-800 space-y-3 animate-in fade-in duration-200">
                     {/* ... (contenido del formulario sin cambios) ... */}
-                    <h4 className="text-sm font-semibold text-zinc-200 mb-2">{formMode === 'create' ? 'Nueva Cita / Tarea' : `Editando: ${citaParaEditar?.asunto}`}</h4> {formError && <p className="text-xs text-red-400 bg-red-900/20 p-2 rounded border border-red-700">{formError}</p>} <div className="grid grid-cols-2 gap-3"> <div> <label htmlFor="tipo" className={labelClasses}>Tipo <span className="text-red-500">*</span></label> <Select value={formData.tipo} onValueChange={(v) => handleSelectChange('tipo', v)} disabled={isSubmitting}> <SelectTrigger id="tipo" className={selectTriggerClasses}><SelectValue /></SelectTrigger> <SelectContent> <SelectItem value="Llamada">Llamada</SelectItem> <SelectItem value="Reunion">Reunión</SelectItem> <SelectItem value="Email">Enviar Email</SelectItem> <SelectItem value="Tarea">Tarea Pendiente</SelectItem> <SelectItem value="Otro">Otro</SelectItem> </SelectContent> </Select> </div> <div> <label htmlFor="agenteId" className={labelClasses}>Agente <span className="text-red-500">*</span></label> <Select value={formData.agenteId || ''} onValueChange={(v) => handleSelectChange('agenteId', v)} disabled={isSubmitting || !datosForm}> <SelectTrigger id="agenteId" className={selectTriggerClasses}><SelectValue placeholder="Asignar a..." /></SelectTrigger> <SelectContent> {datosForm?.agentes.map(a => <SelectItem key={a.id} value={a.id}>{a.nombre}</SelectItem>)} </SelectContent> </Select> </div> </div> <div> <label htmlFor="asunto" className={labelClasses}>Asunto <span className="text-red-500">*</span></label> <Input id="asunto" name="asunto" required value={formData.asunto} onChange={handleInputChange} className={inputClasses} disabled={isSubmitting} maxLength={100} /> </div> <div className="grid grid-cols-1 md:grid-cols-2 gap-3"> <div> <label htmlFor="fecha" className={labelClasses}>Fecha y Hora <span className="text-red-500">*</span></label> <Input id="fecha" name="fecha" type="datetime-local" required value={formData.fecha} onChange={handleInputChange} className={inputClasses} disabled={isSubmitting} min={new Date().toISOString().slice(0, 16)} /> </div> <div> <label htmlFor="fechaRecordatorio" className={labelClasses}>Recordatorio (Opcional)</label> <Input id="fechaRecordatorio" name="fechaRecordatorio" type="datetime-local" value={formData.fechaRecordatorio || ''} onChange={handleInputChange} className={inputClasses} disabled={isSubmitting} /> </div> </div> <div> <label htmlFor="meetingUrl" className={labelClasses}>URL Reunión (Opcional)</label> <Input id="meetingUrl" name="meetingUrl" type="url" value={formData.meetingUrl || ''} onChange={handleInputChange} className={inputClasses} disabled={isSubmitting} placeholder="https://meet.google.com/..." /> </div> <div> <label htmlFor="descripcion" className={labelClasses}>Descripción / Notas</label> <Textarea id="descripcion" name="descripcion" rows={3} value={formData.descripcion || ''} onChange={handleInputChange} className={inputClasses} disabled={isSubmitting} /> </div> {formMode === 'edit' && (<div> <label htmlFor="status" className={labelClasses}>Status <span className="text-red-500">*</span></label> <Select value={(formData as EditarCitaFormData).status || 'pendiente'} onValueChange={(v) => handleSelectChange('status', v)} disabled={isSubmitting}> <SelectTrigger id="status" className={selectTriggerClasses}><SelectValue /></SelectTrigger> <SelectContent> <SelectItem value="pendiente">Pendiente</SelectItem> <SelectItem value="completada">Completada</SelectItem> <SelectItem value="cancelada">Cancelada</SelectItem> </SelectContent> </Select> </div>)} <div className="flex justify-end gap-2 pt-2"> <Button type="button" variant="ghost" size="sm" onClick={closeForm} disabled={isSubmitting}>Cancelar</Button> <Button type="submit" size="sm" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700"> {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {formMode === 'create' ? 'Guardar Cita' : 'Actualizar Cita'} </Button> </div>
+                    <h4 className="text-sm font-semibold text-zinc-200 mb-2">{formMode === 'create' ? 'Nueva Cita / Tarea' : `Editando: ${citaParaEditar?.asunto}`}</h4> {formError && <p className="text-xs text-red-400 bg-red-900/20 p-2 rounded border border-red-700">{formError}</p>} <div className="grid grid-cols-2 gap-3"> <div>
+                        <label htmlFor="tipo" className={labelClasses}>Tipo <span className="text-red-500">*</span></label>
+                        <Select>
+                            <SelectContent>
+                                <SelectItem value="Llamada">Llamada</SelectItem>
+                                <SelectItem value="Reunion">Reunión</SelectItem>
+                                <SelectItem value="Email">Enviar Email</SelectItem>
+                                <SelectItem value="Tarea">Tarea Pendiente</SelectItem>
+                                <SelectItem value="Otro">Otro</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                        <div>
+                            <label htmlFor="agenteId" className={labelClasses}>
+                                Agente <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={formData.agenteId || ''}
+                                onValueChange={(v) => handleSelectChange('agenteId', v)}
+                                disabled={isSubmitting || !datosForm}
+                            >
+                                <SelectTrigger id="agenteId" className={selectTriggerClasses}>
+                                    <SelectValue placeholder="Asignar a..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {datosForm?.agentes.map((a) => (
+                                        <SelectItem key={a.id} value={a.id}>
+                                            {a.nombre}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div>
+                        <label htmlFor="asunto" className={labelClasses}>
+                            Asunto <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                            id="asunto"
+                            name="asunto"
+                            required
+                            value={formData.asunto}
+                            onChange={handleInputChange}
+                            className={inputClasses}
+                            disabled={isSubmitting}
+                            maxLength={100}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label htmlFor="fecha" className={labelClasses}>
+                                Fecha y Hora <span className="text-red-500">*</span>
+                            </label>
+                            <Input
+                                id="fecha"
+                                name="fecha"
+                                type="datetime-local"
+                                required
+                                value={formData.fecha}
+                                onChange={handleInputChange}
+                                className={inputClasses}
+                                disabled={isSubmitting}
+                                min={new Date().toISOString().slice(0, 16)}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="fechaRecordatorio" className={labelClasses}>
+                                Recordatorio (Opcional)
+                            </label>
+                            <Input
+                                id="fechaRecordatorio"
+                                name="fechaRecordatorio"
+                                type="datetime-local"
+                                value={formData.fechaRecordatorio || ''}
+                                onChange={handleInputChange}
+                                className={inputClasses}
+                                disabled={isSubmitting}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label htmlFor="meetingUrl" className={labelClasses}>
+                            URL Reunión (Opcional)
+                        </label>
+                        <Input
+                            id="meetingUrl"
+                            name="meetingUrl"
+                            type="url"
+                            value={formData.meetingUrl || ''}
+                            onChange={handleInputChange}
+                            className={inputClasses}
+                            disabled={isSubmitting}
+                            placeholder="https://meet.google.com/..."
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="descripcion" className={labelClasses}>
+                            Descripción / Notas
+                        </label>
+                        <Textarea
+                            id="descripcion"
+                            name="descripcion"
+                            rows={3}
+                            value={formData.descripcion || ''}
+                            onChange={handleInputChange}
+                            className={inputClasses}
+                            disabled={isSubmitting}
+                        />
+                    </div>
+                    {formMode === 'edit' && (
+                        <div>
+                            <label htmlFor="status" className={labelClasses}>
+                                Status <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={(formData as EditarCitaFormData).status || 'pendiente'}
+                                onValueChange={(v) => handleSelectChange('status', v)}
+                                disabled={isSubmitting}
+                            >
+                                <SelectTrigger id="status" className={selectTriggerClasses}>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                                    <SelectItem value="completada">Completada</SelectItem>
+                                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={closeForm}
+                            disabled={isSubmitting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={isSubmitting}
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            {isSubmitting ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                            )}
+                            {formMode === 'create' ? 'Guardar Cita' : 'Actualizar Cita'}
+                        </Button>
+                    </div>
                 </form>
             )}
 
@@ -188,8 +345,18 @@ export default function LeadGestionCitas({ leadId, negocioId }: Props) {
                         {/* Contenido Cita (con padding derecho para no solapar botones) */}
                         <div className="flex justify-between items-start gap-2 pr-20"> {/* Aumentado pr */}
                             <div>
-                                <p className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
-                                    {cita.tipo === 'Llamada' ? <Clock size={12} /> : cita.tipo === 'Reunion' ? <CalendarIcon size={12} /> : <Tag size={12} />} {cita.asunto} </p><p className="text-xs text-zinc-400 mt-0.5"> {format(new Date(cita.fecha), 'PPP p', { locale: es })} </p>{cita.fechaRecordatorio && (<p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1"> <BellRing size={10} /> Recordatorio: {format(new Date(cita.fechaRecordatorio), 'Pp', { locale: es })} </p>)}</div>
+                                {/* <p className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
+                                    {cita.tipo === 'Llamada' ? <Clock size={12} /> : cita.tipo === 'Reunion' ? <CalendarIcon size={12} /> : <Tag size={12} />} {cita.asunto}
+                                </p> */}
+                                <p className="text-xs text-zinc-400 mt-0.5">
+                                    {format(new Date(cita.fecha), 'PPP p', { locale: es })}
+                                </p>
+                                {cita.fechaRecordatorio && (
+                                    <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
+                                        <BellRing size={10} /> Recordatorio: {format(new Date(cita.fechaRecordatorio), 'Pp', { locale: es })}
+                                    </p>
+                                )}
+                            </div>
                             <Badge
                                 variant={cita.status === 'completada' ? 'default' : cita.status === 'cancelada' ? 'destructive' : 'secondary'}
                                 className={`capitalize text-[10px] ${cita.status === 'completada' ? 'bg-green-600/70 border-green-500/50' : ''}`}>
@@ -198,7 +365,7 @@ export default function LeadGestionCitas({ leadId, negocioId }: Props) {
                         </div>
                         {cita.meetingUrl && (<div className="pt-1 border-t border-zinc-700/50 mt-1.5 pr-10"> <a href={cita.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1 truncate" title={cita.meetingUrl}> <LinkIcon size={12} /> {cita.meetingUrl} </a> </div>)}
                         {cita.descripcion && <p className="text-xs text-zinc-300 pt-1 border-t border-zinc-700/50 mt-1.5 pr-10">{cita.descripcion}</p>}
-                        {cita.agente && <p className="text-[10px] text-zinc-500 flex items-center gap-1 mt-1 pr-10"><User size={10} /> {cita.agente.nombre}</p>}
+                        {/* {cita.agente && <p className="text-[10px] text-zinc-500 flex items-center gap-1 mt-1 pr-10"><User size={10} /> {cita.agente.nombre}</p>} */}
                     </div>
                 ))}
                 {!loading && !error && citas.length === 0 && (<p className="text-xs text-zinc-500 text-center italic py-4">No se encontraron citas para este lead.</p>)}

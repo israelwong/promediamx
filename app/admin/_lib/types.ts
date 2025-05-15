@@ -1,5 +1,13 @@
 // Ruta actual del archivo desde app: admin/_lib/types.ts
 
+export interface ActionResult<T> {
+    success: boolean;
+    error?: string;
+    errorDetails?: Record<string, string[]>;
+    data?: T;
+    errors?: string[]; // Array de errores si es necesario
+}
+
 // Tipo para mostrar una cita existente en la lista
 export interface CitaExistente {
     id: string;
@@ -21,7 +29,7 @@ export interface CitaExistente {
 // Tipo para los datos del formulario de nueva cita
 export type NuevaCitaFormData = Pick<
     Agenda,
-    'tipo' | 'asunto' | 'descripcion' | 'agenteId'
+    'asunto' | 'descripcion' | 'agenteId'
 > & {
     fecha: string;
     meetingUrl?: string | null;
@@ -31,7 +39,7 @@ export type NuevaCitaFormData = Pick<
 // Tipo para datos del formulario de EDICIÓN
 export type EditarCitaFormData = Pick<
     Agenda,
-    'tipo' | 'asunto' | 'descripcion' | 'agenteId' | 'status'
+    'asunto' | 'descripcion' | 'agenteId' | 'status'
 > & {
     fecha: string;
     meetingUrl?: string | null;
@@ -274,12 +282,7 @@ export type EstadisticasCRMResumen = {
     // leadsPorEtiqueta?: { etiquetaId: string | null; nombre?: string; color?: string | null; conteo: number }[] | null;
 };
 
-// Tipo de retorno estándar para acciones (si no lo tienes global)
-export interface ActionResult<T = null> {
-    success: boolean;
-    error?: string | null;
-    data?: T;
-}
+
 
 // Tipo para representar el estado de completitud de cada sección
 export type EstadoSeccionNegocio = {

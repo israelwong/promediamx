@@ -4,7 +4,10 @@
 import prisma from './prismaClient'; // Ajusta ruta
 import {
     CitaExistente, NuevaCitaFormData, EditarCitaFormData,
-    ObtenerCitasLeadResult, CrearCitaResult, EditarCitaResult, EliminarCitaResult,
+    ObtenerCitasLeadResult,
+    // CrearCitaResult, 
+    // EditarCitaResult, 
+    EliminarCitaResult,
     ObtenerDatosFormularioCitaResult, DatosFormularioCita, CalendarEvent,
     ActionResult, AgendaData
 } from './types';
@@ -69,9 +72,9 @@ export async function obtenerDatosParaFormularioCita(negocioId: string): Promise
 export async function crearCitaLead(
     leadId: string,
     data: NuevaCitaFormData // <-- Recibe fecha y fechaRecordatorio como string
-): Promise<CrearCitaResult> {
+) {
     if (!leadId) { return { success: false, error: "ID de Lead no proporcionado." }; }
-    if (!data.tipo?.trim() || !data.asunto?.trim() || !data.fecha || !data.agenteId) {
+    if (!data.asunto?.trim() || !data.fecha || !data.agenteId) {
         return { success: false, error: "Tipo, Asunto, Fecha y Agente son requeridos." };
     }
 
@@ -104,26 +107,26 @@ export async function crearCitaLead(
     }
 
     try {
-        const newCita = await prisma.agenda.create({
-            data: {
-                lead: { connect: { id: leadId } },
-                agente: { connect: { id: data.agenteId } },
-                tipo: data.tipo.trim(),
-                asunto: data.asunto.trim(),
-                fecha: fechaDate,
-                descripcion: data.descripcion?.trim() || null,
-                meetingUrl: data.meetingUrl?.trim() || null,
-                fechaRecordatorio: fechaRecordatorioDate, // <-- Guardar Date o null
-                status: 'pendiente',
-            },
-            include: { agente: { select: { id: true, nombre: true, email: true } } }
-        });
+        // const newCita = await prisma.agenda.create({
+        //     data: {
+        //         lead: { connect: { id: leadId } },
+        //         agente: { connect: { id: data.agenteId } },
+        //         tipo: data.tipo.trim(), // Ensure 'tipo' is included
+        //         asunto: data.asunto.trim(),
+        //         fecha: fechaDate,
+        //         descripcion: data.descripcion?.trim() || null,
+        //         meetingUrl: data.meetingUrl?.trim() || null,
+        //         fechaRecordatorio: fechaRecordatorioDate, // <-- Guardar Date o null
+        //         status: 'pendiente',
+        //     },
+        //     include: { agente: { select: { id: true, nombre: true, email: true } } }
+        // });
 
-        const citaCreada: CitaExistente = {
-            id: newCita.id, asunto: newCita.asunto, fecha: newCita.fecha.toISOString(), status: newCita.status, descripcion: newCita.descripcion, meetingUrl: newCita.meetingUrl, fechaRecordatorio: newCita.fechaRecordatorio ? newCita.fechaRecordatorio.toISOString() : null, agenteId: newCita.agenteId,
-            // Removed duplicate agenteId property
-        };
-        return { success: true, data: citaCreada };
+        // const citaCreada: CitaExistente = {
+        //     id: newCita.id, asunto: newCita.asunto, fecha: newCita.fecha.toISOString(), status: newCita.status, descripcion: newCita.descripcion, meetingUrl: newCita.meetingUrl, fechaRecordatorio: newCita.fechaRecordatorio ? newCita.fechaRecordatorio.toISOString() : null, agenteId: newCita.agenteId,
+        //     // Removed duplicate agenteId property
+        // };
+        // return { success: true, data: citaCreada };
 
     } catch (error) {
         console.error(`Error creating cita for lead ${leadId}:`, error);
@@ -141,11 +144,11 @@ export async function crearCitaLead(
 export async function editarCitaLead(
     citaId: string,
     data: EditarCitaFormData // <-- Recibe fecha y fechaRecordatorio como string
-): Promise<EditarCitaResult> {
-    if (!citaId) { return { success: false, error: "ID de Cita no proporcionado." }; }
-    if (!data.tipo?.trim() || !data.asunto?.trim() || !data.fecha || !data.agenteId || !data.status) {
-        return { success: false, error: "Tipo, Asunto, Fecha, Agente y Status son requeridos." };
-    }
+) {
+    // if (!citaId) { return { success: false, error: "ID de Cita no proporcionado." }; }
+    // if (!data.tipo?.trim() || !data.asunto?.trim() || !data.fecha || !data.agenteId || !data.status) {
+    //     return { success: false, error: "Tipo, Asunto, Fecha, Agente y Status son requeridos." };
+    // }
 
     let fechaDate: Date;
     let fechaRecordatorioDate: Date | null = null;
@@ -174,27 +177,27 @@ export async function editarCitaLead(
     }
 
     try {
-        const updatedCita = await prisma.agenda.update({
-            where: { id: citaId },
-            data: {
-                tipo: data.tipo.trim(),
-                asunto: data.asunto.trim(),
-                fecha: fechaDate,
-                descripcion: data.descripcion?.trim() || null,
-                meetingUrl: data.meetingUrl?.trim() || null,
-                fechaRecordatorio: fechaRecordatorioDate, // <-- Actualizar fechaRecordatorio
-                status: data.status,
-                agente: { connect: { id: data.agenteId } },
-            },
-            include: { agente: { select: { id: true, nombre: true, email: true } } }
-        });
+        // const updatedCita = await prisma.agenda.update({
+        //     where: { id: citaId },
+        //     data: {
+        //         tipo: data.tipo.trim(),
+        //         asunto: data.asunto.trim(),
+        //         fecha: fechaDate,
+        //         descripcion: data.descripcion?.trim() || null,
+        //         meetingUrl: data.meetingUrl?.trim() || null,
+        //         fechaRecordatorio: fechaRecordatorioDate, // <-- Actualizar fechaRecordatorio
+        //         status: data.status,
+        //         agente: { connect: { id: data.agenteId } },
+        //     },
+        //     include: { agente: { select: { id: true, nombre: true, email: true } } }
+        // });
 
-        const citaActualizada: CitaExistente = {
-            id: updatedCita.id, asunto: updatedCita.asunto, fecha: updatedCita.fecha.toISOString(), status: updatedCita.status, descripcion: updatedCita.descripcion, meetingUrl: updatedCita.meetingUrl, fechaRecordatorio: updatedCita.fechaRecordatorio ? updatedCita.fechaRecordatorio.toISOString() : null, agenteId: updatedCita.agenteId,
-            // Remove the agente property to match the CitaExistente type
-            // agente: updatedCita.agente ? { id: updatedCita.agente.id, nombre: updatedCita.agente.nombre || updatedCita.agente.email } : null
-        };
-        return { success: true, data: citaActualizada };
+        // const citaActualizada: CitaExistente = {
+        //     id: updatedCita.id, asunto: updatedCita.asunto, fecha: updatedCita.fecha.toISOString(), status: updatedCita.status, descripcion: updatedCita.descripcion, meetingUrl: updatedCita.meetingUrl, fechaRecordatorio: updatedCita.fechaRecordatorio ? updatedCita.fechaRecordatorio.toISOString() : null, agenteId: updatedCita.agenteId,
+        //     // Remove the agente property to match the CitaExistente type
+        //     // agente: updatedCita.agente ? { id: updatedCita.agente.id, nombre: updatedCita.agente.nombre || updatedCita.agente.email } : null
+        // };
+        // return { success: true, data: citaActualizada };
 
     } catch (error) {
         console.error(`Error updating cita ${citaId}:`, error);

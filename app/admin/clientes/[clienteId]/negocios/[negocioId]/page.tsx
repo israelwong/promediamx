@@ -7,8 +7,9 @@ import SuscripcionesDashboard from './components/SuscripcionesDashboard';
 import CatalogoDashboard from './components/CatalogoDashboard';
 import CRMEstadisticas from './components/CRMEstadisticas';
 import NegocioOfertas from './components/(catalogo)/NegocioOfertas';
-import NegocioGalerias from './components/NegocioGalerias';
+// import NegocioGalerias from './components/NegocioGalerias';
 import NegocioAgenda from './components/NegocioAgenda';
+import NegocioPaquetes from './components/NegocioPaquetes';
 
 export const metadata: Metadata = {
     title: 'Negocio',
@@ -38,7 +39,9 @@ export default async function page({ params }: { params: Promise<{ negocioId: st
 
                     <div className="flex flex-col gap-6 flex-grow">
                         <NegocioOfertas negocioId={negocioId} clienteId={clienteId} />
-                        <NegocioGalerias negocioId={negocioId} clienteId={clienteId} />
+                        {/* pasar a landing page */}
+                        {/* <NegocioGalerias negocioId={negocioId} clienteId={clienteId} /> */}
+                        <NegocioPaquetes clienteId={clienteId} negocioId={negocioId} />
                     </div>
 
                     <div className="lg:col-span-1 flex flex-col gap-6">

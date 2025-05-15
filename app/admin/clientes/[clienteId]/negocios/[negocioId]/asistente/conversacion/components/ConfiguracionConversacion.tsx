@@ -222,7 +222,7 @@ export default function ConfiguracionConversacion() {
                     <div className="flex-grow flex flex-col gap-4 overflow-hidden">
                         {/* Detalles No Editables */}
                         <div className="grid grid-cols-2 gap-3 text-xs border-b border-zinc-700 pb-3">
-                            <div><strong className="text-zinc-400 block">Trigger:</strong> <span className="text-zinc-200 font-mono">{tareaSeleccionadaData.trigger || '-'}</span></div>
+                            {/* <div><strong className="text-zinc-400 block">Trigger:</strong> <span className="text-zinc-200 font-mono">{tareaSeleccionadaData.trigger || '-'}</span></div> */}
                             <div><strong className="text-zinc-400 block">Automatización:</strong> <span className="text-zinc-200 font-mono">{tareaSeleccionadaData.automatizacion || '-'}</span></div>
                         </div>
 

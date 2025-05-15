@@ -375,9 +375,8 @@ model Negocio{
   requiereNombreParaCita Boolean @default(true) 
   bufferMinutos Int? // Minutos de buffer entre citas
 
-
   //!agregar
-  metodosPagoTexto         String?
+  // metodosPagoTexto         String? //!quitar
   almacenamientoUsadoBytes BigInt? @default(0) // Contador total
 
   createdAt DateTime @default(now())
@@ -398,6 +397,9 @@ model Negocio{
   horariosAtencion HorarioAtencion[] // Relación a horarios de atención
   excepcionesHorario ExcepcionHorario[] // Relación a excepciones de horario
   agenda Agenda[] // Relación a la agenda
+
+  NegocioPaquete NegocioPaquete[] // Relación a paquetes
+  NegocioPaqueteCategoria NegocioPaqueteCategoria[] // Relación a categorías de paquetes
 }
 
 // Enum para los días de la semana (más claro que usar números 0-6)
@@ -415,12 +417,9 @@ model HorarioAtencion {
   id         String    @id @default(cuid())
   negocioId  String    // A qué negocio pertenece este horario
   negocio    Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-
   dia        DiaSemana // El día de la semana (LUNES, MARTES, etc.)
   horaInicio String    // Hora de inicio en formato "HH:MM" (ej: "09:00")
   horaFin    String    // Hora de fin en formato "HH:MM" (ej: "19:00")
-
-  // Asegura que no haya múltiples horarios para el mismo día y negocio (ajusta si permites múltiples bloques por día)
   @@unique([negocioId, dia])
   @@index([negocioId])
 }
@@ -487,7 +486,6 @@ model NegocioEtiqueta { // <-- RENOMBRADO
 }
 
 // --- NUEVA ENTIDAD: GaleriaNegocio ---
-// Representa una galería específica (ej: "Local", "Eventos")
 model GaleriaNegocio {
   id            String   @id @default(cuid())
   negocioId     String
@@ -508,7 +506,6 @@ model GaleriaNegocio {
 }
 
 // --- NUEVA ENTIDAD: ImagenGaleriaNegocio ---
-// Representa una imagen dentro de una GaleriaNegocio
 model ImagenGaleriaNegocio {
   id               String         @id @default(cuid())
   galeriaNegocioId String
@@ -523,6 +520,81 @@ model ImagenGaleriaNegocio {
 
   @@index([galeriaNegocioId]) // Índice para buscar imágenes por galería
 }
+
+//! NEGOCIO PAQUETE
+model NegocioPaquete {
+  id            String    @id @default(cuid())
+  negocioId     String
+  negocio       Negocio   @relation(fields: [negocioId], references: [id])
+  nombre        String    // Ej: "Paquete Boda Esencial", "Paquete XV Años Premium"
+  descripcionCorta String? // Descripción corta para mostrar en listados
+  descripcion   String?
+  precio        Float     // Precio total del paquete
+  linkPago     String?   // URL para el pago (ej: Stripe, PayPal, etc.)
+  orden         Int?      // Para ordenar los paquetes entre sí
+  status        String    @default("activo")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  negocioPaqueteCategoriaId String?
+  negocioPaqueteCategoria NegocioPaqueteCategoria? @relation(fields: [negocioPaqueteCategoriaId], references: [id], onDelete: SetNull) // Si se borra la categoría, se quita la relación
+  items         NegocioPaqueteItem[]
+  galeria       NegocioPaqueteGaleria[] // Relación a la galería de este paquete
+  videos        NegocioPaqueteVideos[] // Relación a los videos de este paquete
+  @@index([negocioId])
+}
+
+model NegocioPaqueteCategoria{
+  id            String    @id @default(cuid())
+  negocioId     String
+  negocio       Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borran sus categorías
+  nombre        String    // Ej: "Fotografía", "Video", "Música"
+  orden         Int?      // Para ordenar las categorías entre sí
+  status        String    @default("activo")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  NegocioPaquete NegocioPaquete[]
+}
+
+model NegocioPaqueteItem {
+  id            String    @id @default(cuid())
+  negocioPaqueteId String
+  negocioPaquete NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade)
+  itemCatalogoId String
+  itemCatalogo  ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Restrict)
+  @@index([negocioPaqueteId])
+}
+
+model NegocioPaqueteGaleria{
+  id            String    @id @default(cuid())
+  negocioPaqueteId String
+  negocioPaquete NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade) // Si se borra el paquete, se borran sus imágenes
+  imageUrl      String    // URL de la imagen (ej: Supabase Storage)
+  altText       String?   // Texto alternativo
+  descripcion   String?   // Descripción opcional
+  orden         Int?      // Orden visual
+  tamañoBytes   Int?      // Opcional: Tamaño
+  createdAt     DateTime  @default(now())
+
+  @@index([negocioPaqueteId]) // Índice para buscar imágenes por paquete
+
+}
+
+model NegocioPaqueteVideos{
+  id            String    @id @default(cuid())
+  negocioPaqueteId String
+  negocioPaquete NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade) // Relación con Paquete
+  videoUrl      String    // URL del video (YouTube, Vimeo, o un archivo directo si lo alojas tú)
+  tipoVideo     String?   // Podría ser 'YOUTUBE', 'VIMEO', 'DIRECTO_MP4' para ayudar al frontend a decidir cómo renderizarlo
+  titulo        String?   // Un título o descripción corta para el video
+  descripcion   String?   // Descripción más larga si es necesaria
+  orden         Int?      // Para ordenar los videos si hay varios
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([negocioPaqueteId])
+
+}
+
 
 //! OFERTA
 model Oferta {
@@ -607,7 +679,6 @@ model OfertaVideos {
 }
 
 //! CATALOGO
-// --- Catálogo ---
 model Catalogo {
   id            String   @id @default(cuid())
   negocioId     String
@@ -635,7 +706,6 @@ model CatalogoGaleria{
   @@index([catalogoId]) // Correcto: Índice para eficiencia
 }
 
-// --- Item del Catálogo (Refinado) ---
 model ItemCatalogo {
   id            String     @id @default(cuid())
   catalogoId    String
@@ -667,14 +737,12 @@ model ItemCatalogo {
   updatedAt     DateTime   @updatedAt
 
   // Relaciones
-  // ItemCatalogoPromocion ItemCatalogoPromocion[]
-  // ItemCatalogoDescuento ItemCatalogoDescuento[]
   itemEtiquetas         ItemCatalogoEtiqueta[]
   galeria               ItemCatalogoGaleria[]
-  // --- NUEVA RELACIÓN INVERSA ---
   interacciones         ItemInteraccion[]
 
   itemCatalogoOfertas ItemCatalogoOferta[] // Relación a la tabla intermedia de ofertas
+  negocioPaqueteItems NegocioPaqueteItem[] // Relación a la tabla intermedia de paquetes
 
   @@index([catalogoId])
   @@index([categoriaId])
@@ -719,7 +787,6 @@ model ItemCatalogoGaleria {
   @@index([itemCatalogoId])
 }
 
-// --- Tabla Intermedia Item-Etiqueta (Muchos-a-Muchos) --- // <-- RENOMBRADO
 model ItemCatalogoEtiqueta { // <-- RENOMBRADO
   id             String @id @default(cuid())
   itemCatalogoId String

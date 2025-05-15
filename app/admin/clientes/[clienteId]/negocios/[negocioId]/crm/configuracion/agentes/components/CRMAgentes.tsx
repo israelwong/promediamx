@@ -160,7 +160,7 @@ export default function CRMAgentes({ negocioId }: Props) {
                     crmId: crmId, // <--- Usar crmId del estado
                     nombre: modalFormData.nombre.trim(),
                     email: modalFormData.email.trim(),
-                    telefono: modalFormData.telefono || undefined, // Pasar undefined si está vacío
+                    telefono: modalFormData.telefono || null, // Convertir undefined a null
                     password: modalFormData.password || '',
                     rol: modalFormData.rol || 'agente_ventas',
                     status: modalFormData.status || 'activo',
