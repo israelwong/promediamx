@@ -1,3 +1,4 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/editar/page.tsx
 import { Metadata } from 'next'
 import NegocioEditarForm from './components/NegocioEditForm';
 

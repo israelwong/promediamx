@@ -1,5 +1,5 @@
 import React from 'react'
-import ItemNuevoForm from '../components/ItemNuevoForm'
+import ItemNuevoForm from './components/ItemNuevoForm'
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {

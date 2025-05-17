@@ -1,6 +1,6 @@
 import React from 'react'
 import { Metadata } from 'next'
-import OfertaNuevaForm from '../components/OfertaNuevaForm';
+import OfertaNuevaForm from './components/OfertaNuevaForm';
 
 export const metadata: Metadata = {
     title: 'Nueva Promoción'

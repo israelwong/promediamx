@@ -1,3 +1,4 @@
+// Ruta actual desde app/: admin/_lib/catalogo.actions.ts
 'use server'
 import prisma from './prismaClient'
 import { Prisma } from '@prisma/client'

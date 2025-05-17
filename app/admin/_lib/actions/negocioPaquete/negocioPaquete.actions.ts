@@ -13,18 +13,21 @@ import {
     ActualizarItemsDePaqueteData,
     ActualizarItemsDePaqueteSchema,
     ItemCatalogoParaSeleccion,
+    ReordenarPaquetesData,
+    ReordenarPaquetesSchema,
 
 } from './negocioPaquete.schemas';
 import { ActionResult } from '@/app/admin/_lib/types';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client'; // Importar tipos de Prisma para errores
+import { eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions'; // Asumiendo que tienes esta función para eliminar imágenes de Supabase Storage
 
-// Helper para construir la ruta a revalidar para la lista de paquetes
-const getPathToListaPaquetes = (clienteId: string, negocioId: string) =>
-    `/admin/clientes/${clienteId}/negocios/${negocioId}/paquetes`;
 
 const getPathToPaqueteEdicion = (clienteId: string, negocioId: string, paqueteId: string) =>
     `/admin/clientes/${clienteId}/negocios/${negocioId}/paquetes/${paqueteId}/editar`;
+
+const getPathToListaPaquetes = (clienteId: string, negocioId: string) =>
+    `/admin/clientes/${clienteId}/negocios/${negocioId}/paquetes`;
 
 export async function crearNegocioPaqueteAction(
     negocioId: string,
@@ -73,29 +76,95 @@ export async function crearNegocioPaqueteAction(
 }
 
 // --- Acción para listar (del paso anterior, la mantenemos) ---
+// --- ACCIÓN ACTUALIZADA: Para listar paquetes con más información ---
 export async function obtenerPaquetesPorNegocioAction(
     negocioId: string
 ): Promise<ActionResult<NegocioPaqueteListItem[]>> {
+
+    console.log("obtenerPaquetesPorNegocioAction", negocioId);
     if (!negocioId) return { success: false, error: "El ID del negocio es requerido." };
     try {
         const paquetesFromDb = await prisma.negocioPaquete.findMany({
             where: { negocioId: negocioId },
             select: {
-                id: true, nombre: true, descripcion: true, /* Usar descripcionCorta para la lista */ precio: true, orden: true, status: true, createdAt: true,
+                id: true,
+                nombre: true,
+                descripcionCorta: true,
+                precio: true,
+                orden: true,
+                status: true,
+                createdAt: true,
+                linkPago: true,
                 negocioPaqueteCategoria: { select: { id: true, nombre: true } },
+                galeria: {
+                    select: { imageUrl: true },
+                    orderBy: { orden: 'asc' },
+                    take: 1,
+                },
+                _count: {
+                    select: {
+                        videos: true,
+                        // galeria: true, // Podríamos usar esto si solo necesitamos el conteo
+                    }
+                }
             },
             orderBy: [{ orden: 'asc' }, { nombre: 'asc' }]
         });
+
         const paquetesTyped: NegocioPaqueteListItem[] = paquetesFromDb.map(p => ({
-            ...p,
-            descripcion: p.descripcion ?? undefined, // O usar p.descripcionCorta
-            orden: p.orden ?? undefined,
+            id: p.id,
+            nombre: p.nombre,
+            descripcionCorta: p.descripcionCorta,
+            precio: p.precio,
+            orden: p.orden,
+            status: p.status,
+            createdAt: p.createdAt,
             negocioPaqueteCategoria: p.negocioPaqueteCategoria ?? undefined,
+            linkPagoConfigurado: !!p.linkPago,
+            // Para tieneGaleria, verificamos si la consulta de 'galeria' (que toma 1) devolvió algo.
+            // O si prefieres usar el conteo: p._count.galeria > 0 (necesitarías añadir 'galeria' al _count.select)
+            tieneGaleria: p.galeria.length > 0,
+            tieneVideo: p._count.videos > 0,
+            imagenPortadaUrl: p.galeria.length > 0 ? p.galeria[0].imageUrl : null,
         }));
         return { success: true, data: paquetesTyped };
     } catch (error) {
         console.error("Error al obtener paquetes por negocio:", error);
         return { success: false, error: "No se pudieron obtener los paquetes." };
+    }
+}
+
+// --- ACCIÓN NUEVA: Para actualizar el orden de los paquetes ---
+export async function actualizarOrdenPaquetesAction(
+    negocioId: string,
+    clienteId: string,
+    ordenes: ReordenarPaquetesData
+): Promise<ActionResult<void>> {
+    if (!negocioId) return { success: false, error: "ID de negocio requerido." };
+
+    const validation = ReordenarPaquetesSchema.safeParse(ordenes);
+    if (!validation.success) {
+        return {
+            success: false,
+            error: "Datos de orden inválidos.",
+            errorDetails: validation.error.flatten().fieldErrors as Record<string, string[]>
+        };
+    }
+
+    try {
+        await prisma.$transaction(
+            validation.data.map((paq) =>
+                prisma.negocioPaquete.update({
+                    where: { id: paq.id, negocioId: negocioId },
+                    data: { orden: paq.orden },
+                })
+            )
+        );
+        revalidatePath(getPathToListaPaquetes(clienteId, negocioId));
+        return { success: true };
+    } catch (error) {
+        console.error(`Error actualizando orden de paquetes para negocio ${negocioId}:`, error);
+        return { success: false, error: `Error al guardar orden: ${error instanceof Error ? error.message : 'Desconocido'}` };
     }
 }
 
@@ -179,132 +248,28 @@ export async function actualizarNegocioPaqueteAction(
 }
 
 // --- NUEVA: Acción para eliminar un paquete ---
-export async function eliminarNegocioPaqueteAction(
-    paqueteId: string,
-    clienteId: string, // Para revalidatePath
-    negocioId: string  // Para revalidatePath y asegurar que se elimina el correcto
-): Promise<ActionResult<void>> { // No devuelve datos, solo éxito/error
-    if (!paqueteId) return { success: false, error: "El ID del paquete es requerido." };
-    try {
-        // Prisma se encargará de las eliminaciones en cascada (ej. NegocioPaqueteItem)
-        // según lo definido en el schema.
-        await prisma.negocioPaquete.delete({
-            where: { id: paqueteId, negocioId: negocioId }, // Asegurar que el paquete pertenece al negocio
-        });
-        revalidatePath(getPathToListaPaquetes(clienteId, negocioId));
-        return { success: true };
-    } catch (error: unknown) {
-        console.error("Error eliminarNegocioPaqueteAction:", error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-            return { success: false, error: "Paquete no encontrado o no pertenece a este negocio." };
-        }
-        return { success: false, error: "No se pudo eliminar el paquete." };
-    }
-}
-
-
-// // --- NUEVA: Acción para obtener todos los ItemCatalogo de un negocio (para la lista de disponibles) ---
-// export async function obtenerItemsCatalogoPorNegocioAction(
-//     negocioId: string
-// ): Promise<ActionResult<ItemCatalogoParaSeleccion[]>> {
-//     if (!negocioId) {
-//         return { success: false, error: "El ID del negocio es requerido." };
-//     }
-//     try {
-//         const items = await prisma.itemCatalogo.findMany({
-//             where: {
-//                 negocioId: negocioId,
-//                 // status: 'activo', // Opcional: filtrar solo ítems activos
-//             },
-//             select: {
-//                 id: true,
-//                 nombre: true,
-//                 precio: true,
-//             },
-//             orderBy: {
-//                 nombre: 'asc',
-//             },
-//         });
-//         return { success: true, data: items };
-//     } catch (error) {
-//         console.error("Error obtenerItemsCatalogoPorNegocioAction:", error);
-//         return { success: false, error: "No se pudieron obtener los ítems del catálogo." };
-//     }
-// }
-
-// // --- NUEVA: Acción para obtener los IDs de los ItemCatalogo actualmente en un paquete ---
-// export async function obtenerItemsPaqueteActualAction(
-//     paqueteId: string
-// ): Promise<ActionResult<string[]>> { // Devuelve un array de itemCatalogoId
-//     if (!paqueteId) {
-//         return { success: false, error: "El ID del paquete es requerido." };
-//     }
-//     try {
-//         const paqueteItems = await prisma.negocioPaqueteItem.findMany({
-//             where: {
-//                 negocioPaqueteId: paqueteId,
-//             },
-//             select: {
-//                 itemCatalogoId: true,
-//             },
-//         });
-//         const itemIds = paqueteItems.map(pi => pi.itemCatalogoId);
-//         return { success: true, data: itemIds };
-//     } catch (error) {
-//         console.error("Error obtenerItemsPaqueteActualAction:", error);
-//         return { success: false, error: "No se pudieron obtener los ítems actuales del paquete." };
-//     }
-// }
-
-// // --- NUEVA: Acción para actualizar/establecer los ItemCatalogo de un paquete ---
-// export async function actualizarItemsDePaqueteAction(
+// export async function eliminarNegocioPaqueteAction(
 //     paqueteId: string,
 //     clienteId: string, // Para revalidatePath
-//     negocioId: string, // Para revalidatePath
-//     data: ActualizarItemsDePaqueteData
+//     negocioId: string  // Para revalidatePath y asegurar que se elimina el correcto
 // ): Promise<ActionResult<void>> { // No devuelve datos, solo éxito/error
-//     if (!paqueteId) {
-//         return { success: false, error: "El ID del paquete es requerido." };
-//     }
-
-//     const validation = ActualizarItemsDePaqueteSchema.safeParse(data);
-//     if (!validation.success) {
-//         return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
-//     }
-
-//     const { itemCatalogoIds } = validation.data;
-
+//     if (!paqueteId) return { success: false, error: "El ID del paquete es requerido." };
 //     try {
-//         // Usar una transacción para asegurar la atomicidad:
-//         // 1. Eliminar todas las asociaciones existentes de NegocioPaqueteItem para este paquete.
-//         // 2. Crear las nuevas asociaciones.
-//         await prisma.$transaction(async (tx) => {
-//             await tx.negocioPaqueteItem.deleteMany({
-//                 where: {
-//                     negocioPaqueteId: paqueteId,
-//                 },
-//             });
-
-//             if (itemCatalogoIds.length > 0) {
-//                 await tx.negocioPaqueteItem.createMany({
-//                     data: itemCatalogoIds.map(itemId => ({
-//                         negocioPaqueteId: paqueteId,
-//                         itemCatalogoId: itemId,
-//                     })),
-//                 });
-//             }
+//         // Prisma se encargará de las eliminaciones en cascada (ej. NegocioPaqueteItem)
+//         // según lo definido en el schema.
+//         await prisma.negocioPaquete.delete({
+//             where: { id: paqueteId, negocioId: negocioId }, // Asegurar que el paquete pertenece al negocio
 //         });
-
-//         revalidatePath(getPathToPaqueteEdicion(clienteId, negocioId, paqueteId));
+//         revalidatePath(getPathToListaPaquetes(clienteId, negocioId));
 //         return { success: true };
 //     } catch (error: unknown) {
-//         console.error("Error actualizarItemsDePaqueteAction:", error);
-//         // Podrías añadir manejo específico para errores de FK si un itemCatalogoId no existe,
-//         // aunque la UI debería prevenir esto.
-//         return { success: false, error: "No se pudieron actualizar los ítems del paquete." };
+//         console.error("Error eliminarNegocioPaqueteAction:", error);
+//         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+//             return { success: false, error: "Paquete no encontrado o no pertenece a este negocio." };
+//         }
+//         return { success: false, error: "No se pudo eliminar el paquete." };
 //     }
 // }
-
 
 // --- ACTUALIZADA: Acción para obtener todos los ItemCatalogo de un negocio ---
 export async function obtenerItemsCatalogoPorNegocioAction(
@@ -440,5 +405,79 @@ export async function actualizarItemsDePaqueteAction(
     } catch (error: unknown) {
         console.error("Error actualizarItemsDePaqueteAction:", error);
         return { success: false, error: "No se pudieron actualizar los ítems del paquete." };
+    }
+}
+
+
+// --- ACCIÓN PARA ELIMINAR (necesaria para el botón en la lista) ---
+// (Este es un ejemplo, asegúrate que coincida con tu acción existente o créala si no existe)
+export async function eliminarNegocioPaqueteAction(
+    paqueteId: string,
+    clienteId: string,
+    negocioId: string
+): Promise<ActionResult<void>> {
+    if (!paqueteId) return { success: false, error: "El ID del paquete es requerido." };
+    try {
+        // Antes de eliminar el paquete, considera la lógica para decrementar 'almacenamientoUsadoBytes'
+        // si el paquete tiene imágenes o videos subidos directamente que se eliminarán en cascada.
+        // Esto requeriría obtener el paquete, sumar el tamaño de sus archivos, y luego eliminar.
+        // Por simplicidad aquí, solo se elimina el paquete.
+        // Si tienes onDelete: Cascade para NegocioPaqueteGaleria y NegocioPaqueteVideos,
+        // sus archivos en Supabase deberían eliminarse también (si implementaste esa lógica en sus delete actions).
+
+        // Obtener el paquete para saber si tiene archivos y su tamaño
+        const paqueteAEliminar = await prisma.negocioPaquete.findUnique({
+            where: { id: paqueteId, negocioId: negocioId },
+            include: {
+                galeria: { select: { tamañoBytes: true, imageUrl: true } },
+                videos: { select: { tamañoBytes: true, tipoVideo: true, videoUrl: true } },
+            }
+        });
+
+        if (!paqueteAEliminar) {
+            return { success: false, error: "Paquete no encontrado o no pertenece a este negocio." };
+        }
+
+        let bytesAEliminar = 0;
+        const urlsAEliminarDeStorage: string[] = [];
+
+        paqueteAEliminar.galeria.forEach(img => {
+            if (img.tamañoBytes) bytesAEliminar += img.tamañoBytes;
+            urlsAEliminarDeStorage.push(img.imageUrl);
+        });
+        paqueteAEliminar.videos.forEach(vid => {
+            if (vid.tipoVideo === 'SUBIDO' && vid.tamañoBytes) bytesAEliminar += vid.tamañoBytes;
+            if (vid.tipoVideo === 'SUBIDO' && vid.videoUrl) urlsAEliminarDeStorage.push(vid.videoUrl);
+        });
+
+
+        await prisma.$transaction(async (tx) => {
+            await tx.negocioPaquete.delete({
+                where: { id: paqueteId, negocioId: negocioId },
+            });
+
+            if (bytesAEliminar > 0) {
+                await tx.negocio.update({
+                    where: { id: negocioId },
+                    data: { almacenamientoUsadoBytes: { decrement: bytesAEliminar } },
+                });
+            }
+        });
+
+        // Eliminar archivos de Supabase Storage después de que la transacción de BD sea exitosa
+        if (urlsAEliminarDeStorage.length > 0) {
+            for (const url of urlsAEliminarDeStorage) {
+                await eliminarImagenStorage(url); // Asumiendo que esta función maneja errores individualmente
+            }
+        }
+
+        revalidatePath(getPathToListaPaquetes(clienteId, negocioId));
+        return { success: true };
+    } catch (error: unknown) {
+        console.error("Error eliminarNegocioPaqueteAction:", error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return { success: false, error: "Paquete no encontrado o no pertenece a este negocio." };
+        }
+        return { success: false, error: "No se pudo eliminar el paquete." };
     }
 }

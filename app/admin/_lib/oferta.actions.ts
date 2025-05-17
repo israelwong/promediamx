@@ -1,3 +1,6 @@
+
+// Ruta: /admin/_lib/oferta.actions.ts
+
 'use server';
 
 // import { Prisma, Oferta } from '@prisma/client'; // Asegúrate de importar Oferta

@@ -1,5 +1,7 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/catalogo/nuevo/page.tsx
+
 import React from 'react'
-import CatalogoNuevoForm from '../components/CatalogoNuevoForm';
+import CatalogoNuevoForm from './components/CatalogoNuevoForm';
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {

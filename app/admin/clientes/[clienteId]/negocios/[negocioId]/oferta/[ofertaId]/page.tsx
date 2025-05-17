@@ -1,9 +1,12 @@
+// Ruta del archivo: /Users/israelwong/Documents/Desarrollo/promedia-app/app/admin/clientes/[clienteId]/negocios/[negocioId]/oferta/[ofertaId]/page.tsx
+
 import React from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation'; // Importar notFound
-import OfertaEditarForm from '../components/OfertaEditarForm'; // Asume que existe
-import OfertaGaleria from '../components/OfertaGaleria';     // Asume que existe
-import OfertaVideos from '../components/OfertaVideos';
+import OfertaEditarForm from './components/OfertaEditarForm'; // Asume que existe
+// import OfertaGaleria from './components/OfertaGaleria';     // Asume que existe
+// import OfertaVideos from './components/OfertaVideos';
+import Multimedia from './components/Multimedia';
 
 // Metadata básica
 export const metadata: Metadata = {
@@ -12,7 +15,7 @@ export const metadata: Metadata = {
 
 // Definir la estructura esperada de los parámetros de la ruta
 interface Props {
-    clienteId?: string; // ClienteId puede ser opcional
+    clienteId: string; // ClienteId puede ser opcional
     negocioId: string;
     ofertaId: string;
 }
@@ -29,35 +32,38 @@ export default async function EditarOfertaPage({ params }: { params: Promise<Pro
     }
 
     return (
-        // Contenedor principal con padding
-        <div className="p-4 md:p-6 space-y-6">
-            {/* --- Grid principal con 5 columnas en pantallas medianas y grandes --- */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-6 lg:gap-8">
+        // Contenedor principal con espaciado
+        <div className="space-y-6 lg:space-y-8">
+            {/* Grid principal para layout de columnas */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
 
-                {/* Columna 1: Formulario de Edición (Ocupa 2 columnas) */}
-                <div className="md:col-span-2">
+                {/* Columna Izquierda: Formulario de Edición (ocupa más espacio en lg) */}
+                <div className="lg:col-span-3 xl:col-span-3"> {/* Ajustado a 3/5 para dar más espacio al form */}
                     <OfertaEditarForm
-                        clienteId={clienteId} // Pasa clienteId si existe
+                        clienteId={clienteId}
                         negocioId={negocioId}
                         ofertaId={ofertaId}
                     />
                 </div>
 
-                {/* Columna 2: Galería de Imágenes (Ocupa 3 columnas) */}
-                <div className="md:col-span-2">
-                    <OfertaGaleria
+                {/* Columna Derecha: Galerías y Videos (ocupa menos espacio en lg) */}
+                <div className="lg:col-span-2 xl:col-span-2 space-y-6 lg:space-y-8"> {/* Contenedor para apilar galería y video */}
+                    <Multimedia
                         ofertaId={ofertaId}
-                    // Podrías pasar negocioId si es necesario para alguna acción dentro de Galeria
+                        negocioId={negocioId}
+                        clienteId={clienteId}
                     />
-                </div>
-
-                {/* Columna 3: Videos (Ocupa 3 columnas) */}
-                <div className="md:col-span-2">
+                    {/* <OfertaGaleria
+                        ofertaId={ofertaId}
+                    // negocioId={negocioId} // Pasar para la ruta de storage/actions
+                    // clienteId={clienteId} // Pasar para revalidación
+                    />
                     <OfertaVideos
                         ofertaId={ofertaId}
-                    />
+                    // negocioId={negocioId} // Pasar para la ruta de storage/actions
+                    // clienteId={clienteId} // Pasar para revalidación
+                    /> */}
                 </div>
-
             </div>
         </div>
     );

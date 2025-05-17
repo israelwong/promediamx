@@ -1,7 +1,7 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/editar/components/NegocioRedes.tsx
 'use client';
 
 import React, { useEffect, useState, useCallback, ChangeEvent, FormEvent } from 'react';
-// import { useRouter } from 'next/navigation'; // Puede ser útil para navegación futura
 
 // --- Actions and Types ---
 import {
@@ -10,16 +10,22 @@ import {
     actualizarRedSocialNegocio,
     eliminarRedSocialNegocio,
     actualizarOrdenRedesSociales,
-    RedSocialOrdenData,
-    UpsertRedSocialInput
-} from '@/app/admin/_lib/redesNegocio.actions'; // Ajusta la ruta
-import { NegocioRedSocial, ActionResult } from '@/app/admin/_lib/types'; // O tu tipo NegocioRedSocial
-// --- Icons ---
+} from '@/app/admin/_lib/actions/negocio/redesNegocio.actions'; // Nueva ruta de actions
 
+// Tipos Zod para datos de formulario y la entidad
+import {
+    type NegocioRedSocialType as NegocioRedSocial, // Renombrar si es necesario para evitar colisión
+    type CrearRedSocialNegocioData,
+    type ActualizarRedSocialNegocioData,
+    type ActualizarOrdenRedesSocialesData
+} from '@/app/admin/_lib/actions/negocio/redesNegocio.schemas';
+import { ActionResult } from '@/app/admin/_lib/types'; // Tipo global
+
+// --- Icons ---
 import {
     Loader2, ListX, ListChecks, PlusIcon, PencilIcon, Trash2, Save, XIcon, Link as LinkIconLucide, GripVertical,
-    Facebook, Instagram, Linkedin, Youtube, Twitter, Globe, Mail, Phone, MessageSquare, // Common social icons
-    AlertCircle, CheckCircle // For feedback
+    Facebook, Instagram, Linkedin, Youtube, Twitter, Globe, Mail, Phone, MessageSquare,
+    AlertCircle, CheckCircle
 } from 'lucide-react';
 
 // --- DnD Imports ---
@@ -35,17 +41,19 @@ interface Props {
     negocioId: string;
 }
 
-// --- Mapeo de Nombres a Iconos (sin cambios) ---
 const IconMap: { [key: string]: React.ElementType } = {
     facebook: Facebook, instagram: Instagram, linkedin: Linkedin, youtube: Youtube,
     twitter: Twitter, x: Twitter, website: Globe, web: Globe, sitio: Globe,
     email: Mail, correo: Mail, whatsapp: MessageSquare, telefono: Phone, link: LinkIconLucide,
-    // Añade más mapeos aquí...
 };
 
-// --- Componente Interno para la Fila Arrastrable (sin cambios) ---
+// Definición del tipo para el estado del formulario modal
+// Combinando las propiedades de creación y edición, pero el schema de Zod para la acción será más específico.
+type ModalFormData = Partial<CrearRedSocialNegocioData & ActualizarRedSocialNegocioData>;
+
+
 function SortableRedSocialItem({ redSocial, onEditClick, onDeleteClick }: {
-    redSocial: NegocioRedSocial;
+    redSocial: NegocioRedSocial; // Usar el tipo Zod inferido
     onEditClick: (rs: NegocioRedSocial) => void;
     onDeleteClick: (id: string) => void;
 }) {
@@ -71,7 +79,6 @@ function SortableRedSocialItem({ redSocial, onEditClick, onDeleteClick }: {
     );
 }
 
-// --- Componente Principal ---
 export default function NegocioRedes({ negocioId }: Props) {
     const [redes, setRedes] = useState<NegocioRedSocial[]>([]);
     const [loading, setLoading] = useState(true);
@@ -81,17 +88,13 @@ export default function NegocioRedes({ negocioId }: Props) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
     const [redParaEditar, setRedParaEditar] = useState<NegocioRedSocial | null>(null);
-    const [modalFormData, setModalFormData] = useState<UpsertRedSocialInput>({});
+    const [modalFormData, setModalFormData] = useState<ModalFormData>({}); // Usar el tipo definido arriba
     const [isSubmittingModal, setIsSubmittingModal] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
 
-    // Clases Tailwind
-    // --- AJUSTE: Contenedor principal con padding ---
     const containerClasses = "flex flex-col";
-    // --- AJUSTE: Contenedor de lista con flex-grow y overflow ---
-    const listContainerClasses = "flex-grow overflow-y-auto mb-3 -mr-1 pr-1"; // Margen inferior para separar del botón
-    const crearButtonClasses = "w-full border-2 border-dashed border-zinc-600 hover:border-blue-500 text-zinc-400 hover:text-blue-400 rounded-lg p-2 flex items-center justify-center gap-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800 flex-shrink-0"; // flex-shrink-0 para evitar que se encoja
-    // Clases Modal (sin cambios)
+    const listContainerClasses = "flex-grow overflow-y-auto mb-3 -mr-1 pr-1";
+    const crearButtonClasses = "w-full border-2 border-dashed border-zinc-600 hover:border-blue-500 text-zinc-400 hover:text-blue-400 rounded-lg p-2 flex items-center justify-center gap-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800 flex-shrink-0";
     const modalOverlayClasses = "fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4";
     const modalContentClasses = "bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden";
     const modalHeaderClasses = "flex items-center justify-between p-4 border-b border-zinc-700";
@@ -101,69 +104,151 @@ export default function NegocioRedes({ negocioId }: Props) {
     const inputBaseClasses = "bg-zinc-900 border border-zinc-700 text-zinc-300 block w-full rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70";
     const buttonBaseClasses = "text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 flex items-center justify-center gap-2";
 
-    // Sensores DnD (sin cambios)
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
-    // --- Carga de datos (sin cambios) ---
     const fetchRedes = useCallback(async (isInitialLoad = false) => {
         if (!negocioId) return;
         if (isInitialLoad) setLoading(true); setError(null);
         try {
-            const data = await obtenerRedesSocialesNegocio(negocioId);
-            const redesConOrden = (data || []).map((red, index) => ({ ...red, orden: red.orden ?? index }));
-            setRedes(redesConOrden);
+            const data = await obtenerRedesSocialesNegocio(negocioId); // Acción sin cambios directos en su llamada
+            // El tipo de 'data' es PrismaNegocioRedSocial[]
+            // Mapear a NegocioRedSocialType si es necesario para Zod en el cliente, o usar PrismaNegocioRedSocial directamente si los campos coinciden
+            const redesConOrden = (data || []).map((red, index) => ({
+                ...red,
+                createdAt: new Date(red.createdAt), // Asegurar que sean objetos Date
+                updatedAt: new Date(red.updatedAt),
+                orden: red.orden ?? index,
+            }));
+            setRedes(redesConOrden as NegocioRedSocial[]); // Cast si estás seguro de la compatibilidad o mapea explícitamente
         } catch (err) { console.error("Error al obtener redes sociales:", err); setError("No se pudieron cargar las redes sociales."); setRedes([]); }
         finally { if (isInitialLoad) setLoading(false); }
     }, [negocioId]);
 
     useEffect(() => { fetchRedes(true); }, [fetchRedes]);
 
-    // --- Limpiar mensaje de éxito (sin cambios) ---
     useEffect(() => { let timer: NodeJS.Timeout; if (successMessage) { timer = setTimeout(() => setSuccessMessage(null), 3000); } return () => clearTimeout(timer); }, [successMessage]);
 
-    // --- Manejadores del Modal (sin cambios) ---
-    const openModal = (mode: 'create' | 'edit', red?: NegocioRedSocial) => { setModalMode(mode); setRedParaEditar(mode === 'edit' ? red || null : null); setModalFormData(mode === 'edit' && red ? { nombreRed: red.nombreRed, url: red.url, icono: red.icono } : { nombreRed: '', url: '', icono: '' }); setIsModalOpen(true); setModalError(null); };
+    const openModal = (mode: 'create' | 'edit', red?: NegocioRedSocial) => {
+        setModalMode(mode);
+        setRedParaEditar(mode === 'edit' ? red || null : null);
+        setModalFormData(mode === 'edit' && red ?
+            { nombreRed: red.nombreRed, url: red.url, icono: red.icono || undefined } : // Asegurar que icono sea string o undefined
+            { nombreRed: '', url: '', icono: undefined }
+        );
+        setIsModalOpen(true);
+        setModalError(null);
+    };
     const closeModal = () => { setIsModalOpen(false); setTimeout(() => { setModalMode(null); setRedParaEditar(null); setModalFormData({}); setModalError(null); setIsSubmittingModal(false); }, 300); };
     const handleModalFormChange = (e: ChangeEvent<HTMLInputElement>) => { const { name, value } = e.target; setModalFormData(prev => ({ ...prev, [name]: value })); setModalError(null); };
+
     const handleModalFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault(); if (!modalFormData.nombreRed?.trim() || !modalFormData.url?.trim()) { setModalError("Nombre de red y URL son obligatorios."); return; }
+        e.preventDefault();
+        if (!modalFormData.nombreRed?.trim() || !modalFormData.url?.trim()) {
+            setModalError("Nombre de red y URL son obligatorios.");
+            return;
+        }
         setIsSubmittingModal(true); setModalError(null); setSuccessMessage(null);
+
         try {
-            let result: ActionResult<NegocioRedSocial>; const dataToSend = { nombreRed: modalFormData.nombreRed.trim(), url: modalFormData.url.trim(), icono: modalFormData.icono?.trim() || null, };
-            if (modalMode === 'create') { result = await crearRedSocialNegocio(negocioId, dataToSend.nombreRed, dataToSend.url, dataToSend.icono); }
-            else if (modalMode === 'edit' && redParaEditar?.id) { result = await actualizarRedSocialNegocio(redParaEditar.id, dataToSend); }
-            else { throw new Error("Modo inválido o ID faltante."); }
-            if (result.success) { await fetchRedes(); closeModal(); setSuccessMessage(modalMode === 'create' ? 'Red social añadida.' : 'Red social actualizada.'); }
-            else { throw new Error(result.error || "Error desconocido."); }
-        } catch (err) { console.error(`Error al ${modalMode === 'create' ? 'crear' : 'actualizar'} red social:`, err); setModalError(`Error: ${err instanceof Error ? err.message : "Ocurrió un error"}`); }
-        finally { setIsSubmittingModal(false); }
+            let result: ActionResult<NegocioRedSocial>; // Espera el tipo Zod/Prisma compatible
+
+            if (modalMode === 'create') {
+                // Asegurar que los datos se ajustan a CrearRedSocialNegocioData
+                const dataToSend: CrearRedSocialNegocioData = {
+                    nombreRed: modalFormData.nombreRed.trim(),
+                    url: modalFormData.url.trim(),
+                    icono: modalFormData.icono?.trim() || null,
+                };
+                result = await crearRedSocialNegocio(negocioId, dataToSend);
+            } else if (modalMode === 'edit' && redParaEditar?.id) {
+                // Asegurar que los datos se ajustan a ActualizarRedSocialNegocioData
+                const dataToSend: ActualizarRedSocialNegocioData = {
+                    nombreRed: modalFormData.nombreRed?.trim(), // opcional
+                    url: modalFormData.url?.trim(), // opcional
+                    icono: modalFormData.icono?.trim() || undefined, // opcional, o null si Zod lo permite
+                };
+                // Remover campos undefined para que Prisma no intente ponerles 'undefined'
+                Object.keys(dataToSend).forEach(key => dataToSend[key as keyof ActualizarRedSocialNegocioData] === undefined && delete dataToSend[key as keyof ActualizarRedSocialNegocioData]);
+
+                result = await actualizarRedSocialNegocio(redParaEditar.id, dataToSend);
+            } else {
+                throw new Error("Modo inválido o ID faltante.");
+            }
+
+            if (result.success) {
+                await fetchRedes();
+                closeModal();
+                setSuccessMessage(modalMode === 'create' ? 'Red social añadida.' : 'Red social actualizada.');
+            } else {
+                // Capturar errorDetails si la acción los provee
+                let errorMsg = result.error || "Error desconocido.";
+                if (result.errorDetails) {
+                    errorMsg += Object.entries(result.errorDetails)
+                        .map(([field, errors]) => ` ${field}: ${errors.join(', ')}`)
+                        .join(';');
+                }
+                throw new Error(errorMsg);
+            }
+        } catch (err) {
+            console.error(`Error al ${modalMode === 'create' ? 'crear' : 'actualizar'} red social:`, err);
+            setModalError(`Error: ${err instanceof Error ? err.message : "Ocurrió un error"}`);
+        } finally {
+            setIsSubmittingModal(false);
+        }
     };
+
     const handleModalDelete = async () => {
         if (!redParaEditar?.id) return;
         if (confirm(`¿Eliminar el enlace para "${redParaEditar.nombreRed}"?`)) {
             setIsSubmittingModal(true); setModalError(null); setSuccessMessage(null);
-            try { const result = await eliminarRedSocialNegocio(redParaEditar.id); if (result.success) { await fetchRedes(); closeModal(); setSuccessMessage('Red social eliminada.'); } else { throw new Error(result.error || "Error desconocido."); } }
+            try {
+                const result = await eliminarRedSocialNegocio(redParaEditar.id);
+                if (result.success) {
+                    await fetchRedes(); closeModal(); setSuccessMessage('Red social eliminada.');
+                } else {
+                    throw new Error(result.error || "Error desconocido al eliminar.");
+                }
+            }
             catch (err) { console.error("Error eliminando red social:", err); setModalError(`Error al eliminar: ${err instanceof Error ? err.message : "Ocurrió un error"}`); }
             finally { setIsSubmittingModal(false); }
         }
     };
 
-    // --- Manejador Drag End (sin cambios) ---
     const handleDragEndRedes = useCallback(async (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
-            const oldIndex = redes.findIndex((r) => r.id === active.id); const newIndex = redes.findIndex((r) => r.id === over.id);
+            const oldIndex = redes.findIndex((r) => r.id === active.id);
+            const newIndex = redes.findIndex((r) => r.id === over.id);
             if (oldIndex === -1 || newIndex === -1) return;
-            const reorderedRedes = arrayMove(redes, oldIndex, newIndex); setRedes(reorderedRedes);
-            const ordenData: RedSocialOrdenData[] = reorderedRedes.map(({ id }, index) => ({ id, orden: index }));
+
+            const reorderedRedes = arrayMove(redes, oldIndex, newIndex);
+            // Actualizar el campo 'orden' en cada imagen para la UI antes de guardar
+            const redesConNuevoOrdenVisual = reorderedRedes.map((red, index) => ({ ...red, orden: index }));
+            setRedes(redesConNuevoOrdenVisual); // Actualizar UI inmediatamente
+
+            const ordenData: ActualizarOrdenRedesSocialesData = redesConNuevoOrdenVisual.map(({ id, orden }) => ({
+                id,
+                orden: orden!, // El orden ahora debería estar definido
+            }));
+
             setIsSavingOrder(true); setError(null); setSuccessMessage(null);
-            try { await actualizarOrdenRedesSociales(ordenData); setSuccessMessage("Orden guardado."); }
-            catch (saveError) { console.error('Error al guardar el orden:', saveError); setError('Error al guardar orden.'); fetchRedes(); }
+            try {
+                const result = await actualizarOrdenRedesSociales(ordenData);
+                if (result.success) {
+                    setSuccessMessage("Orden guardado.");
+                } else {
+                    throw new Error(result.error || "No se pudo guardar el orden.");
+                }
+            }
+            catch (saveError) {
+                console.error('Error al guardar el orden:', saveError);
+                setError(saveError instanceof Error ? saveError.message : 'Error al guardar orden.');
+                await fetchRedes(); // Revertir a orden de DB si falla el guardado
+            }
             finally { setIsSavingOrder(false); }
         }
-    }, [redes, fetchRedes]);
+    }, [redes, fetchRedes]); // Removed negocioId as it is unnecessary
 
-    // --- Renderizado Interno ---
     const renderInternalContent = () => {
         if (loading) return <div className="flex items-center justify-center py-6 text-zinc-400"><Loader2 className="h-4 w-4 animate-spin mr-2" /><span>Cargando...</span></div>;
         if (error && !isSavingOrder) return <div className="flex flex-col items-center justify-center text-center py-6"><ListX className="h-6 w-6 text-red-400 mb-2" /><p className="text-red-400 text-sm">{error}</p></div>;
@@ -176,7 +261,7 @@ export default function NegocioRedes({ negocioId }: Props) {
                     ) : (
                         <ul className='divide-y divide-zinc-700'>
                             {redes.map((red) => (
-                                <SortableRedSocialItem key={red.id} redSocial={red} onEditClick={openModal.bind(null, 'edit')} onDeleteClick={handleModalDelete} />
+                                <SortableRedSocialItem key={red.id} redSocial={red} onEditClick={() => openModal('edit', red)} onDeleteClick={handleModalDelete} />
                             ))}
                         </ul>
                     )}
@@ -185,38 +270,21 @@ export default function NegocioRedes({ negocioId }: Props) {
         );
     }
 
-    // --- Renderizado Principal ---
     return (
         <div className={containerClasses}>
-            {/* Título (Opcional, si el contenedor padre no lo tiene) */}
-            {/* <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2"><Share2 size={16}/> Redes Sociales</h3> */}
-
-            {/* Mensajes Globales */}
             {isSavingOrder && (<div className="mb-2 flex items-center justify-center text-xs text-blue-300"> <Loader2 className="h-3 w-3 animate-spin mr-1.5" />Guardando orden... </div>)}
             {successMessage && (<p className="mb-2 text-center text-xs text-green-400 bg-green-900/30 p-1 rounded border border-green-600/50"> <CheckCircle size={12} className="inline mr-1" /> {successMessage} </p>)}
             {error && !isSavingOrder && (<p className="mb-2 text-center text-xs text-red-400 bg-red-900/30 p-1 rounded border border-red-600/50"> <AlertCircle size={12} className="inline mr-1" /> {error} </p>)}
-
-            {/* --- AJUSTE: Contenedor de lista con flex-grow y overflow --- */}
             <div className={listContainerClasses}>
                 {renderInternalContent()}
             </div>
-
-            {/* --- AJUSTE: Botón Crear fuera del contenedor scrollable --- */}
-            {!loading && !error && (
-                <div className="mt-3 flex-shrink-0"> {/* Evita que el botón se encoja */}
-                    <button
-                        onClick={() => openModal('create')}
-                        className={crearButtonClasses}
-                        title="Añadir nueva red social"
-                    >
-                        <PlusIcon size={16} />
-                        <span>Añadir Red Social</span>
+            {!loading && ( // No mostrar botón de crear si hay error inicial y no hay redes
+                <div className="mt-3 flex-shrink-0">
+                    <button onClick={() => openModal('create')} className={crearButtonClasses} title="Añadir nueva red social">
+                        <PlusIcon size={16} /> <span>Añadir Red Social</span>
                     </button>
                 </div>
             )}
-            {/* ------------------------------------------------------- */}
-
-            {/* Modal */}
             {isModalOpen && (
                 <div className={modalOverlayClasses} onClick={closeModal}>
                     <div className={modalContentClasses} onClick={(e) => e.stopPropagation()}>

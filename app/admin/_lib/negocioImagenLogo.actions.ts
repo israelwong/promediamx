@@ -1,3 +1,4 @@
+// app/admin/_lib/negocioImagenLogo.actions.ts
 'use server';
 
 import prisma from './prismaClient'; // Ajusta la ruta a tu cliente Prisma

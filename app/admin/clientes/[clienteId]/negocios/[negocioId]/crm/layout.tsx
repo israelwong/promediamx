@@ -41,7 +41,7 @@ export default async function LayoutCRM({ // Añadido async
                 {/* overflow-auto: Permite scroll en AMBAS direcciones si es necesario */}
                 {/* min-w-0: Clave para que flexbox permita encoger y activar overflow */}
                 {/* IMPORTANTE: Asegurarse que PipelinePanel (el hijo) tenga overflow-x-auto */}
-                <main className="flex-1 overflow-auto min-w-0"> {/* <-- MANTENER overflow-auto y min-w-0 */}
+                <main className="flex-1 overflow-auto min-w-0 "> {/* <-- MANTENER overflow-auto y min-w-0 */}
                     {/* El contenido (PipelinePanel) debe poder scrollear horizontalmente por sí mismo */}
                     {children}
                 </main>

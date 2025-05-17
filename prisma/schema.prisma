@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DIRECT_URL")
 }
 
 //! SISTEMA
@@ -344,6 +344,7 @@ model Negocio{
   clienteId String?
   cliente   Cliente? @relation(fields: [clienteId], references: [id])
   logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
+  logoTamañoBytes Int? // Tamaño del logo en bytes
   nombre    String
   slogan   String? //Lema, Tagline, Frase de Impacto.
   descripcion String? //Resumen Ejecutivo, Misión, Visión, Filosofía, Valores, Antecedentes.
@@ -353,7 +354,7 @@ model Negocio{
   direccion String?
   googleMaps String?
   paginaWeb String?
-  horarioAtencion String?
+  horarioAtencion String? //quitar
   competencia String? //Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
   clienteIdeal String? //Rango de Edad, Rango de Ingresos, Distribución de Género, Distribución Geográfica, Nivel Educativo, Ocupación, Sector, Motivaciones Principales, Factores de Influencia, Personalidad, Intereses, Lenguaje, Tono de Comunicación Preferido, Canal de Comunicación Preferido.
   terminologia String? //Terminología del Negocio, Glosario de Términos, Jerga del Sector.
@@ -464,6 +465,7 @@ model NegocioCategoria { // <-- RENOMBRADO
   orden         Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  status        String   @default("activo")
 
   // Relación: Una categoría puede tener muchos ítems
   ItemCatalogo  ItemCatalogo[]
@@ -588,6 +590,7 @@ model NegocioPaqueteVideos{
   titulo        String?   // Un título o descripción corta para el video
   descripcion   String?   // Descripción más larga si es necesaria
   orden         Int?      // Para ordenar los videos si hay varios
+  tamañoBytes   Int?      // Opcional: Tamaño
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -604,21 +607,13 @@ model Oferta {
   nombre        String    // Ej: "Descuento Primera Compra", "Promo Día Padre", "Cupón BIENVENIDO10"
   variantesNombre String[] // modismos locales 
   descripcion   String?
-
-  // --- Campo Clave: Tipo de Oferta ---
   tipoOferta    String    // Ej: 'DESCUENTO_PORCENTAJE', 'DESCUENTO_MONTO', 'CODIGO_PROMOCIONAL', 'ENVIO_GRATIS', 'COMPRA_X_LLEVA_Y', 'GENERAL'
   valor         Float?    // Valor numérico asociado (ej: 10.0 para 10%, 50.0 para $50) - Nulo si no aplica (ej: GENERAL)
   codigo        String?   @unique // Código promocional único si tipoOferta = 'CODIGO_PROMOCIONAL'
-  
-  // --- Vigencia ---
   fechaInicio   DateTime
   fechaFin      DateTime
-
-  // --- Estado y Condiciones ---
   status        String    @default("activo") // activo, inactivo, programada, finalizada
   condiciones   String?   // Texto libre para describir condiciones adicionales (ej: "Compra mínima $500", "Solo nuevos clientes")
-  
-  // --- Timestamps ---
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -672,6 +667,7 @@ model OfertaVideos {
   titulo      String?  // Un título o descripción corta para el video
   descripcion String?  // Descripción más larga si es necesaria
   orden       Int?     // Para ordenar los videos si hay varios
+  tamañoBytes Int?     // Opcional: Tamaño
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -686,6 +682,7 @@ model Catalogo {
   nombre        String   // Considerar @@unique([negocioId, nombre])
   descripcion   String? 
   imagenPortadaUrl String? // URL de la imagen de portada del catálogo
+  imagenPortadaTamañoBytes Int? // Tamaño de la imagen de portada en bytes
   status        String   @default("activo")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -739,6 +736,7 @@ model ItemCatalogo {
   // Relaciones
   itemEtiquetas         ItemCatalogoEtiqueta[]
   galeria               ItemCatalogoGaleria[]
+  videos                ItemCatalogoVideos[]
   interacciones         ItemInteraccion[]
 
   itemCatalogoOfertas ItemCatalogoOferta[] // Relación a la tabla intermedia de ofertas
@@ -786,6 +784,21 @@ model ItemCatalogoGaleria {
   createdAt     DateTime    @default(now())
   @@index([itemCatalogoId])
 }
+
+model ItemCatalogoVideos {
+  id          String   @id @default(cuid())
+  itemCatalogoId String
+  itemCatalogo ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Relación con ItemCatalogo
+  videoUrl    String   // URL del video (YouTube, Vimeo, o un archivo directo si lo alojas tú)
+  tipoVideo   String?  // Podría ser 'YOUTUBE', 'VIMEO', 'DIRECTO_MP4' para ayudar al frontend a decidir cómo renderizarlo
+  titulo      String?  // Un título o descripción corta para el video
+  descripcion String?  // Descripción más larga si es necesaria
+  orden       Int?     // Para ordenar los videos si hay varios
+  tamañoBytes Int?     // Opcional: Tamaño
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 
 model ItemCatalogoEtiqueta { // <-- RENOMBRADO
   id             String @id @default(cuid())

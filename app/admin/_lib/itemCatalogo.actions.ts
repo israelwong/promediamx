@@ -1,3 +1,6 @@
+
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/catalogo/nuevo/page.tsx
+
 'use server'
 import prisma from './prismaClient'
 import { Prisma } from '@prisma/client';

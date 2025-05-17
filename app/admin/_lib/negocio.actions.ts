@@ -1,3 +1,4 @@
+// app/admin/_lib/negocio.actions.ts
 'use server'
 import prisma from './prismaClient'
 import { Negocio, AsistenteVirtual } from './types'; // Ajusta ruta a tus tipos

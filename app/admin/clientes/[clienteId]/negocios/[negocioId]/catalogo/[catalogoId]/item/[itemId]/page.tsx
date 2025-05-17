@@ -1,57 +1,55 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/catalogo/[catalogoId]/item/[itemId]/page.tsx
 import React from 'react';
 import { Metadata } from 'next';
-import ItemEditarForm from '../components/ItemEditarForm';
-import ItemGaleria from '../components/ItemGaleria';
-import { notFound } from 'next/navigation'; // Importar notFound
+import ItemEditarForm from './components/ItemEditarForm';
+// import ItemGaleria from './components/ItemGaleria'; // Componente para la galería de imágenes del ítem
+// import ItemVideo from './components/ItemVideo';
+import { notFound } from 'next/navigation';
+import Multimedia from './components/Multimedia';
 
 export const metadata: Metadata = {
-    title: 'Editar Ítem', // Título genérico, podría ser dinámico si se carga el nombre
+    title: 'Editar Ítem del Catálogo',
+    description: "Modifica los detalles, imágenes y videos de tu producto o servicio.",
 };
 
-// Definir Props para la página usando params
-interface Props {
+interface PageProps {
     itemId: string;
     catalogoId: string;
     negocioId: string;
-    clienteId?: string; // Asegurarse que coincida con la estructura de tu ruta
+    clienteId: string; // clienteId debería estar disponible desde la estructura de la ruta
 }
 
-// --- CORRECCIÓN: Hacer la función async y usar await ---
-export default async function ItemEditarPage({ params }: { params: Promise<Props> }) {
-    const { itemId, catalogoId, negocioId, clienteId } = await params;
+export default async function ItemEditarPage({ params }: { params: Promise<PageProps> }) { // params es un objeto directo
+    const { itemId, catalogoId, negocioId, clienteId } = await params; // Extraer directamente
 
-
-    if (!itemId || !catalogoId || !negocioId) {
-        console.error("Error: Faltan IDs requeridos en la ruta.", params);
-        notFound(); // Mostrar página 404 si faltan IDs esenciales
+    if (!itemId || !catalogoId || !negocioId || !clienteId) { // Validar todos los IDs necesarios
+        console.error("Error: Faltan IDs requeridos en la ruta para editar ítem.", params);
+        notFound();
     }
 
     return (
-        // Contenedor principal con padding
-        <div className="p-4 md:p-6 space-y-6">
-            {/* Grid principal con 5 columnas en pantallas medianas y grandes */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 lg:gap-8">
+        // Contenedor principal con un layout flexible para diferentes tamaños de pantalla
+        <div className="flex flex-col xl:flex-row gap-6 lg:gap-8 h-full">
+            {/* Columna Principal: Formulario de Edición (ocupa más espacio) */}
+            {/* En pantallas xl y mayores, ocupa 3/5, en más pequeñas, 2/3 o todo el ancho si se apilan */}
+            <div className="xl:w-3/5 lg:w-2/3 w-full flex-shrink-0">
+                <ItemEditarForm
+                    itemId={itemId}
+                    catalogoId={catalogoId}
+                    negocioId={negocioId}
+                    clienteId={clienteId}
+                />
+            </div>
 
-                {/* Columna 1: Formulario de Edición (Ocupa 2 columnas) */}
-                <div className="md:col-span-3">
-                    {/* El componente ItemEditarForm ya tiene su propio padding y fondo */}
-                    <ItemEditarForm
-                        itemId={itemId}
-                        catalogoId={catalogoId}
-                        negocioId={negocioId}
-                        clienteId={clienteId}
-                    />
-                </div>
-
-
-                {/* Columna 3: Galería de Imágenes (Ocupa 2 columnas) */}
-                <div className="md:col-span-2">
-                    {/* El componente ItemGaleriaPanel ya tiene su propio padding y fondo */}
-                    <ItemGaleria
-                        itemId={itemId}
-                    />
-                </div>
-
+            {/* Columna Secundaria: Galería de Imágenes/Videos (ocupa menos espacio) */}
+            {/* En pantallas xl y mayores, ocupa 2/5, en más pequeñas, 1/3 o todo el ancho */}
+            <div className="xl:w-2/5 lg:w-1/3 w-full flex-grow flex flex-col">
+                <Multimedia
+                    itemId={itemId}
+                    catalogoId={catalogoId}
+                    negocioId={negocioId}
+                    clienteId={clienteId}
+                />
             </div>
         </div>
     );

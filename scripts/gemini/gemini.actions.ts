@@ -1,3 +1,5 @@
+
+// app/scripts/gemini/gemini.actions.ts
 'use server';
 
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, Content, Part, GenerationConfig } from "@google/generative-ai";
