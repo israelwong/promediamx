@@ -22,8 +22,6 @@ import {
     type OfertaGaleriaItemType,
     type ActualizarDetallesImagenGaleriaOfertaData // Este es el tipo Zod para la data de la action
 } from '@/app/admin/_lib/actions/oferta/ofertaGaleria.schemas'; // Verifica esta ruta
-// import { eliminarImagenDeGaleria } from '@/app/admin/_lib/imagenGaleriaNegocio.actions';
-// import { ActionResult } from '@/app/admin/_lib/types';
 
 interface OfertaGaleriaProps {
     ofertaId: string; // Corregido: ownerEntityId será ofertaId

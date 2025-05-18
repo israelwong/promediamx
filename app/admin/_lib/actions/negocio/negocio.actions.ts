@@ -5,11 +5,10 @@ import { ActionResult } from '@/app/admin/_lib/types';
 import { Prisma } from '@prisma/client'; // Tipo Negocio vendrá de aquí directamente
 import { revalidatePath } from 'next/cache';
 
+
 // Importar esquemas y tipos Zod
 import {
     ActualizarDetallesNegocioDataSchema,
-    // NegocioFormData, // Si se necesitara el tipo aquí
-    // ActualizarNegocioSuccessPayloadSchema // Si se usa un payload específico
 } from './negocio.schemas';
 import type { Negocio as PrismaNegocioType } from '@prisma/client'; // Para claridad
 
@@ -79,11 +78,7 @@ export async function actualizarDetallesNegocio(
     }
 }
 
-// ... (Las funciones de IA como mejorarDescripcionNegocioIA y generarPoliticasNegocioIA se omiten por ahora)
-// ... (otras acciones como obtenerDatosHeaderNegocio, etc. se mantienen pero podrían refactorizarse luego)
 
-// Mantén las otras funciones existentes aquí por ahora.
-// Las iremos refactorizando una a una o según se necesiten.
-// Ejemplo:
-// export async function obtenerDatosHeaderNegocio(...) { ... }
-// ...etc...
+
+
+

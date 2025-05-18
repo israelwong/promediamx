@@ -1,7 +1,7 @@
 import React from 'react'
 import { Metadata } from 'next'
 
-import AsistenteConfig from './components/AsistenteConfig';
+import AsistenteLista from './components/AsistenteLista'
 
 export const metadata: Metadata = {
     title: 'Asistente',
@@ -16,5 +16,5 @@ interface Props {
 
 export default async function page({ params }: { params: Promise<Props> }) {
     const { clienteId, negocioId } = await params
-    return <AsistenteConfig clienteId={clienteId} negocioId={negocioId} />
+    return <AsistenteLista clienteId={clienteId} negocioId={negocioId} />
 }

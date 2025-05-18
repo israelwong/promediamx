@@ -7,15 +7,13 @@ import { useRouter } from 'next/navigation';
 import {
     obtenerDetallesNegocioParaEditar,
     actualizarDetallesNegocio,
-    // mejorarDescripcionNegocioIA, // Omitido por ahora
-    // generarPoliticasNegocioIA, // Omitido por ahora
 } from '@/app/admin/_lib/actions/negocio/negocio.actions'; // Nueva ruta de actions
 import { NegocioFormData } from '@/app/admin/_lib/actions/negocio/negocio.schemas'; // Tipo Zod inferido
 import type { Negocio as PrismaNegocioType } from '@prisma/client'; // Para el tipo de retorno de obtenerDetalles
-// --- Components ---
+
 import NegocioImagenLogo from './NegocioImagenLogo';
 import NegocioRedes from './NegocioRedes';
-// --- Icons ---
+
 import {
     Loader2, Save, /*Sparkles, Wand2, CheckCheck, Undo2,*/ Info, AlertCircle, // Iconos IA comentados
     Phone, MessageSquareWarning, FileText, Scale,
@@ -26,14 +24,6 @@ interface Props {
     negocioId: string;
     clienteId?: string; // clienteId es opcional aquí, pero usado en el contexto padre
 }
-
-// El tipo NegocioFormData ahora se importa desde negocio.schemas.ts
-
-// type SugerenciaIA = {
-//     campo: keyof NegocioFormData;
-//     original: string | null;
-//     sugerencia: string;
-// };
 
 // --- Componente Simple de Acordeón (SIN CAMBIOS) ---
 interface AccordionItemProps {
@@ -73,8 +63,6 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    // const [estadoIA, setEstadoIA] = useState<{ [key in keyof NegocioFormData]?: 'loading' | 'error' }>({}); // IA omitida por ahora
-    // const [sugerenciaActiva, setSugerenciaActiva] = useState<SugerenciaIA | null>(null); // IA omitida por ahora
     const [openAccordion, setOpenAccordion] = useState<string | null>(null);
 
     // --- Clases Tailwind (sin cambios) ---
@@ -88,10 +76,6 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
     const primaryButtonClasses = `${buttonBaseClasses} text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500`;
     const sectionContainerClasses = "p-4 bg-zinc-900/30 rounded-lg border border-zinc-700/50";
     const sectionTitleClasses = "text-base font-semibold text-zinc-100 border-b border-zinc-600 pb-2 mb-4 flex items-center gap-2";
-    // const aiButtonClasses = "inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium rounded-md border focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-zinc-800 disabled:opacity-50"; // IA Omitida
-    // const improveAiButtonClasses = `${aiButtonClasses} text-purple-300 bg-purple-900/40 hover:bg-purple-800/50 border-purple-700/50 focus:ring-purple-500`; // IA Omitida
-    // const generateAiButtonClasses = `${aiButtonClasses} text-teal-300 bg-teal-900/40 hover:bg-teal-800/50 border-teal-700/50 focus:ring-teal-500`; // IA Omitida
-    // const suggestionActionClasses = "px-2 py-0.5 text-[10px] font-medium rounded-md border flex items-center gap-1"; // IA Omitida
     const switchButtonClasses = "relative inline-flex items-center h-5 rounded-full w-9 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-blue-500 disabled:opacity-50 cursor-pointer";
     const switchKnobClasses = "inline-block w-3.5 h-3.5 transform bg-white rounded-full";
 
@@ -122,8 +106,7 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
                 preguntasFrecuentes: negocioData.preguntasFrecuentes !== null ? negocioData.preguntasFrecuentes : undefined,
                 objeciones: negocioData.objeciones !== null ? negocioData.objeciones : undefined,
                 status: ['activo', 'inactivo'].includes(negocioData.status || '') ? (negocioData.status as 'activo' | 'inactivo') : 'inactivo',
-                // OMITIDOS: competencia, clienteIdeal, terminologia
-                // El logo se maneja en su propio componente
+                logo: negocioData.logo || null,
             };
             setFormData(formDataInicial);
         } catch (err) { console.error("Error al cargar negocio:", err); setError(err instanceof Error ? err.message : "Error al cargar datos."); setFormData({ nombre: '', status: 'inactivo' }); }
@@ -165,16 +148,6 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
         finally { setIsSubmitting(false); }
     };
 
-    // --- Handlers IA (OMITIDOS POR AHORA) ---
-    /*
-    const iniciarAccionIA = (campo: keyof NegocioFormData) => { ... };
-    const finalizarAccionIA = (campo: keyof NegocioFormData) => { ... };
-    const handleMejorarDescripcion = async () => { ... };
-    const handleGenerarPoliticas = async (tipoPolitica: 'privacidad' | 'terminos') => { ... };
-    const aceptarSugerencia = () => { ... };
-    const revertirSugerencia = () => { ... };
-    */
-
     const handleAccordionToggle = (seccionKey: string) => { setOpenAccordion(prev => prev === seccionKey ? null : seccionKey); };
 
     if (loading) return <div className="p-6 text-center text-zinc-300 bg-zinc-900 rounded-lg"><Loader2 className='animate-spin inline mr-2' size={18} /> Cargando Información...</div>;
@@ -183,9 +156,7 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
 
 
     const isActivo = formData.status === 'activo';
-    // const disableAllActions = isSubmitting || Object.values(estadoIA).some(s => s === 'loading'); // IA omitida
     const disableAllActions = isSubmitting;
-
 
     return (
         <div className={formContainerClasses}>

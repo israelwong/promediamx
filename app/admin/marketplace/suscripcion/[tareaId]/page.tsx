@@ -1,6 +1,6 @@
 import React from 'react'
 import { Metadata } from 'next'
-import SuscripcionTareaDetalle from '../components/SuscripcionTareaDetalle'
+import SuscripcionTareaDetalle from './components/SuscripcionTareaDetalle'
 
 export const metadata: Metadata = {
     title: 'Suscripción a una nueva tarea',

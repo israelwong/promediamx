@@ -16,3 +16,15 @@ export type ActualizarImagenLogoData = z.infer<typeof ActualizarImagenLogoDataSc
 // Esquema para los parámetros de eliminarImagenLogoNegocio (negocioId se pasa como argumento directo)
 
 // No se necesita un esquema de datos específico para la respuesta de eliminarImagenLogoNegocio si solo devuelve success/error.
+
+// Exportar un esquema para posibles errores al actualizar la imagen del logo
+export const ActualizarImagenLogoErrorSchema = z.object({
+    error: z.string(),
+});
+export type ActualizarImagenLogoError = z.infer<typeof ActualizarImagenLogoErrorSchema>;
+
+export const actualizarLogoNegocioResultSchema = z.object({
+    imageUrl: z.string().url(),
+    // Podríamos incluir logoTamañoBytes si la UI lo necesitara, pero usualmente no es el caso.
+});
+export type ActualizarLogoNegocioResultData = z.infer<typeof actualizarLogoNegocioResultSchema>;

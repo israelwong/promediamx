@@ -97,7 +97,7 @@ model AsistenteVirtual{
   whatsappHITL String? //telefono para consultas human in the loop
   emailHITL String?//email String? asociado al asistente virtual
   emailCalendario String? //email para agendar citas
-  precioBase Float?
+  // precioBase Float?
   version   Float
   status    String   @default("activo")
   createdAt DateTime @default(now())
@@ -167,8 +167,10 @@ model Tarea{
   iconoUrl           String?   // URL para el ícono principal de la tarea
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
   AsistenteTareaSuscripcion AsistenteTareaSuscripcion[]
+
+  esTareaPorDefecto Boolean @default(false) // Indica si es una tarea por defecto del sistema
+
   TareaEjecutada TareaEjecutada[]
   etiquetas          TareaEtiqueta[]
   canalesSoportados  TareaCanal[]
@@ -367,17 +369,6 @@ model Negocio{
   politicas String? //Políticas de Privacidad, Términos y Condiciones, Políticas de Devolución, Políticas de Reembolso, Políticas de Cancelación.
   garantias String? //Garantías, 
 
-
-  // agenteParaAgendaId Boolean @default(false) // O el default que prefieras
-  aceptaCitasPresenciales Boolean @default(false) // O el default que prefieras
-  aceptaCitasVirtuales   Boolean @default(false) // O el default que prefieras
-  requiereTelefonoParaCita Boolean @default(false) // O el default que prefieras
-  requiereEmailParaCita Boolean @default(false) // O el default que prefieras
-  requiereNombreParaCita Boolean @default(true) 
-  bufferMinutos Int? // Minutos de buffer entre citas
-
-  //!agregar
-  // metodosPagoTexto         String? //!quitar
   almacenamientoUsadoBytes BigInt? @default(0) // Contador total
 
   createdAt DateTime @default(now())
@@ -401,6 +392,8 @@ model Negocio{
 
   NegocioPaquete NegocioPaquete[] // Relación a paquetes
   NegocioPaqueteCategoria NegocioPaqueteCategoria[] // Relación a categorías de paquetes
+
+  AgendaConfiguracion AgendaConfiguracion? // Relación a configuración de agenda
 }
 
 // Enum para los días de la semana (más claro que usar números 0-6)
@@ -679,10 +672,10 @@ model Catalogo {
   id            String   @id @default(cuid())
   negocioId     String
   negocio       Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  nombre        String   // Considerar @@unique([negocioId, nombre])
+  nombre        String   
   descripcion   String? 
-  imagenPortadaUrl String? // URL de la imagen de portada del catálogo
-  imagenPortadaTamañoBytes Int? // Tamaño de la imagen de portada en bytes
+  imagenPortadaUrl String? 
+  imagenPortadaTamañoBytes Int? 
   status        String   @default("activo")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -964,16 +957,8 @@ model Agente{
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  //! --- NUEVAS RELACIONES INVERSAS ---
-  // Relación inversa para las conversaciones que este agente tiene asignadas
   conversacionesAsignadas Conversacion[] @relation("ConversacionesAsignadas")
-
-  // Relación inversa para las interacciones realizadas por este agente (si decides añadir agenteCrmId a Interaccion)
   interaccionesRealizadas Interaccion[] @relation("InteraccionesPorAgente")
-  // --- FIN DE NUEVAS RELACIONES ---
-
-  // Relaciones: Leads asignados, Bitácora, Agenda
   Lead      Lead[]
   Bitacora  Bitacora[]
   Agenda    Agenda[]
@@ -1007,41 +992,51 @@ enum StatusAgenda {
 }
 
 model Agenda {
-  id          String   @id @default(cuid())
-  
-  negocioId String? // A qué negocio pertenece esta agenda
-  negocio   Negocio? @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra negocio, se borra su agenda
-  
-  agenteId    String?   // agendamiento manual por un agente
-  agente      Agente?   @relation(fields: [agenteId], references: [id], onDelete: Cascade) // Si se borra agente, se borra su agenda? O SetNull?
-  
-  asistenteId String? // agendamiento por asistente virtual
+  id          String   @id @default(cuid()) 
+  negocioId String? 
+  negocio   Negocio? @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  agenteId    String?
+  agente      Agente?   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  asistenteId String?
   asistente   AsistenteVirtual? @relation(fields: [asistenteId], references: [id], onDelete: SetNull)
-  
   leadId      String
   lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  
-  fecha       DateTime // Fecha y hora del evento/tarea
-  tipo        String   // Ej: 'Llamada', 'Reunion', 'Email', 'Tarea'
+  fecha       DateTime
+  tipo        String 
   asunto      String
   descripcion String?
-  meetingUrl String? // URL de la reunión (ej: Zoom, Google Meet)
-  fechaRecordatorio DateTime? // Fecha y hora del recordatorio
-  status      String   @default("pendiente") // pendiente, completada, cancelada
+  meetingUrl String?
+  fechaRecordatorio DateTime?
+  status      String   @default("pendiente")
+  tipoDeCitaId String? 
+  tipoDeCita AgendaTipoCita? @relation(fields: [tipoDeCitaId], references: [id], onDelete: SetNull)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  historial AgendaHistorial[] // Relación con el historial de la agenda
-
-  tipoDeCitaId String?   // El ID del TipoDeCita seleccionado
-  tipoDeCita AgendaTipoCita? @relation(fields: [tipoDeCitaId], references: [id], onDelete: SetNull)
-
+  historial AgendaHistorial[] 
   modalidad String? // Presencial, Virtual, Híbrido
 
   @@index([negocioId])
   @@index([leadId])
   @@index([agenteId])
   @@index([fecha])
+}
+
+model AgendaConfiguracion {
+  id                      String    @id @default(cuid())
+  negocioId               String    @unique // Asegura la relación 1:1 con Negocio
+  negocio                 Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borra su config de agenda
+
+  aceptaCitasPresenciales Boolean   @default(false)
+  aceptaCitasVirtuales    Boolean   @default(false)
+  requiereTelefonoParaCita Boolean  @default(false)
+  requiereEmailParaCita   Boolean  @default(false)
+  requiereNombreParaCita  Boolean  @default(true)  // Ya estaba en true
+  bufferMinutos           Int?      // Minutos de buffer entre citas
+  metodosPagoTexto       String?   // Texto para mostrar los métodos de pago disponibles
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 }
 
 model AgendaTipoCita{

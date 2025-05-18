@@ -4,9 +4,6 @@
 import React from 'react';
 import SharedVideoManager, {
     type SharedVideoManagerProps,
-    // Los siguientes tipos son para referencia de lo que SharedVideoManager espera internamente
-    // type SharedVideoItemBase, 
-    // type SharedUpsertVideoData 
 } from '@/app/admin/components/shared/SharedVideoManager'; // Ajusta esta ruta si es diferente
 
 // Actions específicas para OfertaVideos

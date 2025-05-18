@@ -11,7 +11,6 @@ import { useForm, SubmitHandler, Controller, Path, DeepPartial, useWatch, Defaul
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ActionResult } from '@/app/admin/_lib/types';
-// import Image from 'next/image'; // No se usa directamente aquí
 
 // --- Tipos Genéricos y Schemas Base ---
 export const SharedTipoVideoEnumSchema = z.enum(['SUBIDO', 'YOUTUBE', 'VIMEO', 'OTRO_URL']);

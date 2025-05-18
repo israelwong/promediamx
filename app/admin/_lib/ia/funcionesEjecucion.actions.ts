@@ -335,6 +335,7 @@ export async function dispatchTareaEjecutadaAction(
             case 'agendarCita':
 
                 //saber si negocio cliente tiene más de un negocio
+                // Buscar la configuración de agenda personalizada del negocio (si existe)
                 const asistenteContext = await prisma.asistenteVirtual.findUnique({
                     where: { id: asistenteVirtualId },
                     select: {
@@ -347,17 +348,24 @@ export async function dispatchTareaEjecutadaAction(
                         },
                         negocio: {
                             select: {
-                                // id: true,
-                                aceptaCitasPresenciales: true,
-                                aceptaCitasVirtuales: true,
-                                requiereEmailParaCita: true,     // Boolean @default(true) o false
-                                requiereTelefonoParaCita: true,  // Boolean @default(false) o true
-                                requiereNombreParaCita: true,   // Boolean @default(false) o true
-                                bufferMinutos: true,          // Deberías añadir este campo (Int) a tu Prisma Schema para Negocio
+                                AgendaConfiguracion: {
+                                    select: {
+                                        aceptaCitasPresenciales: true,
+                                        aceptaCitasVirtuales: true,
+                                        requiereTelefonoParaCita: true,
+                                        requiereEmailParaCita: true,
+                                        requiereNombreParaCita: true,
+                                        bufferMinutos: true,
+                                        metodosPagoTexto: true,
+                                    }
+                                }
                             }
                         }
                     }
                 });
+
+                // Si existe agendaConfiguracion, usarla en vez de los campos legacy de negocio
+                // (esto requiere ajustar más abajo la construcción de configAgenda)
 
                 if (!asistenteContext?.negocioId || !asistenteContext.negocio) {
                     mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio para agendar la cita.";
@@ -371,14 +379,19 @@ export async function dispatchTareaEjecutadaAction(
                     id: asistenteVirtualId
                 };
                 // Construir el objeto de configuración del negocio
+                if (!asistenteContext.negocio.AgendaConfiguracion) {
+                    mensajeResultadoParaUsuario = "Error interno: No se encontró la configuración de agenda del negocio.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break;
+                }
                 const configAgenda: ConfiguracionAgendaDelNegocio = {
                     negocioId: asistenteContext.negocioId,
-                    aceptaCitasVirtuales: asistenteContext.negocio.aceptaCitasVirtuales,
-                    aceptaCitasPresenciales: asistenteContext.negocio.aceptaCitasPresenciales,
-                    requiereEmail: asistenteContext.negocio.requiereEmailParaCita,
-                    requiereTelefono: asistenteContext.negocio.requiereTelefonoParaCita,
-                    requiereNombre: true,
-                    bufferMinutos: asistenteContext.negocio.bufferMinutos ?? 0, // Asignar un valor predeterminado si es null
+                    aceptaCitasVirtuales: asistenteContext.negocio.AgendaConfiguracion.aceptaCitasVirtuales,
+                    aceptaCitasPresenciales: asistenteContext.negocio.AgendaConfiguracion.aceptaCitasPresenciales,
+                    requiereEmail: asistenteContext.negocio.AgendaConfiguracion.requiereEmailParaCita,
+                    requiereTelefono: asistenteContext.negocio.AgendaConfiguracion.requiereTelefonoParaCita,
+                    requiereNombre: asistenteContext.negocio.AgendaConfiguracion.requiereNombreParaCita ?? true,
+                    bufferMinutos: asistenteContext.negocio.AgendaConfiguracion.bufferMinutos ?? 0, // Asignar un valor predeterminado si es null
                 };
 
                 // Extraer y preparar los argumentos para ejecutarAgendarCitaAction
@@ -455,12 +468,17 @@ export async function dispatchTareaEjecutadaAction(
                         negocioId: true,
                         negocio: {
                             select: {
-                                aceptaCitasPresenciales: true,
-                                aceptaCitasVirtuales: true,
-                                requiereEmailParaCita: true,
-                                requiereTelefonoParaCita: true,
-                                requiereNombreParaCita: true,
-                                bufferMinutos: true,
+                                AgendaConfiguracion: {
+                                    select: {
+                                        aceptaCitasPresenciales: true,
+                                        aceptaCitasVirtuales: true,
+                                        requiereTelefonoParaCita: true,
+                                        requiereEmailParaCita: true,
+                                        requiereNombreParaCita: true,
+                                        bufferMinutos: true,
+                                        metodosPagoTexto: true,
+                                    }
+                                }
                             }
                         }
                     }
@@ -472,14 +490,18 @@ export async function dispatchTareaEjecutadaAction(
                     break;
                 }
 
+                if (!contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion) {
+                    mensajeResultadoParaUsuario = "Error interno: No se encontró la configuración de agenda del negocio para listar horarios.";
+                    break;
+                }
                 const configAgendaParaListar: ConfiguracionAgendaDelNegocio = {
                     negocioId: contextoNegocioParaListarHorarios.negocioId,
-                    aceptaCitasVirtuales: contextoNegocioParaListarHorarios.negocio.aceptaCitasVirtuales,
-                    aceptaCitasPresenciales: contextoNegocioParaListarHorarios.negocio.aceptaCitasPresenciales,
-                    requiereEmail: contextoNegocioParaListarHorarios.negocio.requiereEmailParaCita,
-                    requiereTelefono: contextoNegocioParaListarHorarios.negocio.requiereTelefonoParaCita,
-                    requiereNombre: contextoNegocioParaListarHorarios.negocio.requiereNombreParaCita ?? true,
-                    bufferMinutos: contextoNegocioParaListarHorarios.negocio.bufferMinutos ?? 0,
+                    aceptaCitasVirtuales: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.aceptaCitasVirtuales,
+                    aceptaCitasPresenciales: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.aceptaCitasPresenciales,
+                    requiereEmail: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.requiereEmailParaCita,
+                    requiereTelefono: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.requiereTelefonoParaCita,
+                    requiereNombre: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.requiereNombreParaCita ?? true,
+                    bufferMinutos: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.bufferMinutos ?? 0,
                 };
 
                 // Verificar directamente los argumentos recibidos de Gemini
@@ -547,13 +569,18 @@ export async function dispatchTareaEjecutadaAction(
                     select: {
                         negocio: {
                             select: {
-                                id: true,
-                                aceptaCitasPresenciales: true,
-                                aceptaCitasVirtuales: true,
-                                requiereEmailParaCita: true,
-                                requiereTelefonoParaCita: true,
-                                requiereNombreParaCita: true, // Asegúrate que este campo exista en tu modelo Negocio
-                                bufferMinutos: true
+                                id: true, // <-- Agregar esta línea para incluir el id del negocio
+                                AgendaConfiguracion: {
+                                    select: {
+                                        aceptaCitasPresenciales: true,
+                                        aceptaCitasVirtuales: true,
+                                        requiereTelefonoParaCita: true,
+                                        requiereEmailParaCita: true,
+                                        requiereNombreParaCita: true,
+                                        bufferMinutos: true,
+                                        metodosPagoTexto: true,
+                                    }
+                                }
                             }
                         }
                     }
@@ -567,12 +594,12 @@ export async function dispatchTareaEjecutadaAction(
 
                 const configAgendaReagendar: ConfiguracionAgendaDelNegocio = {
                     negocioId: asistenteCtxReagendar.negocio.id,
-                    aceptaCitasVirtuales: asistenteCtxReagendar.negocio.aceptaCitasVirtuales,
-                    aceptaCitasPresenciales: asistenteCtxReagendar.negocio.aceptaCitasPresenciales,
-                    requiereEmail: asistenteCtxReagendar.negocio.requiereEmailParaCita,
-                    requiereTelefono: asistenteCtxReagendar.negocio.requiereTelefonoParaCita,
-                    requiereNombre: asistenteCtxReagendar.negocio.requiereNombreParaCita ?? true, // Default a true si es null/undefined
-                    bufferMinutos: asistenteCtxReagendar.negocio.bufferMinutos ?? 0,
+                    aceptaCitasVirtuales: asistenteCtxReagendar.negocio.AgendaConfiguracion?.aceptaCitasVirtuales ?? false,
+                    aceptaCitasPresenciales: asistenteCtxReagendar.negocio.AgendaConfiguracion?.aceptaCitasPresenciales ?? false,
+                    requiereEmail: asistenteCtxReagendar.negocio.AgendaConfiguracion?.requiereEmailParaCita ?? true,
+                    requiereTelefono: asistenteCtxReagendar.negocio.AgendaConfiguracion?.requiereTelefonoParaCita ?? false,
+                    requiereNombre: asistenteCtxReagendar.negocio.AgendaConfiguracion?.requiereNombreParaCita ?? true, // Default a true si es null/undefined
+                    bufferMinutos: asistenteCtxReagendar.negocio.AgendaConfiguracion?.bufferMinutos ?? 0,
                 };
 
                 const actorReagendar = { type: ChangedByType.ASSISTANT, id: asistenteVirtualId };

@@ -1,27 +1,30 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Añadido useCallback
 import { useRouter } from 'next/navigation';
-// Ajusta rutas
-import { obtenerTareasSuscritasDetalladas, TareaSuscritaDetalle } from '@/app/admin/_lib/asistenteTareasSuscripciones.actions'; // O tareas.actions
-import { Loader2, AlertCircle, List, Star, Settings, ExternalLink, ShoppingCart } from 'lucide-react';
+// NUEVAS IMPORTS
+import { obtenerTareasSuscritasDetalladasAction } from '@/app/admin/_lib/actions/asistenteTareaSuscripcion/asistenteTareaSuscripcion.actions';
+import type { TareaSuscritaDetalleData } from '@/app/admin/_lib/actions/asistenteTareaSuscripcion/asistenteTareaSuscripcion.schemas';
+
+import { Loader2, AlertCircle, List, Star, Settings, ShoppingCart } from 'lucide-react';
 
 interface Props {
     asistenteId: string;
     clienteId: string;
     negocioId: string;
+    // Opcional: si el componente padre AgendaConfiguracion carga estos datos
+    initialTareasSuscritas?: TareaSuscritaDetalleData[];
 }
 
-// Componente interno reutilizable para renderizar una lista de tareas
+// Componente interno TaskList (actualizado para usar TareaSuscritaDetalleData)
 const TaskList = ({ title, icon: Icon, tareas, showPrice, onManageClick }: {
     title: string;
     icon: React.ElementType;
-    tareas: TareaSuscritaDetalle[];
+    tareas: TareaSuscritaDetalleData[]; // Tipo actualizado
     showPrice: boolean;
     onManageClick: (tareaId: string) => void;
 }) => {
-    // Clases reutilizadas de la versión anterior
-    const taskListContainerClasses = "space-y-2 flex-grow overflow-y-auto pr-1"; // Limitar altura y scroll
+    const taskListContainerClasses = "flex-1 space-y-2 overflow-y-auto pr-1"; // Cambiado flex-grow a flex-1
     const taskItemClasses = "p-2 bg-zinc-900/50 rounded border border-zinc-700/80 flex justify-between items-center gap-2";
     const taskInfoClasses = "flex-grow overflow-hidden";
     const taskNameClasses = "text-xs font-medium text-zinc-100 truncate";
@@ -31,12 +34,12 @@ const TaskList = ({ title, icon: Icon, tareas, showPrice, onManageClick }: {
     const sectionTitleClasses = "text-xs font-semibold text-zinc-300 mb-2 flex items-center gap-1.5 uppercase tracking-wider";
 
     return (
-        <div>
+        <div className="flex flex-col h-full"> {/* Asegurar que tome altura para que overflow funcione */}
             <h4 className={sectionTitleClasses}>
                 <Icon size={14} /> {title} ({tareas.length})
             </h4>
             {tareas.length === 0 ? (
-                <p className="text-xs italic text-zinc-500 text-center py-6 px-2 border border-dashed border-zinc-700 rounded-md bg-zinc-800/30">
+                <p className="text-xs italic text-zinc-500 text-center py-6 px-2 border border-dashed border-zinc-700 rounded-md bg-zinc-800/30 flex-grow flex items-center justify-center">
                     Ninguna tarea suscrita en esta categoría.
                 </p>
             ) : (
@@ -49,19 +52,17 @@ const TaskList = ({ title, icon: Icon, tareas, showPrice, onManageClick }: {
                             <span className={taskStatsClasses} title={`${t.ejecuciones} veces ejecutada`}>
                                 {t.ejecuciones}x
                             </span>
-                            {/* Mostrar precio solo si showPrice es true */}
                             {showPrice && (
                                 <span className={taskPriceClasses}>
                                     + {formatCurrency(t.montoSuscripcion)}
                                 </span>
                             )}
-                            {/* Botón Gestionar siempre visible */}
                             <button
                                 onClick={() => onManageClick(t.tarea.id)}
                                 className={manageButtonClasses}
                                 title="Gestionar Suscripción"
                             >
-                                <ExternalLink size={14} />
+                                <Settings size={14} /> {/* Cambiado icono a Settings */}
                             </button>
                         </div>
                     ))}
@@ -71,36 +72,46 @@ const TaskList = ({ title, icon: Icon, tareas, showPrice, onManageClick }: {
     );
 };
 
+// Helper formatCurrency (sin cambios)
+const formatCurrency = (value: number | null) => {
+    if (value === null || value === 0) return '$ 0.00'; // Mostrar $0.00 si es null o 0
+    return value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+};
 
-export default function AsistenteTareas({ asistenteId, clienteId, negocioId }: Props) {
+
+export default function AsistenteTareas({
+    asistenteId,
+    clienteId,
+    negocioId,
+    initialTareasSuscritas // Prop para datos iniciales
+}: Props) {
     const router = useRouter();
-    const [tareasSuscritas, setTareasSuscritas] = useState<TareaSuscritaDetalle[]>([]);
-    // const [activeTab, setActiveTab] = useState<ActiveTabTareas>('base'); // Ya no se necesita
-    const [loading, setLoading] = useState(true);
+    const [tareasSuscritas, setTareasSuscritas] = useState<TareaSuscritaDetalleData[]>(initialTareasSuscritas || []);
+    const [loading, setLoading] = useState(!initialTareasSuscritas); // No cargar si hay datos iniciales
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchTareas = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const data = await obtenerTareasSuscritasDetalladas(asistenteId);
-                setTareasSuscritas(data ?? []);
-            } catch (err) {
-                console.error("Error fetching subscribed tasks:", err);
-                setError(err instanceof Error ? err.message : "Error al cargar tareas suscritas.");
-                setTareasSuscritas([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchTareas();
+    const fetchTareasSuscritasLocal = useCallback(async (showLoading = true) => {
+        if (showLoading) setLoading(true);
+        setError(null);
+        const result = await obtenerTareasSuscritasDetalladasAction(asistenteId); // Nueva action
+        if (result.success && result.data) {
+            setTareasSuscritas(result.data);
+        } else {
+            setError(result.error || "Error al cargar tareas suscritas.");
+            setTareasSuscritas([]);
+        }
+        if (showLoading) setLoading(false);
     }, [asistenteId]);
 
-    // Separar tareas base y adicionales
+    useEffect(() => {
+        if (!initialTareasSuscritas) { // Solo cargar si no se proveyeron datos iniciales
+            fetchTareasSuscritasLocal();
+        }
+    }, [fetchTareasSuscritasLocal, initialTareasSuscritas]);
+
     const { tareasBase, tareasAdicionales } = useMemo(() => {
-        const base: TareaSuscritaDetalle[] = [];
-        const adicionales: TareaSuscritaDetalle[] = [];
+        const base: TareaSuscritaDetalleData[] = [];
+        const adicionales: TareaSuscritaDetalleData[] = [];
         tareasSuscritas.forEach(t => {
             if (t.montoSuscripcion === null || t.montoSuscripcion === 0) {
                 base.push(t);
@@ -108,86 +119,70 @@ export default function AsistenteTareas({ asistenteId, clienteId, negocioId }: P
                 adicionales.push(t);
             }
         });
-        // Opcional: Ordenar cada lista internamente si es necesario
-        // base.sort((a, b) => a.tarea.nombre.localeCompare(b.tarea.nombre));
-        // adicionales.sort((a, b) => a.tarea.nombre.localeCompare(b.tarea.nombre));
         return { tareasBase: base, tareasAdicionales: adicionales };
     }, [tareasSuscritas]);
 
-    // --- Clases de Tailwind ---
-    const containerClasses = "p-4 bg-zinc-800 border border-zinc-700 rounded-lg shadow-md flex flex-col";
-    const headerClasses = "flex items-center justify-between mb-4 border-b border-zinc-600 pb-2"; // Aumentado mb
+    // Clases UI (sin cambios)
+    const containerClasses = "p-4 bg-zinc-800 border border-zinc-700 rounded-lg shadow-md flex flex-col h-full flex-grow"; // Añadido h-full
+    const columnsContainerClasses = "grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow"; // Mantenemos esto como antes de tu último cambio
+    const headerClasses = "flex items-center justify-between mb-4 border-b border-zinc-600 pb-3"; // Ajustado pb
     const titleClasses = "text-sm font-semibold text-zinc-100 flex items-center gap-2";
-    // --- NUEVO: Grid para las dos columnas ---
-    const columnsContainerClasses = "grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow min-h-[200px]"; // min-h para evitar colapso si está vacío
-    const marketplaceButtonClasses = "mt-4 text-xs font-medium w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-indigo-400";
+    const marketplaceButtonClasses = "mt-auto py-3 text-xs font-medium w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-indigo-400 border-t border-zinc-700"; // Añadido borde superior
 
-    // --- Handlers ---
     const handleManageSubscription = (tareaId: string) => {
-        // console.log("Gestionar suscripción para tarea:", tareaId);
-        // return;
-        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/asistente/${asistenteId}/tarea/${tareaId}`);
+        // router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/asistente/${asistenteId}/tarea/${tareaId}`);
+        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/asistente/${asistenteId}/tarea/${tareaId}/editar`);
     };
     const handleGoToMarketplace = () => {
-        router.push(`/admin/marketplace/${asistenteId}`);
+        router.push(`/admin/marketplace/${asistenteId}`); // Pasar asistenteId al marketplace
     };
 
     return (
         <div className={containerClasses}>
-            {/* Cabecera */}
             <div className={headerClasses}>
                 <h3 className={titleClasses}>
                     <List size={16} className="text-zinc-400" />
-                    Tareas Suscritas
+                    Tareas del Asistente
                 </h3>
             </div>
 
-            {/* Contenido */}
             {loading && (
-                <p className="text-xs italic text-zinc-500 text-center py-4 flex items-center justify-center gap-1">
-                    <Loader2 size={12} className="animate-spin" /> Cargando tareas...
-                </p>
+                <div className="flex-grow flex items-center justify-center text-zinc-400">
+                    <Loader2 size={20} className="animate-spin mr-2" /> Cargando tareas...
+                </div>
             )}
             {error && !loading && (
-                <p className="text-xs text-red-400 text-center flex items-center justify-center gap-1 py-4">
-                    <AlertCircle size={12} /> {error}
-                </p>
+                <div className="flex-grow flex flex-col items-center justify-center text-red-400 p-4 bg-red-900/20 border border-red-700 rounded-md">
+                    <AlertCircle size={24} className="mb-2" />
+                    <p className="text-sm text-center">{error}</p>
+                </div>
             )}
 
             {!loading && !error && (
-                // --- Contenedor de las dos columnas ---
                 <div className={columnsContainerClasses}>
-                    {/* Columna Tareas Base */}
                     <TaskList
-                        title="Incluidas"
+                        title="Tareas Incluidas" // Cambiado título
                         icon={Star}
                         tareas={tareasBase}
-                        showPrice={false} // No mostrar precio para base
+                        showPrice={false}
                         onManageClick={handleManageSubscription}
                     />
-                    {/* Columna Tareas Adicionales */}
                     <TaskList
-                        title="Adicionales"
+                        title="Tareas Premium Suscritas" // Cambiado título
                         icon={Settings}
                         tareas={tareasAdicionales}
-                        showPrice={true} // Mostrar precio para adicionales
+                        showPrice={true}
                         onManageClick={handleManageSubscription}
                     />
                 </div>
             )}
 
-            {/* Botón para ir al Marketplace */}
-            {!loading && ( // Mostrar siempre si no está cargando
+            {/* Botón siempre visible si no hay error y no está cargando, para asegurar acceso al marketplace */}
+            {!loading && !error && (
                 <button onClick={handleGoToMarketplace} className={marketplaceButtonClasses}>
-                    <ShoppingCart size={14} /> Ir al Marketplace
+                    <ShoppingCart size={14} /> Descubrir Más Tareas (Marketplace)
                 </button>
             )}
         </div>
     );
 }
-
-// Helper para formatear moneda
-const formatCurrency = (value: number | null) => {
-    if (value === null || value === 0) return '$ 0.00';
-    return value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
-};

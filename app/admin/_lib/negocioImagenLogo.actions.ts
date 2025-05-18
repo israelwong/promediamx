@@ -13,13 +13,6 @@ interface ActionResult<T = null> {
     data?: T;
 }
 
-/**
- * @description Actualiza o establece el logo de un negocio.
- * Sube la nueva imagen al storage, elimina la anterior si existe, y actualiza la URL en la BD.
- * @param {string} negocioId - ID del negocio a actualizar.
- * @param {File} file - El nuevo archivo de imagen (logo) a subir.
- * @returns {Promise<ActionResult<{ imageUrl: string }>>} - Resultado con la nueva URL pública o un error.
- */
 export async function actualizarImagenLogoNegocio(
     negocioId: string,
     file: File

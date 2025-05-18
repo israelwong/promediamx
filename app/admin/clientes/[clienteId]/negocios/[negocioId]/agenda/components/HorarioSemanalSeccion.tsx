@@ -1,39 +1,55 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangleIcon, CheckSquare, Save, Clock } from 'lucide-react'; // CalendarX2 ya no se usa aquí
+import { Loader2, AlertTriangleIcon, CheckSquare, Save, Clock } from 'lucide-react';
 
+// NUEVAS IMPORTS de Actions y Schemas/Types
 import {
-    obtenerConfiguracionAgenda,
-    guardarHorariosAtencion,
-} from '@/app/admin/_lib/negocioAgenda.actions';
+    obtenerHorariosAtencionAction,
+    guardarHorariosAtencionAction,
+} from '@/app/admin/_lib/actions/agendaHorarioSemanal/agendaHorarioSemanal.actions';
+import type {
+    HorarioAtencionData, // Tipo para los datos que vienen del backend
+    GuardarHorariosAtencionInput, // El componente construirá este objeto
+} from '@/app/admin/_lib/actions/agendaHorarioSemanal/agendaHorarioSemanal.schemas';
 
-import {
-    HorarioSemanalUI,
-    HorarioAtencionBase,
-    DiaSemana,
-    // AgendaActionResult // No se usa directamente en este componente
-} from '@/app/admin/_lib/negocioAgenda.type';
+// Importar el enum DiaSemana de Prisma para usarlo en DIAS_MAP y el estado local
+import { DiaSemana as DiaSemanaPrisma } from '@prisma/client';
+
 
 interface HorarioSemanalSeccionProps {
     negocioId: string;
     isSavingGlobal: boolean;
+    // Opcional: si el componente padre AgendaConfiguracion carga estos datos
+    initialHorarios?: HorarioAtencionData[];
 }
 
-const DIAS_MAP: { numero: number; nombre: string; enumKey: DiaSemana }[] = [
-    { numero: 1, nombre: 'Lunes', enumKey: DiaSemana.LUNES },
-    { numero: 2, nombre: 'Martes', enumKey: DiaSemana.MARTES },
-    { numero: 3, nombre: 'Miércoles', enumKey: DiaSemana.MIERCOLES },
-    { numero: 4, nombre: 'Jueves', enumKey: DiaSemana.JUEVES },
-    { numero: 5, nombre: 'Viernes', enumKey: DiaSemana.VIERNES },
-    { numero: 6, nombre: 'Sábado', enumKey: DiaSemana.SABADO },
-    { numero: 0, nombre: 'Domingo', enumKey: DiaSemana.DOMINGO }
+// Tipo para el estado de la UI, similar al HorarioSemanalUI que tenías
+interface HorarioDiaUI {
+    id?: string; // El ID de Prisma si existe
+    diaSemanaNumero: number; // Para ordenamiento y lógica de UI
+    diaSemanaEnumKey: DiaSemanaPrisma; // Para enviar al backend
+    diaSemanaNombreDisplay: string; // Para mostrar en la UI
+    estaAbierto: boolean;
+    horaInicio: string;
+    horaFin: string;
+}
+
+
+const DIAS_MAP: { numero: number; nombre: string; enumKey: DiaSemanaPrisma }[] = [
+    { numero: 1, nombre: 'Lunes', enumKey: DiaSemanaPrisma.LUNES },
+    { numero: 2, nombre: 'Martes', enumKey: DiaSemanaPrisma.MARTES },
+    { numero: 3, nombre: 'Miércoles', enumKey: DiaSemanaPrisma.MIERCOLES },
+    { numero: 4, nombre: 'Jueves', enumKey: DiaSemanaPrisma.JUEVES },
+    { numero: 5, nombre: 'Viernes', enumKey: DiaSemanaPrisma.VIERNES },
+    { numero: 6, nombre: 'Sábado', enumKey: DiaSemanaPrisma.SABADO },
+    { numero: 0, nombre: 'Domingo', enumKey: DiaSemanaPrisma.DOMINGO } // Domingo es 0 en Date.getDay()
 ];
 
 const generarOpcionesDeHora = (): string[] => {
     const horas = [];
     for (let h = 0; h < 24; h++) {
-        for (let m = 0; m < 60; m += 30) {
+        for (let m = 0; m < 60; m += 30) { // Intervalos de 30 min
             horas.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
     }
@@ -43,15 +59,16 @@ const OPCIONES_HORA = generarOpcionesDeHora();
 
 export default function HorarioSemanalSeccion({
     negocioId,
-    isSavingGlobal
+    isSavingGlobal,
+    initialHorarios // Prop para datos iniciales
 }: HorarioSemanalSeccionProps) {
-    const [horariosUI, setHorariosUI] = useState<HorarioSemanalUI[]>([]);
+    const [horariosUI, setHorariosUI] = useState<HorarioDiaUI[]>([]);
     const [loadingHorarios, setLoadingHorarios] = useState(true);
     const [errorHorarios, setErrorHorarios] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    // Clases de UI (sin cambios respecto a la versión anterior del Canvas)
+    // Clases UI (sin cambios)
     const dayCardClasses = "p-4 bg-zinc-900/50 border border-zinc-700 rounded-md space-y-3";
     const dayHeaderClasses = "flex items-center justify-between";
     const dayTitleClasses = "text-sm font-medium text-zinc-100";
@@ -63,66 +80,60 @@ export default function HorarioSemanalSeccion({
     const alertSectionErrorClasses = "text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 flex items-center gap-2 my-4";
     const alertSectionSuccessClasses = "text-sm text-green-400 bg-green-500/10 p-3 rounded-md border border-green-500/30 flex items-center gap-2 my-4";
 
-    const inicializarHorariosUI = useCallback((horariosFromDB: HorarioAtencionBase[]) => {
+
+    const inicializarHorariosUI = useCallback((horariosFromDB: HorarioAtencionData[]) => {
         const uiState = DIAS_MAP.map(diaInfo => {
             const horarioExistente = horariosFromDB.find(h => h.dia === diaInfo.enumKey);
             return {
                 id: horarioExistente?.id,
                 diaSemanaNumero: diaInfo.numero,
-                diaSemanaNombre: diaInfo.enumKey,
+                diaSemanaEnumKey: diaInfo.enumKey,
+                diaSemanaNombreDisplay: diaInfo.nombre, // Usar el nombre de DIAS_MAP
                 estaAbierto: !!horarioExistente,
-                horaInicio: horarioExistente?.horaInicio || '09:00', // Default si no hay horario
-                horaFin: horarioExistente?.horaFin || '17:00',     // Default si no hay horario
+                horaInicio: horarioExistente?.horaInicio || '09:00',
+                horaFin: horarioExistente?.horaFin || '17:00',
             };
         });
         setHorariosUI(uiState);
-    }, []);
+    }, []); // DIAS_MAP es constante, no necesita estar en dependencias
 
-    const fetchHorarios = useCallback(async () => {
-        setLoadingHorarios(true);
+    const fetchHorariosLocal = useCallback(async (showLoading = true) => {
+        if (showLoading) setLoadingHorarios(true);
         setErrorHorarios(null);
         setSuccessMessage(null);
-        try {
-            const result = await obtenerConfiguracionAgenda(negocioId);
-            if (result.success && result.data) {
-                inicializarHorariosUI(result.data.horariosAtencion || []);
-            } else {
-                throw new Error(result.error || "Error cargando horarios.");
-            }
-        } catch (err) {
-            setErrorHorarios(err instanceof Error ? err.message : "No se pudieron cargar los horarios.");
-            inicializarHorariosUI([]);
-        } finally {
-            setLoadingHorarios(false);
+
+        const result = await obtenerHorariosAtencionAction(negocioId); // Nueva action
+
+        if (result.success && result.data) {
+            inicializarHorariosUI(result.data);
+        } else {
+            setErrorHorarios(result.error || "Error cargando horarios.");
+            inicializarHorariosUI([]); // Inicializar vacío en caso de error
         }
+        if (showLoading) setLoadingHorarios(false);
     }, [negocioId, inicializarHorariosUI]);
 
     useEffect(() => {
-        fetchHorarios();
-    }, [fetchHorarios]);
+        if (initialHorarios) {
+            inicializarHorariosUI(initialHorarios);
+            setLoadingHorarios(false);
+        } else {
+            fetchHorariosLocal();
+        }
+    }, [fetchHorariosLocal, initialHorarios, inicializarHorariosUI]);
 
     const handleToggleAbierto = (diaNumero: number) => {
         setHorariosUI(prev => {
-            // Buscar la configuración de Lunes si existe y está abierto
-            const lunesConfig = prev.find(h => h.diaSemanaNombre === DiaSemana.LUNES && h.estaAbierto);
+            const lunesConfig = prev.find(h => h.diaSemanaEnumKey === DiaSemanaPrisma.LUNES && h.estaAbierto);
             const horaInicioPorDefecto = lunesConfig?.horaInicio || '09:00';
             const horaFinPorDefecto = lunesConfig?.horaFin || '17:00';
 
             return prev.map(h => {
                 if (h.diaSemanaNumero === diaNumero) {
-                    const ahoraEstaAbierto = !h.estaAbierto; // El nuevo estado de 'estaAbierto'
-
-                    // Si se está activando el día (pasando a 'Abierto') y NO es Lunes
-                    if (ahoraEstaAbierto && h.diaSemanaNombre !== DiaSemana.LUNES) {
-                        return {
-                            ...h,
-                            estaAbierto: ahoraEstaAbierto,
-                            // Heredar de Lunes si está configurado, sino usar los defaults generales
-                            horaInicio: horaInicioPorDefecto,
-                            horaFin: horaFinPorDefecto
-                        };
+                    const ahoraEstaAbierto = !h.estaAbierto;
+                    if (ahoraEstaAbierto && h.diaSemanaEnumKey !== DiaSemanaPrisma.LUNES) {
+                        return { ...h, estaAbierto: ahoraEstaAbierto, horaInicio: horaInicioPorDefecto, horaFin: horaFinPorDefecto };
                     }
-                    // Si se está desactivando, o es Lunes, o Lunes no está configurado para heredar, solo cambiar 'estaAbierto'
                     return { ...h, estaAbierto: ahoraEstaAbierto };
                 }
                 return h;
@@ -143,58 +154,59 @@ export default function HorarioSemanalSeccion({
         setErrorHorarios(null);
         setSuccessMessage(null);
 
-        const horariosParaGuardar: HorarioAtencionBase[] = [];
-        let validacionFallida = false;
+        const horariosParaGuardarPayload: { dia: DiaSemanaPrisma; horaInicio: string; horaFin: string }[] = [];
+        let validacionFallidaLocal = false;
 
         for (const h of horariosUI) {
             if (h.estaAbierto) {
                 if (!h.horaInicio || !h.horaFin) {
-                    setErrorHorarios(`Completa las horas para ${DIAS_MAP.find(d => d.enumKey === h.diaSemanaNombre)?.nombre}.`);
-                    validacionFallida = true;
+                    setErrorHorarios(`Completa las horas para ${h.diaSemanaNombreDisplay}.`);
+                    validacionFallidaLocal = true;
                     break;
                 }
                 if (h.horaInicio >= h.horaFin) {
-                    setErrorHorarios(`Hora de inicio debe ser menor que hora de fin para ${DIAS_MAP.find(d => d.enumKey === h.diaSemanaNombre)?.nombre}.`);
-                    validacionFallida = true;
+                    setErrorHorarios(`Hora de inicio debe ser menor que hora de fin para ${h.diaSemanaNombreDisplay}.`);
+                    validacionFallidaLocal = true;
                     break;
                 }
-                horariosParaGuardar.push({
-                    negocioId: negocioId,
-                    dia: h.diaSemanaNombre,
+                horariosParaGuardarPayload.push({
+                    dia: h.diaSemanaEnumKey,
                     horaInicio: h.horaInicio,
                     horaFin: h.horaFin,
                 });
             }
         }
 
-        if (validacionFallida) {
+        if (validacionFallidaLocal) {
             setIsSubmitting(false);
             return;
         }
 
-        try {
-            const result = await guardarHorariosAtencion(negocioId, horariosParaGuardar);
-            if (result.success) {
-                setSuccessMessage("Horarios de atención guardados exitosamente.");
-                // Es buena práctica recargar para obtener IDs actualizados si la action los modificara,
-                // aunque la action actual borra y recrea, por lo que los IDs cambiarían.
-                // Si el usuario no ve los IDs, esta recarga podría ser opcional para una UI más rápida.
-                await fetchHorarios();
-            } else {
-                setErrorHorarios(result.error || "Error al guardar los horarios.");
-            }
-        } catch (err) {
-            setErrorHorarios(err instanceof Error ? err.message : "Un error inesperado ocurrió.");
-        } finally {
-            setIsSubmitting(false);
+        const inputForAction: GuardarHorariosAtencionInput = {
+            negocioId: negocioId,
+            horarios: horariosParaGuardarPayload,
+        };
+
+        const result = await guardarHorariosAtencionAction(inputForAction); // Nueva action
+
+        if (result.success) {
+            setSuccessMessage("Horarios de atención guardados exitosamente.");
+            if (result.data) inicializarHorariosUI(result.data); // Actualizar con los datos guardados (con IDs)
+        } else {
+            const errorMsg = result.errorDetails
+                ? Object.entries(result.errorDetails).map(([key, val]) => `${key}: ${val.join(', ')}`).join('; ')
+                : result.error || "Error al guardar los horarios.";
+            setErrorHorarios(errorMsg);
         }
+        setIsSubmitting(false);
     };
 
-    if (loadingHorarios) { /* ... (loader sin cambios) ... */ }
+    if (loadingHorarios && !initialHorarios) {
+        return <div className="py-8 flex items-center justify-center text-zinc-400"><Loader2 className="h-6 w-6 animate-spin mr-2" /> Cargando horarios...</div>;
+    }
 
     return (
         <div className="space-y-6">
-            {/* ... (Encabezado de la sección sin cambios) ... */}
             <div className="flex justify-between items-center">
                 <h3 className="text-md font-semibold text-zinc-100 flex items-center gap-2">
                     <Clock size={18} className="text-blue-400" />
@@ -207,17 +219,16 @@ export default function HorarioSemanalSeccion({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {horariosUI
-                    .slice()
-                    .sort((a, b) => {
-                        const diaA = a.diaSemanaNumero === 0 ? 7 : a.diaSemanaNumero;
-                        const diaB = b.diaSemanaNumero === 0 ? 7 : b.diaSemanaNumero;
-                        return diaA - diaB;
+                    .slice() // Crear una copia para no mutar el estado original al ordenar
+                    .sort((a, b) => { // Lunes (1) a Domingo (0 -> 7 para ordenar)
+                        const diaAOrden = a.diaSemanaNumero === 0 ? 7 : a.diaSemanaNumero;
+                        const diaBOrden = b.diaSemanaNumero === 0 ? 7 : b.diaSemanaNumero;
+                        return diaAOrden - diaBOrden;
                     })
                     .map((horario) => (
                         <div key={horario.diaSemanaNumero} className={dayCardClasses}>
-                            {/* ... (Contenido de la tarjeta del día sin cambios, ya usa la lógica actualizada de handleToggleAbierto) ... */}
                             <div className={dayHeaderClasses}>
-                                <span className={dayTitleClasses}>{DIAS_MAP.find(d => d.numero === horario.diaSemanaNumero)?.nombre}</span>
+                                <span className={dayTitleClasses}>{horario.diaSemanaNombreDisplay}</span>
                                 <label className={toggleLabelClasses}>
                                     <button
                                         type="button"
@@ -239,7 +250,7 @@ export default function HorarioSemanalSeccion({
                                         <label htmlFor={`inicio-${horario.diaSemanaNumero}`} className="text-xs text-zinc-400">Desde:</label>
                                         <select
                                             id={`inicio-${horario.diaSemanaNumero}`}
-                                            value={horario.horaInicio || ''}
+                                            value={horario.horaInicio}
                                             onChange={(e) => handleTimeChange(horario.diaSemanaNumero, 'horaInicio', e.target.value)}
                                             className={timeSelectClasses}
                                             disabled={isSubmitting || isSavingGlobal}
@@ -251,7 +262,7 @@ export default function HorarioSemanalSeccion({
                                         <label htmlFor={`fin-${horario.diaSemanaNumero}`} className="text-xs text-zinc-400">Hasta:</label>
                                         <select
                                             id={`fin-${horario.diaSemanaNumero}`}
-                                            value={horario.horaFin || ''}
+                                            value={horario.horaFin}
                                             onChange={(e) => handleTimeChange(horario.diaSemanaNumero, 'horaFin', e.target.value)}
                                             className={timeSelectClasses}
                                             disabled={isSubmitting || isSavingGlobal}
@@ -266,7 +277,6 @@ export default function HorarioSemanalSeccion({
             </div>
 
             <div className="pt-6 flex justify-end border-t border-zinc-700 mt-2">
-                {/* ... (Botón Guardar Horarios sin cambios) ... */}
                 <button
                     type="button"
                     onClick={handleGuardarHorarios}

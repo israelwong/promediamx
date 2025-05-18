@@ -1,3 +1,4 @@
+// Ruta actual: app/admin/_lib/categoriaTarea.actions.ts
 'use server'
 import prisma from './prismaClient'
 import { Prisma } from '@prisma/client'

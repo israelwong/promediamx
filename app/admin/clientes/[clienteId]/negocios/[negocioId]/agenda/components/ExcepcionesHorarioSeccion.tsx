@@ -3,37 +3,40 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, AlertTriangleIcon, CheckSquare, Save, XIcon, CalendarOff, PlusIcon, Edit, Trash2, CalendarPlus } from 'lucide-react';
 
+// NUEVAS IMPORTS de Actions y Schemas/Types
 import {
-    obtenerConfiguracionAgenda, // Para obtener las excepciones iniciales
-    crearExcepcionHorario,
-    actualizarExcepcionHorario,
-    eliminarExcepcionHorario,
-} from '@/app/admin/_lib/negocioAgenda.actions';
+    obtenerExcepcionesHorarioAction,
+    crearExcepcionHorarioAction,
+    actualizarExcepcionHorarioAction,
+    eliminarExcepcionHorarioAction,
+} from '@/app/admin/_lib/actions/agendaExcepcionHorario/agendaExcepcionHorario.actions';
+import type {
+    ExcepcionHorarioData,
+    UpsertExcepcionHorarioFormInput,
+} from '@/app/admin/_lib/actions/agendaExcepcionHorario/agendaExcepcionHorario.schemas';
+// ActionResult ya debería ser un tipo global
+// import type { ActionResult } from '@/app/admin/_lib/types';
 
-import {
-    ExcepcionHorarioBase, // Para el estado y la tabla
-    ExcepcionHorarioInput, // Para el formulario
-    AgendaActionResult
-} from '@/app/admin/_lib/negocioAgenda.type';
 
 interface ExcepcionesHorarioSeccionProps {
     negocioId: string;
     isSavingGlobal: boolean;
+    // Opcional: si el componente padre AgendaConfiguracion carga estos datos
+    initialExcepciones?: ExcepcionHorarioData[];
 }
 
-const formInicialExcepcion: ExcepcionHorarioInput = {
-    fecha: '', // YYYY-MM-DD
-    descripcion: '',
-    esDiaNoLaborable: true, // Default a cerrado todo el día
-    horaInicio: null, // Se habilitan si no es día no laborable
+const formInicialExcepcion: UpsertExcepcionHorarioFormInput = {
+    fecha: new Date().toISOString().split('T')[0], // Default a hoy
+    descripcion: null,
+    esDiaNoLaborable: true,
+    horaInicio: null,
     horaFin: null,
 };
 
-// Horas disponibles para los selectores (formato HH:MM) - Reutilizado
 const generarOpcionesDeHora = (): string[] => {
     const horas = [];
     for (let h = 0; h < 24; h++) {
-        for (let m = 0; m < 60; m += 30) { // Intervalos de 30 minutos
+        for (let m = 0; m < 60; m += 30) {
             horas.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
     }
@@ -44,26 +47,27 @@ const OPCIONES_HORA = generarOpcionesDeHora();
 
 export default function ExcepcionesHorarioSeccion({
     negocioId,
-    isSavingGlobal
+    isSavingGlobal,
+    initialExcepciones
 }: ExcepcionesHorarioSeccionProps) {
-    const [excepciones, setExcepciones] = useState<ExcepcionHorarioBase[]>([]);
+    const [excepciones, setExcepciones] = useState<ExcepcionHorarioData[]>([]);
     const [loadingExcepciones, setLoadingExcepciones] = useState(true);
     const [errorExcepciones, setErrorExcepciones] = useState<string | null>(null);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
-    const [currentExcepcion, setCurrentExcepcion] = useState<ExcepcionHorarioBase | null>(null);
-    const [formData, setFormData] = useState<ExcepcionHorarioInput>(formInicialExcepcion);
+    const [currentExcepcion, setCurrentExcepcion] = useState<ExcepcionHorarioData | null>(null);
+    const [formData, setFormData] = useState<UpsertExcepcionHorarioFormInput>(formInicialExcepcion);
 
     const [isSubmittingModal, setIsSubmittingModal] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
     const [modalSuccess, setModalSuccess] = useState<string | null>(null);
 
-    // Clases de UI
+    // Clases UI (sin cambios)
     const tableClasses = "min-w-full";
     const thClasses = "px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap";
     const tdClasses = "px-3 py-3 text-sm text-zinc-300 whitespace-nowrap";
-    const buttonIconClasses = "p-1.5 text-zinc-400 hover:text-zinc-100 rounded-md hover:bg-zinc-700 disabled:text-zinc-600";
+    const buttonIconClasses = "p-1.5 text-zinc-400 hover:text-zinc-100 rounded-md hover:bg-zinc-700 disabled:text-zinc-600 disabled:cursor-not-allowed";
     const buttonPrimaryModal = "bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50";
     const buttonSecondaryModal = "bg-zinc-600 hover:bg-zinc-500 text-zinc-100 text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50";
     const buttonDangerModal = "bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50 mr-auto";
@@ -82,41 +86,44 @@ export default function ExcepcionesHorarioSeccion({
     const alertModalSuccessClasses = "text-sm text-green-400 bg-green-500/10 p-3 rounded-md border border-green-500/30 flex items-center gap-2";
     const alertSectionErrorClasses = "text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 flex items-center gap-2 my-4";
 
-    const fetchExcepciones = useCallback(async () => {
-        setLoadingExcepciones(true);
+
+    const fetchExcepcionesLocal = useCallback(async (showLoading = true) => {
+        if (showLoading) setLoadingExcepciones(true);
         setErrorExcepciones(null);
-        setModalSuccess(null); // Limpiar mensajes de éxito del modal
-        try {
-            const result = await obtenerConfiguracionAgenda(negocioId);
-            if (result.success && result.data) {
-                setExcepciones(result.data.excepcionesHorario || []);
-            } else {
-                throw new Error(result.error || "Error cargando excepciones de horario.");
-            }
-        } catch (err) {
-            setErrorExcepciones(err instanceof Error ? err.message : "No se pudieron cargar las excepciones.");
+        setModalSuccess(null);
+
+        const result = await obtenerExcepcionesHorarioAction(negocioId); // Nueva action
+
+        if (result.success && result.data) {
+            setExcepciones(result.data);
+        } else {
+            setErrorExcepciones(result.error || "Error cargando excepciones de horario.");
             setExcepciones([]);
-        } finally {
-            setLoadingExcepciones(false);
         }
+        if (showLoading) setLoadingExcepciones(false);
     }, [negocioId]);
 
     useEffect(() => {
-        fetchExcepciones();
-    }, [fetchExcepciones]);
+        if (initialExcepciones) {
+            setExcepciones(initialExcepciones);
+            setLoadingExcepciones(false);
+        } else {
+            fetchExcepcionesLocal();
+        }
+    }, [fetchExcepcionesLocal, initialExcepciones]);
 
-    const openModal = (mode: 'create' | 'edit', excepcion?: ExcepcionHorarioBase) => {
+    const openModal = (mode: 'create' | 'edit', excepcion?: ExcepcionHorarioData) => {
         setModalMode(mode);
         setModalError(null);
         setModalSuccess(null);
         if (mode === 'edit' && excepcion) {
             setCurrentExcepcion(excepcion);
             setFormData({
-                fecha: excepcion.fecha, // Ya debería estar en YYYY-MM-DD
-                descripcion: excepcion.descripcion || '',
+                fecha: excepcion.fecha, // Ya está en YYYY-MM-DD
+                descripcion: excepcion.descripcion,
                 esDiaNoLaborable: excepcion.esDiaNoLaborable,
-                horaInicio: excepcion.horaInicio || null,
-                horaFin: excepcion.horaFin || null,
+                horaInicio: excepcion.horaInicio,
+                horaFin: excepcion.horaFin,
             });
         } else {
             setCurrentExcepcion(null);
@@ -137,29 +144,30 @@ export default function ExcepcionesHorarioSeccion({
     };
 
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const target = e.target as HTMLInputElement; // Para type 'radio' y 'checkbox'
-        const { name, value, type, checked } = target;
+        const target = e.target as HTMLInputElement;
+        const { name, value, type } = target;
 
         setFormData(prev => {
-            let newValue: string | boolean = value;
-            if (type === 'checkbox') {
-                newValue = checked;
-            } else if (type === 'radio') {
-                // Para esDiaNoLaborable, el valor es string 'true' o 'false'
+            let newValue: string | boolean | null = value;
+            if (type === 'radio' && name === 'esDiaNoLaborable') {
                 newValue = value === 'true';
+            } else if (type === 'checkbox') { // Aunque no hay checkboxes directos, por si acaso
+                newValue = target.checked;
+            } else if ((name === 'horaInicio' || name === 'horaFin') && value === '') {
+                newValue = null; // Permitir deseleccionar hora
             }
+
 
             const updatedState = { ...prev, [name]: newValue };
 
-            // Si se marca como día no laborable, limpiar horas
-            if (name === 'esDiaNoLaborable' && newValue === true) {
-                updatedState.horaInicio = null;
-                updatedState.horaFin = null;
-            }
-            // Si se marca como horario especial y no hay horas, poner defaults
-            if (name === 'esDiaNoLaborable' && newValue === false) {
-                if (!updatedState.horaInicio) updatedState.horaInicio = '09:00';
-                if (!updatedState.horaFin) updatedState.horaFin = '17:00';
+            if (name === 'esDiaNoLaborable') {
+                if (newValue === true) { // Si es día no laborable
+                    updatedState.horaInicio = null;
+                    updatedState.horaFin = null;
+                } else { // Si es horario especial y no hay horas, poner defaults
+                    if (!updatedState.horaInicio) updatedState.horaInicio = '09:00';
+                    if (!updatedState.horaFin) updatedState.horaFin = '17:00';
+                }
             }
             return updatedState;
         });
@@ -169,47 +177,38 @@ export default function ExcepcionesHorarioSeccion({
 
     const handleSubmitModal = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (!formData.fecha) {
-            setModalError("La fecha es obligatoria.");
-            return;
-        }
-        if (!formData.esDiaNoLaborable && (!formData.horaInicio || !formData.horaFin)) {
-            setModalError("Si es horario especial, las horas de inicio y fin son obligatorias.");
-            return;
-        }
-        if (!formData.esDiaNoLaborable && formData.horaInicio && formData.horaFin && formData.horaInicio >= formData.horaFin) {
-            setModalError("La hora de inicio debe ser anterior a la hora de fin.");
-            return;
-        }
-
         setIsSubmittingModal(true);
         setModalError(null);
         setModalSuccess(null);
 
-        let result: AgendaActionResult<ExcepcionHorarioBase>;
-        const inputData: ExcepcionHorarioInput = {
-            fecha: formData.fecha,
-            descripcion: formData.descripcion?.trim() || null,
-            esDiaNoLaborable: formData.esDiaNoLaborable,
-            horaInicio: !formData.esDiaNoLaborable ? formData.horaInicio : null,
-            horaFin: !formData.esDiaNoLaborable ? formData.horaFin : null,
+        // La validación de Zod ocurre en la action, aquí preparamos el objeto.
+        const inputForAction: UpsertExcepcionHorarioFormInput = {
+            ...formData,
+            descripcion: formData.descripcion || null, // Asegurar null si está vacío
+            horaInicio: !formData.esDiaNoLaborable ? (formData.horaInicio || null) : null,
+            horaFin: !formData.esDiaNoLaborable ? (formData.horaFin || null) : null,
         };
+
+        let result; // Tipo ActionResult<ExcepcionHorarioData>
 
         try {
             if (modalMode === 'create') {
-                result = await crearExcepcionHorario(negocioId, inputData);
+                result = await crearExcepcionHorarioAction(negocioId, inputForAction);
             } else if (currentExcepcion?.id) {
-                result = await actualizarExcepcionHorario(currentExcepcion.id, inputData);
+                result = await actualizarExcepcionHorarioAction(currentExcepcion.id, inputForAction);
             } else {
                 throw new Error("Modo de operación o ID no válidos.");
             }
 
             if (result.success && result.data) {
                 setModalSuccess(`Excepción para ${result.data.fecha} ${modalMode === 'create' ? 'creada' : 'actualizada'} exitosamente.`);
-                await fetchExcepciones();
+                await fetchExcepcionesLocal(false); // Recargar sin loader principal
                 setTimeout(() => closeModal(), 1500);
             } else {
-                setModalError(result.error || "Ocurrió un error desconocido.");
+                const errorMsg = result.errorDetails
+                    ? Object.entries(result.errorDetails).map(([key, val]) => `${key}: ${val.join(', ')}`).join('; ')
+                    : result.error || "Ocurrió un error desconocido.";
+                setModalError(errorMsg);
             }
         } catch (err) {
             setModalError(err instanceof Error ? err.message : "Un error inesperado ocurrió.");
@@ -220,38 +219,44 @@ export default function ExcepcionesHorarioSeccion({
 
     const handleDeleteExcepcion = async (excepcionId: string, fecha: string) => {
         if (isSubmittingModal || isSavingGlobal) return;
-        if (confirm(`¿Estás seguro de eliminar la excepción para la fecha "${fecha}"?`)) {
-            setIsSubmittingModal(true); // Reutilizar estado para deshabilitar botones
+        if (confirm(`¿Estás seguro de eliminar la excepción para la fecha "${formatDateForDisplay(fecha)}"?`)) {
+            setIsSubmittingModal(true);
             setModalError(null);
-            setModalSuccess(null);
-            try {
-                const result = await eliminarExcepcionHorario(excepcionId);
-                if (result.success) {
-                    await fetchExcepciones();
-                    if (currentExcepcion?.id === excepcionId) closeModal();
+            setErrorExcepciones(null);
+
+            const result = await eliminarExcepcionHorarioAction(excepcionId); // Nueva action
+
+            if (result.success) {
+                await fetchExcepcionesLocal(false);
+                if (currentExcepcion?.id === excepcionId && isModalOpen) {
+                    closeModal();
+                }
+            } else {
+                if (isModalOpen && currentExcepcion?.id === excepcionId) {
+                    setModalError(result.error || "Error al eliminar la excepción.");
                 } else {
                     setErrorExcepciones(result.error || "Error al eliminar la excepción.");
                 }
-            } catch (err) {
-                setErrorExcepciones(err instanceof Error ? err.message : "Error al eliminar.");
-            } finally {
-                setIsSubmittingModal(false);
             }
+            setIsSubmittingModal(false);
         }
     };
 
-    const formatDateForDisplay = (dateString: string) => {
+    const formatDateForDisplay = (dateString: string | null | undefined) => {
+        if (!dateString) return 'N/A';
         try {
-            // Asumimos que dateString es YYYY-MM-DD
-            const date = new Date(dateString + 'T00:00:00'); // Asegurar que se parsea como local
-            return date.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+            const [year, month, day] = dateString.split('-');
+            const date = new Date(Number(year), Number(month) - 1, Number(day));
+            if (isNaN(date.getTime())) return dateString; // Fallback si la fecha no es válida
+            return date.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
         } catch {
-            return dateString; // Fallback
+            return dateString;
         }
     };
 
-
-    if (loadingExcepciones) { /* ... (loader) ... */ }
+    if (loadingExcepciones && !initialExcepciones) {
+        return <div className="py-8 flex items-center justify-center text-zinc-400"><Loader2 className="h-6 w-6 animate-spin mr-2" /> Cargando excepciones...</div>;
+    }
 
     return (
         <div className="space-y-4">
@@ -271,8 +276,8 @@ export default function ExcepcionesHorarioSeccion({
 
             {errorExcepciones && <p className={alertSectionErrorClasses}><AlertTriangleIcon size={16} className="mr-1" />{errorExcepciones}</p>}
 
-            {excepciones.length === 0 && !loadingExcepciones && !errorExcepciones ? (
-                <div className="text-center py-8 px-4 bg-zinc-900/30 border border-zinc-700 rounded-md">
+            {excepciones.length === 0 && !errorExcepciones ? (
+                <div className="text-center py-8 px-4 bg-zinc-900/30 border border-dashed border-zinc-700 rounded-md">
                     <CalendarPlus size={32} className="mx-auto text-zinc-500 mb-2" />
                     <p className="text-sm text-zinc-400">No has definido excepciones de horario.</p>
                     <p className="text-xs text-zinc-500 mt-1">Añade días festivos o fechas con horarios especiales.</p>
@@ -300,7 +305,7 @@ export default function ExcepcionesHorarioSeccion({
                                             <span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded-full border border-orange-500/30">Cerrado</span>
                                         ) : (
                                             <span className="text-xs px-2 py-0.5 bg-teal-500/20 text-teal-300 rounded-full border border-teal-500/30">
-                                                Horario Especial: {ex.horaInicio} - {ex.horaFin}
+                                                Horario Especial: {ex.horaInicio || 'N/A'} - {ex.horaFin || 'N/A'}
                                             </span>
                                         )}
                                     </td>
@@ -317,12 +322,12 @@ export default function ExcepcionesHorarioSeccion({
 
             {/* Modal para Crear/Editar Excepción */}
             {isModalOpen && (
-                <div className={modalOverlayClasses}>
+                <div className={modalOverlayClasses} onClick={closeModal}>
                     <div className={modalContentClasses} onClick={(e) => e.stopPropagation()}>
                         <form onSubmit={handleSubmitModal}>
                             <div className={modalHeaderClasses}>
                                 <h4 className={modalTitleClasses}>
-                                    {modalMode === 'create' ? 'Añadir Nueva Excepción' : 'Editar Excepción de Horario'}
+                                    {modalMode === 'create' ? 'Añadir Nueva Excepción' : `Editar Excepción: ${formatDateForDisplay(currentExcepcion?.fecha)}`}
                                 </h4>
                                 <button type="button" onClick={closeModal} className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-blue-500" aria-label="Cerrar modal">
                                     <XIcon size={20} />
@@ -335,22 +340,22 @@ export default function ExcepcionesHorarioSeccion({
                                 <div className="space-y-3">
                                     <div>
                                         <label htmlFor="fecha" className={labelBaseClasses}>Fecha <span className="text-red-500">*</span></label>
-                                        <input type="date" name="fecha" id="fecha" value={formData.fecha} onChange={handleFormChange} className={inputBaseClasses} required disabled={isSubmittingModal} />
+                                        <input type="date" name="fecha" id="fecha" value={formData.fecha} onChange={handleFormChange} className={inputBaseClasses} required disabled={isSubmittingModal || !!modalSuccess} />
                                     </div>
                                     <div>
-                                        <label htmlFor="descripcion" className={labelBaseClasses}>Descripción (Opcional)</label>
-                                        <textarea name="descripcion" id="descripcion" value={formData.descripcion || ''} onChange={handleFormChange} className={textareaBaseClasses} rows={2} disabled={isSubmittingModal} placeholder="Ej: Navidad, Mantenimiento" />
+                                        <label htmlFor="descripcion" className={labelBaseClasses}>Descripción</label>
+                                        <textarea name="descripcion" id="descripcion" value={formData.descripcion || ''} onChange={handleFormChange} className={textareaBaseClasses} rows={2} disabled={isSubmittingModal || !!modalSuccess} placeholder="Ej: Navidad, Mantenimiento Anual" />
                                     </div>
 
                                     <fieldset className="pt-2">
                                         <legend className={labelBaseClasses}>Tipo de Excepción:</legend>
                                         <div className="space-y-2">
                                             <label className={radioLabelClasses}>
-                                                <input type="radio" name="esDiaNoLaborable" value="true" checked={formData.esDiaNoLaborable === true} onChange={handleFormChange} className={radioClasses} disabled={isSubmittingModal} />
+                                                <input type="radio" name="esDiaNoLaborable" value="true" checked={formData.esDiaNoLaborable === true} onChange={handleFormChange} className={radioClasses} disabled={isSubmittingModal || !!modalSuccess} />
                                                 <span>Cerrado todo el día</span>
                                             </label>
                                             <label className={radioLabelClasses}>
-                                                <input type="radio" name="esDiaNoLaborable" value="false" checked={formData.esDiaNoLaborable === false} onChange={handleFormChange} className={radioClasses} disabled={isSubmittingModal} />
+                                                <input type="radio" name="esDiaNoLaborable" value="false" checked={formData.esDiaNoLaborable === false} onChange={handleFormChange} className={radioClasses} disabled={isSubmittingModal || !!modalSuccess} />
                                                 <span>Horario Especial</span>
                                             </label>
                                         </div>
@@ -362,14 +367,14 @@ export default function ExcepcionesHorarioSeccion({
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label htmlFor="horaInicio" className={labelBaseClasses}>Hora Inicio <span className="text-red-500">*</span></label>
-                                                    <select name="horaInicio" id="horaInicio" value={formData.horaInicio || ''} onChange={handleFormChange} className={`${inputBaseClasses} appearance-none`} required={!formData.esDiaNoLaborable} disabled={isSubmittingModal}>
+                                                    <select name="horaInicio" id="horaInicio" value={formData.horaInicio || ''} onChange={handleFormChange} className={`${inputBaseClasses} appearance-none`} required={!formData.esDiaNoLaborable} disabled={isSubmittingModal || !!modalSuccess}>
                                                         <option value="">Selecciona...</option>
                                                         {OPCIONES_HORA.map(hora => <option key={`ex-inicio-${hora}`} value={hora}>{hora}</option>)}
                                                     </select>
                                                 </div>
                                                 <div>
                                                     <label htmlFor="horaFin" className={labelBaseClasses}>Hora Fin <span className="text-red-500">*</span></label>
-                                                    <select name="horaFin" id="horaFin" value={formData.horaFin || ''} onChange={handleFormChange} className={`${inputBaseClasses} appearance-none`} required={!formData.esDiaNoLaborable} disabled={isSubmittingModal}>
+                                                    <select name="horaFin" id="horaFin" value={formData.horaFin || ''} onChange={handleFormChange} className={`${inputBaseClasses} appearance-none`} required={!formData.esDiaNoLaborable} disabled={isSubmittingModal || !!modalSuccess}>
                                                         <option value="">Selecciona...</option>
                                                         {OPCIONES_HORA.map(hora => <option key={`ex-fin-${hora}`} value={hora}>{hora}</option>)}
                                                     </select>
@@ -381,12 +386,12 @@ export default function ExcepcionesHorarioSeccion({
                             </div>
                             <div className={modalFooterClasses}>
                                 {modalMode === 'edit' && currentExcepcion && (
-                                    <button type="button" onClick={() => handleDeleteExcepcion(currentExcepcion.id!, currentExcepcion.fecha)} className={buttonDangerModal} disabled={isSubmittingModal}>
+                                    <button type="button" onClick={() => handleDeleteExcepcion(currentExcepcion.id!, currentExcepcion.fecha)} className={buttonDangerModal} disabled={isSubmittingModal || !!modalSuccess}>
                                         <Trash2 size={16} /> Eliminar
                                     </button>
                                 )}
                                 <button type="button" onClick={closeModal} className={buttonSecondaryModal} disabled={isSubmittingModal}>Cancelar</button>
-                                <button type="submit" className={buttonPrimaryModal} disabled={isSubmittingModal || !formData.fecha}>
+                                <button type="submit" className={buttonPrimaryModal} disabled={isSubmittingModal || !formData.fecha || !!modalSuccess}>
                                     {isSubmittingModal ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                                     {modalMode === 'create' ? 'Crear Excepción' : 'Guardar Cambios'}
                                 </button>
