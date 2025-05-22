@@ -12,6 +12,7 @@ import {
 import { type ActualizarCatalogoData } from '@/app/admin/_lib/actions/catalogo/catalogo.schemas'; // Tipo Zod
 import type { Catalogo as PrismaCatalogo } from '@prisma/client'; // Tipo Prisma
 import { Loader2, Trash2, Save, AlertCircle, CheckCircle, ArrowLeft, BookOpenText } from 'lucide-react';
+import { Button } from '@/app/components/ui/button'; // Componente de botón de UI
 
 interface Props {
     catalogoId: string;
@@ -37,10 +38,10 @@ export default function CatalogoEditarForm({ clienteId, negocioId, catalogoId }:
     const labelBaseClasses = "block text-sm font-medium text-zinc-300 mb-1.5";
     const inputBaseClasses = "block w-full bg-zinc-900 border border-zinc-700 text-zinc-200 rounded-md p-2.5 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 placeholder:text-zinc-500 sm:text-sm";
     const textareaBaseClasses = `${inputBaseClasses} min-h-[100px]`;
-    const buttonBaseClasses = "inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-50 transition-colors duration-150 gap-2";
-    const primaryButtonClasses = `${buttonBaseClasses} text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500`;
-    const secondaryButtonClasses = `${buttonBaseClasses} text-zinc-200 bg-zinc-600 hover:bg-zinc-500 focus:ring-zinc-500`;
-    const destructiveButtonClasses = `${buttonBaseClasses} text-white bg-red-600 hover:bg-red-700 focus:ring-red-500`;
+    // const buttonBaseClasses = "inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-50 transition-colors duration-150 gap-2";
+    // const primaryButtonClasses = `${buttonBaseClasses} text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500`;
+    // const secondaryButtonClasses = `${buttonBaseClasses} text-zinc-200 bg-zinc-600 hover:bg-zinc-500 focus:ring-zinc-500`;
+    // const destructiveButtonClasses = `${buttonBaseClasses} text-white bg-red-600 hover:bg-red-700 focus:ring-red-500`;
     const toggleSwitchClasses = "relative inline-flex items-center h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800";
     const toggleKnobClasses = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out";
     const messageBoxBaseClasses = "p-3 rounded-md text-sm my-3 flex items-center gap-2";
@@ -182,9 +183,9 @@ export default function CatalogoEditarForm({ clienteId, negocioId, catalogoId }:
                 <AlertCircle className="h-10 w-10 text-red-400 mb-3" />
                 <p className="text-red-400 text-center mb-1 font-medium">Error al Cargar</p>
                 <p className="text-zinc-400 text-sm text-center mb-4">{error}</p>
-                <button onClick={handleCancel} className={secondaryButtonClasses}>
+                <Button onClick={handleCancel} variant="secondary">
                     <ArrowLeft size={16} /> Volver a Catálogos
-                </button>
+                </Button>
             </div>
         );
     }
@@ -193,9 +194,9 @@ export default function CatalogoEditarForm({ clienteId, negocioId, catalogoId }:
             <div className={`${mainContainerClasses} items-center justify-center`}>
                 <BookOpenText className="h-10 w-10 text-zinc-500 mb-3" />
                 <p className="text-zinc-400 text-center">Catálogo no encontrado.</p>
-                <button onClick={handleCancel} className={`${secondaryButtonClasses} mt-4`}>
+                <Button onClick={handleCancel} variant="secondary" className="mt-4">
                     <ArrowLeft size={16} /> Volver a Catálogos
-                </button>
+                </Button>
             </div>
         );
     }
@@ -203,15 +204,17 @@ export default function CatalogoEditarForm({ clienteId, negocioId, catalogoId }:
     return (
         <div className={mainContainerClasses}>
             <div className='flex justify-between items-center mb-4 pb-4 border-b border-zinc-700'>
-                <h2 className="text-xl font-semibold text-zinc-100">Editar Catálogo</h2>
-                <button
+                <h2 className="text-xl font-semibold text-zinc-100">Catálogo</h2>
+                <Button
                     onClick={handleCancel}
-                    className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+                    variant="secondary"
+                    size="sm"
+                    className="gap-1.5"
                     title="Volver a la lista de catálogos"
                 >
                     <ArrowLeft size={14} />
                     Volver
-                </button>
+                </Button>
             </div>
 
             {/* Mostrar error general del formulario aquí */}
@@ -282,22 +285,39 @@ export default function CatalogoEditarForm({ clienteId, negocioId, catalogoId }:
                     </div>
 
                     <div className="pt-6 space-y-3 border-t border-zinc-700">
-                        <button
+                        <Button
                             type="submit"
-                            className={primaryButtonClasses + " w-full"}
+                            className="w-full"
+                            variant="default"
                             disabled={isSubmitting || loading}
                         >
-                            {isSubmitting ? <><Loader2 className='animate-spin' size={18} /> Guardando...</> : <><Save size={16} /> Guardar Cambios</>}
-                        </button>
-
-                        <button
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={18} /> Guardando...
+                                </>
+                            ) : (
+                                <>
+                                    <Save size={16} /> Guardar Cambios
+                                </>
+                            )}
+                        </Button>
+                        <Button
                             type="button"
                             onClick={handleDelete}
-                            className={destructiveButtonClasses + " w-full"}
+                            className="w-full"
+                            variant="destructive"
                             disabled={isSubmitting || loading}
                         >
-                            {isSubmitting ? <><Loader2 className='animate-spin' size={18} /> Eliminando...</> : <><Trash2 size={16} /> Eliminar Catálogo</>}
-                        </button>
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={18} /> Eliminando...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 size={16} /> Eliminar Catálogo
+                                </>
+                            )}
+                        </Button>
                     </div>
                 </form>
             </div>

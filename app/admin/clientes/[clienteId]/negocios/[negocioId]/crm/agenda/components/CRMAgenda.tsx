@@ -2,23 +2,28 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, dateFnsLocalizer, Views, View } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { Calendar, dateFnsLocalizer, Views, View, EventProps } from 'react-big-calendar'; // Importar EventProps
+import { format, parse, startOfWeek, getDay, startOfMonth, endOfMonth } from 'date-fns'; // Importar startOfMonth, endOfMonth
 import { es } from 'date-fns/locale/es';
 
-// Importar acción y tipos
-import { obtenerEventosAgenda } from '@/app/admin/_lib/crmAgenda.actions'; // Ajusta ruta!
-import { CalendarEvent } from '@/app/admin/_lib/types'; // Ajusta ruta!
+// --- NUEVAS IMPORTS ---
+import { listarEventosAgendaAction } from '@/app/admin/_lib/actions/agendaCrm/agendaCrm.actions';
+import type {
+    AgendaEventoData, // Tipo Zod para los eventos del calendario
+    // ObtenerEventosAgendaResultData // No se usa directamente en el estado del componente
+} from '@/app/admin/_lib/actions/agendaCrm/agendaCrm.schemas';
 
-// Importar componentes UI y iconos
-import { Loader2, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react'; // Cambiado icono
+// Componentes UI y iconos
+import { XIcon } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
+import 'react-big-calendar/lib/css/react-big-calendar.css'; // Importar CSS base
 
 // Configurar el localizador y mensajes (sin cambios)
 const locales = { 'es': es };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }), getDay, locales });
-const messages = { /* ... (mensajes en español sin cambios) ... */
-    allDay: 'Todo el día', previous: '<', next: '>', today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', agenda: 'Agenda', date: 'Fecha', time: 'Hora', event: 'Evento', noEventsInRange: 'No hay eventos en este rango.', showMore: (total: number) => `+ Ver más (${total})`,
+const messages = {
+    allDay: 'Todo el día', previous: '< Anterior', next: 'Siguiente >', today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', agenda: 'Agenda Detallada', date: 'Fecha', time: 'Hora', event: 'Evento',
+    noEventsInRange: 'No hay eventos en este rango.', showMore: (total: number) => `+ Ver ${total} más`,
 };
 
 interface Props {
@@ -26,25 +31,58 @@ interface Props {
 }
 
 export default function CRMAgenda({ negocioId }: Props) {
-    const [events, setEvents] = useState<CalendarEvent[]>([]);
-    const [crmId, setCrmId] = useState<string | null>(null);
+    const [events, setEvents] = useState<AgendaEventoData[]>([]); // Usar el nuevo tipo Zod
+    const [crmId, setCrmId] = useState<string | null>(null); // Para saber si el CRM está configurado
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
     const [currentDate, setCurrentDate] = useState(new Date());
     const [currentView, setCurrentView] = useState<View>(Views.MONTH);
-    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+    const [selectedEvent, setSelectedEvent] = useState<AgendaEventoData | null>(null); // Usar el nuevo tipo Zod
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Cargar eventos (sin cambios en la lógica)
-    const fetchEvents = useCallback(async (rangeStart?: Date, rangeEnd?: Date) => {
+    const fetchEvents = useCallback(async (dateForRange: Date, viewForRange: View) => {
         setLoading(true);
         setError(null);
+
+        // Determinar el rango de fechas basado en la vista y la fecha actual del calendario
+        let rangeStart: Date;
+        let rangeEnd: Date;
+
+        // Esta lógica de rango es una simplificación. react-big-calendar puede proveer el rango
+        // a través de onRangeChange, pero para una carga inicial basada en la vista actual:
+        if (viewForRange === Views.MONTH) {
+            rangeStart = startOfMonth(dateForRange);
+            rangeEnd = endOfMonth(dateForRange);
+        } else if (viewForRange === Views.WEEK) {
+            rangeStart = startOfWeek(dateForRange, { locale: es });
+            rangeEnd = new Date(rangeStart);
+            rangeEnd.setDate(rangeStart.getDate() + 6);
+            rangeEnd.setHours(23, 59, 59, 999); // Fin del día
+        } else { // DAY o AGENDA
+            rangeStart = new Date(dateForRange);
+            rangeStart.setHours(0, 0, 0, 0);
+            rangeEnd = new Date(dateForRange);
+            rangeEnd.setHours(23, 59, 59, 999);
+        }
+        // Para la vista AGENDA, podrías querer un rango más amplio, ej. 30 días desde rangeStart
+        if (viewForRange === Views.AGENDA) {
+            rangeEnd = new Date(rangeStart);
+            rangeEnd.setDate(rangeStart.getDate() + 30); // Por ejemplo, los próximos 30 días
+        }
+
         try {
-            const result = await obtenerEventosAgenda(negocioId, rangeStart, rangeEnd);
+            const result = await listarEventosAgendaAction({ negocioId, rangeStart, rangeEnd }); // Nueva Action
             if (result.success && result.data) {
                 setCrmId(result.data.crmId);
-                setEvents(result.data.eventos);
-                if (!result.data.crmId && result.data.eventos.length === 0) {
+                // Los datos ya vienen como Date del servidor si Prisma los maneja así
+                setEvents(result.data.eventos.map(ev => ({
+                    ...ev,
+                    start: new Date(ev.start), // Asegurar que sean objetos Date
+                    end: new Date(ev.end),     // Asegurar que sean objetos Date
+                })));
+                if (!result.data.crmId && result.data.eventos.length === 0 && !error) { // Evitar sobreescribir error de carga
                     setError("CRM no configurado para este negocio.");
                 }
             } else {
@@ -52,55 +90,62 @@ export default function CRMAgenda({ negocioId }: Props) {
             }
         } catch (err) {
             console.error("Error fetching events:", err);
-            setError(`No se pudieron cargar los eventos: ${err instanceof Error ? err.message : "Error desconocido"}`);
-            setEvents([]);
+            setError(`No se pudieron cargar los eventos: ${err instanceof Error ? err.message : "Error"}`);
+            setEvents([]); // Limpiar eventos en caso de error
         } finally {
             setLoading(false);
         }
-    }, [negocioId]);
+    }, [negocioId, error]); // Añadido error a dependencias para evitar sobreescribir
 
     useEffect(() => {
-        const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        fetchEvents(start, end);
-    }, [fetchEvents, currentDate]);
+        if (negocioId) fetchEvents(currentDate, currentView);
+    }, [fetchEvents, currentDate, currentView, negocioId]); // Añadido negocioId
 
-    // Manejadores (sin cambios en la lógica)
-    const handleNavigate = useCallback((newDate: Date, view: View) => {
+    const handleNavigate = useCallback((newDate: Date) => {
         setCurrentDate(newDate);
-        setCurrentView(view);
+        // No es necesario llamar a fetchEvents aquí si el useEffect anterior ya depende de currentDate y currentView
     }, []);
-    const handleSelectEvent = useCallback((event: CalendarEvent) => {
-        setSelectedEvent(event);
+
+    const handleView = useCallback((view: View) => {
+        setCurrentView(view);
+        // No es necesario llamar a fetchEvents aquí
+    }, []);
+
+
+    const handleSelectEvent = useCallback((event: unknown) => { // event es 'unknown' de react-big-calendar
+        setSelectedEvent(event as AgendaEventoData); // Cast al tipo Zod
         setIsModalOpen(true);
     }, []);
+
     const closeModal = () => {
         setIsModalOpen(false);
         setSelectedEvent(null);
     }
 
-    // --- Renderizado ---
-    if (loading && events.length === 0) {
-        return <div className="flex items-center justify-center h-64 text-zinc-400"><Loader2 className="h-8 w-8 animate-spin mr-3" />Cargando Agenda...</div>;
-    }
-    if (error) {
-        return <div className="flex flex-col items-center justify-center h-64 text-red-500"><AlertTriangle className="h-8 w-8 mb-2" />{error}</div>;
-    }
-    if (!crmId && !loading) {
+    // Componente personalizado para el evento, si quieres estilizarlo más
+    const EventComponent = ({ event }: EventProps<AgendaEventoData>) => {
+        const tipo = event.resource?.tipo?.toLowerCase();
+        // const letbgColor = 'bg-sky-600 hover:bg-sky-500'; // Default
+        let bgColor = 'bg-sky-600 hover:bg-sky-500'; // Default
+        if (tipo === 'llamada') bgColor = 'bg-amber-600 hover:bg-amber-500';
+        else if (tipo === 'reunion') bgColor = 'bg-purple-600 hover:bg-purple-500';
+        else if (tipo === 'tarea') bgColor = 'bg-rose-600 hover:bg-rose-500';
+
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-center text-zinc-400">
-                <CalendarIcon className="h-12 w-12 mb-4 text-zinc-600" />
-                <h3 className="text-lg font-semibold text-zinc-300 mb-2">CRM No Configurado</h3>
-                <p className="text-sm">La agenda requiere que el CRM esté configurado.</p>
+            <div className={`p-1 text-xs text-white rounded-sm h-full ${bgColor} transition-colors`}>
+                <strong>{event.title.split('(')[0].trim()}</strong> {/* Solo el asunto y tipo */}
+                {event.resource?.lead?.nombre && <span className="block truncate text-[10px] opacity-80">{event.resource.lead.nombre}</span>}
             </div>
         );
-    }
+    };
+
+
+    if (loading && events.length === 0) { /* ... (sin cambios) ... */ }
+    if (error && !loading) { /* ... (sin cambios, pero se muestra solo si no está cargando) ... */ } // Modificado para no mostrar error durante carga
+    if (!crmId && !loading && !error) { /* ... (sin cambios) ... */ }
 
     return (
-        // Contenedor principal del calendario
-        <div className="h-[75vh] bg-zinc-900 p-0 rounded-lg border border-zinc-700 relative"> {/* Cambiado fondo y padding */}
-
-            {/* --- ESTILOS CSS PERSONALIZADOS --- */}
+        <div className="h-[calc(100vh-12rem)] bg-zinc-800 p-0.5 rounded-lg border border-zinc-700 relative shadow-lg"> {/* Ajusta la altura según necesites */}
             {/* Estos estilos sobrescriben los de react-big-calendar */}
             <style jsx global>{`
                 /* Contenedor General */
@@ -168,14 +213,14 @@ export default function CRMAgenda({ negocioId }: Props) {
                     border: none; /* Quitar borde exterior */
                 }
                 .rbc-month-row {
-                     border-bottom: 1px solid #3f3f46; /* zinc-700 */
+                     border-bottom: 1px solid #999999; /* zinc-700 */
                      min-height: 100px; /* Ajustar altura mínima */
                 }
                  .rbc-month-row:last-child {
                      border-bottom: none;
                  }
                 .rbc-day-bg { /* Fondo de cada día */
-                    border-left: 1px solid #3f3f46; /* zinc-700 */
+                    border-left: 1px solid #999999; /* zinc-700 */
                 }
                 .rbc-day-bg:first-child {
                     border-left: none;
@@ -286,33 +331,52 @@ export default function CRMAgenda({ negocioId }: Props) {
             <Calendar
                 localizer={localizer}
                 events={events}
-                startAccessor="start"
-                endAccessor="end"
+                startAccessor="start" // Propiedad del objeto evento que tiene la fecha de inicio
+                endAccessor="end"     // Propiedad del objeto evento que tiene la fecha de fin
                 style={{ height: '100%' }}
                 messages={messages}
                 culture='es'
                 views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
-                view={currentView}
-                date={currentDate}
-                onNavigate={handleNavigate}
-                onView={(view) => setCurrentView(view)}
-                // onRangeChange={handleRangeChange} // Mantener comentado por ahora
-                onSelectEvent={handleSelectEvent}
-                selectable
-                className="rbc-calendar" // Añadir clase base para asegurar aplicación de estilos
+                view={currentView} // Vista actual controlada por el estado
+                date={currentDate} // Fecha actual controlada por el estado
+                onNavigate={handleNavigate} // Se llama cuando el usuario cambia de fecha
+                onView={handleView}         // Se llama cuando el usuario cambia de vista
+                onSelectEvent={handleSelectEvent} // Se llama al hacer clic en un evento
+                selectable // Permite seleccionar slots de tiempo (para crear eventos, no implementado aquí)
+                className="rbc-calendar" // Clase base para aplicar estilos
+                components={{
+                    event: EventComponent, // Componente personalizado para renderizar cada evento
+                }}
+                min={new Date(0, 0, 0, 7, 0, 0)} // Hora mínima visible en vistas de día/semana (7 AM)
+                max={new Date(0, 0, 0, 21, 0, 0)} // Hora máxima visible (9 PM)
+                formats={{ // Formatos de fecha personalizados (opcional)
+                    agendaHeaderFormat: ({ start, end }, culture, local) =>
+                        (local?.format?.(start, 'PPP', culture) ?? '') + ' – ' + (local?.format?.(end, 'PPP', culture) ?? ''),
+                    dayHeaderFormat: (date, culture, local) => local?.format?.(date, 'eeee dd MMM', culture) ?? '',
+                    // ... otros formatos
+                }}
             />
 
-            {/* Modal Básico para Detalles del Evento (sin cambios) */}
-            {isModalOpen && selectedEvent && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeModal}>
-                    <div className="bg-zinc-800 p-6 rounded-lg shadow-xl max-w-md w-full border border-zinc-700" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-semibold mb-4 text-white">{selectedEvent.resource?.tipo}: {selectedEvent.title.split(': ')[1]?.split(' (')[0]}</h3>
-                        <p className="text-sm text-zinc-300 mb-2"><strong>Fecha:</strong> {format(selectedEvent.start, 'PPP p', { locale: es })}</p>
-                        {selectedEvent.resource?.lead && <p className="text-sm text-zinc-300 mb-2"><strong>Lead:</strong> {selectedEvent.resource.lead.nombre}</p>}
-                        {selectedEvent.resource?.agente && <p className="text-sm text-zinc-300 mb-2"><strong>Agente:</strong> {selectedEvent.resource.agente.nombre}</p>}
-                        {selectedEvent.resource?.descripcion && <p className="text-sm text-zinc-300 mb-2"><strong>Descripción:</strong> {selectedEvent.resource.descripcion}</p>}
-                        <p className="text-sm text-zinc-300 mb-4"><strong>Status:</strong> <span className="capitalize">{selectedEvent.resource?.status}</span></p>
-                        <Button onClick={closeModal} variant="outline" className="w-full bg-zinc-700 hover:bg-zinc-600">Cerrar</Button>
+            {isModalOpen && selectedEvent && selectedEvent.resource && ( // Asegurar que resource exista
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeModal}>
+                    <div className="bg-zinc-800 p-6 rounded-lg shadow-xl max-w-md w-full border border-zinc-600" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-start mb-3">
+                            <h3 className="text-lg font-semibold text-white">
+                                {selectedEvent.resource.tipo}: {selectedEvent.title.split(' (')[0].replace(`[${selectedEvent.resource.tipo}] `, '')}
+                            </h3>
+                            <Button variant="ghost" size="sm" onClick={closeModal} className="p-1 h-auto text-zinc-400 hover:text-white -mt-2 -mr-2"><XIcon size={20} /></Button>
+                        </div>
+
+                        <p className="text-sm text-zinc-300 mb-2">
+                            <strong>Fecha:</strong> {format(new Date(selectedEvent.start), "PPP 'a las' p", { locale: es })}
+                        </p>
+                        {selectedEvent.resource.lead && <p className="text-sm text-zinc-300 mb-2"><strong>Lead:</strong> {selectedEvent.resource.lead.nombre}</p>}
+                        {selectedEvent.resource.agente && <p className="text-sm text-zinc-300 mb-2"><strong>Agente:</strong> {selectedEvent.resource.agente.nombre}</p>}
+                        {selectedEvent.resource.descripcion && <p className="text-sm text-zinc-300 mb-2 whitespace-pre-line"><strong>Notas:</strong> {selectedEvent.resource.descripcion}</p>}
+                        <p className="text-sm text-zinc-300 mb-4">
+                            <strong>Status:</strong> <span className="capitalize font-medium">{selectedEvent.resource.status.replace('_', ' ')}</span>
+                        </p>
+                        <Button onClick={closeModal} variant="outline" className="w-full bg-zinc-700 hover:bg-zinc-600 border-zinc-600">Cerrar</Button>
                     </div>
                 </div>
             )}

@@ -6,7 +6,8 @@ import { ActionResult } from '../types'; // Asumo que tienes este tipo genérico
 import {
     AgendarCitaArgs, AgendarCitaData, ConfiguracionAgendaDelNegocio,
 
-} from './agendarCita.type';
+} from './agendarCita.schemas';
+
 import {
     AgendaTipoCita as AgendaTipoCitaPrisma, // Alias para el tipo de Prisma
     StatusAgenda,
@@ -299,18 +300,6 @@ export async function verificarDisponibilidadSlot(
             AND: [
                 { fecha: { lt: slotFinTotalConBuffer } }, // La cita existente DEBE empezar ANTES de que nuestro slot (con buffer) TERMINE
                 {
-                    // Necesitamos calcular el fin_con_buffer de la cita existente.
-                    // Esto es más complejo si las duraciones y buffers varían.
-                    // Para una implementación rápida, simplificamos: contamos las que empiezan en el rango.
-                    // Una mejor aproximación: finRealCitaExistente = fechaExistente + duracionExistente + bufferExistente
-                    // Aquí necesitamos la duración de la cita existente.
-                    // Por ahora, para simplificar, vamos a contar las que *comienzan* dentro del slot de tiempo
-                    // o cuyo fin estimado + buffer se solape.
-                    // Esta lógica de solapamiento necesita ser precisa.
-                    // Placeholder para lógica de solapamiento más robusta:
-                    // Por ahora, contamos las que su inicio cae dentro de nuestro slot ampliado, o viceversa.
-                    // Esto no es perfecto para concurrencia real de slots que duran X y bloquean Y.
-                    // Simulación rápida:
                     fecha: { gte: slotInicio } // que al menos empiecen cuando o después de nuestro slot
                     // OJO: Esta consulta de solapamiento es la parte más difícil.
                     // Para una prueba rápida, podrías contar las que empiezan exactamente a la misma hora.

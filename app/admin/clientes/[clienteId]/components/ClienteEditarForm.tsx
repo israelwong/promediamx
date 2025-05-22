@@ -1,258 +1,271 @@
 'use client';
 
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-// Ajusta las rutas según tu estructura
 import {
-    obtenerClientePorId, // !! NECESITAS CREAR O IMPORTAR ESTA FUNCIÓN !!
+    obtenerClientePorId,
     actualizarClientePorId,
     archivarClientePorId,
-    // eliminarClientePorId // Si prefieres eliminar en lugar de archivar
-} from '@/app/admin/_lib/cliente.actions'; // Asumiendo acciones aquí
-import { Cliente } from '@/app/admin/_lib/types'; // Importar tipo Cliente
-import { Loader2, Save, Archive } from 'lucide-react'; // Iconos
+} from '@/app/admin/_lib/actions/cliente/cliente.actions'; // Ajustada la ruta
+
+// Importar tipos y esquemas Zod
+import {
+    ActualizarClienteInputSchema,
+    type ActualizarClienteInput,
+    type ClienteParaEditar
+} from '@/app/admin/_lib/actions/cliente/cliente.schemas';
+
+
+import { Loader2, Save, Archive, AlertTriangleIcon } from 'lucide-react';
+import { Button } from '@/app/components/ui/button'; // Asumiendo que tienes este componente
+import { Input } from '@/app/components/ui/input';   // Asumiendo que tienes este componente
 
 interface Props {
     clienteId: string;
 }
 
-// Tipo para los datos editables en este formulario
-// Excluimos campos no editables o relaciones complejas
-type ClienteEditFormData = Partial<Omit<Cliente,
-    'id' | 'password' | 'createdAt' | 'updatedAt' | 'contrato' | 'negocio' | 'AsistenteVirtual' | 'cotizaciones'
->>;
+// Usar el tipo inferido de Zod para el estado del formulario, pero parcial porque se carga.
+type ClienteEditFormState = Partial<ActualizarClienteInput>;
 
 export default function ClienteEditarForm({ clienteId }: Props) {
-    const router = useRouter();
 
-    const [clienteOriginal, setClienteOriginal] = useState<Cliente | null>(null);
-    const [formData, setFormData] = useState<ClienteEditFormData>({});
+    const [clienteOriginal, setClienteOriginal] = useState<ClienteParaEditar | null>(null);
+    const [formData, setFormData] = useState<ClienteEditFormState>({});
     const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false); // Para guardar o archivar
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof ActualizarClienteInput, string[]>>>({});
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    // Clases de Tailwind reutilizables
+    // ... (Clases de Tailwind como las definiste, o puedes ajustarlas)
     const labelBaseClasses = "text-zinc-300 block mb-1 text-sm font-medium";
-    const inputBaseClasses = "bg-zinc-900 border border-zinc-700 text-zinc-300 block w-full rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70";
-    const containerClasses = "p-4 bg-zinc-800 rounded-lg shadow-md h-full flex flex-col w-full"; // Contenedor general
-    const buttonBaseClasses = "w-full text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 flex items-center justify-center gap-2";
+    const inputBaseClasses = "bg-zinc-900 border border-zinc-700 text-zinc-300 block w-full rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70 h-10";
+    const containerClasses = "p-4 md:p-6 bg-zinc-800/50 border border-zinc-700 rounded-lg shadow-lg flex flex-col w-full";
     const valueDisplayClasses = "bg-zinc-950 border border-zinc-700 text-zinc-400 block w-full rounded-md p-2 min-h-[40px] text-sm";
-    const sectionTitleClasses = "text-lg font-semibold text-white mt-4";
+    const sectionTitleClasses = "text-lg font-semibold text-white mt-4 mb-2";
 
-    // --- Efecto para cargar datos del Cliente ---
+
     useEffect(() => {
         if (!clienteId) {
-            setError("No se proporcionó un ID de cliente."); setLoading(false); return;
+            setError("ID de cliente no válido."); setLoading(false); return;
         }
-        setLoading(true); setError(null); setSuccessMessage(null);
-
         const fetchCliente = async () => {
-            try {
-                // !! NECESITAS CREAR/IMPORTAR obtenerClientePorId !!
-                const data = await obtenerClientePorId(clienteId);
-                if (data) {
-                    setClienteOriginal({
-                        ...data,
-                        nombre: data.nombre ?? undefined, // Convert null to undefined for compatibility
-                    });
-                    // Poblar formData con campos editables
-                    const { ...editableData } = data;
-                    setFormData({
-                        ...editableData,
-                        nombre: editableData.nombre ?? undefined, // Convert null to undefined
-                        email: editableData.email ?? undefined, // Convert null to undefined
-                        telefono: editableData.telefono ?? undefined, // Convert null to undefined
-                        rfc: editableData.rfc ?? undefined, // Convert null to undefined
-                        curp: editableData.curp ?? undefined, // Convert null to undefined
-                        razonSocial: editableData.razonSocial ?? undefined, // Convert null to undefined
-                        status: editableData.status ?? 'inactivo', // Default status
-                    });
-                } else {
-                    setError(`No se encontró el cliente con ID: ${clienteId}`);
-                    setClienteOriginal(null); setFormData({});
-                }
-            } catch (err) {
-                console.error("Error fetching cliente:", err);
-                setError("No se pudo cargar la información del cliente.");
+            setLoading(true); setError(null); setSuccessMessage(null); setValidationErrors({});
+            const result = await obtenerClientePorId(clienteId);
+            if (result.success && result.data) {
+                setClienteOriginal(result.data);
+                // Poblar formData con campos de ClienteParaEditar que coinciden con ActualizarClienteInput
+                setFormData({
+                    nombre: result.data.nombre,
+                    email: result.data.email,
+                    telefono: result.data.telefono,
+                    rfc: result.data.rfc ?? undefined, // Usar undefined si es null para Zod opcional
+                    curp: result.data.curp ?? undefined,
+                    razonSocial: result.data.razonSocial ?? undefined,
+                    status: result.data.status as 'activo' | 'inactivo' | 'archivado', // Asegurar tipo
+                    stripeCustomerId: result.data.stripeCustomerId ?? undefined,
+                });
+            } else {
+                setError(result.error || `No se encontró el cliente con ID: ${clienteId}`);
                 setClienteOriginal(null); setFormData({});
-            } finally { setLoading(false); }
+            }
+            setLoading(false);
         };
         fetchCliente();
     }, [clienteId]);
 
-    // --- Manejadores ---
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
-        let finalValue: string | number | boolean | null;
+        let finalValue: string | boolean | undefined;
 
         if (type === 'checkbox') {
-            const input = e.target as HTMLInputElement;
-            if (name === 'status') finalValue = input.checked ? 'activo' : 'inactivo';
-            else finalValue = input.checked;
+            const inputEl = e.target as HTMLInputElement;
+            if (name === 'status') { // Asumiendo que 'status' se maneja con el toggle
+                finalValue = inputEl.checked ? 'activo' : 'inactivo';
+            } else {
+                finalValue = inputEl.checked;
+            }
         } else {
-            finalValue = value;
+            finalValue = value === '' ? undefined : value; // Para que Zod opcional funcione bien
         }
         setFormData(prevState => ({ ...prevState, [name]: finalValue }));
-        setError(null); setSuccessMessage(null);
+        setError(null); setSuccessMessage(null); setValidationErrors({});
     };
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        // Validación básica (puedes añadir más)
-        if (!formData.nombre?.trim() || !formData.email?.trim() || !formData.telefono?.trim()) {
-            setError("Nombre, Email y Teléfono son obligatorios."); return;
+        setError(null); setSuccessMessage(null); setValidationErrors({});
+
+        const dataToValidate: ActualizarClienteInput = {
+            nombre: formData.nombre,
+            email: formData.email,
+            telefono: formData.telefono,
+            rfc: formData.rfc || null, // Convertir undefined a null si el schema lo espera así
+            curp: formData.curp || null,
+            razonSocial: formData.razonSocial || null,
+            status: formData.status || 'inactivo',
+            stripeCustomerId: formData.stripeCustomerId || null,
+        };
+
+        const validationResult = ActualizarClienteInputSchema.safeParse(dataToValidate);
+        if (!validationResult.success) {
+            setValidationErrors(validationResult.error.flatten().fieldErrors as Partial<Record<keyof ActualizarClienteInput, string[]>>);
+            setError("Por favor, corrige los errores indicados.");
+            return;
         }
 
-        setIsSubmitting(true); setError(null); setSuccessMessage(null);
+        setIsSubmitting(true);
         try {
-            // Construir objeto solo con los datos editables
-            const dataToSend: Partial<Cliente> = {
-                nombre: formData.nombre?.trim(),
-                email: formData.email?.trim(),
-                telefono: formData.telefono?.trim(),
-                rfc: formData.rfc?.trim() || null,
-                curp: formData.curp?.trim() || null,
-                razonSocial: formData.razonSocial?.trim() || null,
-                status: formData.status || 'inactivo',
-                // No enviar password, createdAt, updatedAt, relaciones
-            };
-
-            await actualizarClientePorId(clienteId, dataToSend);
-            setSuccessMessage("Cliente actualizado correctamente.");
-            // Actualizar estado original local si es necesario (opcional)
-            setClienteOriginal(prev => prev ? { ...prev, ...dataToSend } : null);
-
-        } catch (err) {
-            console.error("Error updating cliente:", err);
-            const errorMessage = err instanceof Error ? err.message : "Ocurrió un error desconocido";
-            setError(`Error al actualizar: ${errorMessage}`);
-        } finally { setIsSubmitting(false); }
+            const result = await actualizarClientePorId(clienteId, validationResult.data);
+            if (result.success && result.data) {
+                setSuccessMessage("Cliente actualizado correctamente.");
+                // Actualizar clienteOriginal con los datos devueltos para reflejar cambios
+                setClienteOriginal(result.data);
+                // Opcionalmente, resetear formData a los nuevos datos de result.data
+                setFormData({
+                    nombre: result.data.nombre,
+                    email: result.data.email,
+                    // ... otros campos ...
+                });
+            } else {
+                setError(result.error || "Error desconocido al actualizar.");
+                if (result.validationErrors) {
+                    setValidationErrors(result.validationErrors as Partial<Record<keyof ActualizarClienteInput, string[]>>);
+                }
+            }
+        } catch (err: unknown) {
+            setError(`Error al actualizar: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
-
-    const handleCancel = () => { router.back(); };
 
     const handleArchive = async () => {
-        if (confirm("¿Estás seguro de archivar este cliente? Podrás reactivarlo más tarde.")) {
+        if (confirm("¿Estás seguro de archivar este cliente?")) {
             setIsSubmitting(true); setError(null); setSuccessMessage(null);
             try {
-                await archivarClientePorId(clienteId);
-                setSuccessMessage("Cliente archivado correctamente.");
-                // Actualizar estado local para reflejar el cambio
-                setFormData(prev => ({ ...prev, status: 'archivado' }));
-                setClienteOriginal(prev => prev ? { ...prev, status: 'archivado' } : null);
-                // Opcional: redirigir a la lista después de un tiempo
-                // setTimeout(() => router.push('/admin/clientes'), 1500);
-            } catch (err) {
-                console.error("Error archiving cliente:", err);
-                const errorMessage = err instanceof Error ? err.message : "Ocurrió un error desconocido";
-                setError(`Error al archivar: ${errorMessage}`);
-            } finally { setIsSubmitting(false); }
+                const result = await archivarClientePorId(clienteId);
+                if (result.success && result.data) {
+                    setSuccessMessage("Cliente archivado correctamente.");
+                    if (result.data) {
+                        setClienteOriginal(prev => prev ? { ...prev, status: result.data!.status as 'activo' | 'inactivo' | 'archivado' } : null);
+                    }
+                    if (result.data) {
+                        setFormData(prev => ({ ...prev, status: result.data!.status as 'activo' | 'inactivo' | 'archivado' }));
+                    }
+                } else {
+                    setError(result.error || "Error desconocido al archivar.");
+                }
+            } catch (err: unknown) {
+                setError(`Error al archivar: ${err instanceof Error ? err.message : String(err)}`);
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
-    // --- Renderizado ---
-    if (loading) {
-        return <div className={containerClasses}>
-            <p className="text-center text-zinc-300 flex items-center justify-center gap-2 w-full">
-                <Loader2 className='animate-spin' size={18} /> Cargando cliente...</p>
-        </div>;
+    if (loading) { /* ... (mismo render de loading) ... */
+        return <div className={containerClasses}><p className="text-center text-zinc-300 flex items-center justify-center gap-2 w-full"><Loader2 className='animate-spin' size={18} /> Cargando cliente...</p></div>;
     }
-    if (error && !clienteOriginal) {
+    if (error && !clienteOriginal && !isSubmitting) { /* ... (mismo render de error si no hay clienteOriginal) ... */
         return <div className={`${containerClasses} border border-red-500`}><p className="text-center text-red-400">{error}</p></div>;
     }
-    if (!clienteOriginal) {
+    if (!clienteOriginal) { /* ... (mismo render si no se encuentra) ... */
         return <div className={containerClasses}><p className="text-center text-zinc-400">Cliente no encontrado.</p></div>;
     }
 
     return (
         <div className={containerClasses}>
-            {/* Cabecera */}
             <div className='border-b border-zinc-700 pb-3 mb-6 flex flex-col sm:flex-row items-start justify-between gap-4'>
                 <div>
-                    <h2 className="text-xl font-semibold text-white leading-tight">Detalles del Cliente</h2>
+                    <h2 className="text-xl font-semibold text-white leading-tight">{clienteOriginal.nombre || 'Editar Cliente'}</h2>
                     <p className="text-xs text-zinc-400 mt-0.5">ID: {clienteId}</p>
                 </div>
                 <div className="flex items-center gap-3 pt-1">
                     <span className={`${labelBaseClasses} mb-0`}>Status:</span>
                     <label className="relative inline-flex items-center cursor-pointer" title={`Status: ${formData.status}`}>
-                        <input type="checkbox" id="status" name="status" checked={formData.status === 'activo'} onChange={handleChange} className="sr-only peer" disabled={isSubmitting} />
-                        <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                        <span className="ml-3 text-sm font-medium text-zinc-300">{formData.status === 'activo' ? 'Activo' : 'Archivado'}</span>
+                        <input type="checkbox" id="status-toggle" name="status" checked={formData.status === 'activo'} onChange={handleChange} className="sr-only peer" disabled={isSubmitting || formData.status === 'archivado'} />
+                        <div className={`w-11 h-6 bg-zinc-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer ${formData.status === 'archivado' ? 'opacity-50 cursor-not-allowed' : ''} peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all`}></div>
+                        <span className="ml-3 text-sm font-medium text-zinc-300 capitalize">{formData.status}</span>
                     </label>
                 </div>
             </div>
 
-            {/* Mensajes Globales */}
-            {error && <p className="mb-4 text-center text-red-400 bg-red-900/30 p-2 rounded border border-red-600 text-sm">{error}</p>}
-            {successMessage && <p className="mb-4 text-center text-green-400 bg-green-900/30 p-2 rounded border border-green-600 text-sm">{successMessage}</p>}
+            {/* Notificaciones Globales del Formulario */}
+            {error && !isSubmitting && Object.keys(validationErrors).length === 0 && (
+                <p className="mb-4 text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 flex items-center gap-2"><AlertTriangleIcon size={16} /> {error}</p>
+            )}
+            {successMessage && <p className="mb-4 text-sm text-green-400 bg-green-500/10 p-3 rounded-md border border-green-500/30">{successMessage}</p>}
 
-            {/* Formulario en una sola columna */}
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
 
-                {/* Información de Contacto */}
+            <form onSubmit={handleSubmit} className="space-y-5 flex-grow" noValidate>
+                {/* Campos del formulario */}
                 <div>
                     <label htmlFor="nombre" className={labelBaseClasses}>Nombre Completo <span className="text-red-500">*</span></label>
-                    <input type="text" id="nombre" name="nombre" value={formData.nombre || ''} onChange={handleChange} className={inputBaseClasses} required disabled={isSubmitting} />
+                    <Input type="text" id="nombre" name="nombre" value={formData.nombre || ''} onChange={handleChange} className={`${inputBaseClasses} ${validationErrors.nombre ? 'border-red-500' : ''}`} required disabled={isSubmitting} />
+                    {validationErrors.nombre && <p className="text-xs text-red-400 mt-1">{validationErrors.nombre.join(', ')}</p>}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="email" className={labelBaseClasses}>Email <span className="text-red-500">*</span></label>
-                        <input type="email" id="email" name="email" value={formData.email || ''} onChange={handleChange} className={inputBaseClasses} required disabled={isSubmitting} />
+                        <Input type="email" id="email" name="email" value={formData.email || ''} onChange={handleChange} className={`${inputBaseClasses} ${validationErrors.email ? 'border-red-500' : ''}`} required disabled={isSubmitting} />
+                        {validationErrors.email && <p className="text-xs text-red-400 mt-1">{validationErrors.email.join(', ')}</p>}
                     </div>
                     <div>
                         <label htmlFor="telefono" className={labelBaseClasses}>Teléfono <span className="text-red-500">*</span></label>
-                        <input type="tel" id="telefono" name="telefono" value={formData.telefono || ''} onChange={handleChange} className={inputBaseClasses} required disabled={isSubmitting} />
+                        <Input type="tel" id="telefono" name="telefono" value={formData.telefono || ''} onChange={handleChange} className={`${inputBaseClasses} ${validationErrors.telefono ? 'border-red-500' : ''}`} required disabled={isSubmitting} />
+                        {validationErrors.telefono && <p className="text-xs text-red-400 mt-1">{validationErrors.telefono.join(', ')}</p>}
                     </div>
                 </div>
 
-                {/* Información Fiscal (Opcional) */}
-                <h3 className={`${sectionTitleClasses} mt-6`}>Información Fiscal (Opcional)</h3>
+                <h3 className={`${sectionTitleClasses}`}>Información Fiscal (Opcional)</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="rfc" className={labelBaseClasses}>RFC</label>
-                        <input type="text" id="rfc" name="rfc" value={formData.rfc || ''} onChange={handleChange} className={inputBaseClasses} disabled={isSubmitting} />
+                        <Input type="text" id="rfc" name="rfc" value={formData.rfc || ''} onChange={handleChange} className={`${inputBaseClasses} ${validationErrors.rfc ? 'border-red-500' : ''}`} disabled={isSubmitting} />
+                        {validationErrors.rfc && <p className="text-xs text-red-400 mt-1">{validationErrors.rfc.join(', ')}</p>}
                     </div>
                     <div>
                         <label htmlFor="curp" className={labelBaseClasses}>CURP</label>
-                        <input type="text" id="curp" name="curp" value={formData.curp || ''} onChange={handleChange} className={inputBaseClasses} disabled={isSubmitting} />
+                        <Input type="text" id="curp" name="curp" value={formData.curp || ''} onChange={handleChange} className={`${inputBaseClasses} ${validationErrors.curp ? 'border-red-500' : ''}`} disabled={isSubmitting} />
+                        {validationErrors.curp && <p className="text-xs text-red-400 mt-1">{validationErrors.curp.join(', ')}</p>}
                     </div>
                 </div>
                 <div>
                     <label htmlFor="razonSocial" className={labelBaseClasses}>Razón Social</label>
-                    <input type="text" id="razonSocial" name="razonSocial" value={formData.razonSocial || ''} onChange={handleChange} className={inputBaseClasses} disabled={isSubmitting} />
+                    <Input type="text" id="razonSocial" name="razonSocial" value={formData.razonSocial || ''} onChange={handleChange} className={`${inputBaseClasses} ${validationErrors.razonSocial ? 'border-red-500' : ''}`} disabled={isSubmitting} />
+                    {validationErrors.razonSocial && <p className="text-xs text-red-400 mt-1">{validationErrors.razonSocial.join(', ')}</p>}
                 </div>
 
-                {/* Fechas solo lectura */}
+                {/* Stripe Customer ID (Solo lectura o para admin avanzado) */}
+                <div>
+                    <label htmlFor="stripeCustomerId" className={labelBaseClasses}>Stripe Customer ID (Info)</label>
+                    <Input type="text" id="stripeCustomerId" name="stripeCustomerId" value={formData.stripeCustomerId || ''} onChange={handleChange} className={`${inputBaseClasses} bg-zinc-950 text-zinc-400`} disabled={isSubmitting} placeholder="Se asignará al crear suscripción" />
+                    {/* <div className={valueDisplayClasses}>{formData.stripeCustomerId || 'No asignado'}</div> */}
+                </div>
+
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                    <div>
-                        <label className={labelBaseClasses}>Fecha Creación</label>
-                        <div className={valueDisplayClasses}>{clienteOriginal?.createdAt ? new Date(clienteOriginal.createdAt).toLocaleDateString() : 'N/A'}</div>
-                    </div>
-                    <div>
-                        <label className={labelBaseClasses}>Última Actualización</label>
-                        <div className={valueDisplayClasses}>{clienteOriginal?.updatedAt ? new Date(clienteOriginal.updatedAt).toLocaleString() : 'N/A'}</div>
-                    </div>
+                    <div><label className={labelBaseClasses}>Fecha Creación</label><div className={valueDisplayClasses}>{clienteOriginal?.createdAt ? new Date(clienteOriginal.createdAt).toLocaleDateString('es-MX') : 'N/A'}</div></div>
+                    <div><label className={labelBaseClasses}>Última Actualización</label><div className={valueDisplayClasses}>{clienteOriginal?.updatedAt ? new Date(clienteOriginal.updatedAt).toLocaleString('es-MX') : 'N/A'}</div></div>
                 </div>
 
-
-                {/* Botones de Acción */}
-                <div className="pt-6 space-y-2 border-t border-zinc-700 mt-6">
-                    <button type="submit" className={`${buttonBaseClasses} bg-blue-600 hover:bg-blue-700 focus:ring-blue-500`} disabled={isSubmitting || loading}>
-                        {isSubmitting && !error ? <span className='flex items-center justify-center gap-2'><Loader2 className='animate-spin' size={18} /> Guardando...</span> : <><Save size={16} /> Guardar Cambios</>}
-                    </button>
-                    <button type="button" onClick={handleCancel} className={`${buttonBaseClasses} bg-gray-600 hover:bg-gray-700 focus:ring-gray-500`} disabled={isSubmitting}>
-                        Cancelar / Volver
-                    </button>
-                    {/* Botón Archivar (solo si no está archivado) */}
+                <div className="pt-6 space-y-3 border-t border-zinc-700 mt-auto"> {/* mt-auto para empujar al fondo si el form es corto */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        {/* <Button type="button" onClick={handleCancel} variant="outline" className="w-full sm:w-auto border-zinc-600 hover:bg-zinc-700" disabled={isSubmitting}>
+                            <ArrowLeft size={16} className="mr-2"/> Volver
+                        </Button> */}
+                        <Button type="submit" className="w-full sm:flex-grow bg-blue-600 hover:bg-blue-700 focus:ring-blue-500" disabled={isSubmitting || loading}>
+                            {isSubmitting ? <Loader2 className='animate-spin mr-2' size={18} /> : <Save size={16} className="mr-2" />}
+                            {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
+                        </Button>
+                    </div>
                     {formData.status !== 'archivado' && (
-                        <div className="flex justify-center pt-2">
-                            <button type="button" onClick={handleArchive} className='text-amber-500 hover:text-amber-400 text-sm p-1 disabled:opacity-50' disabled={isSubmitting}>
-                                <span className='flex items-center gap-1.5'><Archive size={14} /> Archivar Cliente</span>
-                            </button>
+                        <div className="text-center pt-2">
+                            <Button type="button" variant="ghost" onClick={handleArchive} className='text-amber-500 hover:text-amber-400 text-sm p-1 disabled:opacity-50' disabled={isSubmitting}>
+                                <Archive size={14} className="mr-1.5" /> Archivar Cliente
+                            </Button>
                         </div>
                     )}
-
                 </div>
             </form>
         </div>

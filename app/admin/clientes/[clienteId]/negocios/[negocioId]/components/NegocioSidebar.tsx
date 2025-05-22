@@ -14,7 +14,9 @@ import {
     Tag,
     Package,
     Briefcase,
-    DatabaseZap
+    DatabaseZap,
+    Link2,
+    LibraryBig
 } from 'lucide-react';
 
 interface NavLink {
@@ -23,17 +25,21 @@ interface NavLink {
     icon: React.ElementType;
 }
 
+
 const navLinks: NavLink[] = [
     { hrefSuffix: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { hrefSuffix: '/editar', icon: Briefcase, label: 'Info. Negocio' },
+    { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil de Negocio' },
+    { hrefSuffix: '/agenda', icon: CalendarDays, label: 'Configuración de Agenda' },
     { hrefSuffix: '/catalogo', icon: BookOpen, label: 'Catálogo' },
     { hrefSuffix: '/paquetes', icon: Package, label: 'Paquetes' },
     { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
-    { hrefSuffix: '/agenda', icon: CalendarDays, label: 'Agenda' },
-    { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente' },
+    { hrefSuffix: '/asistente', icon: Bot, label: 'Asistentes virtuales' },
     { hrefSuffix: '/crm', icon: DatabaseZap, label: 'CRM' },
-    { hrefSuffix: '/landingpage', icon: Presentation, label: 'Landing page' },
+    { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Conocimiento *' },
+    { hrefSuffix: '/landingpage', icon: Presentation, label: 'Vitrina digital *' },
+    { hrefSuffix: '/pagos', icon: Link2, label: 'Links de pago *' }, // Cambiado a Briefcase como ícono de "budget"
 ];
+
 
 interface NegocioSidebarProps {
     negocioId: string;
@@ -43,11 +49,7 @@ interface NegocioSidebarProps {
 export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarProps) {
     const pathname = usePathname();
 
-    // Clases de Tailwind
-    // ACTUALIZADO: Se quita bg-zinc-800/50 para hacerlo transparente.
-    // El borde a la derecha se manejará en el componente LayoutNegocio.
-    // Se mantiene h-full para que ocupe toda la altura disponible.
-    const navListClasses = "flex-grow p-3 space-y-1.5 h-full";
+    const navListClasses = "flex-grow p-3 space-y-1.5 bg-zinc-800/50 rounded-md border border-zinc-700 shadow-sm";
     const navLinkBaseClasses = "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"; // Asumiendo que el offset es sobre un fondo oscuro
     const navLinkInactiveClasses = "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100";
     const navLinkActiveClasses = "bg-blue-600 text-white shadow-sm";

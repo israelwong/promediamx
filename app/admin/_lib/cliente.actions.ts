@@ -1,3 +1,5 @@
+//ruta actual: app/admin/clientes/[clienteId]/components/ClienteEditarForm.tsx
+
 'use server'
 import prisma from './prismaClient'
 import { Prisma } from '@prisma/client' // Asegúrate de tener Prisma importado
@@ -40,7 +42,7 @@ export async function obtenerClientesConDetalles(): Promise<ClienteConDetalles[]
                             where: { status: 'activo' },
                             select: {
                                 id: true,
-                                precioBase: true,
+                                // precioBase: true,
                                 status: true,
                                 AsistenteTareaSuscripcion: {
                                     where: { status: 'activo' },
@@ -63,7 +65,7 @@ export async function obtenerClientesConDetalles(): Promise<ClienteConDetalles[]
                 ...negocio,
                 AsistenteVirtual: negocio.AsistenteVirtual?.map(asistente => ({
                     ...asistente,
-                    precioBase: asistente.precioBase ?? undefined,
+                    // precioBase: asistente.precioBase ?? undefined,
                     AsistenteTareaSuscripcion: asistente.AsistenteTareaSuscripcion?.map(tarea => ({
                         ...tarea,
                         montoSuscripcion: tarea.montoSuscripcion ?? undefined,

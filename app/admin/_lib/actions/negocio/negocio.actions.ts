@@ -46,7 +46,6 @@ export async function actualizarDetallesNegocio(
         return {
             success: false,
             error: "Datos inválidos.",
-            // errorDetails: validationResult.error.flatten().fieldErrors // Esto es útil para mostrar errores por campo en el form
         };
     }
 

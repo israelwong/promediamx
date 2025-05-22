@@ -1,4 +1,4 @@
-// --- ARCHIVO: app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/page.tsx ---
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/page.tsx
 import React from 'react';
 import { MessageSquareText } from 'lucide-react';
 import { Metadata } from 'next';
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function ConversationsBasePage() {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center p-4">
+    <div className="flex flex-col items-center justify-center h-full text-center p-4 border border-zinc-700 rounded-lg border-dashed">
       <MessageSquareText size={64} className="text-zinc-500 mb-6" />
       <h2 className="text-2xl font-semibold text-zinc-100 mb-2">
         Panel de Conversaciones

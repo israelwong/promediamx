@@ -1,3 +1,8 @@
+/**
+ * The above TypeScript code defines functions to manage conversational channels including creating,
+ * editing, deleting, and ordering them, with error handling and data validation.
+ * @returns The functions in the provided code return different types of data based on their purpose:
+ */
 // Ruta: app/admin/_lib/canalConversacional.actions.ts
 'use server';
 import prisma from './prismaClient';

@@ -8,10 +8,11 @@ import { actualizarNegocio } from '@/app/admin/_lib/negocio.actions'; // Importa
 import { Loader2, AlertTriangle, BadgeCheck, BadgeX, CalendarClock, CreditCard, X, Edit2, Save } from 'lucide-react'; // Iconos
 
 interface Props {
+    clienteId: string;
     negocioId: string;
 }
 
-export default function NegocioHeader({ negocioId }: Props) {
+export default function NegocioHeader({ clienteId, negocioId }: Props) {
     const router = useRouter();
     const [headerData, setHeaderData] = useState<NegocioHeaderData | null>(null);
     const [loading, setLoading] = useState(true); // Loading general para carga inicial
@@ -168,6 +169,12 @@ export default function NegocioHeader({ negocioId }: Props) {
         );
     }
 
+    const handleCerrarNegocio = () => {
+        // Aquí puedes implementar la lógica para cerrar el negocio
+        // Por ejemplo, redirigir a otra página o mostrar un mensaje
+        router.push(`/admin/clientes/${clienteId}`); // Redirigir a la lista de negocios
+    }
+
     // Si hay datos
     const statusInfo = getStatusInfo(headerData.suscripcionStatus);
     const isPagoVencido = headerData.estadoPago === 'vencido';
@@ -207,7 +214,8 @@ export default function NegocioHeader({ negocioId }: Props) {
             {/* Bloque Derecho: Botones */}
             <div className="flex items-center gap-2 flex-shrink-0">
                 {isPagoVencido && (<button onClick={() => alert('Redirigir a página de pago...')} className={payButtonClasses}><CreditCard size={14} /> Pagar Ahora</button>)}
-                <button onClick={() => router.back()} className={closeButtonClasses} title="Cerrar y volver atrás"><X size={14} /> Cerrar</button>
+                <button
+                    onClick={() => handleCerrarNegocio()} className={closeButtonClasses} title="Cerrar y volver atrás"><X size={14} /> Cerrar</button>
             </div>
         </div>
     );

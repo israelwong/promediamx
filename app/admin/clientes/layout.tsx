@@ -1,7 +1,5 @@
-'use client'
+// Ruta actual: app/admin/clientes/layout.tsx
 import React from 'react'
-
-
 export default function LayoutClientes({ children }: Readonly<{ children: React.ReactNode }>) {
     return (
         <div className='h-screen'>

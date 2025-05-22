@@ -17,9 +17,11 @@ import {
     GenerarRespuestaAsistenteConHerramientasInput,
     RespuestaAsistenteConHerramientas,
     TareaCapacidadIA,
-} from '@/app/admin/_lib/crmConversacion.types';
+    ParametroParaIA,
+} from '@/app/admin/_lib/ia/ia.schemas';
 
 import { ActionResult } from '@/app/admin/_lib/types';
+import { Prisma } from '@prisma/client';
 
 const generationConfig: GenerationConfig = {
     temperature: 0.1, // Temperatura baja para respuestas más predecibles y mejor seguimiento de formato
@@ -33,32 +35,35 @@ const safetySettings = [
     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-function mapTipoParametroToSchemaType(tipo: string): SchemaType {
-    switch (tipo.toLowerCase()) {
-        case 'texto':
-        case 'email':
-        case 'telefono':
-        case 'direccion':
-        case 'fecha':
-        case 'fechahora':
-        case 'seleccion_unica': return SchemaType.STRING;
-        case 'numero':
-        case 'decimal':
-        case 'float': return SchemaType.NUMBER;
-        case 'entero': return SchemaType.INTEGER;
-        case 'booleano': return SchemaType.BOOLEAN;
-        case 'seleccion_multiple':
-            console.warn(`[IA Actions] Tipo 'seleccion_multiple' mapeado a SchemaType.ARRAY.`);
+function mapTipoParametroToSchemaType(tipoDatoOriginal: string): SchemaType {
+    if (!tipoDatoOriginal) {
+        console.warn(`[IA Actions] mapTipoParametroToSchemaType recibió un tipoDato nulo o undefined. Usando SchemaType.STRING.`);
+        return SchemaType.STRING;
+    }
+    const tipo = tipoDatoOriginal.toLowerCase().trim();
+
+    switch (tipo) {
+        case 'string': // Si usas 'string' directamente
+            return SchemaType.STRING;
+
+        case 'number':        // Si usas 'number'
+            return SchemaType.NUMBER;
+
+        case 'integer':
+            return SchemaType.INTEGER;
+
+        case 'boolean':
+            return SchemaType.BOOLEAN;
+
+        case 'array':
             return SchemaType.ARRAY;
-        case 'fecha_hora':
         default:
-            console.warn(`[IA Actions] Tipo de parámetro no mapeado explícitamente: ${tipo}. Usando SchemaType.STRING.`);
+            console.warn(`[IA Actions] Tipo de parámetro NO MAPEADO explícitamente: '${tipoDatoOriginal}' (normalizado a '${tipo}'). Usando SchemaType.STRING como default.`);
             return SchemaType.STRING;
     }
 }
 
 function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | undefined {
-
     const functionDeclarations: FunctionDeclaration[] = tareas
         .filter(tarea => tarea.funcionHerramienta)
         .map(tarea => {
@@ -89,8 +94,8 @@ function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | u
             }
 
             const funcDecl: FunctionDeclaration = {
-                name: funcion.nombreInterno,
-                description: tarea.descripcionTool || funcion.descripcion || `Ejecuta la acción ${funcion.nombreInterno}`,
+                name: funcion.nombre,
+                description: tarea.descripcionTool || funcion.descripcion || `Ejecuta la acción ${funcion.nombre}`,
                 parameters: {
                     type: SchemaType.OBJECT,
                     properties: Object.fromEntries(
@@ -152,8 +157,6 @@ Mantén siempre un tono amigable y eficiente.
 `;
 
         //! Herramientas para Gemini
-        //! Herramientas para Gemini
-        //! Herramientas para Gemini
         const tools = construirHerramientasParaGemini(input.tareasDisponibles);
         console.log("[IA Action] Herramientas DEFINITIVAS pasadas a Gemini:", JSON.stringify(tools, null, 2));
 
@@ -184,8 +187,6 @@ Mantén siempre un tono amigable y eficiente.
 
         console.log("[IA Action] Respuesta completa de Gemini:", JSON.stringify(response, null, 2));
 
-        //! ***** variables para almacenar la respuesta textual y la llamada a función a devolver
-        //! ***** variables para almacenar la respuesta textual y la llamada a función a devolver
         //! ***** variables para almacenar la respuesta textual y la llamada a función a devolver
         let respuestaTextual: string | null = null;
         let llamadaFuncion: RespuestaAsistenteConHerramientas['llamadaFuncion'] = null;
@@ -292,4 +293,89 @@ Mantén siempre un tono amigable y eficiente.
         if (error instanceof Error) { errorMessage = error.message; }
         return { success: false, error: errorMessage };
     }
+}
+
+
+export async function obtenerTareasCapacidadParaAsistente(
+    asistenteId: string,
+    tx: Prisma.TransactionClient // Prisma Client o Transaction Client
+): Promise<TareaCapacidadIA[]> {
+    const suscripcionesTareas = await tx.asistenteTareaSuscripcion.findMany({
+        where: {
+            asistenteVirtualId: asistenteId,
+            status: 'activo',
+            tarea: { status: 'activo' },
+        },
+        include: {
+            tarea: {
+                include: {
+                    tareaFuncion: {
+                        include: {
+                            parametros: true, // <-- CAMBIO: Incluir la relación directa 'parametros'
+                        },
+                    },
+                    // Mantener si TareaCampoPersonalizado sigue vigente y se usa:
+                    camposPersonalizadosRequeridos: {
+                        include: { crmCampoPersonalizado: true },
+                    },
+                },
+            },
+        },
+    });
+
+    const tareasCapacidad: TareaCapacidadIA[] = [];
+
+    for (const suscripcion of suscripcionesTareas) {
+        const tareaDb = suscripcion.tarea;
+        if (!tareaDb) continue;
+
+        let funcionHerramienta: TareaCapacidadIA['funcionHerramienta'] = null;
+        if (tareaDb.tareaFuncion) {
+            const tf = tareaDb.tareaFuncion; // Alias para TareaFuncion
+
+            // Mapear los nuevos TareaFuncionParametro a ParametroParaIA
+            const parametrosFuncion: ParametroParaIA[] = tf.parametros.map(p => {
+                // 'p' aquí es un objeto TareaFuncionParametro
+                return {
+                    nombre: p.nombre, // Este es el nombre snake_case para la IA
+                    tipo: p.tipoDato,
+                    descripcion: p.descripcionParaIA, // Descripción específica para la IA
+                    esObligatorio: p.esObligatorio,
+                };
+            });
+
+            funcionHerramienta = {
+                nombre: tf.nombre ?? '', // <-- CAMBIO: Usar el campo 'nombre' (camelCase) y asegurar que sea string
+                descripcion: tf.descripcion, // Descripción interna del admin (usada como fallback en construirHerramientasParaGemini)
+                parametros: parametrosFuncion,
+            };
+        }
+
+        // Mapeo de campos personalizados (sin cambios si la lógica se mantiene)
+        const camposPersonalizadosTarea: ParametroParaIA[] = tareaDb.camposPersonalizadosRequeridos
+            .filter(cp => cp.crmCampoPersonalizado)
+            .map(cp => {
+                const nombreCampo = (cp.crmCampoPersonalizado.nombreCampo ?? cp.crmCampoPersonalizado.nombre) ?? '';
+                if (nombreCampo === '') {
+                    console.warn(`[obtenerTareasCapacidad] Campo Personalizado con ID ${cp.crmCampoPersonalizado.id} no tiene nombreCampo ni nombre.`);
+                }
+                return {
+                    nombre: nombreCampo,
+                    tipo: cp.crmCampoPersonalizado.tipo,
+                    // Usar crmCampoPersonalizado.descripcionParaIA si existe, o crmCampoPersonalizado.nombre como fallback
+                    descripcion: cp.crmCampoPersonalizado.descripcionParaIA || cp.crmCampoPersonalizado.nombre,
+                    esObligatorio: cp.esRequerido,
+                };
+            });
+
+        tareasCapacidad.push({
+            id: tareaDb.id,
+            nombre: tareaDb.nombre, // Nombre de la Tarea
+            descripcionTool: tareaDb.descripcionTool, // <-- CAMBIO: Usar el campo Tarea.descripcionTool
+            instruccionParaIA: tareaDb.instruccion, // <-- CAMBIO: Usar el campo Tarea.instruccion
+            funcionHerramienta: funcionHerramienta,
+            camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,
+        });
+    }
+    return tareasCapacidad;
 }

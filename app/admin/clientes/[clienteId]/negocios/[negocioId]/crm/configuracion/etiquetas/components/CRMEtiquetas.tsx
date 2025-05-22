@@ -1,352 +1,329 @@
 // app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/configuracion/etiquetas/components/CRMEtiquetas.tsx
 'use client';
 
-import React, { useEffect, useState, useCallback, ChangeEvent, FormEvent } from 'react';
-// Ajusta rutas según tu estructura
-import {
-    obtenerEtiquetasCRM, // <-- Acción refactorizada
-    crearEtiquetaCRM,
-    editarEtiquetaCRM,
-    eliminarEtiquetaCRM,
-    ordenarEtiquetasCRM
-} from '@/app/admin/_lib/crmEtiqueta.actions'; // Ajusta ruta!
-import { EtiquetaCRM } from '@/app/admin/_lib/types'; // Ajusta ruta!
-import { Loader2, ListChecks, PlusIcon, PencilIcon, Trash2, Save, XIcon, GripVertical, Tags, Palette } from 'lucide-react'; // Iconos
+import React, { useEffect, useState, useCallback } from 'react';
+import { useForm, Controller, SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-// Imports de dnd-kit
+// DND Kit imports
 import {
-    DndContext,
-    closestCenter,
-    KeyboardSensor,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    DragEndEvent,
+    DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, MeasuringStrategy
 } from '@dnd-kit/core';
 import {
-    arrayMove,
-    SortableContext,
-    sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
-    useSortable,
+    arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+// --- NUEVAS IMPORTS ---
+import {
+    listarEtiquetasCrmAction,
+    crearEtiquetaCrmAction,
+    editarEtiquetaCrmAction,
+    eliminarEtiquetaCrmAction,
+    reordenarEtiquetasCrmAction
+} from '@/app/admin/_lib/actions/etiquetaCrm/etiquetaCrm.actions'; // Ajusta ruta!
+import {
+    etiquetaCrmFormSchema, // Para el formulario del modal
+    type EtiquetaCrmData,    // Para la lista de etiquetas
+    type EtiquetaCrmFormData // Para el tipo de datos del formulario
+} from '@/app/admin/_lib/actions/etiquetaCrm/etiquetaCrm.schemas'; // Ajusta ruta!
+import type { ActionResult } from '@/app/admin/_lib/types';
+
+import { Loader2, ListChecks, PlusIcon, PencilIcon, Trash2, Save, XIcon, GripVertical, Tags, Palette } from 'lucide-react';
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+// Select no se usa en el form de etiquetas, pero podría ser si el status fuera un select
 
 interface Props {
     negocioId: string;
 }
 
-// Interfaz extendida para el estado local
-interface EtiquetaCRMConOrden extends EtiquetaCRM {
-    orden: number; // Hacer orden no opcional
-}
-
-// Tipo para el formulario modal
-type EtiquetaFormData = Partial<Pick<EtiquetaCRM, 'nombre' | 'color' | 'status'>>;
-
-// --- Componente Interno para Item Arrastrable (sin cambios) ---
-function SortableTagItem({ etiqueta, onEditClick }: { etiqueta: EtiquetaCRMConOrden, onEditClick: (et: EtiquetaCRMConOrden) => void }) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: etiqueta.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.7 : 1,
-        zIndex: isDragging ? 10 : undefined,
-        cursor: isDragging ? 'grabbing' : 'grab',
-    };
-
+// Componente SortableTagItem (adaptado para EtiquetaCrmData)
+function SortableTagItem({ etiqueta, onEditClick, isBeingModified }: {
+    etiqueta: EtiquetaCrmData,
+    onEditClick: (et: EtiquetaCrmData) => void,
+    isBeingModified: boolean
+}) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: etiqueta.id, disabled: isBeingModified });
+    const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.7 : 1, zIndex: isDragging ? 10 : undefined, cursor: 'grab' };
     const listItemClasses = `flex items-center gap-2 py-2 px-2 border-b border-zinc-700 transition-colors ${isDragging ? 'bg-zinc-600 shadow-lg' : 'hover:bg-zinc-700/50'}`;
-    const buttonEditClasses = "text-zinc-400 hover:text-blue-400 p-1 flex-shrink-0 rounded-md hover:bg-zinc-700";
+    const buttonEditClasses = "text-zinc-400 hover:text-blue-400 p-1 flex-shrink-0 rounded-md hover:bg-zinc-700 disabled:opacity-50";
     const colorDotClasses = "w-3 h-3 rounded-full border border-zinc-500 flex-shrink-0";
 
     return (
         <li ref={setNodeRef} style={style} className={listItemClasses}>
-            <button {...attributes} {...listeners} data-dndkit-drag-handle className="cursor-grab touch-none text-zinc-500 hover:text-zinc-300 flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded" aria-label="Mover etiqueta"><GripVertical size={18} /></button>
+            <button {...attributes} {...listeners} className="p-1.5 cursor-grab touch-none text-zinc-500 hover:text-zinc-300 flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded" aria-label="Mover etiqueta" disabled={isBeingModified}>
+                <GripVertical size={18} />
+            </button>
             <span className={colorDotClasses} style={{ backgroundColor: etiqueta.color || 'transparent' }} title={`Color: ${etiqueta.color || 'Ninguno'}`}></span>
             <span className="text-sm font-medium text-zinc-200 flex-grow truncate" title={etiqueta.nombre}>{etiqueta.nombre}</span>
-            <button onClick={() => onEditClick(etiqueta)} className={buttonEditClasses} title="Editar Etiqueta"><PencilIcon size={16} /></button>
+            <button onClick={() => onEditClick(etiqueta)} className={buttonEditClasses} title="Editar Etiqueta" disabled={isBeingModified}>
+                <PencilIcon size={14} />
+            </button>
         </li>
     );
 }
 
-// --- Componente Principal ---
+
 export default function CRMEtiquetas({ negocioId }: Props) {
-    const [etiquetas, setEtiquetas] = useState<EtiquetaCRMConOrden[]>([]);
-    const [crmId, setCrmId] = useState<string | null>(null); // <-- Estado para crmId
+    const [etiquetas, setEtiquetas] = useState<EtiquetaCrmData[]>([]);
+    const [crmId, setCrmId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isSavingOrder, setIsSavingOrder] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Estados para el Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
-    const [etiquetaParaEditar, setEtiquetaParaEditar] = useState<EtiquetaCRMConOrden | null>(null);
-    const [modalFormData, setModalFormData] = useState<EtiquetaFormData>({});
+    const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+    const [etiquetaParaEditar, setEtiquetaParaEditar] = useState<EtiquetaCrmData | null>(null);
     const [isSubmittingModal, setIsSubmittingModal] = useState(false);
-    const [modalError, setModalError] = useState<string | null>(null);
+    const [modalSubmitError, setModalSubmitError] = useState<string | null>(null);
+    const [isSavingOrder, setIsSavingOrder] = useState(false);
+    const [pendingOrderToSave, setPendingOrderToSave] = useState<EtiquetaCrmData[] | null>(null);
 
-    // Clases de Tailwind (sin cambios)
+    const {
+        register: registerModal,
+        handleSubmit: handleSubmitModal,
+        reset: resetModal,
+        control: controlModal,
+        formState: { errors: modalFormErrors }
+
+    } = useForm<EtiquetaCrmFormData>({ // EtiquetaCrmFormData ahora tiene status: string
+        resolver: zodResolver(etiquetaCrmFormSchema), // El resolver ahora espera un schema consistente
+        defaultValues: {
+            nombre: '',
+            color: '#ffffff', // O el default que prefieras para el input color
+            status: 'activo' // Este default asegura que 'status' siempre es un string
+        }
+    });
+    // const currentColor = watchModal('color'); // Observar el color para el input de tipo color
+
+    // Clases UI (como las tenías)
     const containerClasses = "bg-zinc-800 border border-zinc-700 rounded-lg shadow-md p-4 md:p-6 flex flex-col h-full";
     const headerClasses = "flex flex-row items-center justify-between gap-2 mb-3 border-b border-zinc-600 pb-2";
-    const listContainerClasses = "flex-grow overflow-y-auto -mr-1 pr-1";
-    const buttonPrimaryClasses = "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2.5 py-1 rounded-md flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out whitespace-nowrap";
+    const listContainerClasses = "flex-grow overflow-y-auto -mr-1 pr-1"; // Quitado space-y-2 para que DnD se vea mejor
+    const buttonPrimaryClasses = "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2.5 py-1 rounded-md flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out whitespace-nowrap disabled:opacity-60";
     const modalOverlayClasses = "fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4";
     const modalContentClasses = "bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden";
     const modalHeaderClasses = "flex items-center justify-between p-4 border-b border-zinc-700";
     const modalBodyClasses = "p-4 space-y-4 overflow-y-auto";
     const modalFooterClasses = "flex justify-end gap-3 p-4 border-t border-zinc-700 bg-zinc-800/50";
     const labelBaseClasses = "text-zinc-300 block mb-1 text-sm font-medium";
-    const inputBaseClasses = "bg-zinc-900 border border-zinc-700 text-zinc-300 block w-full rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70";
-    const buttonBaseClassesModal = "text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 flex items-center justify-center gap-2 text-sm";
-    const colorInputClasses = `${inputBaseClasses} h-10 p-1 cursor-pointer`;
+    const inputBaseClasses = "bg-zinc-900 border border-zinc-700 text-zinc-300 block w-full rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70 text-sm";
+    const colorInputClasses = `${inputBaseClasses} h-10 p-1 cursor-pointer appearance-none`; // appearance-none para mejor control del input color
 
-    // Sensores dnd-kit (sin cambios)
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    // --- Carga de datos (Modificada) ---
     const fetchEtiquetas = useCallback(async (isInitialLoad = false) => {
-        if (!negocioId) {
-            setError("ID de negocio no disponible.");
-            setLoading(false);
-            return;
-        }
-        if (isInitialLoad) setLoading(true);
+        if (!negocioId) { setError("ID de negocio no disponible."); if (isInitialLoad) setLoading(false); return; }
+        if (isInitialLoad) { setLoading(true); setPendingOrderToSave(null); }
         setError(null);
-        setCrmId(null); // Resetear
-        setEtiquetas([]); // Limpiar
-
         try {
-            // Llamar a la acción refactorizada
-            const result = await obtenerEtiquetasCRM(negocioId);
-
+            const result = await listarEtiquetasCrmAction({ negocioId });
             if (result.success && result.data) {
-                // Almacenar crmId y etiquetas
                 setCrmId(result.data.crmId);
-                setEtiquetas((result.data.etiquetas || []).map((et, index) => ({ ...et, orden: et.orden ?? index + 1 })));
-                if (!result.data.crmId) {
-                    setError("CRM no encontrado para este negocio. Debe configurarse primero.");
+                // Asegurar que cada etiqueta tenga un 'orden' para dnd-kit, usando index si es null
+                const etiquetasConOrden = (result.data.etiquetas || []).map((et, index) => ({
+                    ...et,
+                    orden: et.orden ?? index + 1,
+                }));
+                setEtiquetas(etiquetasConOrden);
+                if (!result.data.crmId && isInitialLoad) {
+                    setError("CRM no configurado. Por favor, configura el CRM para añadir etiquetas.");
                 }
-            } else {
-                throw new Error(result.error || "Error desconocido al cargar etiquetas.");
-            }
+            } else { throw new Error(result.error || "Error cargando etiquetas."); }
         } catch (err) {
-            console.error("Error al obtener las etiquetas:", err);
-            setError(`No se pudieron cargar las etiquetas: ${err instanceof Error ? err.message : "Error desconocido"}`);
-            setEtiquetas([]);
-            setCrmId(null);
-        } finally {
-            if (isInitialLoad) setLoading(false);
-        }
+            setError(`No se pudieron cargar las etiquetas: ${err instanceof Error ? err.message : "Error"}`);
+            setEtiquetas([]); setCrmId(null);
+        } finally { if (isInitialLoad) setLoading(false); }
     }, [negocioId]);
 
-    useEffect(() => {
-        fetchEtiquetas(true);
-    }, [fetchEtiquetas]);
+    useEffect(() => { fetchEtiquetas(true); }, [fetchEtiquetas]);
 
-    // --- Manejadores Modal ---
-    const openModal = (mode: 'create' | 'edit', etiqueta?: EtiquetaCRMConOrden) => {
-        // Solo permitir crear si tenemos crmId
-        if (mode === 'create' && !crmId) {
-            setError("No se puede crear una etiqueta sin un CRM configurado.");
-            return;
-        }
+    const openModal = (mode: 'create' | 'edit', etiqueta?: EtiquetaCrmData) => {
+        if (mode === 'create' && !crmId) { setError("CRM no configurado."); return; }
         setModalMode(mode);
         setEtiquetaParaEditar(mode === 'edit' ? etiqueta || null : null);
-        setModalFormData(mode === 'edit' && etiqueta ?
-            { nombre: etiqueta.nombre, color: etiqueta.color, status: etiqueta.status } :
-            { nombre: '', color: '#ffffff', status: 'activo' } // Color por defecto blanco
+        resetModal(
+            mode === 'edit' && etiqueta
+                ? { nombre: etiqueta.nombre, color: etiqueta.color || '#ffffff', status: etiqueta.status ?? 'activo' }
+                : { nombre: '', color: '#ffffff', status: 'activo' }
         );
         setIsModalOpen(true);
-        setModalError(null);
+        setModalSubmitError(null);
     };
 
-    const closeModal = () => { /* ... (sin cambios) ... */
+    const closeModal = () => {
         setIsModalOpen(false);
         setTimeout(() => {
-            setModalMode(null); setEtiquetaParaEditar(null); setModalFormData({}); setModalError(null); setIsSubmittingModal(false);
-        }, 300);
+            setModalMode('create'); setEtiquetaParaEditar(null);
+            resetModal({ nombre: '', color: '#ffffff', status: 'activo' });
+            setModalSubmitError(null);
+        }, 200);
     };
 
-    const handleModalFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setModalFormData(prev => ({ ...prev, [name]: value }));
-        setModalError(null);
-    };
-
-    const handleModalFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!modalFormData.nombre?.trim()) { setModalError("El nombre es obligatorio."); return; }
-        setIsSubmittingModal(true); setModalError(null);
-
+    const onModalFormSubmit: SubmitHandler<EtiquetaCrmFormData> = async (formData) => {
+        setIsSubmittingModal(true); setModalSubmitError(null);
         try {
-            let result;
+            let result: ActionResult<EtiquetaCrmData | null>;
             const dataToSend = {
-                nombre: modalFormData.nombre.trim(),
-                color: modalFormData.color || null, // Enviar null si no hay color
-                status: modalFormData.status || 'activo',
+                nombre: formData.nombre,
+                color: formData.color === '#ffffff' ? null : formData.color, // Blanco como "sin color" -> null
+                status: formData.status || 'activo',
             };
 
             if (modalMode === 'create') {
-                if (!crmId) throw new Error("crmId no está disponible para crear la etiqueta."); // Verificación extra
-                // Pasar crmId del estado
-                result = await crearEtiquetaCRM({ crmId: crmId, nombre: dataToSend.nombre, color: dataToSend.color });
+                if (!crmId) throw new Error("ID de CRM no disponible.");
+                result = await crearEtiquetaCrmAction({
+                    crmId: crmId,
+                    nombre: dataToSend.nombre,
+                    color: dataToSend.color,
+                    status: dataToSend.status
+                });
             } else if (modalMode === 'edit' && etiquetaParaEditar?.id) {
-                // Editar usa el ID de la etiqueta
-                result = await editarEtiquetaCRM(etiquetaParaEditar.id, dataToSend);
-            } else {
-                throw new Error("Modo inválido o ID faltante.");
-            }
+                result = await editarEtiquetaCrmAction({
+                    etiquetaId: etiquetaParaEditar.id,
+                    datos: dataToSend
+                });
+            } else { throw new Error("Modo inválido o ID faltante."); }
 
-            if (result?.success) {
-                await fetchEtiquetas(); // Recargar lista
-                closeModal();
-            } else { throw new Error(result?.error || "Error desconocido."); }
-
+            if (result?.success && result.data) { await fetchEtiquetas(false); closeModal(); }
+            else { throw new Error(result?.error || "Error al guardar."); }
         } catch (err) {
-            console.error(`Error al ${modalMode === 'create' ? 'crear' : 'editar'} etiqueta:`, err);
-            setModalError(`Error: ${err instanceof Error ? err.message : "Ocurrió un error"}`);
-        } finally {
-            setIsSubmittingModal(false); // Asegurar que se desactive
-        }
+            setModalSubmitError(`Error: ${err instanceof Error ? err.message : "Ocurrió un error"}`);
+        } finally { setIsSubmittingModal(false); }
     };
 
     const handleModalDelete = async () => {
         if (!etiquetaParaEditar?.id) return;
-        if (confirm(`¿Estás seguro de eliminar la etiqueta "${etiquetaParaEditar.nombre}"? Se quitará de todos los Leads asociados.`)) {
-            setIsSubmittingModal(true); setModalError(null);
+        if (confirm(`¿Eliminar etiqueta "${etiquetaParaEditar.nombre}"?`)) {
+            setIsSubmittingModal(true); setModalSubmitError(null);
             try {
-                const result = await eliminarEtiquetaCRM(etiquetaParaEditar.id);
-                if (result?.success) { await fetchEtiquetas(); closeModal(); }
-                else { throw new Error(result?.error || "Error desconocido."); }
+                const result = await eliminarEtiquetaCrmAction({ etiquetaId: etiquetaParaEditar.id });
+                if (result?.success) { await fetchEtiquetas(false); closeModal(); }
+                else { throw new Error(result?.error || "Error al eliminar."); }
             } catch (err) {
-                console.error("Error eliminando etiqueta:", err);
-                setModalError(`Error al eliminar: ${err instanceof Error ? err.message : "Ocurrió un error"}`);
-            } finally {
-                setIsSubmittingModal(false);
-            }
+                setModalSubmitError(`Error al eliminar: ${err instanceof Error ? err.message : "Error"}`);
+            } finally { setIsSubmittingModal(false); }
         }
     };
 
-    // --- Manejador Drag End (sin cambios) ---
-    const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
-            const oldIndex = etiquetas.findIndex((et) => et.id === active.id);
-            const newIndex = etiquetas.findIndex((et) => et.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) return;
-
-            const reorderedEtiquetas = arrayMove(etiquetas, oldIndex, newIndex);
-            const finalEtiquetas = reorderedEtiquetas.map((et, index) => ({ ...et, orden: index + 1 }));
-
-            setEtiquetas(finalEtiquetas); // Optimista
-
-            const ordenData = finalEtiquetas.map(({ id, orden }) => ({ id, orden }));
-
-            setIsSavingOrder(true); setError(null);
-            try {
-                const result = await ordenarEtiquetasCRM(ordenData);
-                if (!result.success) throw new Error(result.error || "Error al guardar orden");
-            } catch (saveError) {
-                console.error('Error al guardar el orden:', saveError);
-                setError('Error al guardar el nuevo orden.');
-                fetchEtiquetas(); // Revertir
-            } finally {
-                setIsSavingOrder(false);
-            }
+            setEtiquetas((prevEtiquetas) => {
+                const oldIndex = prevEtiquetas.findIndex((et) => et.id === active.id);
+                const newIndex = prevEtiquetas.findIndex((et) => et.id === over.id);
+                const newOrderedEtiquetas = arrayMove(prevEtiquetas, oldIndex, newIndex);
+                setPendingOrderToSave(newOrderedEtiquetas);
+                return newOrderedEtiquetas;
+            });
         }
-    }, [etiquetas, fetchEtiquetas]);
+    };
 
-    // --- Renderizado ---
+    useEffect(() => {
+        const guardarOrden = async () => {
+            if (!pendingOrderToSave || !crmId || isSavingOrder) return;
+            setIsSavingOrder(true); setError(null);
+            const etiquetasConNuevoOrden = pendingOrderToSave.map((et, index) => ({ id: et.id, orden: index + 1 }));
+            try {
+                const result = await reordenarEtiquetasCrmAction({ crmId, etiquetasOrdenadas: etiquetasConNuevoOrden });
+                if (!result.success) throw new Error(result.error || "Error al guardar orden.");
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "Error al guardar orden.");
+                fetchEtiquetas(false);
+            } finally { setIsSavingOrder(false); setPendingOrderToSave(null); }
+        };
+        if (pendingOrderToSave) {
+            const timer = setTimeout(guardarOrden, 700);
+            return () => clearTimeout(timer);
+        }
+    }, [pendingOrderToSave, crmId, isSavingOrder, fetchEtiquetas]);
+
     return (
         <div className={containerClasses}>
-            {/* Cabecera */}
             <div className={headerClasses}>
-                <h3 className="text-base font-semibold text-white whitespace-nowrap flex items-center gap-2">
-                    <Tags size={16} /> Etiquetas CRM
-                </h3>
-                <button
-                    onClick={() => openModal('create')}
-                    className={buttonPrimaryClasses}
-                    title={!crmId ? "Configura el CRM primero" : "Crear nueva etiqueta"}
-                    disabled={!crmId || loading} // Deshabilitar si no hay crmId o cargando
-                >
+                <h3 className="text-base font-semibold text-white flex items-center gap-2"><Tags size={16} /> Etiquetas CRM</h3>
+                <Button onClick={() => openModal('create')} className={buttonPrimaryClasses} disabled={!crmId || loading || isSavingOrder} title={!crmId && !loading ? "Configura CRM" : ""}>
                     <PlusIcon size={14} /> <span>Crear Etiqueta</span>
-                </button>
+                </Button>
             </div>
 
-            {/* Errores y Guardado Orden */}
-            {error && <p className="mb-2 text-center text-xs text-red-400">{error}</p>}
-            {isSavingOrder && <div className="mb-2 flex items-center justify-center text-xs text-blue-300"><Loader2 className="h-3 w-3 animate-spin mr-1.5" />Guardando orden...</div>}
+            {error && <p className="mb-3 text-center text-sm text-red-400 bg-red-900/20 p-2 rounded-md border border-red-600/50">{error}</p>}
+            {isSavingOrder && <p className="mb-2 text-xs text-sky-400 text-center animate-pulse"><Loader2 className="inline mr-1 h-3 w-3 animate-spin" />Guardando orden...</p>}
 
-            {/* Contenido Principal: Lista */}
             <div className={listContainerClasses}>
-                {loading ? (
-                    <div className="flex items-center justify-center py-10 text-zinc-400"><Loader2 className="h-5 w-5 animate-spin mr-2" /><span>Cargando etiquetas...</span></div>
-                ) : etiquetas.length === 0 && !error && crmId ? ( // Mostrar solo si hay crmId pero no etiquetas
-                    <div className="flex flex-col items-center justify-center text-center py-10"><ListChecks className="h-8 w-8 text-zinc-500 mb-2" /><p className='text-zinc-400 italic text-sm'>No hay etiquetas definidas.</p></div>
-                ) : !crmId && !loading && !error ? ( // Mensaje si no hay CRM
-                    <div className="flex flex-col items-center justify-center text-center py-10"><ListChecks className="h-8 w-8 text-zinc-500 mb-2" /><p className='text-zinc-400 italic text-sm'>El CRM no está configurado.</p></div>
-                ) : etiquetas.length > 0 ? (
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <SortableContext items={etiquetas.map(et => et.id)} strategy={verticalListSortingStrategy}>
-                            <ul className='space-y-0'> {/* Quitar space-y para que bordes colapsen */}
-                                {etiquetas.map((etiqueta) => (
-                                    <SortableTagItem key={etiqueta.id} etiqueta={etiqueta} onEditClick={(et) => openModal('edit', et)} />
-                                ))}
-                            </ul>
-                        </SortableContext>
-                    </DndContext>
-                ) : null /* No mostrar nada si hay error */}
+                {loading ? (<div className="flex items-center justify-center py-10 text-zinc-400"><Loader2 className="h-6 w-6 animate-spin mr-2" /><span>Cargando...</span></div>)
+                    : etiquetas.length === 0 && crmId ? (<div className="flex flex-col items-center justify-center text-center py-10 min-h-[100px]"><ListChecks className="h-10 w-10 text-zinc-500 mb-2" /><p className='text-zinc-400 italic text-sm'>No hay etiquetas.</p></div>)
+                        : !crmId && !loading && !error ? (<div className="flex flex-col items-center justify-center text-center py-10 min-h-[100px]"><ListChecks className="h-10 w-10 text-zinc-500 mb-2" /><p className='text-zinc-400 italic text-sm'>CRM no configurado.</p></div>)
+                            : etiquetas.length > 0 && crmId ? (
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}>
+                                    <SortableContext items={etiquetas.map(et => et.id)} strategy={verticalListSortingStrategy}>
+                                        <ul className='space-y-0 divide-y divide-zinc-700/50'> {/* Usar divide para líneas sutiles */}
+                                            {etiquetas.map((etiqueta) => (
+                                                <SortableTagItem key={etiqueta.id} etiqueta={etiqueta} onEditClick={(et) => openModal('edit', et)} isBeingModified={isSubmittingModal || isSavingOrder} />
+                                            ))}
+                                        </ul>
+                                    </SortableContext>
+                                </DndContext>
+                            ) : null}
             </div>
 
-            {/* Modal */}
             {isModalOpen && (
-                <div className={modalOverlayClasses} onClick={closeModal}>
+                <div className={modalOverlayClasses}>
                     <div className={modalContentClasses} onClick={(e) => e.stopPropagation()}>
                         <div className={modalHeaderClasses}>
-                            <h3 className="text-lg font-semibold text-white">{modalMode === 'create' ? 'Crear Nueva Etiqueta' : 'Editar Etiqueta'}</h3>
-                            <button onClick={closeModal} className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500" aria-label="Cerrar modal"><XIcon size={20} /></button>
+                            <h3 className="text-lg font-semibold text-white">{modalMode === 'create' ? 'Crear Etiqueta' : 'Editar Etiqueta'}</h3>
+                            <button onClick={closeModal} className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"><XIcon size={20} /></button>
                         </div>
-                        <form onSubmit={handleModalFormSubmit}>
+                        <form onSubmit={handleSubmitModal(onModalFormSubmit)}>
                             <div className={modalBodyClasses}>
-                                {modalError && <p className="mb-3 text-center text-red-400 bg-red-900/30 p-2 rounded border border-red-600 text-sm">{modalError}</p>}
+                                {modalSubmitError && <p className="mb-3 text-center text-red-400 bg-red-900/30 p-2 rounded border border-red-600 text-sm">{modalSubmitError}</p>}
                                 <div className="flex items-end gap-3">
                                     <div className="flex-grow">
                                         <label htmlFor="modal-nombre" className={labelBaseClasses}>Nombre Etiqueta <span className="text-red-500">*</span></label>
-                                        <input type="text" id="modal-nombre" name="nombre" value={modalFormData.nombre || ''} onChange={handleModalFormChange} className={inputBaseClasses} required disabled={isSubmittingModal} maxLength={50} />
+                                        <Input type="text" id="modal-nombre" {...registerModal("nombre")} className={inputBaseClasses} disabled={isSubmittingModal} maxLength={50} placeholder="Ej: VIP, Contactar Luego" />
+                                        {modalFormErrors.nombre && <p className="text-xs text-red-400 mt-1">{modalFormErrors.nombre.message}</p>}
                                     </div>
                                     <div>
-                                        <label htmlFor="modal-color" className={`${labelBaseClasses} text-center`}><Palette size={14} className="inline mr-1" /> Color</label>
-                                        <input type="color" id="modal-color" name="color" value={modalFormData.color || '#ffffff'} onChange={handleModalFormChange} className={colorInputClasses} disabled={isSubmittingModal} />
+                                        <label htmlFor="modal-color" className={`${labelBaseClasses} text-center flex items-center justify-center gap-1`}><Palette size={12} /> Color</label>
+                                        <Input type="color" id="modal-color" {...registerModal("color")} className={colorInputClasses} disabled={isSubmittingModal} />
+                                        {/* No es común mostrar error de validación para input color, Zod lo maneja */}
                                     </div>
                                 </div>
-                                {/* Opcional: Editar status si se añade a la acción editar */}
-                                {/* <div>
+                                <div> {/* Select para Status */}
                                     <label htmlFor="modal-status" className={labelBaseClasses}>Status</label>
-                                    <select id="modal-status" name="status" value={modalFormData.status || 'activo'} onChange={handleModalFormChange} className={`${inputBaseClasses} appearance-none`} disabled={isSubmittingModal}>
-                                        <option value="activo">Activo</option>
-                                        <option value="inactivo">Inactivo</option>
-                                    </select>
-                                </div> */}
+                                    <Controller
+                                        name="status"
+                                        control={controlModal}
+                                        defaultValue="activo"
+                                        render={({ field }) => (
+                                            <Select value={field.value} onValueChange={field.onChange} disabled={isSubmittingModal}>
+                                                <SelectTrigger id="modal-status" className={`${inputBaseClasses} flex justify-between items-center`}>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="activo">Activo</SelectItem>
+                                                    <SelectItem value="inactivo">Inactivo</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                    {modalFormErrors.status && <p className="text-xs text-red-400 mt-1">{modalFormErrors.status.message}</p>}
+                                </div>
                             </div>
                             <div className={modalFooterClasses}>
-                                {modalMode === 'edit' && (<button type="button" onClick={handleModalDelete} className={`${buttonBaseClassesModal} !w-auto bg-red-600 hover:bg-red-700 focus:ring-red-500 px-3 py-1.5 mr-auto`} disabled={isSubmittingModal}><Trash2 size={14} /> Eliminar</button>)}
-                                <button type="button" onClick={closeModal} className={`${buttonBaseClassesModal} !w-auto bg-gray-600 hover:bg-gray-700 focus:ring-gray-500`} disabled={isSubmittingModal}>Cancelar</button>
-                                <button type="submit" className={`${buttonBaseClassesModal} !w-auto bg-blue-600 hover:bg-blue-700 focus:ring-blue-500`} disabled={isSubmittingModal}>
-                                    {isSubmittingModal ? <Loader2 className='animate-spin' size={16} /> : <Save size={16} />}
+                                {modalMode === 'edit' && etiquetaParaEditar && (
+                                    <Button type="button" onClick={handleModalDelete} variant="destructive" size="sm" className="mr-auto" disabled={isSubmittingModal}>
+                                        <Trash2 size={14} className="mr-1.5" /> Eliminar
+                                    </Button>)}
+                                <Button type="button" variant="ghost" size="sm" onClick={closeModal} disabled={isSubmittingModal}>Cancelar</Button>
+                                <Button type="submit" size="sm" className={buttonPrimaryClasses} disabled={isSubmittingModal || (modalMode === 'create' && !crmId)}>
+                                    {isSubmittingModal ? <Loader2 className='animate-spin mr-2 h-4 w-4' /> : <Save size={14} className="mr-1.5" />}
                                     {modalMode === 'create' ? 'Crear' : 'Guardar'}
-                                </button>
+                                </Button>
                             </div>
                         </form>
                     </div>

@@ -16,8 +16,8 @@ import NegocioRedes from './NegocioRedes';
 
 import {
     Loader2, Save, /*Sparkles, Wand2, CheckCheck, Undo2,*/ Info, AlertCircle, // Iconos IA comentados
-    Phone, MessageSquareWarning, FileText, Scale,
-    Building, ChevronDown, ShieldCheck, MessageCircleQuestion, /*Target, UserCheck, Share2*/ // Iconos de campos omitidos o secciones IA comentadas
+    Phone, FileText, Scale,
+    Building, ChevronDown, ShieldCheck
 } from 'lucide-react';
 
 interface Props {
@@ -99,12 +99,9 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
                 direccion: negocioData.direccion || null,
                 googleMaps: negocioData.googleMaps || null,
                 paginaWeb: negocioData.paginaWeb || null,
-                horarioAtencion: negocioData.horarioAtencion || null,
                 garantias: negocioData.garantias || null,
                 politicas: negocioData.politicas || null,
                 avisoPrivacidad: negocioData.avisoPrivacidad || null,
-                preguntasFrecuentes: negocioData.preguntasFrecuentes !== null ? negocioData.preguntasFrecuentes : undefined,
-                objeciones: negocioData.objeciones !== null ? negocioData.objeciones : undefined,
                 status: ['activo', 'inactivo'].includes(negocioData.status || '') ? (negocioData.status as 'activo' | 'inactivo') : 'inactivo',
                 logo: negocioData.logo || null,
             };
@@ -192,7 +189,6 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
                             <div><label htmlFor="email" className={labelBaseClasses}>Email Principal</label><input type="email" id="email" name="email" value={formData.email || ''} onChange={handleChange} className={inputBaseClasses} disabled={disableAllActions} /></div>
                             <div><label htmlFor="direccion" className={labelBaseClasses}>Dirección Física</label><textarea id="direccion" name="direccion" value={formData.direccion || ''} onChange={handleChange} className={`${inputBaseClasses} min-h-[60px]`} disabled={disableAllActions} rows={2} /></div>
                             <div><label htmlFor="googleMaps" className={labelBaseClasses}>Enlace Google Maps</label><input type="url" id="googleMaps" name="googleMaps" value={formData.googleMaps || ''} onChange={handleChange} className={inputBaseClasses} disabled={disableAllActions} placeholder="https://..." /></div>
-                            <div><label htmlFor="horarioAtencion" className={labelBaseClasses}>Horario de Atención</label><textarea id="horarioAtencion" name="horarioAtencion" value={formData.horarioAtencion || ''} onChange={handleChange} className={`${inputBaseClasses} min-h-[80px]`} disabled={disableAllActions} rows={3} placeholder="Ej: Lunes a Viernes: 9am - 6pm..." /></div>
                         </div>
                     </div>
                     <div className={sectionContainerClasses}>
@@ -205,44 +201,21 @@ export default function NegocioEditarForm({ negocioId }: Props) { // clienteId n
                     <div className={sectionContainerClasses}>
                         <h3 className={sectionTitleClasses}><Info size={16} /> Descripción General</h3>
                         <label htmlFor="descripcion" className={labelBaseClasses}>Descripción Principal / Resumen Ejecutivo</label>
-                        <textarea id="descripcion" name="descripcion" value={formData.descripcion || ''} onChange={handleChange} className={`${textareaBaseClasses} !min-h-[300px]`} disabled={disableAllActions} rows={12} placeholder="Describe tu negocio, misión, visión, valores, historia..." />
-                        {/* Botones IA Omitidos por ahora 
-                        <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                            <button type="button" onClick={handleMejorarDescripcion} className={improveAiButtonClasses} disabled={disableAllActions || !formData.descripcion?.trim()} title={!formData.descripcion?.trim() ? "Escribe algo primero" : "Mejorar descripción"}> {estadoIA.descripcion === 'loading' ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} <span>Mejorar</span> </button>
-                            {sugerenciaActiva?.campo === 'descripcion' && (<div className="flex items-center gap-1.5"> <button onClick={aceptarSugerencia} className={`${suggestionActionClasses} bg-green-600/20 border-green-500/50 text-green-300 hover:bg-green-600/40`}><CheckCheck size={12} /> Aceptar</button> <button onClick={revertirSugerencia} className={`${suggestionActionClasses} bg-yellow-600/20 border-yellow-500/50 text-yellow-300 hover:bg-yellow-600/40`}><Undo2 size={12} /> Revertir</button> </div>)}
-                        </div>
-                        {estadoIA.descripcion === 'error' && <p className="text-xs text-red-400 mt-1">Error al mejorar.</p>}
-                        */}
+                        <textarea id="descripcion" name="descripcion" value={formData.descripcion || ''} onChange={handleChange} className={`${textareaBaseClasses} !min-h-[600px]`} disabled={disableAllActions} rows={12} placeholder="Describe tu negocio, misión, visión, valores, historia..." />
                     </div>
                 </div>
 
                 <div className="md:col-span-1 flex flex-col gap-4">
                     <AccordionItem title="Políticas (Devolución, etc.)" icon={FileText} isOpen={openAccordion === 'politicas'} onToggle={() => handleAccordionToggle('politicas')}>
                         <textarea id="politicas" name="politicas" value={formData.politicas || ''} onChange={handleChange} className={textareaBaseClasses} disabled={disableAllActions} rows={6} placeholder="Detalla tus políticas..." />
-                        {/* Botones IA Omitidos por ahora
-                        <button type="button" onClick={() => handleGenerarPoliticas('terminos')} className={`mt-2 ${generateAiButtonClasses}`} disabled={disableAllActions} title="Generar/Mejorar políticas"> {estadoIA.politicas === 'loading' ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />} <span>{formData.politicas?.trim() ? 'Mejorar' : 'Generar'}</span> </button>
-                        {sugerenciaActiva?.campo === 'politicas' && (<div className="mt-1 flex items-center gap-1.5"> <button onClick={aceptarSugerencia} className={`${suggestionActionClasses} bg-green-600/20 border-green-500/50 text-green-300 hover:bg-green-600/40`}><CheckCheck size={12} /> Aceptar</button> <button onClick={revertirSugerencia} className={`${suggestionActionClasses} bg-yellow-600/20 border-yellow-500/50 text-yellow-300 hover:bg-yellow-600/40`}><Undo2 size={12} /> Revertir</button> </div>)}
-                        {estadoIA.politicas === 'error' && <p className="text-xs text-red-400 mt-1">Error IA.</p>}
-                        */}
                     </AccordionItem>
                     <AccordionItem title="Aviso de Privacidad" icon={ShieldCheck} isOpen={openAccordion === 'avisoPrivacidad'} onToggle={() => handleAccordionToggle('avisoPrivacidad')}>
                         <textarea id="avisoPrivacidad" name="avisoPrivacidad" value={formData.avisoPrivacidad || ''} onChange={handleChange} className={textareaBaseClasses} disabled={disableAllActions} rows={6} placeholder="Incluye tu aviso de privacidad..." />
-                        {/* Botones IA Omitidos por ahora
-                        <button type="button" onClick={() => handleGenerarPoliticas('privacidad')} className={`mt-2 ${generateAiButtonClasses}`} disabled={disableAllActions} title="Generar/Mejorar aviso"> {estadoIA.avisoPrivacidad === 'loading' ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />} <span>{formData.avisoPrivacidad?.trim() ? 'Mejorar' : 'Generar'}</span> </button>
-                        {sugerenciaActiva?.campo === 'avisoPrivacidad' && (<div className="mt-1 flex items-center gap-1.5"> <button onClick={aceptarSugerencia} className={`${suggestionActionClasses} bg-green-600/20 border-green-500/50 text-green-300 hover:bg-green-600/40`}><CheckCheck size={12} /> Aceptar</button> <button onClick={revertirSugerencia} className={`${suggestionActionClasses} bg-yellow-600/20 border-yellow-500/50 text-yellow-300 hover:bg-yellow-600/40`}><Undo2 size={12} /> Revertir</button> </div>)}
-                        {estadoIA.avisoPrivacidad === 'error' && <p className="text-xs text-red-400 mt-1">Error IA.</p>}
-                        */}
                     </AccordionItem>
                     <AccordionItem title="Garantías" icon={Scale} isOpen={openAccordion === 'garantias'} onToggle={() => handleAccordionToggle('garantias')}>
                         <textarea id="garantias" name="garantias" value={formData.garantias || ''} onChange={handleChange} className={textareaBaseClasses} disabled={disableAllActions} rows={4} placeholder="Describe las garantías ofrecidas..." />
                     </AccordionItem>
-                    {/* CAMPOS OMITIDOS: clienteIdeal, terminologia, competencia */}
-                    <AccordionItem title="Preguntas Frecuentes (FAQ)" icon={MessageCircleQuestion} isOpen={openAccordion === 'faq'} onToggle={() => handleAccordionToggle('faq')}>
-                        <textarea id="preguntasFrecuentes" name="preguntasFrecuentes" value={formData.preguntasFrecuentes || ''} onChange={handleChange} className={textareaBaseClasses} disabled={disableAllActions} rows={6} placeholder="P: Pregunta 1\nR: Respuesta 1..." />
-                    </AccordionItem>
-                    <AccordionItem title="Manejo de Objeciones" icon={MessageSquareWarning} isOpen={openAccordion === 'objeciones'} onToggle={() => handleAccordionToggle('objeciones')}>
-                        <textarea id="objeciones" name="objeciones" value={formData.objeciones || ''} onChange={handleChange} className={textareaBaseClasses} disabled={disableAllActions} rows={5} placeholder="Objeción: Es muy caro.\nRespuesta: Entendemos..." />
-                    </AccordionItem>
+
                 </div>
 
                 <div className="md:col-span-3 pt-5 space-y-3 border-t border-zinc-600 mt-2">

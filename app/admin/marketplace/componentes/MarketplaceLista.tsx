@@ -1,3 +1,4 @@
+// app/admin/marketplace/componentes/MarketplaceLista.tsx
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -12,35 +13,41 @@ import {
     crearOreactivarSuscripcionAction, // Renombrada y usa ActionResult
 } from '@/app/admin/_lib/actions/asistenteTareaSuscripcion/asistenteTareaSuscripcion.actions';
 import type { UpsertSuscripcionTareaInput } from '@/app/admin/_lib/actions/asistenteTareaSuscripcion/asistenteTareaSuscripcion.schemas';
-// import type { SuscripcionActivaInfoData } from '@/app/admin/_lib/actions/asistenteTareaSuscripcion/asistenteTareaSuscripcion.schemas';
-// ActionResult ya es global
 
-import { Loader2, ListX, SearchIcon, ListChecks, BadgeCheck, CheckCircle, GalleryHorizontal, Users, Check } from 'lucide-react';
+import { Loader2, ListX, SearchIcon, ListChecks, BadgeCheck, CheckCircle, Check, Users, GalleryHorizontal } from 'lucide-react';
 
 interface Props {
-    asistenteId?: string; // AsistenteId opcional, se pasa como prop
+    // ids opcionales se pasas como props
+    asistenteId?: string;
     clienteId?: string;
     negocioId?: string;
 }
 
-// Componente TareaCard (sin cambios lógicos internos, solo el tipo de 'tarea')
+const DEFAULT_CARD_COLOR_HEX = '#3f3f46'; // zinc-700 como fallback para borde si no hay color de categoría
+
 const TareaCard = ({ tarea, isSuscrito, isLoadingAction, onSuscribirClick, onCardClick, asistenteId }: {
-    tarea: TareaParaMarketplaceData; // Tipo actualizado
+    tarea: TareaParaMarketplaceData;
     isSuscrito: boolean;
     isLoadingAction: boolean;
     onSuscribirClick: (tareaId: string, tareaNombre: string) => void;
     onCardClick: (tareaId: string) => void;
     asistenteId?: string;
 }) => {
-    // ... (JSX de TareaCard sin cambios, ya que los nombres de campos parecen coincidir)
-    // Solo asegurarse que tarea.CategoriaTarea?.nombre y tarea.etiquetas... sigan funcionando.
-    // El schema TareaParaMarketplaceData debe asegurar estas estructuras.
-    const cardClasses = "bg-zinc-800 border border-zinc-700 rounded-lg shadow-md flex flex-col h-64 hover:border-blue-600/50 hover:shadow-blue-900/20 transition-all duration-200 cursor-pointer group";
-    const contentClasses = "p-3 flex-grow overflow-hidden flex flex-col";
-    const footerClasses = "p-3 border-t border-zinc-700 flex justify-between items-center";
-    const tagClasses = "text-[0.65rem] px-1.5 py-0.5 rounded-full inline-block mr-1 mb-1 bg-teal-900/70 text-teal-300";
-    const buttonSubscribeClasses = "text-white bg-green-600 hover:bg-green-700 focus:ring-green-500 text-xs font-medium px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-opacity-50 transition duration-150 ease-in-out flex items-center justify-center gap-1 disabled:opacity-50";
-    const suscritoIndicatorClasses = "text-xs font-medium text-green-400 flex items-center gap-1";
+    const categoriaColor = tarea.CategoriaTarea?.color || DEFAULT_CARD_COLOR_HEX;
+    // Asumimos que la primera imagen de la galería es la portada
+    // const imagenPortadaUrl = tarea.TareaGaleria?.[0]?.imageUrl || tarea.iconoUrl; // Fallback al iconoUrl si no hay galería
+
+    // Clases base (algunas pueden venir de tu guía de estilos maestra)
+    const cardClasses = `bg-zinc-800 border border-zinc-600 rounded-lg shadow-lg overflow-hidden flex flex-col group transition-all duration-300 hover:shadow-xl`;
+    // const imageContainerClasses = "w-full h-32 relative overflow-hidden"; // Altura fija para la imagen
+    const contentClasses = "p-3 flex-grow flex flex-col";
+    const footerClasses = "p-3 border-t border-zinc-700 flex justify-between items-center mt-auto"; // mt-auto para empujar al fondo
+    const categoryTextClasses = "text-[0.65rem] font-bold uppercase tracking-wider mb-1 text-zinc-500";
+    const titleClasses = "text-sm font-semibold text-zinc-100 mb-1 line-clamp-2 group-hover:text-blue-400 transition-colors";
+    const descriptionClasses = "text-xs text-zinc-400 line-clamp-2 flex-grow mb-2"; // line-clamp-2 para descripción más corta
+    const tagClasses = "text-[0.6rem] px-1.5 py-0.5 rounded-full inline-block mr-1 mb-1 bg-zinc-700 text-zinc-300";
+    const buttonSubscribeClasses = "text-white bg-green-600 hover:bg-green-700 focus:ring-green-500 text-xs font-medium px-2.5 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 transition duration-150 ease-in-out flex items-center justify-center gap-1 disabled:opacity-50";
+    const suscritoIndicatorClasses = "text-xs font-medium text-green-300 flex items-center gap-1";
 
     const handleCardClickInternal = (e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('button[data-action-button="true"]')) return;
@@ -48,47 +55,72 @@ const TareaCard = ({ tarea, isSuscrito, isLoadingAction, onSuscribirClick, onCar
     };
 
     return (
-        <div className={cardClasses} onClick={handleCardClickInternal}>
+        <div
+            className={cardClasses}
+            onClick={handleCardClickInternal}
+            style={{ borderTop: `3px solid ${categoriaColor}` }} // Acento de color en el borde superior
+            role="button" // Hacerlo semánticamente un botón si es clickeable
+            tabIndex={0} // Hacerlo enfocable
+            onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onCardClick(tarea.id);
+                }
+            }} // Accionable con teclado
+        >
+            {/* {imagenPortadaUrl && (
+                <div className={imageContainerClasses}>
+                    <Image
+                        src={imagenPortadaUrl}
+                        alt={`Portada de ${tarea.nombre}`}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" // Ajusta según tus breakpoints
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                </div>
+            )} */}
             <div className={contentClasses}>
-                <span className="text-[0.65rem] font-medium text-zinc-400 uppercase tracking-wider mb-1">
+                <span
+                    className={categoryTextClasses}
+                    style={{ color: categoriaColor }}
+                >
                     {tarea.CategoriaTarea?.nombre || 'General'}
                 </span>
-                <h3 className="text-sm font-semibold text-zinc-100 mb-1 line-clamp-2" title={tarea.nombre}>
+                <h3 className={titleClasses} title={tarea.nombre}>
                     {tarea.nombre}
                 </h3>
-                <p className="text-xs text-zinc-400 line-clamp-3 flex-grow" title={tarea.descripcion || ''}>
-                    {tarea.descripcion || <span className='italic'>Sin descripción</span>}
+                <p className={descriptionClasses} title={tarea.descripcion || ''}>
+                    {tarea.descripcion || <span className='italic text-zinc-500'>Sin descripción</span>}
                 </p>
+                {/* Mostrar un número limitado de etiquetas para mantenerlo minimalista */}
                 {tarea.etiquetas && tarea.etiquetas.length > 0 && (
-                    <div className="mt-2 flex flex-wrap max-h-10 overflow-hidden">
-                        {tarea.etiquetas.slice(0, 3).map(({ etiquetaTarea }) => etiquetaTarea ? (
+                    <div className="mt-1 flex flex-wrap max-h-6 overflow-hidden"> {/* max-h para limitar altura de tags */}
+                        {tarea.etiquetas.slice(0, 2).map(({ etiquetaTarea }) => etiquetaTarea ? (
                             <span key={etiquetaTarea.id} className={tagClasses}>
                                 {etiquetaTarea.nombre}
                             </span>
                         ) : null)}
-                        {tarea.etiquetas.length > 3 && <span className={`${tagClasses} bg-zinc-600`}>...</span>}
+                        {tarea.etiquetas.length > 2 && <span className={`${tagClasses} bg-zinc-600`}>+{tarea.etiquetas.length - 2}</span>}
                     </div>
                 )}
             </div>
             <div className={footerClasses}>
                 <div className='flex items-center gap-2 text-zinc-500'>
-                    <span title={`${tarea._count.AsistenteTareaSuscripcion} asistentes suscritos`}>
-                        <Users size={12} />
-                    </span>
+                    <span title={`${tarea._count.AsistenteTareaSuscripcion} asistentes suscritos`}> <Users size={12} /> </span>
                     {tarea._count.TareaGaleria > 0 && <GalleryHorizontal size={12} />}
-                    <span className="text-sm font-semibold text-emerald-400 ml-1">
+                    <span className="text-sm font-semibold text-emerald-400">
                         {typeof tarea.precio === 'number' && tarea.precio > 0 ? `$${tarea.precio.toFixed(2)}` : 'Gratis'}
                     </span>
                 </div>
-                <div className="h-6">
-                    {asistenteId && isSuscrito ? ( // Solo mostrar si hay asistenteId
+                <div className="h-7 flex items-center"> {/* Altura fija para alinear botones */}
+                    {asistenteId && isSuscrito ? (
                         <span className={suscritoIndicatorClasses} title="Ya estás suscrito a esta tarea">
                             <CheckCircle size={14} /> Suscrito
                         </span>
-                    ) : asistenteId && ( // Solo mostrar si hay asistenteId
+                    ) : asistenteId && (
                         <button
                             data-action-button="true"
-                            onClick={() => onSuscribirClick(tarea.id, tarea.nombre)}
+                            onClick={(e) => { e.stopPropagation(); onSuscribirClick(tarea.id, tarea.nombre); }}
                             className={buttonSubscribeClasses}
                             disabled={isLoadingAction}
                             title="Suscribir asistente a esta tarea"
@@ -97,19 +129,20 @@ const TareaCard = ({ tarea, isSuscrito, isLoadingAction, onSuscribirClick, onCar
                             Suscribir
                         </button>
                     )}
-                    {!asistenteId && ( // Vista admin global: podría enlazar a gestión de tarea o un flujo de "suscribir para"
+                    {!asistenteId && (
                         <button
                             data-action-button="true"
-                            onClick={() => onCardClick(tarea.id)} // Lleva al detalle de la tarea
+                            onClick={(e) => { e.stopPropagation(); onCardClick(tarea.id); }}
                             className="text-xs text-blue-400 hover:text-blue-300"
-                        >Ver detalles</button>
+                        >
+                            Ver Detalles
+                        </button>
                     )}
                 </div>
             </div>
         </div>
     );
 };
-
 
 export default function MarketplaceLista({ negocioId, clienteId, asistenteId }: Props) {
     const [tareas, setTareas] = useState<TareaParaMarketplaceData[]>([]);

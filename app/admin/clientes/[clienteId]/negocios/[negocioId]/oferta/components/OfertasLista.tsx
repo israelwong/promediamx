@@ -31,9 +31,9 @@ export default function OfertasLista({ negocioId, clienteId }: Props) {
     const createButtonCardClasses = "inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-zinc-800 disabled:opacity-50 transition-colors duration-150 gap-1.5";
 
     const listContainerClasses = "flex-grow overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar"; // Espaciado entre tarjetas
-    const cardClasses = "border border-zinc-700 rounded-lg p-4 bg-zinc-800/60 flex flex-col sm:flex-row items-start gap-4 hover:border-blue-600/60 hover:shadow-lg transition-all duration-150 cursor-pointer group focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-800";
+    const cardClasses = "w-[500px] border border-zinc-700 rounded-lg p-4 bg-zinc-800/60 flex flex-col sm:flex-row items-start gap-4 hover:border-blue-600/60 hover:shadow-lg transition-all duration-150 cursor-pointer group focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-800";
     const imageContainerClasses = "w-full sm:w-20 h-32 sm:h-20 rounded-md flex-shrink-0 bg-zinc-700 relative overflow-hidden border border-zinc-600";
-    const contentContainerClasses = "flex-grow overflow-hidden";
+    const contentContainerClasses = "flex-grow overflow-hidden flex items-start flex-col justify-between gap-1.5 relative w-full";
 
     const statusBadgeBaseClasses = "text-[0.7rem] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 leading-tight border";
     const codeBadgeClasses = "text-[0.7rem] font-mono bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30";
@@ -129,7 +129,7 @@ export default function OfertasLista({ negocioId, clienteId }: Props) {
                             const statusInfo = getStatusInfo(oferta.status);
                             const hasCode = !!oferta.codigo;
                             return (
-                                <li key={oferta.id}>
+                                <li key={oferta.id} className="">
                                     <button // Convertido a button para mejor accesibilidad y focus
                                         type="button"
                                         className={cardClasses}

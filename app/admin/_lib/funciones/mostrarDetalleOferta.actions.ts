@@ -3,7 +3,12 @@
 
 import prisma from '../prismaClient';
 import { ActionResult } from '../types';
-import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData, OfertaDetallada } from './mostrarDetalleOferta.type';
+import {
+    // MostrarDetalleOfertaArgsSchema, // Importar el schema Zod para validación si es necesario aquí
+    type MostrarDetalleOfertaArgs,    // Tipo inferido de Zod
+    type MostrarDetalleOfertaData,    // Tipo inferido de Zod
+    type OfertaDetallada              // Tipo inferido de Zod
+} from './mostrarDetalleOferta.schemas'; // Importar desde el nuevo archivo de schemas
 
 async function actualizarTareaEjecutadaFallidaInterna(tareaEjecutadaId: string, mensajeError: string) {
     try {
@@ -26,6 +31,7 @@ export async function ejecutarMostrarDetalleOfertaAction(
     argumentos: MostrarDetalleOfertaArgs,
     tareaEjecutadaId: string
 ): Promise<ActionResult<MostrarDetalleOfertaData>> {
+
     console.log(`[Ejecución Función] Iniciando ejecutarMostrarDetalleOfertaAction para TareaEjecutada ${tareaEjecutadaId}`);
     console.log("[Ejecución Función] Argumentos recibidos:", argumentos);
 
@@ -33,12 +39,14 @@ export async function ejecutarMostrarDetalleOfertaAction(
         await actualizarTareaEjecutadaFallidaInterna(tareaEjecutadaId, "Falta el ID del negocio.");
         return { success: false, error: "Falta el ID del negocio." };
     }
+
     if (!argumentos.nombre_de_la_oferta || argumentos.nombre_de_la_oferta.trim() === "") {
         await actualizarTareaEjecutadaFallidaInterna(tareaEjecutadaId, "Falta el identificador de la oferta.");
         // Este mensaje es para el usuario si la IA no pudo extraer el identificador
         return {
             success: true, // Éxito en la ejecución de la acción, pero la IA necesita más info
             data: {
+                oferta: null,
                 mensajeRespuesta: "No entendí a qué oferta te refieres. ¿Podrías decirme el nombre de la promoción que te interesa?"
             }
         };
@@ -57,17 +65,11 @@ export async function ejecutarMostrarDetalleOfertaAction(
                 OR: [
                     { id: { equals: argumentos.nombre_de_la_oferta } }, // Si el identificador es un ID exacto
                     { nombre: { contains: argumentos.nombre_de_la_oferta, mode: 'insensitive' } },
-                    // Podrías añadir búsqueda en descripción si es relevante
-                    // { descripcion: { contains: argumentos.identificadorOferta, mode: 'insensitive' } }
                 ],
             },
             include: {
                 OfertaGaleria: { // Incluir imágenes de la galería
-                    select: {
-                        imageUrl: true,
-                        altText: true,
-                        descripcion: true,
-                    },
+                    select: { imageUrl: true, altText: true, descripcion: true, },
                     orderBy: { orden: 'asc' }
                 }
             }
@@ -112,12 +114,8 @@ export async function ejecutarMostrarDetalleOfertaAction(
 
             // Imágenes
             if (ofertaDetallada.imagenes.length > 0) {
-                if (argumentos.canalNombre?.toLowerCase() === 'web chat') {
+                if (argumentos.canalNombre?.toLowerCase() === 'webchat') {
                     mensajeRespuesta += `<br><br>Imágenes:<br>`;
-
-                    // ofertaDetallada.imagenes.forEach(img => {
-                    //     mensajeRespuesta += `<img src="${img.imageUrl}" alt="${img.altText || ofertaDetallada!.nombre}" style="max-width:200px; margin:5px; height:auto;"><br>`;
-                    // });
 
                     ofertaDetallada.imagenes.forEach(img => {
                         const altText = img.altText || ofertaDetallada!.nombre; // Usar un fallback para altText

@@ -8,7 +8,7 @@ import {
     CancelarCitaData,
     CitaDetalleParaCancelar,
     ActorInfo
-} from './cancelarCita.type';
+} from './cancelarCita.schemas';
 import { Agenda as AgendaModel, ActionType, ChangedByType, StatusAgenda } from '@prisma/client';
 import { format, isValid, isFuture, startOfDay, endOfDay, formatISO } from 'date-fns';
 import { es } from 'date-fns/locale';

@@ -1,4 +1,4 @@
-// Ejemplo en: @/app/admin/_lib/crmAgente.actions.ts
+// app/admin/_lib/crmAgente.actions.ts
 'use server';
 import prisma from './prismaClient'; // Ajusta ruta
 import { Prisma } from '@prisma/client';

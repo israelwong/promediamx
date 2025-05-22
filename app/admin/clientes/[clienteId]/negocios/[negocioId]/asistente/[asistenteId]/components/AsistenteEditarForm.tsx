@@ -168,7 +168,7 @@ export default function AsistenteEditarForm({ asistenteId, negocioIdOriginal, cl
         const cId = clienteIdOriginal || asistenteOriginal?.clienteId;
         const nId = negocioIdOriginal || asistenteOriginal?.negocioId;
         if (cId && nId) {
-            router.push(`/admin/clientes/${cId}/negocios/${nId}`);
+            router.push(`/admin/clientes/${cId}/negocios/${nId}/asistente`);
         } else {
             router.push('/admin/dashboard'); // Fallback
         }

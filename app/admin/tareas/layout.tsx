@@ -1,4 +1,5 @@
-// Ruta actual del archivo: /Users/israelwong/Documents/Desarrollo/promedia-app/app/admin/tareas/layout.tsx
+// Ruta actual del archivo: /app/admin/tareas/layout.tsx
+
 import React from 'react';
 import TareaSidebar from './components/TareaSidebar'; // Asegúrate que la ruta sea correcta
 

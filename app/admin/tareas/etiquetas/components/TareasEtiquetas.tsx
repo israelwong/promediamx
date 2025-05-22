@@ -9,52 +9,36 @@ import {
     arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-// --- Fin DnD Imports ---
 
-// Mantener las importaciones de actions originales
+// --- ACCIONES ---
 import {
     obtenerEtiquetasTarea,
     crearEtiquetaTarea,
     editarEtiquetaTarea,
     eliminarEtiquetaTarea,
     ordenarEtiquetasTarea
-} from '@/app/admin/_lib/etiquetaTareas.actions';
+} from '@/app/admin/_lib/actions/etiquetaTarea/etiquetaTarea.actions'; // Ajusta la ruta si es necesario
 
-// --- IMPORTACIONES DE TIPOS ACTUALIZADAS ---
+// --- TIPOS Y ESQUEMAS ZOD ---
 import {
-    EtiquetaConOrden,
-    EtiquetaFormData,
-    EtiquetaTareaInput // Para el tipo de datos a enviar
-} from '@/app/admin/_lib/etiquetaTareas.type'; // Ajusta la ruta si es necesario
-// import { EtiquetaTarea as EtiquetaTareaBasePrisma } from '@/app/admin/_lib/types';
+    EtiquetaTareaInputSchema,     // El esquema Zod para validación del formulario
+    type EtiquetaTareaInput,      // Tipo inferido para los datos del formulario
+    type EtiquetaConOrden          // Para el estado local y la UI (definido en schemas.ts)
+} from '@/app/admin/_lib/actions/etiquetaTarea/etiquetaTarea.schemas';
+import type { ActionResult } from '@/app/admin/_lib/types';
+import type { EtiquetaTarea as EtiquetaTareaPrisma } from '@prisma/client';
 
 
+// --- ICONOS ---
 import {
-    Loader2,
-    ListChecks,
-    PlusIcon,
-    Trash2,
-    Save,
-    XIcon,
-    GripVertical,
-    Tags, // Icono para Etiquetas
-    InfoIcon, // Para descripciones
-    AlertTriangleIcon // Para errores
+    Loader2, ListChecks, PlusIcon, Trash2, Save, XIcon, GripVertical, Tags, InfoIcon, AlertTriangleIcon
 } from 'lucide-react';
 
-// --- Componente Sortable Table Row (Ajustado según Guía de Estilos) ---
+// --- Componente SortableEtiquetaRow ---
+// (Tu implementación original se ve bien, asegurar que 'etiqueta' sea de tipo EtiquetaConOrden)
 function SortableEtiquetaRow({ id, etiqueta, onEdit }: { id: string; etiqueta: EtiquetaConOrden; onEdit: () => void }) {
-    const {
-        attributes, listeners, setNodeRef, transform, transition, isDragging,
-    } = useSortable({ id: id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.7 : 1,
-        zIndex: isDragging ? 10 : undefined,
-    };
-
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+    const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.7 : 1, zIndex: isDragging ? 10 : undefined, };
     const tdBaseClasses = "px-2 py-1.5 text-xs border-b border-zinc-700 align-middle";
 
     const handleRowClickInternal = (e: React.MouseEvent<HTMLTableRowElement>) => {
@@ -63,49 +47,17 @@ function SortableEtiquetaRow({ id, etiqueta, onEdit }: { id: string; etiqueta: E
     };
 
     return (
-        <tr
-            ref={setNodeRef}
-            style={style}
-            className={`bg-zinc-800 hover:bg-zinc-700/50 transition-colors duration-100 cursor-pointer ${isDragging ? 'shadow-lg ring-1 ring-blue-500 bg-zinc-700' : ''}`}
-            onClick={handleRowClickInternal}
-        >
-            <td className={`${tdBaseClasses} text-center w-10`}>
-                <button
-                    {...attributes} {...listeners} data-dnd-handle="true"
-                    className="p-1 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    aria-label="Arrastrar para reordenar"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <GripVertical size={14} />
-                </button>
-            </td>
-            <td className={`${tdBaseClasses} text-zinc-100 font-medium`}>
-                <div className="flex items-center gap-2">
-                    <Tags size={14} className="text-zinc-500 flex-shrink-0" /> {/* Icono genérico para etiqueta */}
-                    <span>{etiqueta.nombre}</span>
-                </div>
-            </td>
-            <td className={`${tdBaseClasses} text-zinc-400 max-w-md`}> {/* Aumentado max-w para descripción */}
-                {etiqueta.descripcion ? (
-                    <div className="flex items-center gap-1">
-                        <span title="Descripción">
-                            <InfoIcon size={12} className="text-zinc-500 flex-shrink-0" />
-                        </span>
-                        <span className="line-clamp-1" title={etiqueta.descripcion}>
-                            {etiqueta.descripcion}
-                        </span>
-                    </div>
-                ) : (
-                    <span className="text-zinc-600 italic">N/A</span>
-                )}
-            </td>
-            {/* Celda Uso (Tareas) - Descomentar si la action devuelve _count.tareas */}
-            <td className={`${tdBaseClasses} text-center text-zinc-300 w-20`}>
-                {etiqueta._count?.tareas ?? 0}
-            </td>
+        <tr ref={setNodeRef} style={style} className={`bg-zinc-800 hover:bg-zinc-700/50 transition-colors duration-100 cursor-pointer ${isDragging ? 'shadow-lg ring-1 ring-blue-500 bg-zinc-700' : ''}`} onClick={handleRowClickInternal}>
+            <td className={`${tdBaseClasses} text-center w-10`}><button {...attributes} {...listeners} data-dnd-handle="true" className="p-1 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none rounded focus:outline-none focus:ring-1 focus:ring-blue-500" aria-label="Arrastrar para reordenar" onClick={(e) => e.stopPropagation()}><GripVertical size={14} /></button></td>
+            <td className={`${tdBaseClasses} text-zinc-100 font-medium`}><div className="flex items-center gap-2"><Tags size={14} className="text-zinc-500 flex-shrink-0" /><span>{etiqueta.nombre}</span></div></td>
+            <td className={`${tdBaseClasses} text-zinc-400 max-w-md`}>{etiqueta.descripcion ? <div className="flex items-center gap-1"><span title="Descripción"><InfoIcon size={12} className="text-zinc-500 flex-shrink-0" /></span><span className="line-clamp-1" title={etiqueta.descripcion}>{etiqueta.descripcion}</span></div> : <span className="text-zinc-600 italic">N/A</span>}</td>
+            <td className={`${tdBaseClasses} text-center text-zinc-300 w-20`}>{etiqueta._count?.tareas ?? 0}</td>
         </tr>
     );
 }
+
+// Tipo para el estado del formulario del modal, incluyendo el id opcional para edición.
+type ModalFormState = Partial<EtiquetaTareaInput> & { id?: string };
 
 export default function TareasEtiquetas() {
     const [etiquetas, setEtiquetas] = useState<EtiquetaConOrden[]>([]);
@@ -116,17 +68,22 @@ export default function TareasEtiquetas() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
     const [etiquetaParaEditar, setEtiquetaParaEditar] = useState<EtiquetaConOrden | null>(null);
-    const [modalFormData, setModalFormData] = useState<EtiquetaFormData>({});
+
+    const [modalFormData, setModalFormData] = useState<ModalFormState>({
+        nombre: '',
+        descripcion: ''
+    });
     const [isSubmittingModal, setIsSubmittingModal] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
+    const [modalValidationErrors, setModalValidationErrors] = useState<Partial<Record<keyof EtiquetaTareaInput, string[]>>>({});
 
-    // Clases de Tailwind según la Guía de Estilos
-    const containerClasses = "bg-zinc-800 rounded-lg shadow-md flex flex-col h-full";
-    const headerSectionClasses = "flex items-center justify-between mb-4 border-b border-zinc-700 pb-3 px-4 pt-4";
+    // ... (Clases de Tailwind y sensores DnD se mantienen igual que en TareasCanales.tsx) ...
+    const containerClasses = "bg-zinc-800 rounded-lg shadow-md flex flex-col h-full p-4";
+    const headerSectionClasses = "flex items-center justify-between mb-4 border-b border-zinc-700 pb-3";
     const headerTitleClasses = "text-lg font-semibold text-zinc-100 flex items-center gap-2";
     const buttonPrimaryClasses = "bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-md flex items-center gap-2 disabled:opacity-50";
-    const errorAlertClasses = "mb-3 text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 mx-4 flex items-center gap-2";
-    const tableWrapperClasses = "flex-grow overflow-auto";
+    const errorAlertClasses = "mb-3 text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 flex items-center gap-2";
+    const tableWrapperClasses = "flex-grow overflow-auto border border-zinc-700 bg-zinc-900/30";
 
     const modalOverlayClasses = "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4";
     const modalContentClasses = "bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden";
@@ -149,35 +106,41 @@ export default function TareasEtiquetas() {
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    // Lógica de fetchEtiquetas (mantenida de tu original, adaptada para _count opcional)
     const fetchEtiquetas = useCallback(async (isInitialLoad = false) => {
-        if (isInitialLoad) setLoading(true); setError(null);
+        if (isInitialLoad) setLoading(true);
+        setError(null);
         try {
-            const data = await obtenerEtiquetasTarea();
-            setEtiquetas((data || []).map((et, index) => ({
-                ...et,
-                orden: et.orden ?? index,
-                _count: (et as { _count?: { tareas: number } })._count || { tareas: 0 } // Asegurar que _count exista
-            })));
-        } catch (err) {
+            const result = await obtenerEtiquetasTarea(); // Devuelve ActionResult<EtiquetaConOrden[]>
+            if (result.success && result.data) {
+                setEtiquetas(result.data); // El mapeo ya se hace en la action
+            } else {
+                throw new Error(result.error || "No se pudieron cargar las etiquetas.");
+            }
+        } catch (err: unknown) {
             console.error("Error al obtener etiquetas:", err);
-            setError("No se pudieron cargar las etiquetas.");
+            setError(err instanceof Error ? err.message : "No se pudieron cargar las etiquetas.");
             setEtiquetas([]);
-        } finally { if (isInitialLoad) setLoading(false); }
+        } finally {
+            if (isInitialLoad) setLoading(false);
+        }
     }, []);
 
     useEffect(() => { fetchEtiquetas(true); }, [fetchEtiquetas]);
 
-    // Lógica de openModal y closeModal (mantenida de tu original)
     const openModal = (modeToSet: 'create' | 'edit', etiqueta?: EtiquetaConOrden) => {
         setModalMode(modeToSet);
         setEtiquetaParaEditar(modeToSet === 'edit' ? etiqueta || null : null);
         setModalFormData(modeToSet === 'edit' && etiqueta ?
-            { nombre: etiqueta.nombre, descripcion: etiqueta.descripcion || '' } :
+            {
+                id: etiqueta.id, // Guardar id para edición
+                nombre: etiqueta.nombre,
+                descripcion: etiqueta.descripcion || '',
+            } :
             { nombre: '', descripcion: '' }
         );
         setIsModalOpen(true);
         setModalError(null);
+        setModalValidationErrors({});
     };
 
     const closeModal = () => {
@@ -185,52 +148,62 @@ export default function TareasEtiquetas() {
         setTimeout(() => {
             setModalMode(null);
             setEtiquetaParaEditar(null);
-            setModalFormData({});
+            setModalFormData({ nombre: '', descripcion: '' });
             setModalError(null);
+            setModalValidationErrors({});
             setIsSubmittingModal(false);
         }, 300);
     };
 
-    // Lógica de handleModalFormChange (mantenida de tu original)
     const handleModalFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setModalFormData(prev => ({ ...prev, [name]: value }));
         if (modalError) setModalError(null);
+        if (Object.keys(modalValidationErrors).length > 0) setModalValidationErrors({});
     };
 
-    // Lógica de handleModalFormSubmit (mantenida de tu original, adaptada para EtiquetaTareaInput)
     const handleModalFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (!modalFormData.nombre?.trim()) {
-            setModalError("El nombre de la etiqueta es obligatorio.");
+        setModalError(null);
+        setModalValidationErrors({});
+
+        const dataToValidate: EtiquetaTareaInput = {
+            nombre: modalFormData.nombre || '',
+            descripcion: modalFormData.descripcion || null,
+        };
+
+        const validationResult = EtiquetaTareaInputSchema.safeParse(dataToValidate);
+
+        if (!validationResult.success) {
+            const flatErrors = validationResult.error.flatten().fieldErrors;
+            setModalValidationErrors(flatErrors as Partial<Record<keyof EtiquetaTareaInput, string[]>>);
+            setModalError("Por favor, corrige los errores indicados.");
             return;
         }
+
         setIsSubmittingModal(true);
-        setModalError(null);
         try {
-            let result;
-            const dataToSend: EtiquetaTareaInput = { // Usa el tipo importado
-                nombre: modalFormData.nombre.trim(),
-                descripcion: modalFormData.descripcion?.trim() || null,
-            };
+            let result: ActionResult<EtiquetaTareaPrisma>;
+            const validatedData = validationResult.data;
 
             if (modalMode === 'create') {
-                // La action original espera Pick<EtiquetaTarea, 'nombre' | 'descripcion'>
-                result = await crearEtiquetaTarea(dataToSend);
+                result = await crearEtiquetaTarea(validatedData);
             } else if (modalMode === 'edit' && etiquetaParaEditar?.id) {
-                // La action original espera Partial<Pick<EtiquetaTarea, 'nombre' | 'descripcion'>>
-                result = await editarEtiquetaTarea(etiquetaParaEditar.id, dataToSend);
+                result = await editarEtiquetaTarea(etiquetaParaEditar.id, validatedData);
             } else {
                 throw new Error("Modo de modal inválido o ID de etiqueta faltante.");
             }
 
-            if (result?.success) {
+            if (result.success) {
                 await fetchEtiquetas();
                 closeModal();
             } else {
-                throw new Error(result?.error || "Ocurrió un error desconocido al guardar la etiqueta.");
+                setModalError(result.error || "Ocurrió un error desconocido.");
+                if (result.validationErrors) {
+                    setModalValidationErrors(result.validationErrors as Partial<Record<keyof EtiquetaTareaInput, string[]>>);
+                }
             }
-        } catch (err) {
+        } catch (err: unknown) {
             console.error(`Error al ${modalMode === 'create' ? 'crear' : 'editar'} etiqueta:`, err);
             setModalError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
         } finally {
@@ -238,29 +211,23 @@ export default function TareasEtiquetas() {
         }
     };
 
-    // Lógica de handleModalDelete (mantenida de tu original, adaptada para _count opcional)
     const handleModalDelete = async () => {
         if (!etiquetaParaEditar?.id || !etiquetaParaEditar.nombre) return;
-
         const tareasCount = etiquetaParaEditar._count?.tareas ?? 0;
         if (tareasCount > 0) {
             setModalError(`No se puede eliminar: Usada por ${tareasCount} tarea(s).`);
             return;
         }
-
-        if (confirm(`¿Estás seguro de que quieres eliminar la etiqueta "${etiquetaParaEditar.nombre}"? Esta acción no se puede deshacer.`)) {
-            setIsSubmittingModal(true);
-            setModalError(null);
+        if (confirm(`¿Seguro que quieres eliminar la etiqueta "${etiquetaParaEditar.nombre}"?`)) {
+            setIsSubmittingModal(true); setModalError(null);
             try {
                 const result = await eliminarEtiquetaTarea(etiquetaParaEditar.id);
-                if (result?.success) {
-                    await fetchEtiquetas();
-                    closeModal();
+                if (result.success) {
+                    await fetchEtiquetas(); closeModal();
                 } else {
-                    throw new Error(result?.error || "Error al eliminar la etiqueta.");
+                    setModalError(result.error || "Error al eliminar.");
                 }
-            } catch (err) {
-                console.error("Error eliminando etiqueta:", err);
+            } catch (err: unknown) {
                 setModalError(err instanceof Error ? err.message : "Error al eliminar.");
             } finally {
                 setIsSubmittingModal(false);
@@ -268,7 +235,6 @@ export default function TareasEtiquetas() {
         }
     };
 
-    // Lógica de handleDragEnd (mantenida de tu original)
     const handleDragEnd = useCallback(async (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
@@ -281,44 +247,33 @@ export default function TareasEtiquetas() {
 
             const ordenData = reorderedEtiquetas.map((etiqueta, index) => ({ id: etiqueta.id, orden: index }));
 
-            setIsSavingOrder(true);
-            setError(null);
+            setIsSavingOrder(true); setError(null);
             try {
                 const result = await ordenarEtiquetasTarea(ordenData);
                 if (!result.success) {
                     throw new Error(result.error || "Error al guardar el orden en el servidor.");
                 }
-            } catch (saveError) {
-                console.error('Error al guardar orden:', saveError);
+            } catch (saveError: unknown) {
                 setError(saveError instanceof Error ? saveError.message : 'Error al guardar el nuevo orden.');
-                await fetchEtiquetas();
+                await fetchEtiquetas(true);
             } finally {
                 setIsSavingOrder(false);
             }
         }
     }, [etiquetas, fetchEtiquetas]);
 
+    // --- JSX del Componente ---
     return (
         <div className={containerClasses}>
             <div className={headerSectionClasses}>
-                <h2 className={headerTitleClasses}>
-                    <Tags size={20} />
-                    Etiquetas de Tareas
-                </h2>
+                <h2 className={headerTitleClasses}><Tags size={20} /> Etiquetas de Tareas</h2>
                 <div className='flex items-center gap-3'>
                     {isSavingOrder && <span className='text-xs text-blue-400 flex items-center gap-1'><Loader2 size={12} className='animate-spin' /> Guardando orden...</span>}
-                    <button
-                        onClick={() => openModal('create')}
-                        className={buttonPrimaryClasses}
-                        title="Crear nueva etiqueta de tarea"
-                    >
-                        <PlusIcon size={16} />
-                        <span>Crear Etiqueta</span>
-                    </button>
+                    <button onClick={() => openModal('create')} className={buttonPrimaryClasses} title="Crear nueva etiqueta"><PlusIcon size={16} /><span>Crear Etiqueta</span></button>
                 </div>
             </div>
 
-            {error && <p className={errorAlertClasses}><AlertTriangleIcon size={16} className="text-red-400" /> {error}</p>}
+            {error && <p className={errorAlertClasses}><AlertTriangleIcon size={16} /> {error}</p>}
 
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <div className={tableWrapperClasses}>
@@ -335,14 +290,9 @@ export default function TareasEtiquetas() {
                                 </tr>
                             </thead>
                             <SortableContext items={etiquetas.map(et => et.id)} strategy={verticalListSortingStrategy}>
-                                <tbody className="divide-y divide-zinc-700">
-                                    {etiquetas.length === 0 && !error ? (
-                                        <tr>
-                                            <td colSpan={4} className="text-center py-10 text-sm text-zinc-500 italic">
-                                                <ListChecks className="h-8 w-8 mx-auto text-zinc-600 mb-2" />
-                                                No hay etiquetas de tarea definidas.
-                                            </td>
-                                        </tr>
+                                <tbody className="divide-y divide-zinc-700 bg-zinc-800">
+                                    {etiquetas.length === 0 && !error && !loading ? (
+                                        <tr><td colSpan={4} className="text-center py-10 text-sm text-zinc-500 italic"><ListChecks className="h-8 w-8 mx-auto text-zinc-600 mb-2" />No hay etiquetas definidas.</td></tr>
                                     ) : (
                                         etiquetas.map((etiqueta) => (
                                             <SortableEtiquetaRow key={etiqueta.id} id={etiqueta.id} etiqueta={etiqueta} onEdit={() => openModal('edit', etiqueta)} />
@@ -354,7 +304,7 @@ export default function TareasEtiquetas() {
                     )}
                     {!loading && etiquetas.length > 0 && (
                         <p className="text-xs text-center text-zinc-500 mt-4 mb-2 italic px-4">
-                            Haz clic en una fila para editar o arrastra <GripVertical size={12} className='inline align-text-bottom -mt-0.5 mx-0.5' /> para reordenar las etiquetas.
+                            Haz clic en una fila para editar o arrastra <GripVertical size={12} className='inline align-text-bottom -mt-0.5 mx-0.5' /> para reordenar.
                         </p>
                     )}
                 </div>
@@ -364,16 +314,8 @@ export default function TareasEtiquetas() {
                 <div className={modalOverlayClasses} onClick={closeModal}>
                     <div className={modalContentClasses} onClick={(e) => e.stopPropagation()}>
                         <div className={modalHeaderClasses}>
-                            <h3 className={modalTitleClasses}>
-                                {modalMode === 'create' ? 'Crear Nueva Etiqueta' : 'Editar Etiqueta'}
-                            </h3>
-                            <button
-                                onClick={closeModal}
-                                className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-blue-500"
-                                aria-label="Cerrar modal"
-                            >
-                                <XIcon size={20} />
-                            </button>
+                            <h3 className={modalTitleClasses}>{modalMode === 'create' ? 'Crear Nueva Etiqueta' : 'Editar Etiqueta'}</h3>
+                            <button onClick={closeModal} className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-blue-500" aria-label="Cerrar modal"><XIcon size={20} /></button>
                         </div>
                         <form onSubmit={handleModalFormSubmit}>
                             <div className={modalBodyClasses}>
@@ -383,48 +325,20 @@ export default function TareasEtiquetas() {
                                     </p>
                                 )}
                                 <div>
-                                    <label htmlFor="modal-nombre" className={labelBaseClasses}>
-                                        Nombre de la Etiqueta <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text" id="modal-nombre" name="nombre"
-                                        value={modalFormData.nombre || ''} onChange={handleModalFormChange}
-                                        className={inputBaseClasses} required disabled={isSubmittingModal}
-                                        maxLength={50} placeholder="Ej: Urgente, Marketing, Soporte Técnico"
-                                    />
+                                    <label htmlFor="modal-etiqueta-nombre" className={labelBaseClasses}>Nombre <span className="text-red-500">*</span></label>
+                                    <input type="text" id="modal-etiqueta-nombre" name="nombre" value={modalFormData.nombre || ''} onChange={handleModalFormChange} className={`${inputBaseClasses} ${modalValidationErrors.nombre ? 'border-red-500' : ''}`} required disabled={isSubmittingModal} maxLength={50} placeholder="Ej: Marketing" />
+                                    {modalValidationErrors.nombre && <p className="text-xs text-red-400 mt-1">{modalValidationErrors.nombre.join(', ')}</p>}
                                 </div>
                                 <div>
-                                    <label htmlFor="modal-descripcion" className={labelBaseClasses}>Descripción (Opcional)</label>
-                                    <textarea
-                                        id="modal-descripcion" name="descripcion"
-                                        value={modalFormData.descripcion || ''} onChange={handleModalFormChange}
-                                        className={textareaBaseClasses} disabled={isSubmittingModal}
-                                        rows={3} maxLength={200}
-                                        placeholder="Breve descripción del propósito de la etiqueta"
-                                    />
+                                    <label htmlFor="modal-etiqueta-descripcion" className={labelBaseClasses}>Descripción</label>
+                                    <textarea id="modal-etiqueta-descripcion" name="descripcion" value={modalFormData.descripcion || ''} onChange={handleModalFormChange} className={`${textareaBaseClasses} ${modalValidationErrors.descripcion ? 'border-red-500' : ''}`} disabled={isSubmittingModal} rows={3} maxLength={200} placeholder="Breve descripción" />
+                                    {modalValidationErrors.descripcion && <p className="text-xs text-red-400 mt-1">{modalValidationErrors.descripcion.join(', ')}</p>}
                                 </div>
-                                {/* No hay campo 'status' o 'icono' en el formulario original para etiquetas */}
                             </div>
                             <div className={modalFooterClasses}>
-                                {modalMode === 'edit' && (
-                                    <button
-                                        type="button" onClick={handleModalDelete}
-                                        className={buttonModalDanger}
-                                        disabled={isSubmittingModal || (etiquetaParaEditar?._count?.tareas ?? 0) > 0}
-                                        title={
-                                            (etiquetaParaEditar?._count?.tareas ?? 0) > 0
-                                                ? `No se puede eliminar: Usada por ${etiquetaParaEditar?._count?.tareas} tarea(s).`
-                                                : 'Eliminar Etiqueta'
-                                        }
-                                    >
-                                        <Trash2 size={16} /> Eliminar
-                                    </button>
-                                )}
+                                {modalMode === 'edit' && (<button type="button" onClick={handleModalDelete} className={buttonModalDanger} disabled={isSubmittingModal || (etiquetaParaEditar?._count?.tareas ?? 0) > 0} title={(etiquetaParaEditar?._count?.tareas ?? 0) > 0 ? "No se puede eliminar: Usada por tareas." : 'Eliminar Etiqueta'}><Trash2 size={16} /> Eliminar</button>)}
                                 <button type="button" onClick={closeModal} className={buttonModalSecondary} disabled={isSubmittingModal}>Cancelar</button>
-                                <button
-                                    type="submit" className={buttonModalPrimary}
-                                    disabled={isSubmittingModal || !modalFormData.nombre?.trim()}
-                                >
+                                <button type="submit" className={buttonModalPrimary} disabled={isSubmittingModal || !modalFormData.nombre?.trim()} >
                                     {isSubmittingModal ? <Loader2 className='animate-spin' size={18} /> : <Save size={18} />}
                                     {modalMode === 'create' ? 'Crear Etiqueta' : 'Guardar Cambios'}
                                 </button>

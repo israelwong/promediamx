@@ -1,6 +1,6 @@
 import React from 'react'
 import { Metadata } from 'next'
-import AgendaConfguraxion from './AgendaConfguracion';
+import AgendaConfguraxion from './components/AgendaConfguracion';
 
 export const metadata: Metadata = {
     title: 'Agenda',

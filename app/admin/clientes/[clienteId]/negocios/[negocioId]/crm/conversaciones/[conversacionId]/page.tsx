@@ -1,6 +1,7 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/[conversacionId]/page.tsx
 import React from 'react'
 import { Metadata } from 'next'
-import ConversacionDetalle from '../components/ConversacionDetalle'
+import ConversacionDetalle from './components/ConversacionDetalle'
 
 export const metadata: Metadata = {
     title: 'Conversaciones - CRM',

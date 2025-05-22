@@ -6,6 +6,8 @@ export interface ActionResult<T> {
     errorDetails?: Record<string, string[]>;
     data?: T;
     errors?: string[]; // Array de errores si es necesario
+    // Nota: No existe la propiedad 'validationErrors', usa 'errorDetails'
+    validationErrors?: Record<string, string[]>; // Errores de validación específicos
 }
 
 // Tipo para mostrar una cita existente en la lista
@@ -1456,11 +1458,7 @@ export type TareaConDetalles = {
 };
 
 
-export type CanalConversacionalSimple = {
-    id: string;
-    nombre: string;
-    // icono?: string | null; // Opcional si lo necesitaras mostrar
-};
+
 
 
 export type CalendarEvent = {

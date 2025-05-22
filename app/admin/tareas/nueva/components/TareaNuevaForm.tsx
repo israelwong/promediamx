@@ -1,204 +1,148 @@
-// app/admin/tareas/nueva/components/TareaNuevaForm.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Importar acciones refactorizadas
+// --- ACCIONES ---
 import {
-    crearTarea,
-    obtenerCategoriasParaFiltro,
-} from '@/app/admin/_lib/tareas.actions'; // Ajusta la ruta a tus acciones de tareas
-import {
-    obtenerCanalesActivos
-} from '@/app/admin/_lib/canalConversacional.actions'; // Ajusta la ruta a tus acciones de canales
+    crearTareaBasica,
+    obtenerCategoriasParaFiltro
+} from '@/app/admin/_lib/actions/tarea/tarea.actions';
 
-// Importar tipos CENTRALIZADOS (¡Ahora son los explícitos!)
+// --- TIPOS Y ESQUEMAS ---
 import {
-    CrearTareaBasicaInput,   // Tipo explícito para el estado del formulario
-    CategoriaTareaSimple,    // Tipo explícito para estado de categorías
-    CanalConversacionalSimple // Tipo explícito para estado de canales
-    // Importa ActionResult si lo necesitas manejar directamente en el componente
-    // import { ActionResult } from '@/app/admin/_lib/types';
-} from '@/app/admin/_lib/types'; // <-- AJUSTA LA RUTA a tu types.ts central
+    CrearTareaBasicaInputSchema, // <-- AÑADIDA LA IMPORTACIÓN DEL OBJETO ESQUEMA ZOD
+    type CrearTareaBasicaInput,  // El tipo inferido
+    type CategoriaTareaSimple
+} from '@/app/admin/_lib/actions/tarea/tarea.schemas';
+// import type { CanalConversacionalSimple } from '@/app/admin/_lib/types'; // Ajusta si es necesario
 
-// Importar componentes UI y Iconos
+//! mover
+export type CanalConversacionalSimple = {
+    id: string;
+    nombre: string;
+    // icono?: string | null; // Opcional si lo necesitaras mostrar
+};
+
+// --- COMPONENTES UI Y ICONOS ---
 import { Loader2, Save, XIcon } from 'lucide-react';
-import { Button } from '@/app/components/ui/button'; // Ajusta ruta
-import { Input } from '@/app/components/ui/input'; // Ajusta ruta
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'; // Usar Select de shadcn/ui
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 
-// Tipo para el estado del formulario, coincide con CrearTareaBasicaInput
 type TareaNuevaFormState = CrearTareaBasicaInput;
 
 export default function TareaNuevaForm() {
     const router = useRouter();
 
-    // Estado del formulario con tipo explícito
     const [formData, setFormData] = useState<TareaNuevaFormState>({
         nombre: '',
-        categoriaTareaId: '',
-        canalConversacionalId: '',
+        categoriaTareaId: ''
     });
 
-    // Estados para datos de dropdowns (usan tipos explícitos)
     const [categorias, setCategorias] = useState<CategoriaTareaSimple[]>([]);
-    const [canales, setCanales] = useState<CanalConversacionalSimple[]>([]);
+    // const [canales, setCanales] = useState<CanalConversacionalSimple[]>([]);
 
-    // Estados de UI
     const [loadingData, setLoadingData] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof TareaNuevaFormState, string[]>>>({}); // Ajustado para mejor tipado
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    // Clases de Tailwind (sin cambios)
+    // Clases Tailwind
     const containerClasses = "p-6 mx-auto bg-zinc-800/50 border border-zinc-700 rounded-lg shadow-md max-w-lg";
     const labelBaseClasses = "text-zinc-100 block mb-1 text-sm font-medium";
     const inputBaseClasses = "text-sm bg-zinc-900 border border-zinc-700 text-white block w-full rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70 placeholder-zinc-500";
-    const selectTriggerClasses = `${inputBaseClasses} flex justify-between items-center`;
-    const buttonBaseClasses = "text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50 flex items-center justify-center gap-2";
+    const selectTriggerClasses = `${inputBaseClasses} flex justify-between items-center h-10`;
 
-    // --- Carga inicial de datos (Usa las acciones refactorizadas) ---
     const fetchDropdownData = useCallback(async () => {
         setLoadingData(true);
         setError(null);
         try {
-            // Obtener categorías y canales en paralelo
-            const [catResult, canResult] = await Promise.all([
-                obtenerCategoriasParaFiltro(), // Llama acción que devuelve ActionResult
-                obtenerCanalesActivos()      // Llama acción que devuelve ActionResult
+            const [catResult] = await Promise.all([
+                obtenerCategoriasParaFiltro(),
+                // obtenerCanalesActivos()
             ]);
 
-            // Manejar resultado de categorías
-            if (catResult.success) {
-                setCategorias(catResult.data || []);
+            // Manejo de categorías
+            if (catResult.success && catResult.data) {
+                setCategorias(catResult.data);
             } else {
-                console.error("Error cargando categorías:", catResult.error);
-                // Podrías lanzar un error aquí para detener la carga si las categorías son esenciales
-                // throw new Error(catResult.error || "Error cargando categorías.");
+                // Lanzar error si las categorías son esenciales para el formulario
+                throw new Error(catResult.error || "Error crítico: No se pudieron cargar las categorías.");
             }
-
-            // Manejar resultado de canales
-            if (Array.isArray(canResult)) {
-                const canalesData = canResult || [];
-                setCanales(canalesData);
-                // Si solo hay un canal, seleccionarlo automáticamente
-                if (canalesData.length === 1) {
-                    // Actualiza el estado del formulario de forma segura
-                    setFormData(prevState => ({
-                        ...prevState,
-                        canalConversacionalId: canalesData[0].id,
-                    }));
-                }
-            } else {
-                console.error("Error cargando canales: No se pudo obtener la lista de canales.");
-                // Podrías lanzar un error aquí también
-                // throw new Error(canResult.error || "Error cargando canales.");
-            }
-
-            // Si alguna de las cargas falló (y no lanzaste error antes), muestra un error general
-            if (!catResult.success) {
-                // Manejar error de categorías
-                throw new Error(catResult.error || "No se pudieron cargar las categorías necesarias para el formulario.");
-            }
-
-        } catch (err: unknown) { // Captura cualquier error lanzado
+        } catch (err: unknown) {
             console.error("Error fetching dropdown data:", err);
-            setError(err instanceof Error ? err.message : "Error al cargar datos necesarios.");
-            setCategorias([]); // Asegurar estado vacío en error
-            setCanales([]);
+            setError(err instanceof Error ? err.message : "Error al cargar datos necesarios para el formulario.");
+            setCategorias([]);
+            // setCanales([]);
         } finally {
             setLoadingData(false);
         }
-    }, []); // Sin dependencias externas
+    }, []);
 
-    // Ejecuta la carga de datos al montar
     useEffect(() => {
         fetchDropdownData();
-    }, [fetchDropdownData]); // Incluye fetchData como dependencia
+    }, [fetchDropdownData]);
 
-    // --- Manejador de Cambios (Input) ---
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setFormData(prevState => ({
-            ...prevState,
-            [name]: value
-        }));
-        // Limpiar mensajes al cambiar cualquier campo
-        setError(null);
-        setSuccessMessage(null);
+        setFormData(prevState => ({ ...prevState, [name]: value }));
+        setError(null); setSuccessMessage(null); setValidationErrors({});
     };
 
-    // --- Manejador para Select de shadcn/ui ---
-    // Asegura que el nombre coincida con una clave de TareaNuevaFormState
     const handleSelectChange = (name: keyof TareaNuevaFormState, value: string) => {
-        setFormData(prevState => ({
-            ...prevState,
-            // Asigna el valor; si es string vacío, se mantiene así
-            [name]: value,
-        }));
-        setError(null);
-        setSuccessMessage(null);
+        setFormData(prevState => ({ ...prevState, [name]: value }));
+        setError(null); setSuccessMessage(null); setValidationErrors({});
     };
 
-    // --- Manejador de Submit (Usa la acción refactorizada) ---
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault(); // Prevenir recarga de página
+        e.preventDefault();
+        setError(null); setSuccessMessage(null); setValidationErrors({});
 
-        // Validaciones básicas del lado del cliente (mejor UX)
-        if (!formData.nombre?.trim()) {
-            setError("El nombre de la tarea es obligatorio.");
-            return; // Detener si falta nombre
-        }
-        if (!formData.categoriaTareaId) {
-            setError("Debes seleccionar una categoría.");
-            return; // Detener si falta categoría
-        }
-        if (!formData.canalConversacionalId) {
-            setError("Debes seleccionar un canal conversacional principal.");
-            return; // Detener si falta canal
+        // Validar con Zod antes de enviar
+        const clientValidation = CrearTareaBasicaInputSchema.safeParse(formData); // Correcto: usar el objeto schema importado
+        if (!clientValidation.success) {
+            // Mapear errores a un formato más simple si es necesario o usar flatten directamente
+            const flatErrors = clientValidation.error.flatten().fieldErrors;
+            setValidationErrors(flatErrors as Partial<Record<keyof TareaNuevaFormState, string[]>>);
+            setError("Por favor, corrige los errores indicados en el formulario.");
+            setIsSubmitting(false);
+            return;
         }
 
-        // Iniciar estado de envío
-        setIsSubmitting(true);
-        setError(null);
-        setSuccessMessage(null);
+        setIsSubmitting(true); // Mover aquí, solo si la validación del cliente pasa
 
         try {
-            // El estado formData ya coincide con CrearTareaBasicaInput
-            const result = await crearTarea(formData); // Llamar a la acción
+            // Enviar datos ya validados por el cliente (clientValidation.data)
+            const result = await crearTareaBasica(clientValidation.data);
 
-            // Manejar el resultado de la acción (ActionResult)
             if (result.success && result.data) {
-                // Éxito: Mostrar mensaje y redirigir
                 setSuccessMessage(`¡Tarea "${result.data.nombre}" creada! Redirigiendo a edición...`);
-                // Redirigir a la página de edición de la nueva tarea después de un breve retraso
                 setTimeout(() => {
-                    router.push(`/admin/tareas/${result.data?.id}`); // Ajusta la ruta según tu estructura
-                }, 1500); // 1.5 segundos de retraso
+                    router.push(`/admin/tareas/${result.data?.id}`);
+                }, 1500);
             } else {
-                // Falla: Mostrar el error devuelto por la acción
-                throw new Error(result.error || "Error desconocido al crear la tarea.");
+                setError(result.error || "Error desconocido al crear la tarea.");
+                if (result.validationErrors) {
+                    // Asegurar que validationErrors sea del tipo correcto
+                    setValidationErrors(result.validationErrors as Partial<Record<keyof TareaNuevaFormState, string[]>>);
+                }
             }
-
-        } catch (err: unknown) { // Capturar errores (incluyendo los lanzados desde el bloque 'else')
+        } catch (err: unknown) {
             console.error("Error creating tarea:", err);
-            const errorMessage = err instanceof Error ? err.message : "Ocurrió un error desconocido";
-            // Mostrar error en la UI
-            setError(`Error al crear la tarea: ${errorMessage}`);
+            setError(`Error al crear la tarea: ${err instanceof Error ? err.message : "Ocurrió un error desconocido"}`);
         } finally {
-            // Finalizar estado de envío, independientemente del resultado
             setIsSubmitting(false);
         }
     };
 
-    // --- Manejador para Cancelar ---
     const handleCancel = () => {
-        router.push('/admin/tareas'); // Volver a la lista de tareas (ajusta ruta)
+        router.push('/admin/tareas');
     };
 
-    // --- Renderizado Condicional (Carga y Error Inicial) ---
     if (loadingData) {
+        // ... (mismo código de loading que antes) ...
         return (
             <div className={containerClasses}>
                 <p className="text-center text-zinc-300 flex items-center justify-center gap-2">
@@ -208,158 +152,130 @@ export default function TareaNuevaForm() {
         );
     }
 
-    // Mostrar error si falló la carga inicial de datos (categorías/canales)
-    // Nota: El error de envío se maneja dentro del formulario.
-    if (error && !isSubmitting && categorias.length === 0 && canales.length === 0) {
+    // Error crítico durante la carga inicial de datos
+    if (error && !isSubmitting && (categorias.length === 0)) {
         return (
             <div className={`${containerClasses} border border-red-500`}>
-                <p className="text-center text-red-400 mb-4">{error}</p>
-                <Button onClick={() => router.back()} variant="secondary">
-                    Volver
+                <h3 className="text-lg font-semibold text-red-400 mb-3">Error de Carga</h3>
+                <p className="text-sm text-red-300 mb-4">{error}</p>
+                <Button onClick={handleCancel} variant="outline" className="w-full">
+                    Volver a la lista de Tareas
                 </Button>
             </div>
         );
     }
 
-    // --- Renderizado del Formulario ---
     return (
-
+        // ... (resto del JSX del formulario igual que antes, solo me aseguro que los nombres de los campos 
+        // en validationErrors (ej. validationErrors.nombre) coincidan con los `id` y `name` de los inputs/selects) ...
         <div className={containerClasses}>
             <h2 className="text-xl font-semibold text-white mb-6 border-b border-zinc-700 pb-3">
                 Crear Nueva Tarea (Paso 1 de 2)
             </h2>
-
             <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-
-                {/* Campo Nombre */}
                 <div>
                     <label htmlFor="nombre" className={labelBaseClasses}>
                         Nombre Tarea <span className="text-red-500">*</span>
                     </label>
                     <Input
-                        type="text"
-                        id="nombre"
-                        name="nombre" // Importante para handleChange
-                        value={formData.nombre}
-                        onChange={handleChange}
-                        className={inputBaseClasses}
-                        required
-                        disabled={isSubmitting}
+                        type="text" id="nombre" name="nombre"
+                        value={formData.nombre} onChange={handleChange}
+                        className={`${inputBaseClasses} ${validationErrors.nombre ? 'border-red-500' : ''}`}
+                        required disabled={isSubmitting}
                         placeholder="Ej: Agendar Demostración Producto X"
-                        aria-describedby="nombre-help"
+                        aria-describedby="nombre-help nombre-error"
                     />
+                    {validationErrors.nombre && <p id="nombre-error" className="text-xs text-red-400 mt-1">{validationErrors.nombre.join(', ')}</p>}
                     <p id="nombre-help" className="text-xs text-zinc-400 mt-1">Nombre descriptivo y único para la tarea.</p>
                 </div>
 
-                {/* Campo Categoría (Select) */}
                 <div>
-                    <label htmlFor="categoriaTareaId-select" className={labelBaseClasses}>
+                    <label htmlFor="categoriaTareaId" className={labelBaseClasses}> {/* Cambiado htmlFor a id del SelectTrigger */}
                         Categoría <span className="text-red-500">*</span>
                     </label>
                     <Select
-                        // Usa el valor del estado o undefined si está vacío
                         value={formData.categoriaTareaId || undefined}
-                        // Llama a handleSelectChange con el nombre del campo y el nuevo valor
                         onValueChange={(value) => handleSelectChange('categoriaTareaId', value)}
-                        disabled={isSubmitting || categorias.length === 0} // Deshabilitar si envía o no hay opciones
+                        disabled={isSubmitting || loadingData || categorias.length === 0}
                     >
-                        <SelectTrigger id="categoriaTareaId-select" className={selectTriggerClasses} aria-label="Seleccionar categoría">
+                        <SelectTrigger
+                            id="categoriaTareaId" // ID para el label
+                            className={`${selectTriggerClasses} ${validationErrors.categoriaTareaId ? 'border-red-500' : ''}`}
+                            aria-label="Seleccionar categoría"
+                            aria-describedby="categoria-error"
+                        >
                             <SelectValue placeholder="-- Selecciona una Categoría --" />
                         </SelectTrigger>
                         <SelectContent>
-                            {/* Opción placeholder no seleccionable (si se desea) */}
-                            {/* <SelectItem value="" disabled>-- Selecciona una Categoría --</SelectItem> */}
                             {categorias.map(cat => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                    {cat.nombre}
-                                </SelectItem>
+                                <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
-                    {/* Mensaje si no hay categorías */}
-                    {categorias.length === 0 && !loadingData && (
-                        <p className="text-xs text-amber-400 mt-1">No hay categorías disponibles. Crea una primero.</p>
-                    )}
+                    {validationErrors.categoriaTareaId && <p id="categoria-error" className="text-xs text-red-400 mt-1">{validationErrors.categoriaTareaId.join(', ')}</p>}
+                    {categorias.length === 0 && !loadingData && <p className="text-xs text-amber-400 mt-1">No hay categorías. Crea una primero.</p>}
                 </div>
 
-                {/* Campo Canal Principal (Select o Texto) */}
-                <div>
-                    <label htmlFor="canalConversacionalId-select" className={labelBaseClasses}>
+                {/* <div>
+                    <label htmlFor="canalConversacionalId" className={labelBaseClasses}>
                         Canal Conversacional Principal <span className="text-red-500">*</span>
                     </label>
-                    {/* Si solo hay un canal, mostrarlo como texto y deshabilitar selección */}
                     {canales.length === 1 ? (
-                        <div className="text-sm text-zinc-300 bg-zinc-900 border border-zinc-700 rounded-md p-2 h-10 flex items-center">
+                        <div className="text-sm text-zinc-300 bg-zinc-950 border border-zinc-700 rounded-md p-2 h-10 flex items-center">
                             {canales[0].nombre}
-                            {/* Guardamos el ID internamente, no es necesario mostrarlo */}
                         </div>
                     ) : (
-                        /* Si hay múltiples canales, mostrar Select */
                         <Select
                             value={formData.canalConversacionalId || undefined}
                             onValueChange={(value) => handleSelectChange('canalConversacionalId', value)}
-                            disabled={isSubmitting || canales.length === 0}
+                            disabled={isSubmitting || loadingData || canales.length === 0}
                         >
-                            <SelectTrigger id="canalConversacionalId-select" className={selectTriggerClasses} aria-label="Seleccionar canal principal">
+                            <SelectTrigger
+                                id="canalConversacionalId"
+                                className={`${selectTriggerClasses} ${validationErrors.canalConversacionalId ? 'border-red-500' : ''}`}
+                                aria-label="Seleccionar canal principal"
+                                aria-describedby="canal-error"
+                            >
                                 <SelectValue placeholder="-- Selecciona un Canal --" />
                             </SelectTrigger>
                             <SelectContent>
-                                {/* <SelectItem value="" disabled>-- Selecciona un Canal --</SelectItem> */}
                                 {canales.map(canal => (
-                                    <SelectItem key={canal.id} value={canal.id}>
-                                        {canal.nombre}
-                                    </SelectItem>
+                                    <SelectItem key={canal.id} value={canal.id}>{canal.nombre}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     )}
+                    {validationErrors.canalConversacionalId && <p id="canal-error" className="text-xs text-red-400 mt-1">{validationErrors.canalConversacionalId.join(', ')}</p>}
                     <p className="text-xs text-zinc-400 mt-1">Canal por defecto donde operará esta tarea.</p>
-                    {/* Mensaje si no hay canales */}
-                    {canales.length === 0 && !loadingData && (
-                        <p className="text-xs text-amber-400 mt-1">No hay canales activos disponibles. Activa uno primero.</p>
-                    )}
-                </div>
+                    {canales.length === 0 && !loadingData && <p className="text-xs text-amber-400 mt-1">No hay canales activos. Activa uno primero.</p>}
+                </div> */}
 
-                {/* --- Sección de Botones y Mensajes --- */}
                 <div className="pt-5 space-y-3 border-t border-zinc-700 mt-6">
-                    {/* Mensaje de error durante el envío */}
-                    {error && !isSubmitting && (
-                        <p className="text-center text-red-400 bg-red-900/30 p-2 rounded border border-red-600 text-sm">
-                            {error}
-                        </p>
+                    {error && !successMessage && ( // Mostrar error general solo si no hay mensaje de éxito
+                        <p className="text-center text-red-400 bg-red-900/30 p-2 rounded border border-red-600 text-sm">{error}</p>
                     )}
-                    {/* Mensaje de éxito */}
                     {successMessage && (
-                        <p className="text-center text-green-400 bg-green-900/30 p-2 rounded border border-green-600 text-sm">
-                            {successMessage}
-                        </p>
+                        <p className="text-center text-green-400 bg-green-900/30 p-2 rounded border border-green-600 text-sm">{successMessage}</p>
                     )}
-
-                    {/* Contenedor de botones */}
                     <div className="flex flex-col sm:flex-row gap-3">
-                        {/* Botón Cancelar */}
                         <Button
-                            type="button"
-                            onClick={handleCancel}
-                            variant="outline" // Estilo secundario
-                            className={`${buttonBaseClasses} bg-transparent hover:bg-zinc-700 border-zinc-600 text-zinc-300 order-2 sm:order-1 w-full sm:w-auto`}
-                            disabled={isSubmitting} // Deshabilitar durante envío
+                            type="button" onClick={handleCancel} variant="outline"
+                            className="bg-transparent hover:bg-zinc-700 border-zinc-600 text-zinc-300 order-2 sm:order-1 w-full sm:w-auto flex items-center justify-center gap-2"
+                            disabled={isSubmitting}
                         >
                             <XIcon size={18} /> Cancelar
                         </Button>
-                        {/* Botón Guardar */}
                         <Button
                             type="submit"
-                            className={`${buttonBaseClasses} bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 order-1 sm:order-2 w-full`}
-                            // Deshabilitar si está enviando, cargando datos iniciales, o faltan campos requeridos
-                            disabled={isSubmitting || loadingData || !formData.nombre || !formData.categoriaTareaId || !formData.canalConversacionalId}
+                            className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 order-1 sm:order-2 w-full flex items-center justify-center gap-2"
+                            disabled={isSubmitting || loadingData} // La validación Zod manejará campos vacíos
                         >
                             {isSubmitting ? <Loader2 className='animate-spin' size={18} /> : <Save size={18} />}
                             {isSubmitting ? 'Creando...' : 'Crear Tarea y Continuar'}
                         </Button>
                     </div>
                     <p className="text-xs text-center text-zinc-400 mt-2">
-                        Podrás configurar los detalles adicionales (descripción, instrucciones, etc.) en el siguiente paso.
+                        Podrás configurar los detalles adicionales en el siguiente paso.
                     </p>
                 </div>
             </form>

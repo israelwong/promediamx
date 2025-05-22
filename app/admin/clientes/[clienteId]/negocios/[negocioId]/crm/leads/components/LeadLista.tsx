@@ -5,22 +5,25 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/app/admin/_lib/hooks/useDebounce';
 
-// Importar acciones y tipos
-import { obtenerLeadsCRM, obtenerDatosParaFiltrosLead } from '@/app/admin/_lib/crmLead.actions';
+// --- NUEVAS IMPORTS ---
 import {
-    LeadListaItem, FiltrosLeads, OpcionesSortLeads,
-    DatosFiltros
-} from '@/app/admin/_lib/types';
+    listarLeadsAction,
+    obtenerDatosFiltrosLeadAction
+} from '@/app/admin/_lib/actions/lead/lead.actions'; // Nueva ruta
+import type {
+    LeadListaItemData,
+    FiltrosLeadsData, // Usar este tipo para el estado de filtros
+    OpcionesSortLeadsData, // Usar este tipo para el estado de sort
+    DatosParaFiltrosLeadData,
+    ListarLeadsParams, // Para construir el input de listarLeadsAction
+} from '@/app/admin/_lib/actions/lead/lead.schemas'; // Nuevos tipos/schemas
 
-// Importar componentes UI
+// Componentes UI (sin cambios en importación)
 import { Input } from "@/app/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
-
-// --- DropdownMenu ya no se importa ---
-// import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/app/components/ui/dropdown-menu";
-import { Loader2, Search, ArrowUpDown, PlusCircle, MessageSquare, X } from 'lucide-react'; // Añadido X para quitar filtro
+import { Loader2, Search, ArrowUpDown, PlusCircle, MessageSquare, X } from 'lucide-react';
 import { Badge } from "@/app/components/ui/badge";
 
 interface Props {
@@ -28,101 +31,163 @@ interface Props {
     clienteId: string;
 }
 
-const DEBOUNCE_DELAY = 300; // ms
+const DEBOUNCE_DELAY = 300;
 
 export default function LeadLista({ clienteId, negocioId }: Props) {
     const router = useRouter();
-    const [leads, setLeads] = useState<LeadListaItem[]>([]);
-    const [crmId, setCrmId] = useState<string | null>(null);
-    const [datosFiltros, setDatosFiltros] = useState<DatosFiltros | null>(null);
+    const [leads, setLeads] = useState<LeadListaItemData[]>([]);
+    const [crmId, setCrmId] = useState<string | null | undefined>(undefined); // undefined para estado inicial de "no cargado"
+    const [datosFiltros, setDatosFiltros] = useState<DatosParaFiltrosLeadData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [loadingFilters, setLoadingFilters] = useState(true); // Estado separado para carga de filtros
+    const [loadingFilters, setLoadingFilters] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Estado para filtros
-    const [filtros, setFiltros] = useState<FiltrosLeads>({
+    const [filtros, setFiltros] = useState<FiltrosLeadsData>({ // Usar el tipo de Zod
         searchTerm: '',
-        pipelineId: 'all',
+        pipelineId: 'all', // 'all' o un CUID
         canalId: 'all',
         etiquetaId: 'all',
         agenteId: 'all',
     });
-    const debouncedSearchTerm = useDebounce(filtros.searchTerm, DEBOUNCE_DELAY);
+    const debouncedSearchTerm = useDebounce(filtros.searchTerm || '', DEBOUNCE_DELAY); // Asegurar que sea string
 
-    // Estado para ordenamiento
-    const [sort, setSort] = useState<OpcionesSortLeads>({ campo: 'updatedAt', direccion: 'desc' });
+    const [sort, setSort] = useState<OpcionesSortLeadsData>({ // Usar el tipo de Zod
+        campo: 'updatedAt',
+        direccion: 'desc'
+    });
 
-    // --- Carga de Datos ---
     const fetchLeads = useCallback(async () => {
-        // No iniciar carga si aún no tenemos crmId (evita llamadas innecesarias)
-        // if (!crmId && crmId !== null) return; // Permitir carga si crmId es null (CRM no existe)
+        if (crmId === undefined) return; // No cargar si crmId aún no se ha determinado desde fetchFilterData
 
         setLoading(true);
         setError(null);
         try {
-            const filtrosActivos: FiltrosLeads = { ...filtros, searchTerm: debouncedSearchTerm };
-            const result = await obtenerLeadsCRM(negocioId, filtrosActivos, sort);
+            const paramsForAction: ListarLeadsParams = {
+                negocioId,
+                filtros: {
+                    ...filtros,
+                    searchTerm: debouncedSearchTerm,
+                    // Convertir 'all' a null para la action si es necesario, o la action lo maneja
+                    pipelineId: filtros.pipelineId === 'all' ? null : filtros.pipelineId,
+                    canalId: filtros.canalId === 'all' ? null : filtros.canalId,
+                    etiquetaId: filtros.etiquetaId === 'all' ? null : filtros.etiquetaId,
+                    agenteId: filtros.agenteId === 'all' ? null : filtros.agenteId,
+                },
+                sort,
+            };
+            const result = await listarLeadsAction(paramsForAction); // Nueva Action
+
             if (result.success && result.data) {
-                // Actualizar crmId solo si es la primera carga o cambió
-                if (crmId === undefined) setCrmId(result.data.crmId);
+                setCrmId(result.data.crmId); // Actualizar crmId (puede ser null si no hay CRM)
                 setLeads(result.data.leads);
-                if (!result.data.crmId && result.data.leads.length === 0) { setError(null); }
-            } else { throw new Error(result.error || "Error desconocido al cargar leads."); }
+                if (result.data.crmId === null && result.data.leads.length === 0) {
+                    // setError("CRM no configurado para este negocio. No se pueden mostrar leads."); 
+                    // O simplemente mostrar "No hay leads" como ya hace
+                }
+            } else {
+                throw new Error(result.error || "Error desconocido al cargar leads.");
+            }
         } catch (err) {
             console.error("Error fetching leads:", err);
             setError(`No se pudieron cargar los leads: ${err instanceof Error ? err.message : "Error desconocido"}`);
             setLeads([]);
-        } finally { setLoading(false); }
-    }, [negocioId, debouncedSearchTerm, filtros, sort, crmId]); // Añadir crmId a dependencias? Revisar
+        } finally {
+            setLoading(false);
+        }
+    }, [negocioId, debouncedSearchTerm, filtros, sort, crmId]); // crmId como dependencia
 
     const fetchFilterData = useCallback(async () => {
         setLoadingFilters(true);
         try {
-            const result = await obtenerDatosParaFiltrosLead(negocioId);
+            const result = await obtenerDatosFiltrosLeadAction({ negocioId }); // Nueva Action
             if (result.success && result.data) {
                 setDatosFiltros(result.data);
-                // Obtener crmId de esta llamada también si es la primera vez
-                if (crmId === undefined) {
-                    const crmResult = result.data as (DatosFiltros & { crmId?: string | null }); // Asumir que la acción puede devolverlo
-                    setCrmId(crmResult.crmId ?? null);
-                }
+                setCrmId(result.data.crmId); // Establecer crmId (puede ser null)
+            } else {
+                console.warn("No se pudieron cargar los datos para filtros:", result.error);
+                setCrmId(null); // Asumir que no hay CRM si falla la carga de filtros
+                setDatosFiltros(null);
             }
-            else { console.warn("No se pudieron cargar los datos para filtros:", result.error); }
-        } catch (err) { console.error("Error fetching filter data:", err); }
-        finally { setLoadingFilters(false); }
-    }, [negocioId, crmId]); // Depender de crmId aquí? Revisar
+        } catch (err) {
+            console.error("Error fetching filter data:", err);
+            setCrmId(null);
+            setDatosFiltros(null);
+        } finally {
+            setLoadingFilters(false);
+        }
+    }, [negocioId]);
 
-    // Carga inicial
     useEffect(() => {
-        fetchFilterData();
-    }, [fetchFilterData]);
+        if (negocioId) fetchFilterData();
+    }, [fetchFilterData, negocioId]);
 
-    // Carga de leads cuando cambian filtros o sort (y crmId está definido o es null)
     useEffect(() => {
-        // Ejecutar solo si crmId no es undefined (ya se intentó cargar)
-        if (crmId !== undefined) {
+        if (crmId !== undefined && negocioId) { // Solo cargar leads si crmId ha sido determinado y hay negocioId
             fetchLeads();
         }
-    }, [debouncedSearchTerm, filtros, sort, crmId, fetchLeads]); // Depender de crmId
+    }, [debouncedSearchTerm, filtros, sort, crmId, fetchLeads, negocioId]);
+
 
 
     // --- Manejadores de Eventos ---
-    const handleFilterChange = (name: keyof FiltrosLeads, value: string) => {
+    const handleFilterChange = (name: keyof FiltrosLeadsData, value: string) => {
         setFiltros(prev => ({ ...prev, [name]: value }));
         // La recarga se dispara por el useEffect que depende de 'filtros'
     };
 
     // --- NUEVO: Manejador para quitar un filtro desde el badge ---
-    const handleRemoveFilter = (name: keyof FiltrosLeads) => {
+    const handleRemoveFilter = (name: keyof FiltrosLeadsData) => {
         setFiltros(prev => ({ ...prev, [name]: 'all' }));
     };
 
-    const handleSortChange = (campo: OpcionesSortLeads['campo']) => {
+    const handleSortChange = (campo: OpcionesSortLeadsData['campo']) => {
         setSort(prev => ({ campo, direccion: prev.campo === campo && prev.direccion === 'desc' ? 'asc' : 'desc' }));
     };
     const handleViewDetails = (leadId: string) => {
         router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads/${leadId}`);
     };
+
+    const handleCrearNuevoLead = () => {
+        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads/nuevo`);
+    };
+
+    const getStatusBadgeVariant = (status: string | null | undefined): "default" | "secondary" | "destructive" | "outline" => { /* ... (sin cambios, pero considera que status puede ser null) ... */
+        switch (status?.toLowerCase()) {
+            case 'nuevo': return 'default'; // Azul/primario
+            case 'contactado': return 'secondary';
+            case 'calificado': return 'default'; // Podría ser otro color
+            case 'propuesta': return 'default';
+            case 'negociacion': return 'default';
+            case 'ganado': return 'default'; // Verde
+            case 'perdido': return 'destructive'; // Rojo
+            case 'descartado': return 'outline'; // Gris
+            default: return 'secondary';
+        }
+    };
+
+    // const getPipelineColor = (pipeline: LeadListaItemData['pipeline']): string => { /* ... */ return pipeline?.color || 'bg-zinc-600'; };
+
+    const activeFilters = useMemo(() => { /* ... (lógica similar, pero usa datosFiltros con el nuevo tipo) ... */
+        const active: { key: keyof FiltrosLeadsData; label: string; valueLabel: string }[] = [];
+        if (filtros.pipelineId && filtros.pipelineId !== 'all') {
+            const pipeline = datosFiltros?.pipelines.find(p => p.id === filtros.pipelineId);
+            if (pipeline) active.push({ key: 'pipelineId', label: 'Etapa', valueLabel: pipeline.nombre });
+        }
+        // ... replicar para canalId, etiquetaId, agenteId usando datosFiltros ...
+        if (filtros.canalId && filtros.canalId !== 'all') {
+            const canal = datosFiltros?.canales.find(c => c.id === filtros.canalId);
+            if (canal) active.push({ key: 'canalId', label: 'Canal', valueLabel: canal.nombre });
+        }
+        if (filtros.etiquetaId && filtros.etiquetaId !== 'all') {
+            const etiqueta = datosFiltros?.etiquetas.find(e => e.id === filtros.etiquetaId);
+            if (etiqueta) active.push({ key: 'etiquetaId', label: 'Etiqueta', valueLabel: etiqueta.nombre });
+        }
+        if (filtros.agenteId && filtros.agenteId !== 'all') {
+            const agente = datosFiltros?.agentes.find(a => a.id === filtros.agenteId);
+            if (agente) active.push({ key: 'agenteId', label: 'Agente', valueLabel: agente.nombre ?? 'N/A' });
+        }
+        return active;
+    }, [filtros, datosFiltros]);
 
     // --- Renderizado ---
     interface TableColumn {
@@ -130,6 +195,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
         label: string;
         sortable?: boolean;
     }
+
 
     const tableColumns: TableColumn[] = useMemo(() => [
         { key: 'nombre', label: 'Nombre', sortable: true },
@@ -142,46 +208,11 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
         { key: 'createdAt', label: 'Creado', sortable: true },
         // { key: 'acciones', label: 'Acciones', sortable: false },
     ], []);
-    const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-        switch (status) {
-            case 'active':
-                return 'default';
-            case 'inactive':
-                return 'destructive';
-            default:
-                return 'secondary';
-        }
-    };
-    const getPipelineColor = (): string => { /* ... (sin cambios) ... */ return 'bg-zinc-600' };
 
-    // --- NUEVO: Lógica para mostrar filtros activos ---
-    const activeFilters = useMemo(() => {
-        const active: { key: keyof FiltrosLeads; label: string; valueLabel: string }[] = [];
-        if (filtros.pipelineId !== 'all') {
-            const pipeline = datosFiltros?.pipelines.find(p => p.id === filtros.pipelineId);
-            if (pipeline) active.push({ key: 'pipelineId', label: 'Etapa', valueLabel: pipeline.nombre });
-        }
-        if (filtros.canalId !== 'all') {
-            const canal = datosFiltros?.canales.find(c => c.id === filtros.canalId);
-            if (canal) active.push({ key: 'canalId', label: 'Canal', valueLabel: canal.nombre });
-        }
-        if (filtros.etiquetaId !== 'all') {
-            const etiqueta = datosFiltros?.etiquetas.find(e => e.id === filtros.etiquetaId);
-            if (etiqueta) active.push({ key: 'etiquetaId', label: 'Etiqueta', valueLabel: etiqueta.nombre });
-        }
-        if (filtros.agenteId !== 'all') {
-            const agente = datosFiltros?.agentes.find(a => a.id === filtros.agenteId);
-            if (agente) active.push({ key: 'agenteId', label: 'Agente', valueLabel: agente.nombre ?? '' });
-        }
-        return active;
-    }, [filtros, datosFiltros]);
-    // --- FIN Lógica Filtros Activos ---
-
-    // --- NUEVO: Manejador para crear nuevo lead ---
-    const handleCrearNuevoLead = () => {
-        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads/nuevo`);
-    };
-
+    // JSX de renderizado (la estructura es la misma, pero ahora los datos en `leads` y `datosFiltros`
+    // son de los tipos inferidos por Zod: `LeadListaItemData` y `DatosParaFiltrosLeadData`)
+    // Debes asegurarte que el acceso a propiedades (ej. `lead.pipeline?.nombre`) sea compatible.
+    // El mapeo en la Server Action ya debería estar alineado con LeadListaItemData.
 
     return (
         <div className="space-y-4 h-full flex flex-col">
@@ -205,7 +236,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
                             id="search-leads"
                             type="search"
                             placeholder="Nombre, email, teléfono..."
-                            value={filtros.searchTerm}
+                            value={filtros.searchTerm ?? ''}
                             onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
                             className="pl-8 w-full bg-zinc-800 border-zinc-700 h-9" // Altura ajustada
                         />
@@ -214,7 +245,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
                 {/* Filtro Pipeline */}
                 <div>
                     <label htmlFor="filter-pipeline" className="text-xs font-medium text-zinc-400 block mb-1">Etapa</label>
-                    <Select value={filtros.pipelineId} onValueChange={(v) => handleFilterChange('pipelineId', v)} disabled={loadingFilters}>
+                    <Select value={filtros.pipelineId ?? 'all'} onValueChange={(v) => handleFilterChange('pipelineId', v)} disabled={loadingFilters}>
                         <SelectTrigger id="filter-pipeline" className="bg-zinc-800 border-zinc-700 h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todas</SelectItem>
@@ -225,7 +256,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
                 {/* Filtro Canal */}
                 <div>
                     <label htmlFor="filter-canal" className="text-xs font-medium text-zinc-400 block mb-1">Canal</label>
-                    <Select value={filtros.canalId} onValueChange={(v) => handleFilterChange('canalId', v)} disabled={loadingFilters}>
+                    <Select value={filtros.canalId ?? 'all'} onValueChange={(v) => handleFilterChange('canalId', v)} disabled={loadingFilters}>
                         <SelectTrigger id="filter-canal" className="bg-zinc-800 border-zinc-700 h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todos</SelectItem>
@@ -236,7 +267,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
                 {/* Filtro Agente */}
                 <div>
                     <label htmlFor="filter-agente" className="text-xs font-medium text-zinc-400 block mb-1">Agente</label>
-                    <Select value={filtros.agenteId} onValueChange={(v) => handleFilterChange('agenteId', v)} disabled={loadingFilters}>
+                    <Select value={filtros.agenteId ?? 'all'} onValueChange={(v) => handleFilterChange('agenteId', v)} disabled={loadingFilters}>
                         <SelectTrigger id="filter-agente" className="bg-zinc-800 border-zinc-700 h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todos</SelectItem>
@@ -246,17 +277,18 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
                 </div>
                 {/* Filtro Etiqueta (se mantiene en Select por simplicidad, podría ser MultiSelect si se arregla) */}
                 {/* <div className="lg:col-start-4">
-                    <label htmlFor="filter-etiqueta" className="text-xs font-medium text-zinc-400 block mb-1">Etiqueta</label>
-                    <Select value={filtros.etiquetaId} onValueChange={(v) => handleFilterChange('etiquetaId', v)} disabled={loadingFilters}>
-                        <SelectTrigger id="filter-etiqueta" className="bg-zinc-800 border-zinc-700 h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas</SelectItem>
-                            {datosFiltros?.etiquetas.map(e => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                 </div> */}
+                               <label htmlFor="filter-etiqueta" className="text-xs font-medium text-zinc-400 block mb-1">Etiqueta</label>
+                               <Select value={filtros.etiquetaId} onValueChange={(v) => handleFilterChange('etiquetaId', v)} disabled={loadingFilters}>
+                                   <SelectTrigger id="filter-etiqueta" className="bg-zinc-800 border-zinc-700 h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
+                                   <SelectContent>
+                                       <SelectItem value="all">Todas</SelectItem>
+                                       {datosFiltros?.etiquetas.map(e => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}
+                                   </SelectContent>
+                               </Select>
+                            </div> */}
             </div>
             {/* --- Fin Nueva Sección Filtros --- */}
+
 
             {/* --- NUEVO: Mostrar Filtros Activos --- */}
             {activeFilters.length > 0 && (
@@ -277,6 +309,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
             )}
             {/* --- FIN Filtros Activos --- */}
 
+            {/* ... (sin cambios en JSX) ... */}
 
             {/* Tabla de Leads */}
             <div className="flex-1 overflow-auto border border-zinc-700 rounded-lg">
@@ -286,7 +319,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
                             {tableColumns.map((col) => (
                                 <TableHead key={col.key} className="text-zinc-400 px-4 py-2 whitespace-nowrap">
                                     {col.sortable ? (
-                                        <Button variant="ghost" onClick={() => handleSortChange(col.key as OpcionesSortLeads['campo'])} className="px-1 py-0 h-auto hover:bg-zinc-700">
+                                        <Button variant="ghost" onClick={() => handleSortChange(col.key as OpcionesSortLeadsData['campo'])} className="px-1 py-0 h-auto hover:bg-zinc-700">
                                             {col.label}
                                             <ArrowUpDown className={`ml-2 h-3 w-3 ${sort.campo === col.key ? 'text-white' : 'text-zinc-500'}`} />
                                         </Button>
@@ -296,32 +329,64 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {/* ... (Renderizado de filas de la tabla sin cambios) ... */}
-                        {loading ? (<TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-zinc-400"><Loader2 className="inline-block h-6 w-6 animate-spin mr-2" /> Cargando leads...</TableCell></TableRow>
-                        ) : error ? (<TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-red-500">{error}</TableCell></TableRow>
-                        ) : leads.length === 0 ? (<TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-zinc-500">No se encontraron leads.</TableCell></TableRow>
-                        ) : (
+                        {loading && crmId === undefined && ( /* Solo mostrar "Cargando filtros..." al inicio */
+                            <TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-zinc-400"><Loader2 className="inline-block h-6 w-6 animate-spin mr-2" /> Cargando filtros y configuración...</TableCell></TableRow>
+                        )}
+                        {loading && crmId !== undefined && ( /* "Cargando leads..." una vez que los filtros cargaron */
+                            <TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-zinc-400"><Loader2 className="inline-block h-6 w-6 animate-spin mr-2" /> Cargando leads...</TableCell></TableRow>
+                        )}
+                        {!loading && error && (
+                            <TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-red-400 p-4">{error}</TableCell></TableRow>
+                        )}
+                        {!loading && !error && crmId === null && ( /* Si crmId es null, no hay CRM */
+                            <TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-zinc-500 p-4">El CRM no está configurado para este negocio. No se pueden mostrar leads.</TableCell></TableRow>
+                        )}
+                        {!loading && !error && crmId !== null && leads.length === 0 && ( /* Hay CRM pero no leads */
+                            <TableRow><TableCell colSpan={tableColumns.length} className="h-24 text-center text-zinc-500 p-4">No se encontraron leads que coincidan con los filtros.</TableCell></TableRow>
+                        )}
+                        {!loading && !error && crmId !== null && leads.length > 0 && (
                             leads.map((lead) => (
                                 <TableRow key={lead.id} className="hover:bg-zinc-800/50 cursor-pointer"
                                     onClick={() => handleViewDetails(lead.id)}>
-                                    <TableCell className="font-medium text-zinc-100 px-4 py-2"><p className="truncate max-w-[200px]" title={lead.nombre}>{lead.nombre}</p><p className="text-xs text-zinc-400 truncate max-w-[200px]" title={lead.email || ''}>{lead.email || '-'}</p></TableCell>
-                                    <TableCell className="px-4 py-2 text-zinc-300 text-xs"><div className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${getPipelineColor()} flex-shrink-0`}></span>
-                                        <span>{lead.pipeline?.nombre || '-'}</span></div>
+                                    {/* Asegúrate que las propiedades coincidan con LeadListaItemData */}
+                                    <TableCell className="font-medium text-zinc-100 px-4 py-2">
+                                        <p className="truncate max-w-[200px]" title={lead.nombre}>{lead.nombre}</p>
+                                        <p className="text-xs text-zinc-400 truncate max-w-[200px]" title={lead.email || ''}>{lead.email || '-'}</p>
+                                    </TableCell>
+                                    <TableCell className="px-4 py-2 text-zinc-300 text-xs">
+                                        <div className="flex items-center gap-2">
+                                            {lead.pipeline?.color && <span className={`w-2 h-2 rounded-full flex-shrink-0`} style={{ backgroundColor: lead.pipeline.color }}></span>}
+                                            <span>{lead.pipeline?.nombre || '-'}</span>
+                                        </div>
                                     </TableCell>
                                     <TableCell className="px-4 py-2 text-xs">
-                                        <Badge
-                                            variant={getStatusBadgeVariant(lead.status || '')}
-                                            className="capitalize">{lead.status?.replace('_', ' ') || '-'}
-                                        </Badge></TableCell>
-                                    <TableCell className="px-4 py-2"><div className="flex flex-wrap gap-1 max-w-[150px]">{lead.etiquetas?.slice(0, 2).map(({ etiqueta }) => (<Badge key={etiqueta.id} variant="secondary" className="text-[10px]" style={{ backgroundColor: etiqueta.color ? `${etiqueta.color}20` : undefined, color: etiqueta.color || undefined, borderColor: etiqueta.color ? `${etiqueta.color}80` : undefined }}>{etiqueta.nombre}</Badge>))}{lead.etiquetas && lead.etiquetas.length > 2 && <Badge variant="secondary" className="text-[10px]">...</Badge>}</div></TableCell>
+                                        <Badge variant={getStatusBadgeVariant(lead.status)} className="capitalize">{lead.status?.replace('_', ' ') || '-'}</Badge>
+                                    </TableCell>
+                                    <TableCell className="px-4 py-2">
+                                        <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                            {lead.etiquetas?.slice(0, 2).map(item => ( // Acceder a item.etiqueta
+                                                <Badge key={item.etiqueta.id} variant="secondary" className="text-[10px]" style={{ backgroundColor: item.etiqueta.color ? `${item.etiqueta.color}20` : undefined, color: item.etiqueta.color || undefined, borderColor: item.etiqueta.color ? `${item.etiqueta.color}80` : undefined }}>
+                                                    {item.etiqueta.nombre}
+                                                </Badge>
+                                            ))}
+                                            {lead.etiquetas && lead.etiquetas.length > 2 && <Badge variant="secondary" className="text-[10px]">...</Badge>}
+                                        </div>
+                                    </TableCell>
                                     <TableCell className="px-4 py-2 text-zinc-300 text-xs">{lead.agente?.nombre || '-'}</TableCell>
                                     <TableCell className="px-4 py-2 text-zinc-300 text-xs">{lead.valorEstimado ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(lead.valorEstimado) : '-'}</TableCell>
-                                    <TableCell className="px-4 py-2 text-zinc-400 text-xs"><div className="flex items-center gap-1.5">{lead.ultimaConversacion && (<MessageSquare size={12} className={lead.ultimaConversacion.status === 'abierta' ? 'text-green-400' : 'text-zinc-500'} />)}<span>
-                                        {lead.ultimaConversacion?.updatedAt ? new Date(lead.ultimaConversacion.updatedAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }) : (lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }) : '-')}
-                                    </span></div></TableCell>
-                                    <TableCell className="px-4 py-2 text-zinc-400 text-xs">{new Date(lead.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' })}</TableCell>
-                                    {/* <TableCell className="px-4 py-2 text-right"><Button variant="ghost" size="sm" onClick={() => handleViewDetails(lead.id)} className="h-7 px-2 hover:bg-zinc-700"><Eye className="h-4 w-4 text-zinc-400" /></Button></TableCell> */}
+                                    <TableCell className="px-4 py-2 text-zinc-400 text-xs">
+                                        <div className="flex items-center gap-1.5">
+                                            {lead.ultimaConversacion && (<MessageSquare size={12} className={lead.ultimaConversacion.status === 'abierta' ? 'text-green-400' : 'text-zinc-500'} />)}
+                                            <span>
+                                                {lead.ultimaConversacion?.updatedAt
+                                                    ? new Date(lead.ultimaConversacion.updatedAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                    : (lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '-')}
+                                            </span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="px-4 py-2 text-zinc-400 text-xs">
+                                        {new Date(lead.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </TableCell>
                                 </TableRow>
                             ))
                         )}

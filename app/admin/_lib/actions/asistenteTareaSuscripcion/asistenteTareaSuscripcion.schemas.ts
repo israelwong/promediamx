@@ -1,3 +1,4 @@
+// app/admin/_lib/actions/asistenteTareaSuscripcion/asistenteTareaSuscripcion.schemas.ts
 import { z } from 'zod';
 
 // Esquema para los detalles de una tarea individual dentro de la suscripción
@@ -24,7 +25,7 @@ export type TareaSuscritaDetalleData = z.infer<typeof tareaSuscritaDetalleSchema
 export const tareaDetallesSchema = z.object({
     id: z.string().cuid(),
     nombre: z.string(),
-    descripcion: z.string().nullable(),
+    descripcionMarketplace: z.string().optional(),
     precio: z.number().nullable(),
     iconoUrl: z.string().url().nullable().optional(), // Hacer opcional si puede no estar
     CategoriaTarea: z.object({
@@ -109,7 +110,7 @@ export const tareaGaleriaItemSchema = z.object({
     id: z.string().cuid(),
     imageUrl: z.string().url(),
     altText: z.string().nullable().optional(),
-    descripcion: z.string().nullable().optional(),
+    descripcion: z.string().optional(),
 });
 export type TareaGaleriaItemData = z.infer<typeof tareaGaleriaItemSchema>;
 
@@ -134,7 +135,7 @@ export type EtiquetaDeTareaData = z.infer<typeof etiquetaDeTareaSchema>;
 export const tareaFullDetailsSchema = z.object({
     id: z.string().cuid(),
     nombre: z.string(),
-    descripcion: z.string().nullable(),
+    descripcion: z.string().optional(),
     precio: z.number().nullable(),
     iconoUrl: z.string().url().nullable().optional(),
     CategoriaTarea: categoriaDeTareaSchema,
@@ -143,37 +144,6 @@ export const tareaFullDetailsSchema = z.object({
 });
 export type TareaFullDetailsData = z.infer<typeof tareaFullDetailsSchema>;
 
-// Información de la Suscripción
-// export const suscripcionInfoSchema = z.object({
-//     id: z.string().cuid(),
-//     status: z.string(), // ej: 'activo', 'inactivo'
-//     montoSuscripcion: z.number().nullable(),
-//     fechaSuscripcion: z.date(), // Las fechas de Prisma son Date objects
-//     fechaDesuscripcion: z.date().nullable(),
-// }).nullable(); // La suscripción entera puede ser null
-// export type SuscripcionInfoData = z.infer<typeof suscripcionInfoSchema>;
-
-// Schema principal para los detalles completos que la página necesita
-// export const tareaSuscripcionDetallesDataSchema = z.object({
-//     tarea: tareaFullDetailsSchema,
-//     suscripcion: suscripcionInfoSchema, // Ya es nullable en su definición
-//     // IDs de contexto, devueltos por la action para uso en el cliente
-//     clienteId: z.string().cuid().nullable(), 
-//     negocioId: z.string().cuid().nullable(),
-//     // asistenteId ya se conoce en el cliente por useSearchParams
-// });
-// export type TareaSuscripcionDetallesData = z.infer<typeof tareaSuscripcionDetallesDataSchema>;
-
-
-// --- Schemas para las actions de modificar suscripción ---
-// export const upsertSuscripcionTareaInputSchema = z.object({
-//     asistenteId: z.string().cuid(),
-//     tareaId: z.string().cuid(),
-//     // Los IDs de contexto para revalidación se pasarán como args separados a la action
-//     clienteId: z.string().cuid({ message: "ID de cliente es requerido para revalidación." }),
-//     negocioId: z.string().cuid({ message: "ID de negocio es requerido para revalidación." }),
-// });
-// export type UpsertSuscripcionTareaInput = z.infer<typeof upsertSuscripcionTareaInputSchema>;
 
 export const suscripcionIdentificadoresSchema = z.object({
     suscripcionId: z.string().cuid(),
@@ -184,9 +154,3 @@ export const suscripcionIdentificadoresSchema = z.object({
 });
 export type SuscripcionIdentificadores = z.infer<typeof suscripcionIdentificadoresSchema>;
 
-
-// export const suscripcionBasicaDataSchema = z.object({
-//     id: z.string().cuid(),
-//     status: z.string(),
-// });
-// export type SuscripcionBasicaData = z.infer<typeof suscripcionBasicaDataSchema>;

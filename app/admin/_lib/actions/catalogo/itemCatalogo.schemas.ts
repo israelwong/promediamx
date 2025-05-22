@@ -71,21 +71,21 @@ export type CrearItemBasicoData = z.infer<typeof CrearItemBasicoDataSchema>;
 // Esquema para los datos completos al actualizar un ítem (desde ItemEditarForm)
 export const ActualizarItemDataSchema = z.object({
     nombre: z.string().min(1, "El nombre es obligatorio.").max(150, "Máximo 150 caracteres.").optional(),
-    descripcion: z.string().max(2000, "Máximo 2000 caracteres.").nullish(),
-    precio: z.number({ invalid_type_error: "El precio debe ser un número." }).positive("El precio debe ser positivo o cero.").gte(0, "El precio no puede ser negativo.").optional(), // Permitir 0
-    tipoItem: z.string().nullish(), // Podría ser z.enum(['PRODUCTO', 'SERVICIO']).optional(),
-    sku: z.string().max(50, "Máximo 50 caracteres.").nullish(),
-    stock: z.number().int("El stock debe ser un número entero.").min(0, "El stock no puede ser negativo.").nullish(),
-    stockMinimo: z.number().int("El stock mínimo debe ser un número entero.").min(0, "El stock mínimo no puede ser negativo.").nullish(),
-    unidadMedida: z.string().max(50, "Máximo 50 caracteres.").nullish(),
-    linkPago: z.string().url("URL de pago inválida.").nullish().or(z.literal('')),
-    funcionPrincipal: z.string().max(500, "Máximo 500 caracteres.").nullish(),
+    descripcion: z.string().max(2000, "Máximo 2000 caracteres.").nullish().optional(),
+    precio: z.number().optional(),
+    tipoItem: z.string().nullish().optional(), // Podría ser z.enum(['PRODUCTO', 'SERVICIO']).optional(),
+    sku: z.string().max(50, "Máximo 50 caracteres.").nullish().optional(),
+    stock: z.number().int("El stock debe ser un número entero.").min(0, "El stock no puede ser negativo.").nullish().optional(),
+    stockMinimo: z.number().int("El stock mínimo debe ser un número entero.").min(0, "El stock mínimo no puede ser negativo.").nullish().optional(),
+    unidadMedida: z.string().max(50, "Máximo 50 caracteres.").nullish().optional(),
+    linkPago: z.string().url("URL de pago inválida.").nullish().or(z.literal('')).optional(),
+    funcionPrincipal: z.string().max(500, "Máximo 500 caracteres.").nullish().optional(),
     esPromocionado: z.boolean().optional(),
-    AquienVaDirigido: z.string().max(1000, "Máximo 1000 caracteres.").nullish(),
-    palabrasClave: z.string().max(500, "Máximo 500 caracteres.").nullish(),
+    AquienVaDirigido: z.string().max(1000, "Máximo 1000 caracteres.").nullish().optional(),
+    palabrasClave: z.string().max(500, "Máximo 500 caracteres.").nullish().optional(),
     // videoUrl: z.string().url("URL de video inválida.").nullish().or(z.literal('')), // OMITIDO
     status: z.string().optional(), // Podría ser z.enum(['activo', 'inactivo', 'agotado', 'proximamente']).optional(),
-    categoriaId: z.string().cuid().nullish(),
+    categoriaId: z.string().cuid().nullish().optional(),
     // etiquetaIds se maneja como un array separado en la action
 });
 export type ActualizarItemData = z.infer<typeof ActualizarItemDataSchema>;

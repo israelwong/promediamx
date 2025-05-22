@@ -1,3 +1,4 @@
+// app/admin/marketplace/[asistenteId]/page.tsx
 import React from 'react'
 import { Metadata } from 'next'
 import MarketplaceLista from '../componentes/MarketplaceLista'
@@ -10,12 +11,11 @@ export const metadata: Metadata = {
 export default async function page({ params }: { params: Promise<{ asistenteId: string }> }) {
     const { asistenteId } = await params
 
-    // Ejemplo de cómo obtener el contexto:
+    // obtener contexto del asistente:
     const asistenteConContexto = await prisma.asistenteVirtual.findUnique({
         where: { id: asistenteId },
         select: {
             negocioId: true,
-            // Asumiendo que AsistenteVirtual tiene clienteId directamente o a través de Negocio
             clienteId: true, // O: negocio: { select: { clienteId: true } }
         }
     });
@@ -25,7 +25,7 @@ export default async function page({ params }: { params: Promise<{ asistenteId: 
 
 
     return (
-        <div>
+        <div className='p-5'>
             <MarketplaceLista
                 asistenteId={asistenteId}
                 negocioId={negocioId ?? undefined}

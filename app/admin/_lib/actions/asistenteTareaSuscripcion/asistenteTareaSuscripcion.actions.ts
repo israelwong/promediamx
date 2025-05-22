@@ -1,3 +1,4 @@
+// app/admin/_lib/actions/asistenteTareaSuscripcion/asistenteTareaSuscripcion.actions.ts
 'use server';
 
 import { z } from 'zod'; // Asegúrate de tener zod instalado
@@ -47,8 +48,9 @@ export async function obtenerTareasSuscritasDetalladasAction(
                     select: {
                         id: true,
                         nombre: true,
-                        descripcion: true,
+                        descripcionMarketplace: true,
                         precio: true,
+                        CategoriaTarea: { select: { nombre: true, color: true } }, // <-- Añadido para incluir CategoriaTarea
                         _count: {
                             select: {
                                 // Contar ejecuciones específicas para este asistente y esta tarea
@@ -71,7 +73,7 @@ export async function obtenerTareasSuscritasDetalladasAction(
             tarea: {
                 id: s.tarea.id,
                 nombre: s.tarea.nombre,
-                descripcion: s.tarea.descripcion,
+                descripcion: s.tarea.descripcionMarketplace,
                 precio: s.tarea.precio,
             },
             montoSuscripcion: s.montoSuscripcion,
@@ -92,8 +94,6 @@ export async function obtenerTareasSuscritasDetalladasAction(
         return { success: false, error: "No se pudieron obtener las tareas suscritas." };
     }
 }
-
-
 
 export async function crearOreactivarSuscripcionAction(
     input: UpsertSuscripcionTareaInput
@@ -159,204 +159,110 @@ export async function crearOreactivarSuscripcionAction(
     }
 }
 
+export async function obtenerDetallesSuscripcionTareaAction(
+    tareaId: string, // tareaId es siempre requerida
+    asistenteId: string | null // asistenteId ahora es opcional (puede ser null)
+): Promise<ActionResult<TareaSuscripcionDetallesData | null>> {
+    if (!tareaId) {
+        return { success: false, error: "Falta ID de tarea." };
+    }
 
-// Helper para los paths a revalidar
-// function getPathsToRevalidateForSuscripcion(
-//     clienteId: string | null,
-//     negocioId: string | null,
-//     asistenteId: string,
-//     tareaId?: string // Opcional, para la página de detalle de la tarea
-// ): string[] {
-//     const paths = [];
-//     if (clienteId && negocioId) {
-//         const basePathAsistente = `/admin/clientes/${clienteId}/negocios/${negocioId}/asistente/${asistenteId}`;
-//         paths.push(basePathAsistente); // Página de edición del asistente (donde se listan tareas)
-//         if (tareaId) {
-//             paths.push(`${basePathAsistente}/tarea/${tareaId}`); // Página de detalle de esta suscripción
-//         }
-//     }
-//     // Revalidar marketplace del asistente y general
-//     paths.push(`/admin/marketplace/${asistenteId}`);
-//     paths.push(`/admin/marketplace`);
-//     console.log("[RevalidatePaths Suscripcion]", paths);
-//     return paths;
-// }
+    try {
+        // 1. Obtener siempre los detalles de la Tarea
+        const tareaDataPrisma = await prisma.tarea.findUnique({
+            where: { id: tareaId },
+            select: {
+                id: true, nombre: true, descripcionMarketplace: true, precio: true, iconoUrl: true,
+                CategoriaTarea: { select: { nombre: true, color: true } },
+                etiquetas: { select: { etiquetaTarea: { select: { id: true, nombre: true } } } },
+                TareaGaleria: { select: { id: true, imageUrl: true, altText: true, descripcion: true }, orderBy: { orden: 'asc' } }
+            }
+        });
 
+        if (!tareaDataPrisma) {
+            return { success: false, error: `Tarea con ID ${tareaId} no encontrada.` };
+        }
 
-// export async function obtenerDetallesSuscripcionTareaAction(
-//     asistenteId: string,
-//     tareaId: string
-// ): Promise<ActionResult<TareaSuscripcionDetallesData | null>> {
-//     if (!asistenteId || !tareaId) {
-//         return { success: false, error: "Faltan IDs de asistente o tarea." };
-//     }
-//     try {
-//         const tareaDataPrisma = await prisma.tarea.findUnique({
-//             where: { id: tareaId },
-//             select: {
-//                 id: true, nombre: true, descripcion: true, precio: true, iconoUrl: true,
-//                 CategoriaTarea: { select: { nombre: true, color: true } },
-//                 etiquetas: { select: { etiquetaTarea: { select: { id: true, nombre: true } } } },
-//                 TareaGaleria: { select: { id: true, imageUrl: true, altText: true, descripcion: true }, orderBy: { orden: 'asc' } }
-//             }
-//         });
-//         if (!tareaDataPrisma) {
-//             return { success: false, error: `Tarea con ID ${tareaId} no encontrada.` };
-//         }
-//         const asistenteInfo = await prisma.asistenteVirtual.findUnique({
-//             where: { id: asistenteId },
-//             select: {
-//                 clienteId: true,
-//                 negocioId: true,
-//                 AsistenteTareaSuscripcion: {
-//                     where: { tareaId: tareaId /*, status: 'activo' <- o podrías querer verla aunque esté inactiva */ },
-//                     select: { id: true, status: true, montoSuscripcion: true, fechaSuscripcion: true, fechaDesuscripcion: true },
-//                     take: 1
-//                 }
-//             }
-//         });
-//         if (!asistenteInfo) {
-//             return { success: false, error: `Asistente con ID ${asistenteId} no encontrado.` };
-//         }
-//         const suscripcion = asistenteInfo.AsistenteTareaSuscripcion?.[0] || null;
-//         // Mapeo cuidadoso a la estructura esperada por Zod, especialmente los campos opcionales/nulos
-//         const dataToParse: TareaSuscripcionDetallesData = {
-//             tarea: {
-//                 id: tareaDataPrisma.id,
-//                 nombre: tareaDataPrisma.nombre,
-//                 descripcion: tareaDataPrisma.descripcion ?? null,
-//                 precio: tareaDataPrisma.precio ?? null,
-//                 iconoUrl: tareaDataPrisma.iconoUrl ?? undefined,
-//                 CategoriaTarea: tareaDataPrisma.CategoriaTarea ? {
-//                     nombre: tareaDataPrisma.CategoriaTarea.nombre,
-//                     color: tareaDataPrisma.CategoriaTarea.color ?? undefined
-//                 } : null,
-//                 etiquetas: tareaDataPrisma.etiquetas.map(et => ({
-//                     etiquetaTarea: {
-//                         id: et.etiquetaTarea.id,
-//                         nombre: et.etiquetaTarea.nombre,
-//                     }
-//                 })),
-//                 TareaGaleria: tareaDataPrisma.TareaGaleria.map(g => ({
-//                     ...g,
-//                     altText: g.altText ?? undefined,
-//                     descripcion: g.descripcion ?? undefined,
-//                 })),
-//             },
-//             suscripcion: suscripcion ? {
-//                 id: suscripcion.id,
-//                 status: suscripcion.status,
-//                 montoSuscripcion: suscripcion.montoSuscripcion ?? null,
-//                 fechaSuscripcion: suscripcion.fechaSuscripcion, // Prisma devuelve Date
-//                 fechaDesuscripcion: suscripcion.fechaDesuscripcion ?? null, // Prisma devuelve Date o null
-//             } : null,
-//             clienteId: asistenteInfo.clienteId ?? null,
-//             negocioId: asistenteInfo.negocioId ?? null,
-//         };
-//         const validationResult = tareaSuscripcionDetallesSchema.safeParse(dataToParse);
-//         if (!validationResult.success) {
-//             console.error("Error de validación Zod en obtenerDetallesSuscripcionTareaAction:", validationResult.error.flatten());
-//             return { success: false, error: "Datos de suscripción con formato inesperado." };
-//         }
-//         return { success: true, data: validationResult.data };
-//     } catch (error) {
-//         console.error(`Error obteniendo detalles suscripción tarea ${tareaId}, asistente ${asistenteId}:`, error);
-//         return { success: false, error: `No se pudieron obtener los detalles de la suscripción.` };
-//     }
-// }
+        // 2. Si se proporciona asistenteId, intentar obtener su información y la suscripción
+        let suscripcionInfoPrisma = null;
+        let clienteIdDb: string | null = null;
+        let negocioIdDb: string | null = null;
 
+        if (asistenteId) {
+            const asistenteInfo = await prisma.asistenteVirtual.findUnique({
+                where: { id: asistenteId },
+                select: {
+                    clienteId: true,
+                    negocioId: true,
+                    AsistenteTareaSuscripcion: {
+                        where: { tareaId: tareaId }, // Busca suscripción para ESTA tarea
+                        select: { id: true, status: true, montoSuscripcion: true, fechaSuscripcion: true, fechaDesuscripcion: true },
+                        take: 1 // Solo debería haber una o ninguna
+                    }
+                }
+            });
 
-// export async function cancelarSuscripcionTareaAction(
-//     suscripcionId: string,
-//     // IDs de contexto para revalidación y logs
-//     clienteId: string | null,
-//     negocioId: string | null,
-//     asistenteId: string,
-//     tareaId: string
-// ): Promise<ActionResult<SuscripcionBasicaData>> { // Devolver la suscripción actualizada
-//     if (!suscripcionId) { return { success: false, error: "ID de suscripción no proporcionado." }; }
-//     if (!asistenteId) { return { success: false, error: "ID de asistente no proporcionado." }; }
+            if (asistenteInfo) {
+                suscripcionInfoPrisma = asistenteInfo.AsistenteTareaSuscripcion?.[0] || null;
+                clienteIdDb = asistenteInfo.clienteId;
+                negocioIdDb = asistenteInfo.negocioId;
+            } else {
+                // Si se pasó un asistenteId pero no se encontró, podría ser un error o simplemente
+                // que se está intentando ver una tarea para un asistente que ya no existe.
+                // Para el flujo de "ver tarea sin contexto de asistente", este bloque no se ejecuta.
+                console.warn(`Asistente con ID ${asistenteId} no encontrado al buscar detalles de suscripción.`);
+                // No retornamos error aquí, permitimos que se muestren los detalles de la tarea sin info de suscripción.
+            }
+        }
 
-//     try {
-//         const updatedSuscripcion = await prisma.asistenteTareaSuscripcion.update({
-//             where: { id: suscripcionId, asistenteVirtualId: asistenteId }, // Asegurar que la suscripción pertenece al asistente
-//             data: {
-//                 status: 'inactivo', // O el estado que uses para cancelada
-//                 fechaDesuscripcion: new Date(),
-//             },
-//             select: { id: true, status: true } // Devolver solo lo necesario para SuscripcionBasicaData
-//         });
+        // 3. Mapear los datos para la validación Zod y la respuesta
+        const dataToParse: TareaSuscripcionDetallesData = {
+            tarea: {
+                id: tareaDataPrisma.id,
+                nombre: tareaDataPrisma.nombre,
+                // descripcion: tareaDataPrisma.descripcion ?? null,
+                precio: tareaDataPrisma.precio ?? null,
+                iconoUrl: tareaDataPrisma.iconoUrl ?? undefined,
+                CategoriaTarea: tareaDataPrisma.CategoriaTarea ? {
+                    nombre: tareaDataPrisma.CategoriaTarea.nombre,
+                    color: tareaDataPrisma.CategoriaTarea.color ?? undefined,
+                } : null,
+                etiquetas: tareaDataPrisma.etiquetas
+                    .map(et => et.etiquetaTarea ? ({ etiquetaTarea: { id: et.etiquetaTarea.id, nombre: et.etiquetaTarea.nombre } }) : null)
+                    .filter(Boolean) as { etiquetaTarea: { id: string; nombre: string } }[], // Asegura que no haya nulos y que el tipo sea correcto
+                TareaGaleria: tareaDataPrisma.TareaGaleria.map(g => ({
+                    id: g.id, // Asegúrate que el schema Zod TareaGaleriaItemData incluya 'id'
+                    imageUrl: g.imageUrl,
+                    altText: g.altText ?? undefined,
+                    descripcion: g.descripcion ?? undefined,
+                })),
+            },
+            suscripcion: suscripcionInfoPrisma ? {
+                id: suscripcionInfoPrisma.id,
+                status: suscripcionInfoPrisma.status,
+                montoSuscripcion: suscripcionInfoPrisma.montoSuscripcion ?? null,
+                fechaSuscripcion: suscripcionInfoPrisma.fechaSuscripcion,
+                fechaDesuscripcion: suscripcionInfoPrisma.fechaDesuscripcion ?? null,
+            } : null,
+            clienteId: clienteIdDb, // Será null si no hay asistenteId o el asistente no tiene clienteId
+            negocioId: negocioIdDb, // Será null si no hay asistenteId o el asistente no tiene negocioId
+        };
 
-//         const paths = getPathsToRevalidateForSuscripcion(clienteId, negocioId, asistenteId, tareaId);
-//         paths.forEach(p => revalidatePath(p, 'page'));
+        const validationResult = tareaSuscripcionDetallesSchema.safeParse(dataToParse);
 
-//         const validatedData = suscripcionBasicaDataSchema.parse(updatedSuscripcion);
-//         return { success: true, data: validatedData };
+        if (!validationResult.success) {
+            console.error("Error de validación Zod en obtenerDetallesSuscripcionTareaAction:", validationResult.error.flatten());
+            // console.log("Datos que fallaron validación:", dataToParse); // Para depuración
+            return { success: false, error: "Datos de la tarea o suscripción con formato inesperado." };
+        }
 
-//     } catch (error) {
-//         console.error(`Error al cancelar suscripción ${suscripcionId}:`, error);
-//         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-//             return { success: false, error: "Suscripción no encontrada o no pertenece al asistente." };
-//         }
-//         return { success: false, error: `Error al cancelar la suscripcion: ${error instanceof Error ? error.message : String(error)}` };
-//     }
-// }
+        return { success: true, data: validationResult.data };
 
-// export async function crearOreactivarSuscripcionTareaAction(
-//     asistenteId: string,
-//     tareaId: string,
-//     // IDs de contexto para revalidación
-//     clienteId: string | null,
-//     negocioId: string | null
-// ): Promise<ActionResult<SuscripcionBasicaData>> {
-//     if (!asistenteId || !tareaId) { return { success: false, error: "Faltan IDs de asistente o tarea." }; }
-
-//     try {
-//         const tareaInfo = await prisma.tarea.findUnique({
-//             where: { id: tareaId },
-//             select: { precio: true, status: true } // Necesitamos el precio y el status de la tarea
-//         });
-
-//         if (!tareaInfo) return { success: false, error: "Tarea no encontrada." };
-//         if (tareaInfo.status !== 'activo') return { success: false, error: "Esta tarea no está activa y no se puede suscribir." };
-
-//         const montoACobrar = tareaInfo.precio ?? 0; // Si la tarea no tiene precio (es base), el monto es 0
-
-//         const suscripcion = await prisma.asistenteTareaSuscripcion.upsert({
-//             where: {
-//                 asistenteVirtualId_tareaId: { // Constraint único compuesto
-//                     asistenteVirtualId: asistenteId,
-//                     tareaId: tareaId,
-//                 }
-//             },
-//             update: { // Si ya existe (ej. estaba inactiva), la reactivamos
-//                 status: 'activo',
-//                 montoSuscripcion: montoACobrar, // Actualizar el monto por si el precio de la tarea cambió
-//                 fechaDesuscripcion: null,     // Limpiar fecha de desuscripción
-//                 // fechaSuscripcion no se actualiza, se mantiene la original o la de creación.
-//             },
-//             create: { // Si no existe, la creamos
-//                 asistenteVirtualId: asistenteId,
-//                 tareaId: tareaId,
-//                 montoSuscripcion: montoACobrar,
-//                 status: 'activo',
-//                 // fechaSuscripcion tomará el default now() definido en el schema Prisma
-//             },
-//             select: { id: true, status: true } // Devolver solo lo necesario
-//         });
-
-//         const paths = getPathsToRevalidateForSuscripcion(clienteId, negocioId, asistenteId, tareaId);
-//         paths.forEach(p => revalidatePath(p, 'page'));
-
-//         const validatedData = suscripcionBasicaDataSchema.parse(suscripcion);
-//         return { success: true, data: validatedData };
-
-//     } catch (error) {
-//         console.error(`Error al suscribir/reactivar tarea ${tareaId} para asistente ${asistenteId}:`, error);
-//         return { success: false, error: `Error al procesar la suscripción: ${error instanceof Error ? error.message : String(error)}` };
-//     }
-// }
-
+    } catch (error) {
+        console.error(`Error obteniendo detalles para tarea ${tareaId} (asistente ${asistenteId || 'N/A'}):`, error);
+        return { success: false, error: "No se pudieron obtener los detalles." };
+    }
+}
 
 export async function obtenerSuscripcionesParaAsistenteAction(
     asistenteId: string
@@ -415,92 +321,92 @@ function getPathsToRevalidateForSuscripcion(
     return paths;
 }
 
-export async function obtenerDetallesSuscripcionTareaAction(
-    asistenteIdParam: string | null, // Puede ser null si se ve la tarea sin contexto de asistente
-    tareaId: string
-): Promise<ActionResult<TareaSuscripcionDetallesData | null>> {
-    if (!tareaId) {
-        return { success: false, error: "Falta ID de tarea." };
-    }
-    try {
-        const tareaDataPrisma = await prisma.tarea.findUnique({
-            where: { id: tareaId },
-            select: {
-                id: true, nombre: true, descripcion: true, precio: true, iconoUrl: true,
-                CategoriaTarea: { select: { nombre: true, color: true } },
-                etiquetas: { select: { etiquetaTarea: { select: { id: true, nombre: true } } } },
-                TareaGaleria: { select: { id: true, imageUrl: true, altText: true, descripcion: true }, orderBy: { orden: 'asc' } }
-            }
-        });
-        if (!tareaDataPrisma) {
-            return { success: false, error: `Tarea con ID ${tareaId} no encontrada.` };
-        }
-        let suscripcionInfoPrisma = null;
-        let clienteIdDb: string | null = null;
-        let negocioIdDb: string | null = null;
-        if (asistenteIdParam) {
-            const asistenteInfo = await prisma.asistenteVirtual.findUnique({
-                where: { id: asistenteIdParam },
-                select: {
-                    clienteId: true,
-                    negocioId: true,
-                    AsistenteTareaSuscripcion: {
-                        where: { tareaId: tareaId },
-                        select: { id: true, status: true, montoSuscripcion: true, fechaSuscripcion: true, fechaDesuscripcion: true },
-                        take: 1
-                    }
-                }
-            });
-            if (asistenteInfo) {
-                suscripcionInfoPrisma = asistenteInfo.AsistenteTareaSuscripcion?.[0] || null;
-                clienteIdDb = asistenteInfo.clienteId; // Puede ser null si AsistenteVirtual.clienteId es opcional
-                negocioIdDb = asistenteInfo.negocioId; // Puede ser null si AsistenteVirtual.negocioId es opcional
-            } else {
-                console.warn(`Asistente con ID ${asistenteIdParam} no encontrado al buscar suscripción.`);
-            }
-        }
-        // Mapeo y transformación cuidadosa a la estructura que espera el schema Zod
-        const dataToParse = {
-            tarea: {
-                id: tareaDataPrisma.id,
-                nombre: tareaDataPrisma.nombre,
-                descripcion: tareaDataPrisma.descripcion ?? null,
-                precio: tareaDataPrisma.precio ?? null,
-                iconoUrl: tareaDataPrisma.iconoUrl ?? undefined,
-                CategoriaTarea: tareaDataPrisma.CategoriaTarea ? {
-                    nombre: tareaDataPrisma.CategoriaTarea.nombre,
-                    color: tareaDataPrisma.CategoriaTarea.color ?? undefined,
-                } : null,
-                etiquetas: tareaDataPrisma.etiquetas
-                    .map(et => et.etiquetaTarea ? { id: et.etiquetaTarea.id, nombre: et.etiquetaTarea.nombre } : null)
-                    .filter(Boolean) as { id: string; nombre: string }[], // Filtrar nulos y asegurar tipo
-                TareaGaleria: tareaDataPrisma.TareaGaleria.map(g => ({
-                    ...g,
-                    altText: g.altText ?? undefined,
-                    descripcion: g.descripcion ?? undefined,
-                })),
-            },
-            suscripcion: suscripcionInfoPrisma ? {
-                id: suscripcionInfoPrisma.id,
-                status: suscripcionInfoPrisma.status,
-                montoSuscripcion: suscripcionInfoPrisma.montoSuscripcion ?? null,
-                fechaSuscripcion: suscripcionInfoPrisma.fechaSuscripcion,
-                fechaDesuscripcion: suscripcionInfoPrisma.fechaDesuscripcion ?? null,
-            } : null,
-            clienteId: clienteIdDb,
-            negocioId: negocioIdDb,
-        };
-        const validationResult = tareaSuscripcionDetallesSchema.safeParse(dataToParse);
-        if (!validationResult.success) {
-            console.error("Error Zod en obtenerDetallesSuscripcionTareaAction:", validationResult.error.flatten());
-            return { success: false, error: "Datos de suscripción con formato inesperado." };
-        }
-        return { success: true, data: validationResult.data };
-    } catch (error) {
-        console.error("Error en obtenerDetallesSuscripcionTareaAction:", error);
-        return { success: false, error: "No se pudieron obtener los detalles de la suscripción." };
-    }
-}
+// export async function obtenerDetallesSuscripcionTareaAction(
+//     asistenteIdParam: string | null, // Puede ser null si se ve la tarea sin contexto de asistente
+//     tareaId: string
+// ): Promise<ActionResult<TareaSuscripcionDetallesData | null>> {
+//     if (!tareaId) {
+//         return { success: false, error: "Falta ID de tarea." };
+//     }
+//     try {
+//         const tareaDataPrisma = await prisma.tarea.findUnique({
+//             where: { id: tareaId },
+//             select: {
+//                 id: true, nombre: true, descripcion: true, precio: true, iconoUrl: true,
+//                 CategoriaTarea: { select: { nombre: true, color: true } },
+//                 etiquetas: { select: { etiquetaTarea: { select: { id: true, nombre: true } } } },
+//                 TareaGaleria: { select: { id: true, imageUrl: true, altText: true, descripcion: true }, orderBy: { orden: 'asc' } }
+//             }
+//         });
+//         if (!tareaDataPrisma) {
+//             return { success: false, error: `Tarea con ID ${tareaId} no encontrada.` };
+//         }
+//         let suscripcionInfoPrisma = null;
+//         let clienteIdDb: string | null = null;
+//         let negocioIdDb: string | null = null;
+//         if (asistenteIdParam) {
+//             const asistenteInfo = await prisma.asistenteVirtual.findUnique({
+//                 where: { id: asistenteIdParam },
+//                 select: {
+//                     clienteId: true,
+//                     negocioId: true,
+//                     AsistenteTareaSuscripcion: {
+//                         where: { tareaId: tareaId },
+//                         select: { id: true, status: true, montoSuscripcion: true, fechaSuscripcion: true, fechaDesuscripcion: true },
+//                         take: 1
+//                     }
+//                 }
+//             });
+//             if (asistenteInfo) {
+//                 suscripcionInfoPrisma = asistenteInfo.AsistenteTareaSuscripcion?.[0] || null;
+//                 clienteIdDb = asistenteInfo.clienteId; // Puede ser null si AsistenteVirtual.clienteId es opcional
+//                 negocioIdDb = asistenteInfo.negocioId; // Puede ser null si AsistenteVirtual.negocioId es opcional
+//             } else {
+//                 console.warn(`Asistente con ID ${asistenteIdParam} no encontrado al buscar suscripción.`);
+//             }
+//         }
+//         // Mapeo y transformación cuidadosa a la estructura que espera el schema Zod
+//         const dataToParse = {
+//             tarea: {
+//                 id: tareaDataPrisma.id,
+//                 nombre: tareaDataPrisma.nombre,
+//                 descripcion: tareaDataPrisma.descripcion ?? null,
+//                 precio: tareaDataPrisma.precio ?? null,
+//                 iconoUrl: tareaDataPrisma.iconoUrl ?? undefined,
+//                 CategoriaTarea: tareaDataPrisma.CategoriaTarea ? {
+//                     nombre: tareaDataPrisma.CategoriaTarea.nombre,
+//                     color: tareaDataPrisma.CategoriaTarea.color ?? undefined,
+//                 } : null,
+//                 etiquetas: tareaDataPrisma.etiquetas
+//                     .map(et => et.etiquetaTarea ? { id: et.etiquetaTarea.id, nombre: et.etiquetaTarea.nombre } : null)
+//                     .filter(Boolean) as { id: string; nombre: string }[], // Filtrar nulos y asegurar tipo
+//                 TareaGaleria: tareaDataPrisma.TareaGaleria.map(g => ({
+//                     ...g,
+//                     altText: g.altText ?? undefined,
+//                     descripcion: g.descripcion ?? undefined,
+//                 })),
+//             },
+//             suscripcion: suscripcionInfoPrisma ? {
+//                 id: suscripcionInfoPrisma.id,
+//                 status: suscripcionInfoPrisma.status,
+//                 montoSuscripcion: suscripcionInfoPrisma.montoSuscripcion ?? null,
+//                 fechaSuscripcion: suscripcionInfoPrisma.fechaSuscripcion,
+//                 fechaDesuscripcion: suscripcionInfoPrisma.fechaDesuscripcion ?? null,
+//             } : null,
+//             clienteId: clienteIdDb,
+//             negocioId: negocioIdDb,
+//         };
+//         const validationResult = tareaSuscripcionDetallesSchema.safeParse(dataToParse);
+//         if (!validationResult.success) {
+//             console.error("Error Zod en obtenerDetallesSuscripcionTareaAction:", validationResult.error.flatten());
+//             return { success: false, error: "Datos de suscripción con formato inesperado." };
+//         }
+//         return { success: true, data: validationResult.data };
+//     } catch (error) {
+//         console.error("Error en obtenerDetallesSuscripcionTareaAction:", error);
+//         return { success: false, error: "No se pudieron obtener los detalles de la suscripción." };
+//     }
+// }
 
 export async function cancelarSuscripcionTareaAction(
     input: SuscripcionIdentificadores // Recibe un objeto con todos los IDs

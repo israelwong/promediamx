@@ -4,18 +4,19 @@
 import prisma from '../prismaClient';
 import { Prisma } from '@prisma/client'; // Asegúrate de tener Prisma importado
 import { ActionResult } from '../types';
+import { ConfiguracionAgendaDelNegocio } from './agendarCita.schemas'; // Reutilizamos
 import {
     ReagendarCitaArgs,
     ReagendarCitaData,
     CitaOriginalDetalles,
     // ActorInfo // Asegúrate que este tipo esté disponible
-} from './reagendarCita.type';
-import { ConfiguracionAgendaDelNegocio } from './agendarCita.type'; // Reutilizamos
+} from './reagendarCita.schemas'
+
 import {
     parsearFechaHoraInteligente,
     verificarDisponibilidadSlot,
-    // crearAgendaEnTransaccion // No creamos, actualizamos
 } from './agendarCita.actions'; // Reutilizamos funciones
+
 import { Agenda as AgendaModel, ActionType, ChangedByType, StatusAgenda, Lead } from '@prisma/client';
 import { format, isFuture, startOfDay, addDays, formatISO } from 'date-fns';
 import { es } from 'date-fns/locale';

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Metadata } from 'next'
-import LeadFormNuevo from '../components/LeadFormNuevo'
+import LeadFormNuevo from './components/LeadFormNuevo'
 
 export const metadata: Metadata = {
     title: 'Nuevo Lead',

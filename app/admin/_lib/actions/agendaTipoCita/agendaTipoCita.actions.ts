@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 import type { ActionResult } from '@/app/admin/_lib/types';
 import {
     AgendaTipoCitaData,
-    UpsertAgendaTipoCitaFormInput,
+    upsertAgendaTipoCitaFormInput,
     upsertAgendaTipoCitaFormSchema,
     ActualizarOrdenTiposCitaInput,
     actualizarOrdenTiposCitaSchema,
@@ -32,27 +32,46 @@ function parseToAgendaTipoCitaData(data: AgendaTipoCitaPrisma): AgendaTipoCitaDa
     };
 }
 
-
 export async function obtenerTiposCitaAction(
     negocioId: string
 ): Promise<ActionResult<AgendaTipoCitaData[]>> {
-    if (!negocioId) return { success: false, error: "ID de negocio no proporcionado." };
+    if (!negocioId) {
+        return { success: false, error: "ID de negocio no proporcionado." };
+    }
     try {
-        const tiposPrisma = await prisma.agendaTipoCita.findMany({
-            where: { negocioId },
+        const tiposCitaDb = await prisma.agendaTipoCita.findMany({
+            where: { negocioId: negocioId },
             orderBy: { orden: 'asc' },
+            include: { // Incluir conteo de agendas asociadas
+                _count: {
+                    select: { agendas: true } // 'agendas' es el nombre de la relación en AgendaTipoCita
+                }
+            }
         });
-        const tiposData = tiposPrisma.map(parseToAgendaTipoCitaData);
-        return { success: true, data: tiposData };
-    } catch (error) {
-        console.error("Error en obtenerTiposCitaAction:", error);
+
+        // Mapear y validar con Zod si es necesario, o asegurar que el tipo coincida
+        // El tipo AgendaTipoCitaData incluye _count opcional.
+        const data: AgendaTipoCitaData[] = tiposCitaDb.map((tc, index) => ({
+            ...tc,
+            orden: tc.orden ?? index,
+            descripcion: tc.descripcion ?? null,
+            duracionMinutos: tc.duracionMinutos ?? null,
+            todoElDia: tc.todoElDia === null ? undefined : tc.todoElDia,
+            _count: {
+                agendas: tc._count?.agendas ?? 0,
+            }
+        }));
+
+        return { success: true, data: data };
+    } catch (error: unknown) {
+        console.error(`Error obteniendo tipos de cita para negocio ${negocioId}:`, error);
         return { success: false, error: "No se pudieron obtener los tipos de cita." };
     }
 }
 
 export async function crearTipoCitaAction(
     negocioId: string,
-    inputData: UpsertAgendaTipoCitaFormInput
+    inputData: upsertAgendaTipoCitaFormInput
 ): Promise<ActionResult<AgendaTipoCitaData>> {
     if (!negocioId) return { success: false, error: "ID de negocio no proporcionado." };
 
@@ -64,7 +83,7 @@ export async function crearTipoCitaAction(
             errorDetails: validation.error.flatten().fieldErrors,
         };
     }
-    const { nombre, descripcion, duracionMinutos, esVirtual, esPresencial, limiteConcurrencia } = validation.data;
+    const { nombre, descripcion, duracionMinutos, todoElDia, esVirtual, esPresencial, limiteConcurrencia } = validation.data;
 
     try {
         // Verificar unicidad de nombre DENTRO del negocio
@@ -88,6 +107,7 @@ export async function crearTipoCitaAction(
                 nombre,
                 descripcion,
                 duracionMinutos,
+                todoElDia,
                 esVirtual,
                 esPresencial,
                 limiteConcurrencia, // Ya tiene default de 1 en Zod si es null/undefined
@@ -110,7 +130,7 @@ export async function crearTipoCitaAction(
 
 export async function actualizarTipoCitaAction(
     tipoCitaId: string,
-    inputData: Partial<UpsertAgendaTipoCitaFormInput> // Partial para actualizaciones
+    inputData: Partial<upsertAgendaTipoCitaFormInput> // Partial para actualizaciones
 ): Promise<ActionResult<AgendaTipoCitaData>> {
     if (!tipoCitaId) return { success: false, error: "ID de tipo de cita no proporcionado." };
 
@@ -152,6 +172,7 @@ export async function actualizarTipoCitaAction(
                 ...dataToUpdate,
                 // Asegurarse que los campos opcionales se manejen correctamente si no vienen
                 duracionMinutos: dataToUpdate.duracionMinutos === undefined ? undefined : (dataToUpdate.duracionMinutos ?? null),
+                todoElDia: dataToUpdate.todoElDia === undefined ? undefined : (dataToUpdate.todoElDia ?? null),
                 descripcion: dataToUpdate.descripcion === undefined ? undefined : (dataToUpdate.descripcion ?? null),
                 limiteConcurrencia: dataToUpdate.limiteConcurrencia === undefined ? undefined : (dataToUpdate.limiteConcurrencia ?? 1),
             },

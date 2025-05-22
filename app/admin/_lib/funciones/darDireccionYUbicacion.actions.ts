@@ -3,7 +3,7 @@
 
 import prisma from '../prismaClient'; // Ajusta la ruta a tu prismaClient
 import { ActionResult } from '../types'; // Ajusta la ruta a tus tipos globales
-import { DarDireccionArgs, DarDireccionData } from './darDireccionYUbicacion.type'; // Importa los tipos específicos
+import { DarDireccionArgs, DarDireccionData } from './darDireccionYUbicacion.schemas'; // Importa los tipos específicos
 
 // Importar función auxiliar para actualizar TareaEjecutada en caso de error (si la tienes separada)
 // import { actualizarTareaEjecutadaFallida } from './utils/tareaUtils'; // Ejemplo de ruta
@@ -22,7 +22,6 @@ async function actualizarTareaEjecutadaFallidaInterna(tareaEjecutadaId: string, 
     }
 }
 // --- Fin función auxiliar ---
-
 
 /**
  * Ejecuta la lógica para obtener la dirección y ubicación de un negocio.

@@ -68,8 +68,8 @@ export interface ReorderGalleryItemData {
 // --- Props del Componente Reutilizable ---
 export interface SharedImageGalleryManagerProps<T extends GalleryItemBase> {
     ownerEntityId: string;
-    negocioId: string;
-    clienteId: string;
+    negocioId: string | null;
+    clienteId: string | null;
     catalogoId?: string;
 
 
@@ -286,7 +286,13 @@ export default function SharedImageGalleryManager<T extends GalleryItemBase>({
             const formData = new FormData();
             formData.append('file', fileToUpload, originalFile.name);
 
-            const result = await actions.addItemAction(ownerEntityId, negocioId, clienteId, catalogoId, formData);
+            const result = await actions.addItemAction(
+                ownerEntityId,
+                negocioId ?? '',
+                clienteId ?? '',
+                catalogoId,
+                formData
+            );
             if (!result.success) {
                 setUploadError(prev => `${prev ? prev + '\n' : ''}Error al subir ${originalFile.name}: ${result.error}`);
                 setUploadingFilesInfo(prev => prev.map((f, idx) => idx === i ? { ...f, progress: 'Error subida' } : f));
@@ -307,7 +313,7 @@ export default function SharedImageGalleryManager<T extends GalleryItemBase>({
 
     const handleUpdateDetailsSubmit = async (id: string, data: UpdateGalleryItemDetailsData) => {
         setIsSubmittingDetails(true);
-        const result = await actions.updateItemDetailsAction(id, clienteId, negocioId, ownerEntityId, catalogoId, data);
+        const result = await actions.updateItemDetailsAction(id, clienteId ?? '', negocioId ?? '', ownerEntityId, catalogoId, data);
         if (result.success) {
             handleCloseEditModal(); fetchItems();
         } else { throw new Error(result.error || `Error al actualizar detalles de la ${itemDisplayName}.`); }
@@ -317,7 +323,7 @@ export default function SharedImageGalleryManager<T extends GalleryItemBase>({
     const handleDeleteImage = async (id: string) => {
         if (confirm(`¿Estás seguro de que quieres eliminar esta ${itemDisplayName}?`)) {
             setIsDeleting(true); setCurrentDeletingId(id);
-            await actions.deleteItemAction(id, negocioId, clienteId, ownerEntityId, catalogoId);
+            await actions.deleteItemAction(id, negocioId ?? '', clienteId ?? '', ownerEntityId, catalogoId);
             fetchItems();
             setIsDeleting(false); setCurrentDeletingId(null);
         }
@@ -339,7 +345,7 @@ export default function SharedImageGalleryManager<T extends GalleryItemBase>({
             setItems(itemsWithNewOrderField as T[]);
             const ordenesParaGuardar: ReorderGalleryItemData[] = itemsWithNewOrderField.map((img) => ({ id: img.id, orden: img.orden }));
             setIsSavingOrder(true);
-            const result = await actions.updateOrderAction(ownerEntityId, negocioId, clienteId, catalogoId, ordenesParaGuardar);
+            const result = await actions.updateOrderAction(ownerEntityId, negocioId ?? '', clienteId ?? '', catalogoId, ordenesParaGuardar);
             if (!result.success) {
                 alert("Error al guardar el nuevo orden: " + result.error);
                 fetchItems();

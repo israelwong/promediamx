@@ -6,19 +6,21 @@ import { useRouter } from 'next/navigation';
 import {
     obtenerItemCatalogoPorId,
     actualizarItemCatalogo,
-    // eliminarItemCatalogo, // La acción de eliminar se llama desde el page.tsx o un componente de layout si es un botón global
-    mejorarDescripcionItemIA,
+    eliminarItemCatalogo,
+    // mejorarDescripcionItemIA,
 } from '@/app/admin/_lib/actions/catalogo/itemCatalogo.actions';
 import {
     type ActualizarItemData, // Tipo Zod para los datos del formulario
-    type MejorarDescripcionItemIAData,
-    type NivelCreatividadIA // Importar el tipo enum
+    // type MejorarDescripcionItemIAData,
+    // type NivelCreatividadIA // Importar el tipo enum
 } from '@/app/admin/_lib/actions/catalogo/itemCatalogo.schemas';
+
 import { obtenerNegocioCategorias } from '@/app/admin/_lib/actions/catalogo/negocioCategoria.actions';
 import { type NegocioCategoriaType } from '@/app/admin/_lib/actions/catalogo/negocioCategoria.schemas';
 import { obtenerNegocioEtiquetas } from '@/app/admin/_lib/actions/catalogo/negocioEtiqueta.actions';
 import { type NegocioEtiquetaType } from '@/app/admin/_lib/actions/catalogo/negocioEtiqueta.schemas';
 // import { ActionResult } from '@/app/admin/_lib/types';
+import { Button } from '@/app/components/ui/button';
 
 import {
     Loader2, Save, /*Trash2,*/ Sparkles, Settings, Info,
@@ -50,10 +52,10 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    const [nivelCreatividad, setNivelCreatividad] = useState<NivelCreatividadIA>('medio');
-    const [maxCaracteres, setMaxCaracteres] = useState<number>(250); // Aumentado un poco
-    const [isImprovingDesc, setIsImprovingDesc] = useState(false);
-    const [descripcionOriginalIA, setDescripcionOriginalIA] = useState<string | null | undefined>(null);
+    // const [nivelCreatividad, setNivelCreatividad] = useState<NivelCreatividadIA>('medio');
+    // const [maxCaracteres, setMaxCaracteres] = useState<number>(250); // Aumentado un poco
+    const [isImprovingDesc] = useState(false);
+    // const [descripcionOriginalIA, setDescripcionOriginalIA] = useState<string | null | undefined>(null);
 
 
     // Clases de Tailwind
@@ -80,8 +82,8 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
     const switchButtonClasses = "relative inline-flex items-center h-5 rounded-full w-9 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-blue-500 disabled:opacity-50 cursor-pointer";
     const switchKnobClasses = "inline-block w-3.5 h-3.5 transform bg-white rounded-full transition-transform";
 
-    const aiButtonBaseClasses = "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-zinc-800 disabled:opacity-50";
-    const improveAiButtonClasses = `${aiButtonBaseClasses} text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 border-purple-500/40 focus:ring-purple-500`;
+    // const aiButtonBaseClasses = "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-zinc-800 disabled:opacity-50";
+    // const improveAiButtonClasses = `${aiButtonBaseClasses} text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 border-purple-500/40 focus:ring-purple-500`;
     // const suggestionActionClasses = "px-2 py-0.5 text-[10px] font-medium rounded-md border flex items-center gap-1";
 
     const messageBoxBaseClasses = "p-3 rounded-md text-sm my-3 flex items-center gap-2";
@@ -119,7 +121,7 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
                 });
                 const initialEtiquetas = new Set(itemData.itemEtiquetas?.map(et => et.etiquetaId) || []);
                 setSelectedEtiquetas(initialEtiquetas);
-                setDescripcionOriginalIA(itemData.descripcion); // Guardar para posible reversión de IA
+                // setDescripcionOriginalIA(itemData.descripcion); // Guardar para posible reversión de IA
             } else {
                 setError(result.error || "Ítem no encontrado.");
             }
@@ -229,44 +231,64 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
         }
     };
 
-    const handleMejorarConIA = async () => {
-        if (!formData.descripcion?.trim() && !descripcionOriginalIA?.trim()) {
-            setError("Escribe una descripción primero para poder mejorarla.");
-            return;
-        }
-        setIsImprovingDesc(true); setError(null); setSuccessMessage(null);
+    // const handleMejorarConIA = async () => {
+    //     if (!formData.descripcion?.trim() && !descripcionOriginalIA?.trim()) {
+    //         setError("Escribe una descripción primero para poder mejorarla.");
+    //         return;
+    //     }
+    //     setIsImprovingDesc(true); setError(null); setSuccessMessage(null);
 
-        const descripcionParaMejorar = formData.descripcion?.trim() || descripcionOriginalIA?.trim();
+    //     const descripcionParaMejorar = formData.descripcion?.trim() || descripcionOriginalIA?.trim();
 
-        try {
-            const dataForIA: MejorarDescripcionItemIAData = {
-                itemId,
-                descripcionActual: descripcionParaMejorar,
-                nivelCreatividad,
-                maxCaracteres
-            };
-            const result = await mejorarDescripcionItemIA(dataForIA);
-            if (result.success && result.data?.sugerencia) {
-                setFormData(prev => ({ ...prev, descripcion: result.data?.sugerencia }));
-                setSuccessMessage("Descripción mejorada con IA.");
-            } else {
-                throw new Error(result.error || "No se pudo obtener la sugerencia de mejora.");
+    //     try {
+    //         const dataForIA: MejorarDescripcionItemIAData = {
+    //             itemId,
+    //             descripcionActual: descripcionParaMejorar,
+    //             nivelCreatividad,
+    //             maxCaracteres
+    //         };
+    //         const result = await mejorarDescripcionItemIA(dataForIA);
+    //         if (result.success && result.data?.sugerencia) {
+    //             setFormData(prev => ({ ...prev, descripcion: result.data?.sugerencia }));
+    //             setSuccessMessage("Descripción mejorada con IA.");
+    //         } else {
+    //             throw new Error(result.error || "No se pudo obtener la sugerencia de mejora.");
+    //         }
+    //     } catch (err) {
+    //         console.error("Error llamando a mejorarDescripcionItemIA:", err);
+    //         setError(err instanceof Error ? err.message : "Error al mejorar con IA.");
+    //     } finally {
+    //         setIsImprovingDesc(false);
+    //     }
+    // };
+
+    // const revertirDescripcionIA = () => {
+    //     if (descripcionOriginalIA !== undefined) {
+    //         setFormData(prev => ({ ...prev, descripcion: descripcionOriginalIA }));
+    //         setSuccessMessage("Descripción revertida al original.");
+    //     }
+    // };
+
+    const handleEliminarItem = async () => {
+        if (confirm("¿Estás seguro de que deseas eliminar este ítem? Esta acción no se puede deshacer.")) {
+            setIsSubmitting(true);
+            try {
+                const result = await eliminarItemCatalogo(itemId, catalogoId, negocioId, clienteId);
+                if (result.success) {
+                    setSuccessMessage("Ítem eliminado exitosamente.");
+                    router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/catalogo/${catalogoId}`);
+                    router.refresh();
+                } else {
+                    setError(result.error || "No se pudo eliminar el ítem.");
+                }
+            } catch (err) {
+                console.error("Error eliminando ítem:", err);
+                setError(err instanceof Error ? err.message : "Ocurrió un error desconocido.");
+            } finally {
+                setIsSubmitting(false);
             }
-        } catch (err) {
-            console.error("Error llamando a mejorarDescripcionItemIA:", err);
-            setError(err instanceof Error ? err.message : "Error al mejorar con IA.");
-        } finally {
-            setIsImprovingDesc(false);
         }
-    };
-
-    const revertirDescripcionIA = () => {
-        if (descripcionOriginalIA !== undefined) {
-            setFormData(prev => ({ ...prev, descripcion: descripcionOriginalIA }));
-            setSuccessMessage("Descripción revertida al original.");
-        }
-    };
-
+    }
 
     if (loading) {
         return (
@@ -313,15 +335,43 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
                     </button>
                     <h2 className={titleCardClasses}>Editar Ítem</h2>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => handleSubmit()}
-                    className={primaryButtonClasses}
-                    disabled={disableAllActions}
-                >
-                    {isSubmitting ? <Loader2 className='animate-spin' size={16} /> : <Save size={16} />}
-                    <span>Guardar Cambios</span>
-                </button>
+
+
+
+                <div className="flex items-center gap-2 ml-auto">
+
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={handleEliminarItem}
+                        disabled={disableAllActions}
+                    >
+                        Eliminar
+                    </Button>
+
+
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => router.back()}
+                        className="ml-auto"
+                        disabled={disableAllActions}
+                    >
+                        <ArrowLeft size={16} /> Volver
+                    </Button>
+
+
+                    <Button
+                        type="submit"
+                        variant="default"
+                        className={primaryButtonClasses}
+                        disabled={disableAllActions || isSubmitting}
+                        form="" // asegura que actúa como submit del form principal
+                    >
+                        {isSubmitting ? <Loader2 className='animate-spin' size={16} /> : <Save size={16} />}
+                        <span>Guardar Cambios</span>
+                    </Button>
+                </div>
             </div>
 
             {error && !successMessage && <div className={`${errorBoxClasses} mx-4 md:mx-6`}><AlertCircle size={18} /><span>{error}</span></div>}
@@ -340,8 +390,8 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
                                 </div>
                                 <div>
                                     <label htmlFor="descripcion" className={labelBaseClasses}>Descripción</label>
-                                    <textarea id="descripcion" name="descripcion" value={formData.descripcion || ''} onChange={handleChange} className={`${textareaBaseClasses} !min-h-[120px] whitespace-pre-wrap`} disabled={disableAllActions} rows={5} />
-                                    <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <textarea id="descripcion" name="descripcion" value={formData.descripcion || ''} onChange={handleChange} className={`${textareaBaseClasses} !min-h-[300px] whitespace-pre-wrap`} disabled={disableAllActions} rows={5} />
+                                    {/* <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                         <button type="button" onClick={handleMejorarConIA} className={improveAiButtonClasses} disabled={disableAllActions || !formData.descripcion?.trim()} title={!formData.descripcion?.trim() ? "Escribe una descripción primero" : "Mejorar descripción con IA"}>
                                             {isImprovingDesc ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                                             <span>{isImprovingDesc ? 'Mejorando...' : 'Mejorar con IA'}</span>
@@ -351,8 +401,8 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
                                                 Revertir a Original
                                             </button>
                                         )}
-                                    </div>
-                                    <div className="mt-2 grid grid-cols-2 gap-2 items-center">
+                                    </div> */}
+                                    {/* <div className="mt-2 grid grid-cols-2 gap-2 items-center">
                                         <div>
                                             <label htmlFor="nivelCreatividad" className={`${labelBaseClasses} !mb-0.5`}>Creatividad IA:</label>
                                             <select id="nivelCreatividad" value={nivelCreatividad} onChange={(e) => setNivelCreatividad(e.target.value as NivelCreatividadIA)} className={`${selectClasses} !py-1 !text-xs`} disabled={disableAllActions}>
@@ -363,13 +413,22 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
                                             <label htmlFor="maxCaracteres" className={`${labelBaseClasses} !mb-0.5`}>Máx. Caracteres:</label>
                                             <input type="number" id="maxCaracteres" value={maxCaracteres} onChange={(e) => setMaxCaracteres(Math.max(50, Math.min(parseInt(e.target.value) || 50, 1000)))} className={`${inputBaseClasses} !py-1 !text-xs`} disabled={disableAllActions} min="50" max="1000" step="50" />
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             </div>
                         </div>
 
                         <div className={sectionContainerClasses}>
                             <h3 className={sectionTitleClasses}><Settings size={15} /> Organización y Tipo</h3>
+
+                            <div className='mb-3'>
+                                <label htmlFor="tipoItem" className={labelBaseClasses}>Tipo de Ítem</label>
+                                <select id="tipoItem" name="tipoItem" value={formData.tipoItem || 'PRODUCTO'} onChange={handleChange} className={selectClasses} disabled={disableAllActions}>
+                                    <option value="PRODUCTO">Producto (Bien tangible)</option>
+                                    <option value="SERVICIO">Servicio (Intangible, cita, etc.)</option>
+                                </select>
+                            </div>
+
                             <div className="space-y-3">
                                 <div>
                                     <label htmlFor="categoriaId" className={labelBaseClasses}>Categoría</label>
@@ -391,13 +450,7 @@ export default function ItemEditarForm({ itemId, catalogoId, negocioId, clienteI
                                         </div>
                                     }
                                 </div>
-                                <div>
-                                    <label htmlFor="tipoItem" className={labelBaseClasses}>Tipo de Ítem</label>
-                                    <select id="tipoItem" name="tipoItem" value={formData.tipoItem || 'PRODUCTO'} onChange={handleChange} className={selectClasses} disabled={disableAllActions}>
-                                        <option value="PRODUCTO">Producto (Bien tangible)</option>
-                                        <option value="SERVICIO">Servicio (Intangible, cita, etc.)</option>
-                                    </select>
-                                </div>
+
                             </div>
                         </div>
                     </div>

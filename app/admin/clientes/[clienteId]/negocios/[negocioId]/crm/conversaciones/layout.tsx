@@ -1,3 +1,4 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/layout.tsx
 import React from 'react';
 import ListaConversaciones from './components/ListaConversaciones';
 

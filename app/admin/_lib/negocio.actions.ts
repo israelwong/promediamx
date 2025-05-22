@@ -204,15 +204,15 @@ export async function actualizarNegocio(negocioId: string, negocio: Negocio) {
             direccion: negocio.direccion,
             googleMaps: negocio.googleMaps,
             paginaWeb: negocio.paginaWeb,
-            horarioAtencion: negocio.horarioAtencion,
+            // horarioAtencion: negocio.horarioAtencion,
             garantias: negocio.garantias,
             politicas: negocio.politicas,
             avisoPrivacidad: negocio.avisoPrivacidad,
             competencia: negocio.competencia,
             clienteIdeal: negocio.clienteIdeal,
             terminologia: negocio.terminologia,
-            preguntasFrecuentes: negocio.preguntasFrecuentes,
-            objeciones: negocio.objeciones,
+            // preguntasFrecuentes: negocio.preguntasFrecuentes,
+            // objeciones: negocio.objeciones,
             status: negocio.status ?? undefined,
             clienteId: negocio.clienteId,
         }
@@ -251,9 +251,9 @@ export async function generarPrompt(negocioId: string, palabrasClave: string) {
         if (negocio.email && negocio.email.trim() !== '') {
             contacto.push(`- **Email:** ${negocio.email}`);
         }
-        if (negocio.horarioAtencion && negocio.horarioAtencion.trim() !== '') {
-            contacto.push(`- **Horario de Atención:**\n${negocio.horarioAtencion}`);
-        }
+        // if (negocio.horarioAtencion && negocio.horarioAtencion.trim() !== '') {
+        //     contacto.push(`- **Horario de Atención:**\n${negocio.horarioAtencion}`);
+        // }
         if (negocio.direccion && negocio.direccion.trim() !== '') {
             contacto.push(`- **Dirección:** ${negocio.direccion}`);
         }
@@ -285,11 +285,11 @@ export async function generarPrompt(negocioId: string, palabrasClave: string) {
             informacionAdicional.push(`- **Políticas:** ${negocio.politicas}`);
         }
     }
-    if (!keywords || (negocio.catalogoDescriptivo && (keywords.includes('catalogo_descriptivo') || keywords.includes('catálogo') || keywords.includes('descriptivo')))) {
-        if (negocio.catalogoDescriptivo && negocio.catalogoDescriptivo.trim() !== '') {
-            informacionAdicional.push(`- **Catálogo Descriptivo:** ${negocio.catalogoDescriptivo}`);
-        }
-    }
+    // if (!keywords || (negocio.catalogoDescriptivo && (keywords.includes('catalogo_descriptivo') || keywords.includes('catálogo') || keywords.includes('descriptivo')))) {
+    //     if (negocio.catalogoDescriptivo && negocio.catalogoDescriptivo.trim() !== '') {
+    //         informacionAdicional.push(`- **Catálogo Descriptivo:** ${negocio.catalogoDescriptivo}`);
+    //     }
+    // }
 
     if (informacionAdicional.length > 0) {
         sections.push(`## Información Adicional\n${informacionAdicional.join('\n')}`);
@@ -307,12 +307,12 @@ export async function generarPrompt(negocioId: string, palabrasClave: string) {
         analisisEstrategia.push(`- **Terminología Especializada:** ${negocio.terminologia}`);
     }
 
-    if (!keywords || (negocio.preguntasFrecuentes && keywords.includes('preguntas_frecuentes'))) {
-        analisisEstrategia.push(`- **Preguntas Frecuentes:** ${negocio.preguntasFrecuentes}`);
-    }
-    if (!keywords || (negocio.objeciones && (keywords.includes('objeciones') || keywords.includes('queja')))) {
-        analisisEstrategia.push(`- **Objeciones Comunes:** ${negocio.objeciones}`);
-    }
+    // if (!keywords || (negocio.preguntasFrecuentes && keywords.includes('preguntas_frecuentes'))) {
+    //     analisisEstrategia.push(`- **Preguntas Frecuentes:** ${negocio.preguntasFrecuentes}`);
+    // }
+    // if (!keywords || (negocio.objeciones && (keywords.includes('objeciones') || keywords.includes('queja')))) {
+    //     analisisEstrategia.push(`- **Objeciones Comunes:** ${negocio.objeciones}`);
+    // }
     if (analisisEstrategia.length > 0) {
         sections.push(`## Análisis y Estrategia\n${analisisEstrategia.join('\n')}`);
     }
@@ -353,7 +353,7 @@ export async function obtenerDatosHeaderNegocio(negocioId: string): Promise<Nego
                 AsistenteVirtual: {
                     select: {
                         id: true,
-                        precioBase: true, // Asegúrate que este campo exista
+                        // precioBase: true, // Asegúrate que este campo exista
                         nombre: true, // Include 'nombre' to match NegocioHeaderData
                         version: true, // Include 'version' to match NegocioHeaderData
                         // Incluir solo suscripciones activas y con monto para cálculo
@@ -429,7 +429,7 @@ export async function obtenerNegociosPorClienteIdConDetalles(clienteId: string):
                     where: { status: 'activo' }, // O considerar todos los asistentes?
                     select: {
                         id: true,
-                        precioBase: true, // ¡Necesario!
+                        // precioBase: true, // ¡Necesario!
                         status: true,
                         AsistenteTareaSuscripcion: {
                             where: { status: 'activo' }, // Solo suscripciones activas
@@ -487,7 +487,7 @@ export async function obtenerDetallesNegocioParaEditar(negocioId: string): Promi
 export async function actualizarDetallesNegocio(
     negocioId: string,
     data: ActualizarNegocioInput
-): Promise<ActionResult> {
+): Promise<ActionResult<void>> {
     if (!negocioId) return { success: false, error: "ID de negocio no proporcionado." };
     // Quitar explícitamente redesSociales si aún viniera en data por error
     if ('redesSociales' in data) {
@@ -646,7 +646,7 @@ export async function obtenerEstadoConfiguracionNegocio(negocioId: string): Prom
     try {
         const negocio = await prisma.negocio.findUnique({
             where: { id: negocioId },
-            select: { id: true, logo: true, nombre: true, slogan: true, descripcion: true, telefonoLlamadas: true, telefonoWhatsapp: true, email: true, direccion: true, politicas: true, avisoPrivacidad: true, clienteIdeal: true, terminologia: true, preguntasFrecuentes: true, objeciones: true, }
+            select: { id: true, logo: true, nombre: true, slogan: true, descripcion: true, telefonoLlamadas: true, telefonoWhatsapp: true, email: true, direccion: true, politicas: true, avisoPrivacidad: true, clienteIdeal: true, terminologia: true, }
         });
         if (!negocio) { console.warn(`Negocio ${negocioId} no encontrado.`); return null; }
         const seccionesCompletas: { [key: string]: boolean } = {
@@ -654,7 +654,7 @@ export async function obtenerEstadoConfiguracionNegocio(negocioId: string): Prom
             contacto: !!(negocio.telefonoLlamadas?.trim() || negocio.telefonoWhatsapp?.trim() || negocio.email?.trim()),
             politicas: !!(negocio.politicas?.trim() || negocio.avisoPrivacidad?.trim()),
             marketing: !!(negocio.clienteIdeal?.trim() || negocio.terminologia?.trim()),
-            faqObjeciones: !!(negocio.preguntasFrecuentes?.trim() || negocio.objeciones?.trim()),
+            // faqObjeciones: !!(negocio.preguntasFrecuentes?.trim() || negocio.objeciones?.trim()),
         };
         const totalSecciones = Object.keys(seccionesCompletas).length;
         const seccionesCompletadas = Object.values(seccionesCompletas).filter(Boolean).length;

@@ -3,10 +3,11 @@
 
 import prisma from '../prismaClient'; // Tu cliente Prisma
 import { ActionResult } from '../types'; // Asumo que tienes este tipo genérico
-import { ListarHorariosDisponiblesArgs, ListarHorariosDisponiblesData } from './listarHorariosDisponiblesAgenda.type';
-import { ConfiguracionAgendaDelNegocio } from './agendarCita.type'; // Necesitaremos la config del negocio
-import { parsearFechaHoraInteligente } from './agendarCita.actions'; // Reutilizamos el parseador de fecha
-import { verificarDisponibilidadSlot } from './agendarCita.actions'; // Reutilizamos el verificador de slot
+
+import { ListarHorariosDisponiblesArgs, ListarHorariosDisponiblesData } from './listarHorariosDisponiblesAgenda.schemas';
+import { ConfiguracionAgendaDelNegocio } from './agendarCita.schemas'; // Necesitaremos la config del negocio
+import { parsearFechaHoraInteligente, verificarDisponibilidadSlot } from './agendarCita.actions'; // Reutilizamos el verificador de slot
+
 import { DiaSemana } from '@prisma/client'; // Tipos de Prisma
 
 import {

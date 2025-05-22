@@ -3,7 +3,7 @@
 
 import prisma from '../prismaClient'; // Ajusta la ruta a tu prismaClient
 import { ActionResult } from '../types'; // Ajusta la ruta a tus tipos globales
-import { MostrarOfertasArgs, MostrarOfertasData, OfertaResumen } from './mostrarOfertas.type';
+import { MostrarOfertasArgs, MostrarOfertasData, OfertaResumen } from './mostrarOfertas.schemas';
 
 // --- Implementación de la función auxiliar (si no está global) ---
 async function actualizarTareaEjecutadaFallidaInterna(tareaEjecutadaId: string, mensajeError: string) {
@@ -18,16 +18,12 @@ async function actualizarTareaEjecutadaFallidaInterna(tareaEjecutadaId: string, 
         console.error(`[mostrarOfertas] Error al actualizar TareaEjecutada ${tareaEjecutadaId} como fallida:`, updateError);
     }
 }
-// --- Fin función auxiliar ---
 
-/**
- * Ejecuta la lógica para obtener y listar las ofertas activas de un negocio.
- * Construye un mensaje para el usuario basado en las ofertas encontradas.
- */
 export async function ejecutarMostrarOfertasAction(
     argumentos: MostrarOfertasArgs,
     tareaEjecutadaId: string
 ): Promise<ActionResult<MostrarOfertasData>> {
+
     console.log(`[Ejecución Función] Iniciando ejecutarMostrarOfertasAction para TareaEjecutada ${tareaEjecutadaId}`);
     console.log("[Ejecución Función] Argumentos recibidos:", argumentos);
 

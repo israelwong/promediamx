@@ -1,3 +1,5 @@
+//ruta actual app/admin/_lib/actions/negocio/negocioImagenLogo.actions.ts
+
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';

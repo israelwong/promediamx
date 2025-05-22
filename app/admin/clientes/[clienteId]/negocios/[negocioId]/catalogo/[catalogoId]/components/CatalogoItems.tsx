@@ -16,6 +16,8 @@ import {
     Users, Search, Filter, Box, Plus, AlertCircle, CheckCircle
 } from 'lucide-react';
 
+import { Button } from '@/app/components/ui/button'; // Componente de botón de UI
+
 // Actions y tipos Zod
 import {
     obtenerItemsParaCatalogo,
@@ -248,10 +250,12 @@ export default function CatalogoItems({ catalogoId, negocioId, clienteId }: Prop
                 <Box size={48} className="mb-4" />
                 <p className="text-lg font-medium mb-2">Este catálogo aún no tiene ítems.</p>
                 <p className="text-sm mb-6">Comienza añadiendo tu primer producto o servicio.</p>
-                <button
+                <Button
                     onClick={handleCrearItem}
                     className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800 flex items-center gap-2"
-                > <Plus size={16} /> Añadir Primer Ítem </button>
+                >
+                    <Plus size={16} /> Añadir Primer Ítem
+                </Button>
             </div>
         );
         if (filteredItems.length === 0) return <div className="text-center py-10 text-zinc-500">No se encontraron ítems con los filtros aplicados.</div>;
@@ -286,13 +290,15 @@ export default function CatalogoItems({ catalogoId, negocioId, clienteId }: Prop
                             <input
                                 type="text" placeholder="Buscar por nombre, descripción..." value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-zinc-900 border border-zinc-600 text-zinc-200 text-sm block w-full rounded-md py-1.5 px-2.5 pl-8 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                className="bg-zinc-900 border border-zinc-600 text-zinc-200 text-sm block w-full rounded-md py-2 px-2.5 pl-8 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
-                        <button
+                        <Button
                             onClick={handleCrearItem}
-                            className="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-zinc-800 flex items-center gap-1.5 whitespace-nowrap"
-                        > <Plus size={14} /> Nuevo Ítem </button>
+                            variant='secondary'
+                        >
+                            <Plus size={14} /> Nuevo Ítem
+                        </Button>
                     </div>
                 </div>
                 {categorias.length > 0 && (

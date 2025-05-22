@@ -7,8 +7,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
     ListChecks,      // Para Tareas
-    FunctionSquare,  // Para Funciones
-    SlidersHorizontal, // Para Parametros
+    // FunctionSquare,  // Para Funciones
+    // SlidersHorizontal, // Para Parametros
     Folder,          // Para Categorias
     Tag,             // Para Etiquetas
     MessagesSquare   // Para Canales
@@ -23,8 +23,8 @@ interface NavLink {
 
 const navLinks: NavLink[] = [
     { hrefSuffix: '/', icon: ListChecks, label: 'Tareas' },
-    { hrefSuffix: '/funciones', icon: FunctionSquare, label: 'Funciones' },
-    { hrefSuffix: '/parametros', icon: SlidersHorizontal, label: 'Parámetros' },
+    // { hrefSuffix: '/funciones', icon: FunctionSquare, label: 'Funciones' },
+    // { hrefSuffix: '/parametros', icon: SlidersHorizontal, label: 'Parámetros' },
     { hrefSuffix: '/categorias', icon: Folder, label: 'Categorías' }, // Asumiendo que "Categorias" se refiere a CategoriaTarea
     { hrefSuffix: '/etiquetas', icon: Tag, label: 'Etiquetas' },     // Asumiendo que "Etiquetas" se refiere a EtiquetaTarea
     { hrefSuffix: '/canales', icon: MessagesSquare, label: 'Canales' }, // Asumiendo que "Canales" se refiere a CanalConversacional

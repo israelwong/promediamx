@@ -32,7 +32,7 @@ export async function obtenerDatosFacturacionCliente(clienteId: string): Promise
                             where: { status: 'activo' },
                             select: {
                                 id: true,
-                                precioBase: true,
+                                // precioBase: true,
                                 AsistenteTareaSuscripcion: {
                                     where: { status: 'activo' },
                                     select: { montoSuscripcion: true, status: true }
@@ -52,7 +52,7 @@ export async function obtenerDatosFacturacionCliente(clienteId: string): Promise
         let montoEstimado = 0;
         clienteConDatos.negocio?.forEach(negocio => {
             negocio.AsistenteVirtual?.forEach(asistente => {
-                montoEstimado += typeof asistente.precioBase === 'number' ? asistente.precioBase : 0;
+                // montoEstimado += typeof asistente.precioBase === 'number' ? asistente.precioBase : 0;
                 asistente.AsistenteTareaSuscripcion?.forEach(suscripcion => {
                     if (suscripcion.status === 'activo' && typeof suscripcion.montoSuscripcion === 'number') {
                         montoEstimado += suscripcion.montoSuscripcion;

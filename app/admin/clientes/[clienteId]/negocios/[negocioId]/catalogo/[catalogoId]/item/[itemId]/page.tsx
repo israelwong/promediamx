@@ -29,7 +29,7 @@ export default async function ItemEditarPage({ params }: { params: Promise<PageP
 
     return (
         // Contenedor principal con un layout flexible para diferentes tamaños de pantalla
-        <div className="flex flex-col xl:flex-row gap-6 lg:gap-8 h-full">
+        <div className="flex flex-col xl:flex-row gap-6 lg:gap-6 h-full">
             {/* Columna Principal: Formulario de Edición (ocupa más espacio) */}
             {/* En pantallas xl y mayores, ocupa 3/5, en más pequeñas, 2/3 o todo el ancho si se apilan */}
             <div className="xl:w-3/5 lg:w-2/3 w-full flex-shrink-0">

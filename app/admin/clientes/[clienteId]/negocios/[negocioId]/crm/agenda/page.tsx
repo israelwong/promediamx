@@ -1,3 +1,4 @@
+// Ruta del archivo: app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/agenda/page.tsx
 import React from 'react'
 import { Metadata } from 'next'
 

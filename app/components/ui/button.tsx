@@ -1,3 +1,4 @@
+
 // components/ui/button.tsx (o tu ruta de componentes UI)
 import React from 'react';
 import { Slot } from '@radix-ui/react-slot'; // Necesario para 'asChild'

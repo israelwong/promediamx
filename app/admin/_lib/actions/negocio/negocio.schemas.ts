@@ -12,12 +12,9 @@ export const NegocioEditableCoreSchema = z.object({
     direccion: z.string().nullish(),
     googleMaps: z.string().url({ message: "URL de Google Maps inválida." }).nullish().or(z.literal('')),
     paginaWeb: z.string().url({ message: "URL de página web inválida." }).nullish().or(z.literal('')),
-    horarioAtencion: z.string().nullish(),
     garantias: z.string().nullish(),
     politicas: z.string().nullish(),
     avisoPrivacidad: z.string().nullish(),
-    preguntasFrecuentes: z.string().nullish(),
-    objeciones: z.string().nullish(),
     status: z.enum(['activo', 'inactivo']).default('inactivo'),
 });
 

@@ -1,33 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
 // --- DnD Imports ---
 import {
-    DndContext,
-    closestCenter,
-    KeyboardSensor,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    DragEndEvent,
-    TouchSensor
+    DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, TouchSensor
 } from '@dnd-kit/core';
 import {
-    arrayMove,
-    SortableContext,
-    sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
-    useSortable
+    arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-// --- Fin DnD Imports ---
 
-import {
-    Loader2, Edit, Trash2, PlusIcon, Save, XIcon, AlertTriangleIcon, CheckSquare, ListPlus,
-    Check, GripVertical, Copy
-} from 'lucide-react';
-
-// NUEVAS IMPORTS de Actions y Schemas/Types
+// --- ACCIONES Y SCHEMAS/TIPOS ---
 import {
     obtenerTiposCitaAction,
     crearTipoCitaAction,
@@ -35,278 +18,246 @@ import {
     eliminarTipoCitaAction,
     actualizarOrdenTiposCitaAction
 } from '@/app/admin/_lib/actions/agendaTipoCita/agendaTipoCita.actions';
-import type {
-    AgendaTipoCitaData,
-    UpsertAgendaTipoCitaFormInput,
-    // OrdenAgendaTipoCitaItem,
+import {
+    upsertAgendaTipoCitaFormSchema,
+    type AgendaTipoCitaData as BaseAgendaTipoCitaData,
+    type UpsertAgendaTipoCitaFormInput,
 } from '@/app/admin/_lib/actions/agendaTipoCita/agendaTipoCita.schemas';
-// ActionResult ya debería ser un tipo global
-// import type { ActionResult } from '@/app/admin/_lib/types';
+import type { ActionResult } from '@/app/admin/_lib/types';
 
+// Extiende el tipo para incluir _count opcionalmente
+type AgendaTipoCitaData = BaseAgendaTipoCitaData & {
+    _count?: { agendas?: number };
+};
+// import type { CategoriaTarea as CategoriaTareaPrisma } from '@prisma/client'; // Asumiendo que AgendaTipoCita es similar o tiene su propio tipo Prisma
 
+// --- ICONOS ---
+import {
+    Loader2, Edit, Trash2, PlusIcon, Save, XIcon, AlertTriangleIcon, CheckSquare, ListPlus,
+    Check, GripVertical, Copy, ClockIcon
+} from 'lucide-react';
+
+// --- PROPS DEL COMPONENTE ---
 interface TiposCitaSeccionProps {
     negocioId: string;
-    isSavingGlobal: boolean; // Para deshabilitar acciones si otra parte de la página principal está guardando
-    // initialTiposCita?: AgendaTipoCitaData[]; // Recibirá los datos del componente padre AgendaConfiguracion.tsx
+    isSavingGlobal: boolean; // Para deshabilitar si otra parte de la página está guardando
+    initialTiposCita?: AgendaTipoCitaData[]; // Datos iniciales opcionales
 }
 
-// El estado local usará directamente AgendaTipoCitaData y asegurará que `orden` sea un número
-// si la carga inicial desde la BD puede tener `orden` como null.
-interface TipoCitaLocalState extends AgendaTipoCitaData {
-    orden: number; // Para DnD, siempre debe ser un número en el estado local.
-}
-
-
+// Estado inicial del formulario modal
 const formInicialTipoCita: UpsertAgendaTipoCitaFormInput = {
     nombre: '',
     descripcion: null,
     duracionMinutos: 30,
+    todoElDia: false,
     esVirtual: false,
     esPresencial: false,
     limiteConcurrencia: 1,
+    activo: true,
 };
 
-// Componente SortableTipoCitaRow (MODIFICADO para usar AgendaTipoCitaData y permitir edición en toda la fila)
+// --- Componente SortableTipoCitaRow ---
 function SortableTipoCitaRow({
-    tipoCita, // Ahora es AgendaTipoCitaData o TipoCitaLocalState
-    onEdit,
-    onDelete,
-    onClone,
-    isSubmittingModal,
-    isSavingGlobal
+    tipoCita, onEdit, onDelete, onClone, isSubmittingModal, isSavingGlobal
 }: {
-    tipoCita: TipoCitaLocalState;
+    tipoCita: AgendaTipoCitaData; // Usar AgendaTipoCitaData que ya incluye orden como number|null
     onEdit: (tipo: AgendaTipoCitaData) => void;
     onDelete: (id: string, nombre: string) => void;
     onClone: (tipo: AgendaTipoCitaData) => void;
     isSubmittingModal: boolean;
     isSavingGlobal: boolean;
 }) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: tipoCita.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.7 : 1,
-        zIndex: isDragging ? 10 : undefined,
-    };
-
-    const tdClasses = "px-3 py-3 text-sm text-zinc-300 whitespace-nowrap cursor-pointer"; // Añadido cursor-pointer
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tipoCita.id });
+    const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.7 : 1, zIndex: isDragging ? 10 : undefined, };
+    const tdClasses = "px-3 py-2.5 text-sm text-zinc-300 whitespace-nowrap";
     const buttonIconClasses = "p-1.5 text-zinc-400 hover:text-zinc-100 rounded-md hover:bg-zinc-700 disabled:text-zinc-600 disabled:cursor-not-allowed";
     const checkIconClasses = "text-green-400";
     const noCheckIconClasses = "text-zinc-600";
 
     return (
-        <tr
-            ref={setNodeRef}
-            style={style}
-            className={`bg-zinc-800/50 hover:bg-zinc-700/40 transition-colors ${isDragging ? 'shadow-xl ring-1 ring-blue-500' : ''}`}
-            onClick={() => onEdit(tipoCita)} // Editar al hacer clic en la fila
-        >
-            <td className="px-3 py-3 text-sm text-zinc-300 whitespace-nowrap w-10 text-center">
-                <button
-                    {...attributes}
-                    {...listeners}
-                    className={`${buttonIconClasses} cursor-grab active:cursor-grabbing touch-none`}
-                    title="Reordenar"
-                    onClick={(e) => e.stopPropagation()} // Prevenir que se dispare onEdit de la fila
-                >
-                    <GripVertical size={16} />
-                </button>
-            </td>
+        <tr ref={setNodeRef} style={style} className={`bg-zinc-800/50 hover:bg-zinc-700/40 transition-colors cursor-pointer ${isDragging ? 'shadow-xl ring-1 ring-blue-500' : ''}`} onClick={() => onEdit(tipoCita)}>
+            <td className={`${tdClasses} w-10 text-center`}><button type="button" {...attributes} {...listeners} className={`${buttonIconClasses} cursor-grab active:cursor-grabbing touch-none`} title="Reordenar" onClick={(e) => e.stopPropagation()}><GripVertical size={16} /></button></td>
             <td className={`${tdClasses} font-medium text-zinc-100`}>{tipoCita.nombre}</td>
-            <td className={`${tdClasses} text-center w-32`}>
-                {tipoCita.duracionMinutos ? `${tipoCita.duracionMinutos} min` : <span className="text-zinc-500 italic">N/A</span>}
-            </td>
-            <td className={`${tdClasses} text-center w-24`}>
-                {tipoCita.limiteConcurrencia}
-            </td>
-            <td className={`${tdClasses} text-center w-24`}>
-                {tipoCita.esPresencial ? <Check size={18} className={checkIconClasses} /> : <XIcon size={18} className={noCheckIconClasses} />}
-            </td>
-            <td className={`${tdClasses} text-center w-20`}>
-                {tipoCita.esVirtual ? <Check size={18} className={checkIconClasses} /> : <XIcon size={18} className={noCheckIconClasses} />}
-            </td>
-            <td className={`${tdClasses} max-w-xs truncate text-zinc-400`} title={tipoCita.descripcion || ''}>
-                {tipoCita.descripcion || <span className="text-zinc-500 italic">N/A</span>}
-            </td>
-            <td className="px-3 py-3 text-sm text-zinc-300 whitespace-nowrap text-right">
-                <button onClick={(e) => { e.stopPropagation(); onClone(tipoCita); }} className={buttonIconClasses} title="Clonar tipo de cita" disabled={isSavingGlobal || isSubmittingModal}><Copy size={16} /></button>
-                <button onClick={(e) => { e.stopPropagation(); onEdit(tipoCita); }} className={buttonIconClasses} title="Editar tipo de cita" disabled={isSavingGlobal || isSubmittingModal}><Edit size={16} /></button>
-                <button onClick={(e) => { e.stopPropagation(); onDelete(tipoCita.id, tipoCita.nombre); }} className={`${buttonIconClasses} text-red-500 hover:text-red-400`} title="Eliminar tipo de cita" disabled={isSavingGlobal || isSubmittingModal}><Trash2 size={16} /></button>
+            <td className={`${tdClasses} text-center w-32`}>{tipoCita.todoElDia ? <span className="flex items-center justify-center gap-1 text-sky-400"><ClockIcon size={14} /> Todo el día</span> : (tipoCita.duracionMinutos ? `${tipoCita.duracionMinutos} min` : <span className="text-zinc-500 italic">N/A</span>)}</td>
+            <td className={`${tdClasses} text-center w-24`}>{tipoCita.limiteConcurrencia}</td>
+            <td className={`${tdClasses} text-center w-24`}>{tipoCita.esPresencial ? <Check size={18} className={checkIconClasses} /> : <XIcon size={18} className={noCheckIconClasses} />}</td>
+            <td className={`${tdClasses} text-center w-20`}>{tipoCita.esVirtual ? <Check size={18} className={checkIconClasses} /> : <XIcon size={18} className={noCheckIconClasses} />}</td>
+            <td className={`${tdClasses} max-w-xs truncate text-zinc-400`} title={tipoCita.descripcion || ''}>{tipoCita.descripcion || <span className="text-zinc-500 italic">N/A</span>}</td>
+            <td className={`${tdClasses} text-center w-20`}>{tipoCita._count?.agendas ?? 0}</td>
+            <td className={`${tdClasses} text-right w-[130px]`}>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onClone(tipoCita); }} className={buttonIconClasses} title="Clonar" disabled={isSavingGlobal || isSubmittingModal}><Copy size={15} /></button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(tipoCita); }} className={buttonIconClasses} title="Editar" disabled={isSavingGlobal || isSubmittingModal}><Edit size={15} /></button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(tipoCita.id, tipoCita.nombre); }} className={`${buttonIconClasses} hover:text-red-400`} title="Eliminar" disabled={isSavingGlobal || isSubmittingModal || (tipoCita._count?.agendas ?? 0) > 0}><Trash2 size={15} /></button>
             </td>
         </tr>
     );
 }
 
-
-export default function TiposCitaSeccion({
-    negocioId,
-    isSavingGlobal,
-    initialTiposCita // Desestructurar correctamente la prop opcional
-}: TiposCitaSeccionProps & { initialTiposCita?: AgendaTipoCitaData[] }) { // Añadir prop opcional para datos iniciales
-
-    // Estado local para los tipos de cita, compatible con DnD
-    const [tiposCita, setTiposCita] = useState<TipoCitaLocalState[]>([]);
-    const [loadingTiposCita, setLoadingTiposCita] = useState(true);
+// --- Componente Principal TiposCitaSeccion ---
+export default function TiposCitaSeccion({ negocioId, isSavingGlobal, initialTiposCita }: TiposCitaSeccionProps) {
+    const [tiposCita, setTiposCita] = useState<AgendaTipoCitaData[]>(initialTiposCita || []);
+    const [loadingTiposCita, setLoadingTiposCita] = useState(!initialTiposCita);
     const [errorTiposCita, setErrorTiposCita] = useState<string | null>(null);
-
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit' | 'clone'>('create');
-    const [currentTipoCita, setCurrentTipoCita] = useState<AgendaTipoCitaData | null>(null); // Usar AgendaTipoCitaData
+    const [currentTipoCita, setCurrentTipoCita] = useState<AgendaTipoCitaData | null>(null);
     const [formData, setFormData] = useState<UpsertAgendaTipoCitaFormInput>(formInicialTipoCita);
-
     const [isSubmittingModal, setIsSubmittingModal] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
+    const [modalValidationErrors, setModalValidationErrors] = useState<Partial<Record<keyof UpsertAgendaTipoCitaFormInput, string[]>>>({});
     const [modalSuccess, setModalSuccess] = useState<string | null>(null);
     const [isSavingOrder, setIsSavingOrder] = useState(false);
 
-    // Clases UI (sin cambios)
+    // Clases UI
     const tableClasses = "min-w-full";
-    const buttonPrimaryModal = "bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50";
-    const buttonSecondaryModal = "bg-zinc-600 hover:bg-zinc-500 text-zinc-100 text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50";
-    const buttonDangerModal = "bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50 mr-auto";
+    const headerClasses = "flex items-center justify-between mb-3 pb-3 border-b border-zinc-600";
+    const titleClasses = "text-md font-semibold text-zinc-100 flex items-center gap-2";
+    const buttonAddClasses = "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1.5 disabled:opacity-50";
+    const alertSectionErrorClasses = "text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 flex items-center gap-2 my-3";
     const modalOverlayClasses = "fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4";
-    const modalContentClasses = "bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-full max-w-lg flex flex-col overflow-hidden";
+    const modalContentClasses = "bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl w-full max-w-lg flex flex-col";
     const modalHeaderClasses = "flex items-center justify-between p-4 border-b border-zinc-700";
     const modalTitleClasses = "text-lg font-semibold text-zinc-100";
-    const modalBodyClasses = "p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-220px)]";
+    const modalBodyClasses = "p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-240px)]";
     const modalFooterClasses = "flex justify-end gap-3 p-4 border-t border-zinc-700 bg-zinc-900/30";
-    const labelBaseClasses = "block mb-1.5 text-sm font-medium text-zinc-300";
-    const inputBaseClasses = "bg-zinc-900 border border-zinc-700 text-zinc-300 placeholder:text-zinc-600 block w-full rounded-md p-2.5 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70 disabled:bg-zinc-950";
-    const textareaBaseClasses = `${inputBaseClasses} min-h-[80px] resize-none`;
-    const checkboxLabelClasses = "flex items-center gap-2 p-3 bg-zinc-900/50 border border-zinc-700 rounded-md hover:bg-zinc-700/30 cursor-pointer text-sm text-zinc-200";
-    const checkboxClasses = "h-5 w-5 rounded text-blue-600 bg-zinc-800 border-zinc-600 focus:ring-blue-500 focus:ring-offset-zinc-900/50";
+    const labelBaseClasses = "block mb-1 text-sm font-medium text-zinc-300";
+    const inputBaseClasses = "bg-zinc-900 border border-zinc-700 text-zinc-300 placeholder:text-zinc-500 block w-full rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70 disabled:bg-zinc-950 h-10";
+    const textareaBaseClasses = `${inputBaseClasses} min-h-[80px] h-auto resize-none`;
+    const checkboxLabelClasses = "flex items-center gap-2.5 p-2.5 bg-zinc-900/50 border border-zinc-700 rounded-md hover:bg-zinc-700/30 cursor-pointer text-sm text-zinc-200 transition-colors";
+    const checkboxInputClasses = "h-4 w-4 rounded text-blue-600 bg-zinc-800 border-zinc-600 focus:ring-blue-500 focus:ring-offset-zinc-900/50";
     const alertModalErrorClasses = "text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 flex items-center gap-2";
     const alertModalSuccessClasses = "text-sm text-green-400 bg-green-500/10 p-3 rounded-md border border-green-500/30 flex items-center gap-2";
-    const alertSectionErrorClasses = "text-sm text-red-400 bg-red-500/10 p-3 rounded-md border border-red-500/30 flex items-center gap-2 my-4";
+    const buttonModalPrimary = "bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50 min-w-[100px]";
+    const buttonModalSecondary = "bg-zinc-600 hover:bg-zinc-500 text-zinc-100 text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50";
+    const buttonModalDanger = "bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-md flex items-center justify-center gap-2 disabled:opacity-50 mr-auto";
 
-
-    const mapToLocalState = (data: AgendaTipoCitaData[]): TipoCitaLocalState[] => {
-        return data.map((tc, index) => ({
-            ...tc,
-            orden: typeof tc.orden === 'number' ? tc.orden : index, // Asegura que 'orden' sea un número
-        }));
-    };
-
-    const fetchTiposCitaLocal = useCallback(async (showLoading = true) => {
-        if (showLoading) setLoadingTiposCita(true);
+    const fetchTiposCitaLocal = useCallback(async (showLoadingIndicator = true) => {
+        if (!negocioId) {
+            setErrorTiposCita("ID de negocio no disponible para cargar tipos de cita.");
+            setLoadingTiposCita(false);
+            setTiposCita([]);
+            return;
+        }
+        if (showLoadingIndicator) setLoadingTiposCita(true);
         setErrorTiposCita(null);
-        // Usar la nueva action
-        const result = await obtenerTiposCitaAction(negocioId);
+        const result: ActionResult<AgendaTipoCitaData[]> = await obtenerTiposCitaAction(negocioId);
         if (result.success && result.data) {
-            setTiposCita(mapToLocalState(result.data));
+            setTiposCita(result.data);
         } else {
             setErrorTiposCita(result.error || "Error cargando tipos de cita.");
             setTiposCita([]);
         }
-        if (showLoading) setLoadingTiposCita(false);
+        if (showLoadingIndicator) setLoadingTiposCita(false);
     }, [negocioId]);
 
     useEffect(() => {
-        // Si initialTiposCita es provisto por el padre, usarlo, sino, cargar.
-        // Esto es relevante si AgendaConfiguracion.tsx carga todos los datos al inicio.
         if (initialTiposCita) {
-            setTiposCita(mapToLocalState(initialTiposCita));
+            setTiposCita(initialTiposCita.map((tc, index) => ({ ...tc, orden: tc.orden ?? index, activo: tc.activo ?? true })));
             setLoadingTiposCita(false);
+        } else if (negocioId) {
+            fetchTiposCitaLocal(true);
         } else {
-            fetchTiposCitaLocal();
+            setLoadingTiposCita(false);
+            setTiposCita([]);
         }
-    }, [fetchTiposCitaLocal, initialTiposCita]);
-
+    }, [fetchTiposCitaLocal, initialTiposCita, negocioId]);
 
     const openModal = (mode: 'create' | 'edit' | 'clone', tipoCita?: AgendaTipoCitaData) => {
-        setModalMode(mode);
-        setModalError(null);
-        setModalSuccess(null);
+        setModalMode(mode); setModalError(null); setModalSuccess(null); setModalValidationErrors({});
         if ((mode === 'edit' || mode === 'clone') && tipoCita) {
-            setCurrentTipoCita(tipoCita); // tipoCita ahora es AgendaTipoCitaData
+            setCurrentTipoCita(tipoCita);
             setFormData({
                 nombre: mode === 'clone' ? `${tipoCita.nombre} (Copia)` : tipoCita.nombre,
-                descripcion: tipoCita.descripcion, // Ya es nullable
-                duracionMinutos: tipoCita.duracionMinutos, // Ya es nullable
+                descripcion: tipoCita.descripcion,
+                duracionMinutos: tipoCita.todoElDia ? null : tipoCita.duracionMinutos, // Si es todo el día, duración es null
+                todoElDia: tipoCita.todoElDia ?? false,
                 esVirtual: tipoCita.esVirtual,
                 esPresencial: tipoCita.esPresencial,
                 limiteConcurrencia: tipoCita.limiteConcurrencia,
+                activo: tipoCita.activo ?? true,
             });
         } else {
-            setCurrentTipoCita(null);
-            setFormData(formInicialTipoCita);
+            setCurrentTipoCita(null); setFormData(formInicialTipoCita);
         }
         setIsModalOpen(true);
     };
 
     const closeModal = () => {
         setIsModalOpen(false);
-        // Retrasar el reseteo para que no se vea el cambio antes de que cierre la animación del modal
         setTimeout(() => {
-            setCurrentTipoCita(null);
-            setFormData(formInicialTipoCita);
-            setModalError(null);
-            setModalSuccess(null);
-            setIsSubmittingModal(false); // Asegurar que el submitting se resetee
-        }, 300); // Ajustar este tiempo si la animación del modal es diferente
+            setCurrentTipoCita(null); setFormData(formInicialTipoCita);
+            setModalError(null); setModalSuccess(null); setModalValidationErrors({});
+            setIsSubmittingModal(false);
+        }, 300);
     };
 
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const target = e.target as HTMLInputElement;
-        const { name, value, type } = target; // No necesitamos 'checked' explícitamente si usamos target.checked
-
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox'
-                ? target.checked
-                : (type === 'number'
-                    ? (value === '' ? null : parseInt(value, 10)) // Permitir que el campo numérico se vacíe a null
-                    : value)
-        }));
-        if (modalError) setModalError(null);
-        if (modalSuccess) setModalSuccess(null);
+        const { name, value, type, checked } = target;
+        setFormData(prev => {
+            const newState = {
+                ...prev,
+                [name]: type === 'checkbox' ? checked : (type === 'number' ? (value === '' ? null : parseInt(value, 10)) : value)
+            };
+            // Lógica para 'todoElDia' y 'duracionMinutos'
+            if (name === 'todoElDia') {
+                newState.duracionMinutos = checked ? null : (prev.duracionMinutos || 30); // Si se activa todoElDia, duración null, sino, valor previo o default
+            }
+            if (name === 'duracionMinutos' && newState.todoElDia) { // Si se cambia duración y todoElDia está activo, desactivar todoElDia
+                newState.todoElDia = false;
+            }
+            return newState;
+        });
+        setModalError(null); setModalSuccess(null); setModalValidationErrors({});
     };
 
-    const handleSubmitModal = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmitModal = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        setIsSubmittingModal(true);
-        setModalError(null);
-        setModalSuccess(null);
+        setModalError(null); setModalSuccess(null); setModalValidationErrors({});
 
-        // La validación de Zod se hace en la Server Action, pero podemos hacer una pre-validación aquí si queremos.
-        // upsertAgendaTipoCitaFormSchema.parseAsync(formData) podría usarse aquí, pero es redundante.
-
-        let result; // Tipo ActionResult<AgendaTipoCitaData>
-        const inputForAction: UpsertAgendaTipoCitaFormInput = {
-            ...formData,
-            // Zod schema se encarga de los defaults y transformaciones para nulls
+        const dataToValidate: UpsertAgendaTipoCitaFormInput = {
+            nombre: formData.nombre,
+            descripcion: formData.descripcion || null,
+            duracionMinutos: formData.todoElDia ? null : (formData.duracionMinutos ?? 0),
+            todoElDia: formData.todoElDia || false,
+            esVirtual: formData.esVirtual || false,
+            esPresencial: formData.esPresencial || false,
+            limiteConcurrencia: formData.limiteConcurrencia ?? 1,
+            activo: formData.activo ?? true,
         };
 
+        const validationResult = upsertAgendaTipoCitaFormSchema.safeParse(dataToValidate);
+        if (!validationResult.success) {
+            setModalValidationErrors(validationResult.error.flatten().fieldErrors as Partial<Record<keyof UpsertAgendaTipoCitaFormInput, string[]>>);
+            setModalError("Por favor, corrige los errores indicados.");
+            return;
+        }
+
+        setIsSubmittingModal(true);
         try {
+            let result: ActionResult<AgendaTipoCitaData>;
+            const validatedData = validationResult.data;
+
             if (modalMode === 'create' || modalMode === 'clone') {
-                result = await crearTipoCitaAction(negocioId, inputForAction);
+                result = await crearTipoCitaAction(negocioId, validatedData);
             } else if (modalMode === 'edit' && currentTipoCita?.id) {
-                result = await actualizarTipoCitaAction(currentTipoCita.id, inputForAction);
+                result = await actualizarTipoCitaAction(currentTipoCita.id, validatedData);
             } else {
-                throw new Error("Modo de operación o ID no válidos para el modal.");
+                throw new Error("Modo de operación o ID no válidos.");
             }
 
             if (result.success && result.data) {
-                setModalSuccess(`Tipo de cita "${result.data.nombre}" ${modalMode === 'create' || modalMode === 'clone' ? 'creado' : 'actualizado'} exitosamente.`);
-                await fetchTiposCitaLocal(false); // Recargar sin mostrar loader principal
+                setModalSuccess(`"${result.data.nombre}" ${modalMode === 'create' || modalMode === 'clone' ? 'creado' : 'actualizado'}.`);
+                await fetchTiposCitaLocal(false);
                 setTimeout(() => closeModal(), 1500);
             } else {
-                const errorMsg = result.errorDetails
-                    ? Object.entries(result.errorDetails).map(([key, val]) => `${key}: ${val.join(', ')}`).join('; ')
-                    : result.error || "Ocurrió un error desconocido.";
-                setModalError(errorMsg);
+                setModalError(result.error || "Error desconocido.");
+                if (result.validationErrors) {
+                    setModalValidationErrors(result.validationErrors as Partial<Record<keyof UpsertAgendaTipoCitaFormInput, string[]>>);
+                }
             }
-        } catch (err) {
-            setModalError(err instanceof Error ? err.message : "Un error inesperado ocurrió durante el guardado.");
+        } catch (err: unknown) {
+            setModalError(err instanceof Error ? err.message : "Error inesperado.");
         } finally {
             setIsSubmittingModal(false);
         }
@@ -314,28 +265,18 @@ export default function TiposCitaSeccion({
 
     const handleDeleteTipoCita = async (tipoCitaId: string, nombre: string) => {
         if (isSubmittingModal || isSavingGlobal || isSavingOrder) return;
-
-        if (confirm(`¿Estás seguro de eliminar el tipo de cita "${nombre}"? Esta acción no se puede deshacer.`)) {
-            setIsSubmittingModal(true); // Reutilizar este estado para indicar una operación en curso
-            setModalError(null); // Limpiar errores previos del modal
-            setErrorTiposCita(null); // Limpiar errores de la sección
-
+        if (confirm(`¿Eliminar tipo de cita "${nombre}"?`)) {
+            setIsSubmittingModal(true); setModalError(null); setErrorTiposCita(null);
             const result = await eliminarTipoCitaAction(tipoCitaId);
-
             if (result.success) {
-                await fetchTiposCitaLocal(false); // Recargar lista sin loader principal
-                if (currentTipoCita?.id === tipoCitaId && isModalOpen) {
-                    closeModal(); // Cerrar el modal si el ítem eliminado era el que se estaba editando
-                }
-                // Opcional: Mostrar un toast de éxito aquí
+                await fetchTiposCitaLocal(false);
+                if (currentTipoCita?.id === tipoCitaId && isModalOpen) closeModal();
+                setModalSuccess("Tipo de cita eliminado."); // Mensaje de éxito
+                setTimeout(() => setModalSuccess(null), 2000);
             } else {
-                // Si el modal está abierto y el error es relevante para el ítem actual, mostrarlo en el modal
-                if (isModalOpen && currentTipoCita?.id === tipoCitaId) {
-                    setModalError(result.error || "Error al eliminar el tipo de cita.");
-                } else {
-                    // Si no, mostrar el error a nivel de sección
-                    setErrorTiposCita(result.error || "Error al eliminar el tipo de cita.");
-                }
+                const errorMsg = result.error || "Error al eliminar.";
+                if (isModalOpen && currentTipoCita?.id === tipoCitaId) setModalError(errorMsg);
+                else setErrorTiposCita(errorMsg);
             }
             setIsSubmittingModal(false);
         }
@@ -350,100 +291,62 @@ export default function TiposCitaSeccion({
     const handleDragEndTiposCita = useCallback(async (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
-            setTiposCita((items) => {
-                const oldIndex = items.findIndex((item) => item.id === active.id);
-                const newIndex = items.findIndex((item) => item.id === over.id);
-                const reorderedItems = arrayMove(items, oldIndex, newIndex);
-                // Actualizar el orden visual inmediatamente
-                return reorderedItems.map((item, index) => ({ ...item, orden: index }));
-            });
+            const oldIndex = tiposCita.findIndex((item) => item.id === active.id);
+            const newIndex = tiposCita.findIndex((item) => item.id === over.id);
+            const reorderedItems = arrayMove(tiposCita, oldIndex, newIndex);
+            const finalOrder = reorderedItems.map((item, index) => ({ ...item, orden: index }));
+            setTiposCita(finalOrder);
 
-            // Preparar datos para la action después de actualizar el estado visual
-            // Necesitamos un breve delay o usar el estado actualizado en el siguiente render
-            // o simplemente recalcularlo desde el estado actual
-            setTimeout(async () => {
-                setIsSavingOrder(true);
-                setErrorTiposCita(null);
-
-                // Obtener el estado más reciente de tiposCita para enviar a la action
-                // Esto es importante si setTiposCita es asíncrono
-                const currentOrderForAction = tiposCita.map(({ id, orden }) => ({ id, orden: orden as number }));
-
-                const result = await actualizarOrdenTiposCitaAction({
-                    negocioId: negocioId,
-                    items: currentOrderForAction // Usar el orden que se acaba de setear visualmente
-                });
-
-                if (!result.success) {
-                    setErrorTiposCita(result.error || "Error al guardar el nuevo orden.");
-                    await fetchTiposCitaLocal(false); // Revertir al orden del servidor
-                }
-                // Si es exitoso, el estado local ya refleja el nuevo orden.
-                // Se podría llamar a fetchTiposCitaLocal(false) para reconfirmar desde el servidor si se desea.
-                setIsSavingOrder(false);
-            }, 0);
+            const ordenData = { negocioId, items: finalOrder.map(({ id, orden }) => ({ id, orden: orden as number })) };
+            setIsSavingOrder(true); setErrorTiposCita(null);
+            const result = await actualizarOrdenTiposCitaAction(ordenData);
+            if (!result.success) {
+                setErrorTiposCita(result.error || "Error al guardar orden.");
+                await fetchTiposCitaLocal(false);
+            }
+            setIsSavingOrder(false);
         }
-    }, [negocioId, fetchTiposCitaLocal, tiposCita]); // tiposCita en dependencias para que currentOrderForAction use el valor más reciente
+    }, [negocioId, fetchTiposCitaLocal, tiposCita]);
 
-    // ---- RENDERIZADO ----
-    if (loadingTiposCita && !initialTiposCita) { // Solo mostrar loader principal si no hay datos iniciales
+    // --- RENDERIZADO ---
+    if (loadingTiposCita && !initialTiposCita && negocioId) {
         return <div className="py-8 flex items-center justify-center text-zinc-400"><Loader2 className="h-6 w-6 animate-spin mr-2" /> Cargando tipos de cita...</div>;
+    }
+    if (!negocioId) {
+        return <div className="py-8 px-4 bg-zinc-900/30 border border-dashed border-zinc-700 rounded-md text-center"><p className="text-orange-400 text-sm">Se requiere un ID de negocio para gestionar los tipos de cita.</p></div>;
     }
 
     return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h3 className="text-md font-semibold text-zinc-100 flex items-center gap-2">
-                    <ListPlus size={18} className="text-blue-400" />
-                    Servicios / Tipos de Cita Ofrecidos
-                </h3>
-                <button
-                    onClick={() => openModal('create')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1.5 disabled:opacity-50"
-                    disabled={isSavingGlobal || isSubmittingModal || isSavingOrder}
-                >
-                    <PlusIcon size={14} /> Añadir Tipo
-                </button>
+        <div className="space-y-3 bg-zinc-800/50 p-4 rounded-lg border border-zinc-700"> {/* Contenedor con padding y estilos base */}
+            <div className={headerClasses}>
+                <h3 className={titleClasses}><ListPlus size={18} className="text-blue-400" /> Tipos de Cita / Servicios</h3>
+                <button onClick={() => openModal('create')} className={buttonAddClasses} disabled={isSavingGlobal || isSubmittingModal || isSavingOrder}><PlusIcon size={14} /> Añadir</button>
             </div>
 
             {isSavingOrder && <p className="text-xs text-blue-400 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Guardando orden...</p>}
-            {errorTiposCita && <p className={alertSectionErrorClasses}><AlertTriangleIcon size={16} className="mr-1" />{errorTiposCita}</p>}
+            {errorTiposCita && <p className={alertSectionErrorClasses}><AlertTriangleIcon size={16} />{errorTiposCita}</p>}
 
-            {tiposCita.length === 0 && !errorTiposCita ? (
-                <div className="text-center py-8 px-4 bg-zinc-900/30 border border-dashed border-zinc-700 rounded-md">
-                    <p className="text-zinc-400 text-sm">Aún no has añadido ningún tipo de cita/servicio.</p>
-                    <p className="text-zinc-500 text-xs mt-1">Haz clic en &quot;Añadir Tipo&quot; para empezar.</p>
-                </div>
+            {tiposCita.length === 0 && !loadingTiposCita && !errorTiposCita ? (
+                <div className="text-center py-6 px-4 bg-zinc-900/30 border border-dashed border-zinc-700 rounded-md"><p className="text-zinc-400 text-sm">No has añadido tipos de cita.</p><p className="text-zinc-500 text-xs mt-1">Clic en &quot;Añadir&quot; para empezar.</p></div>
             ) : (
                 <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEndTiposCita}>
                     <div className="overflow-x-auto rounded-md border border-zinc-700 bg-zinc-900/30">
                         <table className={tableClasses}>
-                            <thead className="bg-zinc-800/50">
+                            <thead className="bg-zinc-800/60">{/* Un poco más claro que el cuerpo */}
                                 <tr>
-                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap w-10"></th>
-                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap">Nombre</th>
-                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap">Duración</th>
-                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap">Concurrencia</th>
-                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap">Presencial</th>
-                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap">Virtual</th>
-                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider whitespace-nowrap">Descripción</th>
-                                    <th className="px-3 py-2.5 text-right w-[120px]"> {/* Ajustado ancho para acomodar botones */} </th>
+                                    <th className="px-3 py-2.5 w-10"></th>
+                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase">Nombre</th>
+                                    <th className="px-3 py-2.5 text-center text-xs font-medium text-zinc-400 uppercase">Duración</th>
+                                    <th className="px-3 py-2.5 text-center text-xs font-medium text-zinc-400 uppercase">Concurr.</th>
+                                    <th className="px-3 py-2.5 text-center text-xs font-medium text-zinc-400 uppercase">Presencial</th>
+                                    <th className="px-3 py-2.5 text-center text-xs font-medium text-zinc-400 uppercase">Virtual</th>
+                                    <th className="px-3 py-2.5 text-left text-xs font-medium text-zinc-400 uppercase">Descripción</th>
+                                    <th className="px-3 py-2.5 text-center text-xs font-medium text-zinc-400 uppercase">Agendas</th>
+                                    <th className="px-3 py-2.5 text-right w-[130px]"></th>
                                 </tr>
                             </thead>
                             <SortableContext items={tiposCita.map(tc => tc.id)} strategy={verticalListSortingStrategy}>
-                                <tbody className="divide-y divide-zinc-700/70">
-                                    {tiposCita.map((tipo) => (
-                                        <SortableTipoCitaRow
-                                            key={tipo.id}
-                                            tipoCita={tipo}
-                                            onEdit={openModal.bind(null, 'edit')}
-                                            onDelete={handleDeleteTipoCita}
-                                            onClone={openModal.bind(null, 'clone')}
-                                            isSubmittingModal={isSubmittingModal}
-                                            isSavingGlobal={isSavingGlobal}
-                                        />
-                                    ))}
-                                </tbody>
+                                <tbody className="divide-y divide-zinc-700/50">{tiposCita.map((tipo) => (<SortableTipoCitaRow key={tipo.id} tipoCita={tipo} onEdit={openModal.bind(null, 'edit')} onDelete={handleDeleteTipoCita} onClone={openModal.bind(null, 'clone')} isSubmittingModal={isSubmittingModal} isSavingGlobal={isSavingGlobal} />))}</tbody>
                             </SortableContext>
                         </table>
                     </div>
@@ -451,68 +354,54 @@ export default function TiposCitaSeccion({
             )}
             {tiposCita.length > 0 && <p className="text-xs text-zinc-500 italic mt-2 text-center">Arrastra <GripVertical size={12} className="inline -mt-px" /> para reordenar.</p>}
 
-            {/* Modal para Crear/Editar Tipo de Cita */}
             {isModalOpen && (
-                <div className={modalOverlayClasses} onClick={closeModal /* Cerrar al hacer clic fuera */}>
-                    <div className={modalContentClasses} onClick={(e) => e.stopPropagation() /* Evitar que se cierre al hacer clic dentro */}>
+                <div className={modalOverlayClasses} onClick={closeModal}>
+                    <div className={modalContentClasses} onClick={(e) => e.stopPropagation()}>
                         <form onSubmit={handleSubmitModal}>
-                            <div className={modalHeaderClasses}>
-                                <h4 className={modalTitleClasses}>
-                                    {modalMode === 'create' && 'Añadir Nuevo Tipo de Cita'}
-                                    {modalMode === 'edit' && `Editar: ${currentTipoCita?.nombre || 'Tipo de Cita'}`}
-                                    {modalMode === 'clone' && `Clonar: ${currentTipoCita?.nombre || 'Tipo de Cita'}`}
-                                </h4>
-                                <button type="button" onClick={closeModal} className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 focus:ring-blue-500" aria-label="Cerrar modal">
-                                    <XIcon size={20} />
-                                </button>
-                            </div>
+                            <div className={modalHeaderClasses}><h4 className={modalTitleClasses}>{modalMode === 'create' && 'Añadir Tipo de Cita'}{modalMode === 'edit' && `Editar: ${currentTipoCita?.nombre || ''}`}{modalMode === 'clone' && `Clonar: ${currentTipoCita?.nombre || ''}`}</h4><button type="button" onClick={closeModal} className="p-1 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700"><XIcon size={20} /></button></div>
                             <div className={modalBodyClasses}>
-                                {modalError && <p className={alertModalErrorClasses}><AlertTriangleIcon size={16} className="mr-1" />{modalError}</p>}
-                                {modalSuccess && <p className={alertModalSuccessClasses}><CheckSquare size={16} className="mr-1" />{modalSuccess}</p>}
-
-                                <div className="space-y-3">
-                                    <div>
-                                        <label htmlFor="nombre" className={labelBaseClasses}>Nombre del Servicio <span className="text-red-500">*</span></label>
-                                        <input type="text" name="nombre" id="nombre" value={formData.nombre} onChange={handleFormChange} className={inputBaseClasses} required disabled={isSubmittingModal || !!modalSuccess} placeholder="Ej: Consulta General" />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="descripcion" className={labelBaseClasses}>Descripción</label>
-                                        <textarea name="descripcion" id="descripcion" value={formData.descripcion || ''} onChange={handleFormChange} className={textareaBaseClasses} rows={3} disabled={isSubmittingModal || !!modalSuccess} placeholder="Detalles adicionales..." />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label htmlFor="duracionMinutos" className={labelBaseClasses}>Duración (minutos)</label>
-                                            <input type="number" name="duracionMinutos" id="duracionMinutos" value={formData.duracionMinutos ?? ''} onChange={handleFormChange} className={inputBaseClasses} disabled={isSubmittingModal || !!modalSuccess} placeholder="Ej: 30" min="0" step="5" />
+                                {modalError && !Object.keys(modalValidationErrors).length && <p className={alertModalErrorClasses}><AlertTriangleIcon size={16} /> {modalError}</p>}
+                                {modalSuccess && <p className={alertModalSuccessClasses}><CheckSquare size={16} /> {modalSuccess}</p>}
+                                <div className="space-y-4"> {/* Aumentado espaciado en el modal */}
+                                    <div><label htmlFor="nombre-modal" className={labelBaseClasses}>Nombre <span className="text-red-500">*</span></label><input type="text" name="nombre" id="nombre-modal" value={formData.nombre} onChange={handleFormChange} className={`${inputBaseClasses} ${modalValidationErrors.nombre ? 'border-red-500' : ''}`} required disabled={isSubmittingModal || !!modalSuccess} placeholder="Ej: Consulta General" />{modalValidationErrors.nombre && <p className="text-xs text-red-400 mt-1">{modalValidationErrors.nombre.join(', ')}</p>}</div>
+                                    <div><label htmlFor="descripcion-modal" className={labelBaseClasses}>Descripción</label><textarea name="descripcion" id="descripcion-modal" value={formData.descripcion || ''} onChange={handleFormChange} className={`${textareaBaseClasses} ${modalValidationErrors.descripcion ? 'border-red-500' : ''}`} rows={2} disabled={isSubmittingModal || !!modalSuccess} placeholder="Detalles adicionales..." />{modalValidationErrors.descripcion && <p className="text-xs text-red-400 mt-1">{modalValidationErrors.descripcion.join(', ')}</p>}</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3 items-end">
+                                        <div className="sm:col-span-1 flex flex-col justify-end"> {/* Contenedor para alinear el checkbox con los inputs */}
+                                            <label htmlFor="todoElDia-modal" className={`${checkboxLabelClasses} ${formData.todoElDia ? 'bg-blue-600/30 border-blue-500' : ''} h-10`}> {/* h-10 para alinear con inputs */}
+                                                <input type="checkbox" name="todoElDia" id="todoElDia-modal" checked={formData.todoElDia} onChange={handleFormChange} className={checkboxInputClasses} disabled={isSubmittingModal || !!modalSuccess} />
+                                                <span>Todo el Día</span> <ClockIcon size={15} className="text-zinc-400 ml-auto" />
+                                            </label>
                                         </div>
-                                        <div>
-                                            <label htmlFor="limiteConcurrencia" className={labelBaseClasses}>Concurrencia (máx.)</label>
-                                            <input type="number" name="limiteConcurrencia" id="limiteConcurrencia" value={formData.limiteConcurrencia ?? ''} onChange={handleFormChange} className={inputBaseClasses} disabled={isSubmittingModal || !!modalSuccess} placeholder="Ej: 1" min="1" step="1" />
+                                        <div className="sm:col-span-1">
+                                            <label htmlFor="duracionMinutos-modal" className={labelBaseClasses}>Duración (min)</label>
+                                            <input type="number" name="duracionMinutos" id="duracionMinutos-modal" value={formData.duracionMinutos ?? ''} onChange={handleFormChange} className={`${inputBaseClasses} ${modalValidationErrors.duracionMinutos ? 'border-red-500' : ''}`} disabled={isSubmittingModal || !!modalSuccess || formData.todoElDia} placeholder="Ej: 30" min="0" step="5" />
+                                            {modalValidationErrors.duracionMinutos && <p className="text-xs text-red-400 mt-1">{modalValidationErrors.duracionMinutos.join(', ')}</p>}
+                                        </div>
+                                        <div className="sm:col-span-1">
+                                            <label htmlFor="limiteConcurrencia-modal" className={labelBaseClasses}>Concurrencia</label>
+                                            <input type="number" name="limiteConcurrencia" id="limiteConcurrencia-modal" value={formData.limiteConcurrencia ?? ''} onChange={handleFormChange} className={`${inputBaseClasses} ${modalValidationErrors.limiteConcurrencia ? 'border-red-500' : ''}`} disabled={isSubmittingModal || !!modalSuccess} placeholder="Ej: 1" min="1" step="1" />
+                                            {modalValidationErrors.limiteConcurrencia && <p className="text-xs text-red-400 mt-1">{modalValidationErrors.limiteConcurrencia.join(', ')}</p>}
                                         </div>
                                     </div>
-                                    <div className="space-y-2 pt-2">
-                                        <p className={labelBaseClasses}>Modalidad del Servicio:</p>
-                                        <label className={checkboxLabelClasses}>
-                                            <input type="checkbox" name="esPresencial" checked={formData.esPresencial} onChange={handleFormChange} className={checkboxClasses} disabled={isSubmittingModal || !!modalSuccess} />
-                                            <span>Servicio Presencial</span>
-                                        </label>
-                                        <label className={checkboxLabelClasses}>
-                                            <input type="checkbox" name="esVirtual" checked={formData.esVirtual} onChange={handleFormChange} className={checkboxClasses} disabled={isSubmittingModal || !!modalSuccess} />
-                                            <span>Servicio Virtual / En línea</span>
+                                    <div className="space-y-2 pt-1">
+                                        <p className={labelBaseClasses}>Modalidad:</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <label className={`${checkboxLabelClasses} ${formData.esPresencial ? 'bg-blue-600/30 border-blue-500' : ''}`}><input type="checkbox" name="esPresencial" checked={formData.esPresencial} onChange={handleFormChange} className={checkboxInputClasses} disabled={isSubmittingModal || !!modalSuccess} /><span>Presencial</span></label>
+                                            <label className={`${checkboxLabelClasses} ${formData.esVirtual ? 'bg-sky-600/30 border-sky-500' : ''}`}><input type="checkbox" name="esVirtual" checked={formData.esVirtual} onChange={handleFormChange} className={checkboxInputClasses} disabled={isSubmittingModal || !!modalSuccess} /><span>Virtual</span></label>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className={`${labelBaseClasses} flex items-center gap-2 cursor-pointer mt-3 ${formData.activo ? 'bg-green-600/30 border-green-500' : ''} p-2.5 rounded-md border border-zinc-700 hover:bg-zinc-700/30`}>
+                                            <input type="checkbox" name="activo" id="activo-modal" checked={formData.activo} onChange={handleFormChange} className={checkboxInputClasses} disabled={isSubmittingModal || !!modalSuccess} />
+                                            <span>Activo (disponible para agendar)</span>
                                         </label>
                                     </div>
                                 </div>
                             </div>
                             <div className={modalFooterClasses}>
-                                {(modalMode === 'edit' || modalMode === 'clone') && currentTipoCita && ( // Mostrar Eliminar solo en edit, no en clone
-                                    modalMode === 'edit' && <button type="button" onClick={() => handleDeleteTipoCita(currentTipoCita.id, currentTipoCita.nombre)} className={buttonDangerModal} disabled={isSubmittingModal || !!modalSuccess}>
-                                        <Trash2 size={16} /> Eliminar
-                                    </button>
-                                )}
-                                <button type="button" onClick={closeModal} className={buttonSecondaryModal} disabled={isSubmittingModal}>Cancelar</button>
-                                <button type="submit" className={buttonPrimaryModal} disabled={isSubmittingModal || !formData.nombre.trim() || !!modalSuccess}>
-                                    {isSubmittingModal ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                                    {modalMode === 'create' || modalMode === 'clone' ? 'Crear Tipo de Cita' : 'Guardar Cambios'}
-                                </button>
+                                {modalMode === 'edit' && currentTipoCita && (<button type="button" onClick={() => handleDeleteTipoCita(currentTipoCita.id, currentTipoCita.nombre)} className={buttonModalDanger} disabled={isSubmittingModal || !!modalSuccess || (currentTipoCita._count?.agendas ?? 0) > 0} title={(currentTipoCita._count?.agendas ?? 0) > 0 ? `No se puede eliminar: Usado por ${currentTipoCita._count?.agendas} agendas.` : 'Eliminar'}><Trash2 size={16} />Eliminar</button>)}
+                                <button type="button" onClick={closeModal} className={buttonModalSecondary} disabled={isSubmittingModal}>Cancelar</button>
+                                <button type="submit" className={buttonModalPrimary} disabled={isSubmittingModal || !formData.nombre?.trim() || !!modalSuccess} >{isSubmittingModal ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}{modalMode === 'create' || modalMode === 'clone' ? 'Crear' : 'Guardar'}</button>
                             </div>
                         </form>
                     </div>

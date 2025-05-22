@@ -15,8 +15,8 @@ import {
     IniciarConversacionWebchatInput,
     EnviarMensajeWebchatInput,
     EnviarMensajeWebchatData,
-    TareaCapacidadIA,
-    ParametroParaIA,
+    // TareaCapacidadIA,
+    // ParametroParaIA,
     RespuestaAsistenteConHerramientas,
     IniciarConversacionWebchatDataConDispatcher
 } from '@/app/admin/_lib/crmConversacion.types';
@@ -25,6 +25,8 @@ import { AgenteBasico } from '@/app/admin/_lib/agente.types';
 import { MensajeEntrantePayload } from '@/app/admin/_lib/webhook.types'; // Importar el nuevo tipo
 import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions'; // Importar la nueva acción de IA
 import { dispatchTareaEjecutadaAction } from './ia/funcionesEjecucion.actions'; // Ajusta la ruta si es necesario
+
+import { obtenerTareasCapacidadParaAsistente } from '@/app/admin/_lib/ia/ia.actions';
 
 /******************** CRM CHATPANEL ************************ */
 /******************** CRM CHATPANEL ************************ */
@@ -688,6 +690,7 @@ export async function obtenerListaConversacionesAction(
     }
 }
 
+//!conversación
 export async function obtenerUltimosMensajesAction(
     conversationId: string,
     limit: number = 50 // Obtener los últimos 50 por defecto
@@ -955,7 +958,7 @@ export async function procesarMensajeEntranteAction(
 
                 // Registrar TareaEjecutada si hubo llamada a función
                 if (llamadaFuncionDetectadaVar) {
-                    const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombreInterno === llamadaFuncionDetectadaVar?.nombreFuncion);
+                    const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === llamadaFuncionDetectadaVar?.nombreFuncion);
                     if (tareaCoincidente) {
                         const tareaEjecutada = await tx.tareaEjecutada.create({
                             data: {
@@ -1293,7 +1296,7 @@ export async function iniciarConversacionWebchatAction(
                 }
                 if (llamadaFuncionDetectadaVar) {
 
-                    const t = tareasDisponibles.find(t => t.funcionHerramienta?.nombreInterno === llamadaFuncionDetectadaVar?.nombreFuncion);
+                    const t = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === llamadaFuncionDetectadaVar?.nombreFuncion);
 
                     if (t) {
                         const te = await tx.tareaEjecutada.create({
@@ -1486,7 +1489,7 @@ export async function enviarMensajeWebchatAction(
                 }
 
                 if (llamadaFuncionDetectadaVar) {
-                    const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombreInterno === llamadaFuncionDetectadaVar?.nombreFuncion);
+                    const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === llamadaFuncionDetectadaVar?.nombreFuncion);
                     if (tareaCoincidente) {
                         const tareaEjecutada = await tx.tareaEjecutada.create({
                             data: {
@@ -1562,95 +1565,4 @@ export async function enviarMensajeWebchatAction(
         console.error('[CRM Actions] Error en enviarMensajeWebchatAction:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Error interno al enviar el mensaje en webchat.' };
     }
-}
-
-async function obtenerTareasCapacidadParaAsistente(asistenteId: string, tx: Prisma.TransactionClient): Promise<TareaCapacidadIA[]> {
-    const suscripcionesTareas = await tx.asistenteTareaSuscripcion.findMany({
-        where: {
-            asistenteVirtualId: asistenteId,
-            status: 'activo',
-            tarea: { status: 'activo' },
-        },
-        include: {
-            tarea: {
-                include: {
-                    tareaFuncion: {
-                        include: {
-                            parametrosRequeridos: {
-                                include: { parametroRequerido: true },
-                            },
-                        },
-                    },
-                    camposPersonalizadosRequeridos: {
-                        include: { crmCampoPersonalizado: true },
-                    },
-                },
-            },
-        },
-    });
-
-    const tareasCapacidad: TareaCapacidadIA[] = [];
-
-    for (const suscripcion of suscripcionesTareas) {
-        const tareaDb = suscripcion.tarea;
-        if (!tareaDb) continue;
-
-        let funcionHerramienta: TareaCapacidadIA['funcionHerramienta'] = null;
-        if (tareaDb.tareaFuncion) {
-            const parametrosFuncion: ParametroParaIA[] = tareaDb.tareaFuncion.parametrosRequeridos
-                // Filtrar por si acaso parametroRequerido es null
-                .filter(p => p.parametroRequerido)
-                .map(p => {
-                    // Usar ?? para asegurar que siempre haya un string, incluso si ambos son null/undefined
-                    const nombreParam = (p.parametroRequerido.nombreInterno ?? p.parametroRequerido.nombreVisible) ?? '';
-                    if (nombreParam === '') {
-                        console.warn(`[CRM Actions] Parámetro con ID ${p.parametroRequerido.id} no tiene nombreInterno ni nombreVisible.`);
-                    }
-                    return {
-                        nombre: nombreParam,
-                        tipo: p.parametroRequerido.tipoDato,
-                        descripcion: p.parametroRequerido.descripcion || p.parametroRequerido.nombreVisible,
-                        esObligatorio: p.esObligatorio,
-                    };
-                    // --- FIN CORRECCIÓN ---
-                });
-
-            funcionHerramienta = {
-                nombreInterno: tareaDb.tareaFuncion.nombreInterno,
-                nombreVisible: tareaDb.tareaFuncion.nombreVisible,
-                descripcion: tareaDb.tareaFuncion.descripcion,
-                parametros: parametrosFuncion,
-            };
-        }
-
-        const camposPersonalizadosTarea: ParametroParaIA[] = tareaDb.camposPersonalizadosRequeridos
-            // Filtrar por si acaso crmCampoPersonalizado es null
-            .filter(cp => cp.crmCampoPersonalizado)
-            .map(cp => {
-                // --- CORRECCIÓN AQUÍ ---
-                // Usar ?? para asegurar que siempre haya un string
-                const nombreCampo = (cp.crmCampoPersonalizado.nombreCampo ?? cp.crmCampoPersonalizado.nombre) ?? '';
-                if (nombreCampo === '') {
-                    console.warn(`[CRM Actions] Campo Personalizado con ID ${cp.crmCampoPersonalizado.id} no tiene nombreCampo ni nombre.`);
-                }
-                return {
-                    nombre: nombreCampo,
-                    tipo: cp.crmCampoPersonalizado.tipo,
-                    descripcion: cp.crmCampoPersonalizado.nombre, // Usar siempre el nombre visible como descripción
-                    esObligatorio: cp.esRequerido,
-                };
-                // --- FIN CORRECCIÓN ---
-            });
-
-        tareasCapacidad.push({
-            id: tareaDb.id,
-            nombre: tareaDb.nombre,
-            descripcionTool: tareaDb.descripcion,
-            instruccionParaIA: tareaDb.instruccion,
-            funcionHerramienta: funcionHerramienta,
-            camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,
-        });
-    }
-    // console.log(`[CRM Actions] Tareas capacidad para Asistente ${asistenteId}:`, JSON.stringify(tareasCapacidad, null, 2)); // Log detallado opcional
-    return tareasCapacidad;
 }

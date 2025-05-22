@@ -1,45 +1,43 @@
 // Ruta sugerida: app/admin/_lib/funciones/ia/funcionesEjecucion.actions.ts
 'use server';
 
-import prisma from '../prismaClient'; //
-import { ActionResult } from '../types'; //
-import { ChatMessageItem } from '../crmConversacion.types';
+import prisma from '../prismaClient';
+import { ActionResult } from '../types';
+import { ChatMessageItem } from './ia.schemas';
 
-import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacionDelNegocio.type';
-import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
-
-import { InformarHorarioArgs, InformarHorarioData } from '../funciones/informarHorarioDeAtencion.type';
-import { ejecutarInformarHorarioAction } from '../funciones/informarHorarioDeAtencion.actions';
-
+import { MostrarOfertasArgs, MostrarOfertasData } from '../funciones/mostrarOfertas.schemas';
 import { ejecutarMostrarOfertasAction } from '../funciones/mostrarOfertas.actions';
-import { MostrarOfertasArgs, MostrarOfertasData } from '../funciones/mostrarOfertas.type';
 
-import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta.type';
+import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta.schemas';
 import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta.actions';
 
-import { ejecutarDarDireccionAction } from '../funciones/darDireccionYUbicacion.actions';
-import { DarDireccionArgs, DarDireccionData } from '../funciones/darDireccionYUbicacion.type';
-
-import { AceptarOfertaArgs, AceptarOfertaData } from '../funciones/aceptarOferta.type';
+import { AceptarOfertaArgs, AceptarOfertaData } from '../funciones/aceptarOferta.schemas';
 import { ejecutarAceptarOfertaAction } from '../funciones/aceptarOferta.actions';
 
+import { AgendarCitaArgs, ConfiguracionAgendaDelNegocio } from '../funciones/agendarCita.schemas';
 import { ejecutarAgendarCitaAction } from '../funciones/agendarCita.actions';
-import { AgendarCitaArgs, ConfiguracionAgendaDelNegocio } from '../funciones/agendarCita.type';
 
-import { ListarServiciosAgendaArgs } from '../funciones/listarServiciosAgenda.type';
+import { ListarServiciosAgendaArgs } from '../funciones/listarServiciosAgenda.schemas';
 import { ejecutarListarServiciosAgendaAction } from '../funciones/listarServiciosAgenda.actions';
 
-import { ListarHorariosDisponiblesArgs } from '../funciones/listarHorariosDisponiblesAgenda.type';
+import { ListarHorariosDisponiblesArgs } from '../funciones/listarHorariosDisponiblesAgenda.schemas';
 import { ejecutarListarHorariosDisponiblesAction } from '../funciones/listarHorariosDisponiblesAgenda.actions';
 
 import { ejecutarCancelarCitaAction } from '../funciones/cancelarCita.actions';
-import { CancelarCitaArgs } from '../funciones/cancelarCita.type';
+import { CancelarCitaArgs } from '../funciones/cancelarCita.schemas';
 
+import { ReagendarCitaArgs } from '../funciones/reagendarCita.schemas';
 import { ejecutarReagendarCitaAction } from '../funciones/reagendarCita.actions';
-import { ReagendarCitaArgs } from '../funciones/reagendarCita.type';
+
+import { ejecutarDarDireccionAction } from '../funciones/darDireccionYUbicacion.actions';
+import { DarDireccionArgs, DarDireccionData } from '../funciones/darDireccionYUbicacion.schemas';
+
+import { InformarHorarioArgs, InformarHorarioData } from '../funciones/informarHorarioDeAtencion.schemas';
+import { ejecutarInformarHorarioAction } from '../funciones/informarHorarioDeAtencion.actions';
 
 
-
+import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacionDelNegocio.schemas';
+import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
 
 import { ChangedByType } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
 
@@ -144,12 +142,15 @@ export async function dispatchTareaEjecutadaAction(
         }
 
         const metadataObj = parsedMetadata as Record<string, unknown>;
+        console.log(`[Dispatcher] Metadata parseada:`, metadataObj);
 
         const funcionLlamada = typeof metadataObj.funcionLlamada === 'string' ? metadataObj.funcionLlamada : undefined;
         const argumentos = typeof metadataObj.argumentos === 'object' && metadataObj.argumentos !== null ? metadataObj.argumentos as Record<string, unknown> : undefined;
         const conversacionId = typeof metadataObj.conversacionId === 'string' ? metadataObj.conversacionId : undefined;
         const leadId = typeof metadataObj.leadId === 'string' ? metadataObj.leadId : undefined;
         const asistenteVirtualId = typeof metadataObj.asistenteVirtualId === 'string' ? metadataObj.asistenteVirtualId : undefined;
+        const canalNombre = typeof metadataObj.canalNombre === 'string' ? metadataObj.canalNombre : undefined;//!revisar
+
 
         if (!funcionLlamada || !argumentos || !conversacionId || !leadId || !asistenteVirtualId) {
             console.error(`[Dispatcher] Metadata incompleta o inválida en TareaEjecutada ${tareaEjecutadaId}:`, metadataObj);
@@ -227,7 +228,7 @@ export async function dispatchTareaEjecutadaAction(
                 }
                 break;
 
-            //!MOSTRAR OFERTAS
+            //!MOSTRAR OFERTAS ?? listo
             case 'mostrarOfertas': // <-- NUEVO CASE
                 const asistenteOfertas = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
                 if (!asistenteOfertas?.negocioId) {
@@ -247,7 +248,7 @@ export async function dispatchTareaEjecutadaAction(
                 }
                 break;
 
-            //!MOSTRAR DETALLE OFERTA
+            //!MOSTRAR DETALLE OFERTA  ?? listo
             case 'mostrarDetalleOferta':
                 const asistenteConCanal = await prisma.asistenteVirtual.findUnique({
                     where: { id: asistenteVirtualId },
@@ -277,7 +278,8 @@ export async function dispatchTareaEjecutadaAction(
                 const argsDetalleOferta: MostrarDetalleOfertaArgs = {
                     negocioId: asistenteConCanal.negocioId,
                     nombre_de_la_oferta: nombreDeLaOfertaExtraido,
-                    canalNombre: asistenteConCanal.canalConversacional?.nombre, // <-- PASAR EL NOMBRE DEL CANAL
+                    // canalNombre: asistenteConCanal.canalConversacional?.nombre, // <-- PASAR EL NOMBRE DEL CANAL
+                    canalNombre: canalNombre
                 };
 
                 resultadoEjecucion = await ejecutarMostrarDetalleOfertaAction(argsDetalleOferta, tareaEjecutadaId);
@@ -333,9 +335,6 @@ export async function dispatchTareaEjecutadaAction(
 
             //!AGENDAR CITA
             case 'agendarCita':
-
-                //saber si negocio cliente tiene más de un negocio
-                // Buscar la configuración de agenda personalizada del negocio (si existe)
                 const asistenteContext = await prisma.asistenteVirtual.findUnique({
                     where: { id: asistenteVirtualId },
                     select: {
@@ -366,7 +365,6 @@ export async function dispatchTareaEjecutadaAction(
 
                 // Si existe agendaConfiguracion, usarla en vez de los campos legacy de negocio
                 // (esto requiere ajustar más abajo la construcción de configAgenda)
-
                 if (!asistenteContext?.negocioId || !asistenteContext.negocio) {
                     mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio para agendar la cita.";
                     await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
@@ -400,13 +398,15 @@ export async function dispatchTareaEjecutadaAction(
                     negocioId: asistenteContext.negocioId,//!
                     asistenteId: asistenteVirtualId, //! 
                     leadId: leadId, //!
-                    fecha_hora_deseada: typeof argumentos.fecha_hora_deseada === 'string' ? argumentos.fecha_hora_deseada : undefined, //!
+                    fecha_hora_deseada: typeof argumentos.fecha_hora_deseada === 'string' && argumentos.fecha_hora_deseada.trim() !== ''
+                        ? argumentos.fecha_hora_deseada
+                        : '', //!
                     motivo_de_reunion: typeof argumentos.motivo_de_reunion === 'string' ? argumentos.motivo_de_reunion : null,
                     tipo_cita_modalidad_preferida: typeof argumentos.tipo_cita_modalidad_preferida === 'string' && (argumentos.tipo_cita_modalidad_preferida === 'presencial' || argumentos.tipo_cita_modalidad_preferida === 'virtual') ? argumentos.tipo_cita_modalidad_preferida : undefined,
                     nombre_contacto: typeof argumentos.nombre_contacto === 'string' ? argumentos.nombre_contacto : undefined,
                     email_contacto: typeof argumentos.email_contacto === 'string' ? argumentos.email_contacto : null,
                     telefono_contacto: typeof argumentos.telefono_contacto === 'string' ? argumentos.telefono_contacto : null,
-                    servicio_nombre: typeof argumentos.servicio_nombre === 'string' ? argumentos.servicio_nombre : undefined, // <-- NUEVO y CRUCIAL
+                    servicio_nombre: typeof argumentos.servicio_nombre === 'string' ? argumentos.servicio_nombre : '', // <-- NUEVO y CRUCIAL
                 };
 
                 resultadoEjecucion = await ejecutarAgendarCitaAction(

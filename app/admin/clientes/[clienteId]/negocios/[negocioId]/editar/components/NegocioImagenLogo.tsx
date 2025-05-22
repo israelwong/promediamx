@@ -14,8 +14,6 @@ import {
 interface Props {
     negocioId: string;
     initialLogoUrl?: string | null;
-    // Podrías necesitar clienteId aquí si tus actions de negocio lo requieren para revalidatePath
-    // clienteId: string; 
 }
 
 export default function NegocioImagenLogo({ negocioId, initialLogoUrl }: Props) {

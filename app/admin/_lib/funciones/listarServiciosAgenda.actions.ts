@@ -7,7 +7,7 @@ import {
     ListarServiciosAgendaArgs,
     ListarServiciosAgendaData,
     ServicioAgendaInfo
-} from './listarServiciosAgenda.type'; // Importa tus tipos
+} from './listarServiciosAgenda.schemas'; // Importa tus tipos
 // No necesitamos otros tipos de Prisma aquí a menos que los uses en la lógica de formateo
 
 /**

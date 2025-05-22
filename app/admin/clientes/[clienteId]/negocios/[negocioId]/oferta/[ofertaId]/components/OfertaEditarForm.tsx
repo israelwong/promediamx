@@ -367,8 +367,40 @@ export default function OfertaEditarForm({ clienteId, negocioId, ofertaId }: Pro
                                     </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="status" className={labelBaseClasses}>Estado de la Oferta</label>
-                                    <select id="status" name="status" value={formData.status || 'inactivo'} onChange={(e) => handleStatusChange(e.target.value as OfertaStatusType)} className={selectClasses} disabled={isSubmitting}>
+                                    <label htmlFor="status" className={labelBaseClasses + " mb-2"}>Estado de la Oferta</label>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs text-zinc-400">Inactiva</span>
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={formData.status === 'activo'}
+                                            tabIndex={0}
+                                            onClick={() => handleStatusChange(formData.status === 'activo' ? 'inactivo' : 'activo')}
+                                            disabled={isSubmitting}
+                                            className={`
+                                                relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                                                ${formData.status === 'activo' ? 'bg-green-500/80' : 'bg-zinc-600/60'}
+                                                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800
+                                                disabled:opacity-50
+                                            `}
+                                        >
+                                            <span
+                                                className={`
+                                                    inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition
+                                                    ${formData.status === 'activo' ? 'translate-x-5' : 'translate-x-1'}
+                                                `}
+                                            />
+                                        </button>
+                                        <span className="text-xs text-green-400">Activa</span>
+                                    </div>
+                                    <select
+                                        id="status"
+                                        name="status"
+                                        value={formData.status || 'inactivo'}
+                                        onChange={(e) => handleStatusChange(e.target.value as OfertaStatusType)}
+                                        className="hidden"
+                                        disabled={isSubmitting}
+                                    >
                                         {STATUS_OFERTA_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                     </select>
                                 </div>

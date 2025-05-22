@@ -3,16 +3,14 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
     MessageSquareText,
     Users,
     CalendarClock,
     Settings,
-    Filter,
-    LogOut
+    Filter
 } from 'lucide-react';
-import CRMNegocioLogo from './CRMNegocioLogo';
 
 interface NavLink {
     hrefSuffix: string;
@@ -28,23 +26,14 @@ const navLinks: NavLink[] = [
     { hrefSuffix: '/configuracion', icon: Settings, label: 'Configuración' },
 ];
 
-interface Props {
-    negocioId: string;
-    clienteId: string;
-}
-
-export default function CRMSidebar({ clienteId, negocioId }: Props) {
-    const router = useRouter();
+export default function CRMSidebar() {
     const pathname = usePathname();
 
     // Clases de Tailwind
-    const logoContainerClasses = "p-4 border-b border-zinc-700";
     const navListClasses = "flex-grow p-3 space-y-1";
     const navLinkBaseClasses = "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out w-full text-left";
     const navLinkInactiveClasses = "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100";
     const navLinkActiveClasses = "bg-sky-600 text-white shadow-inner";
-    const footerContainerClasses = "mt-auto p-3 border-t border-zinc-700";
-    const closeButtonClasses = "w-full flex items-center justify-center gap-2 text-sm text-zinc-400 hover:text-red-400 hover:bg-red-900/30 py-2 px-3 rounded-md transition-colors duration-150 ease-in-out";
 
     // Lógica de Navegación
     const getBasePath = (): string | null => {
@@ -75,7 +64,6 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
         }
 
         // Caso 3: Secciones sin subrutas esperadas (Pipeline, Agenda)
-        // Coincidencia exacta
         return pathname === expectedPath;
     };
     // --- Fin Corrección ---
@@ -86,15 +74,8 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
         return `${basePath}${hrefSuffix}`;
     };
 
-    const handleCloseCRM = () => {
-        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}`);
-    }
-
     return (
         <>
-            <div className={logoContainerClasses}>
-                <CRMNegocioLogo negocioId={negocioId} />
-            </div>
             <nav className={navListClasses}>
                 <ul>
                     {navLinks.map((link) => {
@@ -114,16 +95,6 @@ export default function CRMSidebar({ clienteId, negocioId }: Props) {
                     })}
                 </ul>
             </nav>
-            <div className={footerContainerClasses}>
-                <button
-                    onClick={handleCloseCRM}
-                    className={closeButtonClasses}
-                    title="Volver al panel del negocio"
-                >
-                    <LogOut size={14} />
-                    <span>Cerrar CRM</span>
-                </button>
-            </div>
         </>
     );
 }

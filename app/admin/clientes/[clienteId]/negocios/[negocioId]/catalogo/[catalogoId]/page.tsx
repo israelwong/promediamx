@@ -22,7 +22,7 @@ export default async function EditarCatalogoPage({ params }: { params: Promise<P
 
     return (
         // Layout de dos columnas: Formulario a la izquierda, Items a la derecha
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 h-full">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-6 h-full">
             {/* Columna para el formulario de edición del catálogo y su portada */}
             <div className="lg:w-1/3 xl:w-1/4 w-full flex-shrink-0">
                 <CatalogoEditarForm

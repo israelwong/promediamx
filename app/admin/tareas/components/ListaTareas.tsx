@@ -15,19 +15,18 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 // --- Fin DnD Imports ---
 
-// Importar acciones refactorizadas
+import {
+    OrdenarTareasInput, // Desde tarea.schemas.ts (ya está así en tu ejemplo)
+    CategoriaTareaSimple,
+    TareaConDetalles
+} from '@/app/admin/_lib/actions/tarea/tarea.schemas'; // o el archivo correspondiente
+
 import {
     obtenerTareasConDetalles,
     obtenerCategoriasParaFiltro,
     actualizarOrdenTareas
-} from '@/app/admin/_lib/tareas.actions'; // Ajusta ruta!
+} from '@/app/admin/_lib/actions/tarea/tarea.actions';
 
-// Importar tipos CENTRALIZADOS (¡Ahora son los explícitos!)
-import {
-    TareaConDetalles,
-    OrdenarTareasInput,
-    CategoriaTareaSimple
-} from '@/app/admin/_lib/tareas.type';
 
 import { Loader2, Search, ListFilter, GripVertical, Image as ImageIcon, GalleryHorizontal, Check, PlusIcon } from 'lucide-react';
 import { Input } from "@/app/components/ui/input"; // Ajusta ruta
@@ -91,11 +90,6 @@ function SortableTableRow({ id, tarea, onRowClick }: { id: string; tarea: TareaC
             <td className={`${tdClasses} font-medium text-zinc-100 max-w-[200px] truncate`}>
                 <span title={tarea.nombre}>{tarea.nombre}</span>
                 {/* Verifica si tareaFuncion existe antes de acceder */}
-                {tarea.tareaFuncion && (
-                    <span className="block text-[0.7rem] text-blue-400/80 font-normal truncate" title={`Función: ${tarea.tareaFuncion.nombreVisible}`}>
-                        Fn: {tarea.tareaFuncion.nombreVisible}
-                    </span>
-                )}
             </td>
             {/* Categoría */}
             <td className={tdClasses}>

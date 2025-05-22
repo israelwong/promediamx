@@ -3,7 +3,7 @@
 
 import prisma from '../prismaClient';
 import { ActionResult } from '../types';
-import { AceptarOfertaArgs, AceptarOfertaData } from './aceptarOferta.type';
+import { AceptarOfertaArgs, AceptarOfertaData } from './aceptarOferta.schemas';
 
 async function actualizarTareaEjecutadaFallidaInterna(tareaEjecutadaId: string, mensajeError: string) {
     try {

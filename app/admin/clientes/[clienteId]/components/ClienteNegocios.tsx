@@ -1,3 +1,4 @@
+//ruta actual: app/admin/clientes/[clienteId]/components/ClienteEditarForm.tsx
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
