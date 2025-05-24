@@ -15,7 +15,7 @@ import {
     Package,
     Briefcase,
     DatabaseZap,
-    Link2,
+    CreditCard,
     LibraryBig
 } from 'lucide-react';
 
@@ -35,9 +35,9 @@ const navLinks: NavLink[] = [
     { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
     { hrefSuffix: '/asistente', icon: Bot, label: 'Asistentes virtuales' },
     { hrefSuffix: '/crm', icon: DatabaseZap, label: 'CRM' },
+    { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' }, // Cambiado a Briefcase como ícono de "budget"
     { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Conocimiento *' },
     { hrefSuffix: '/landingpage', icon: Presentation, label: 'Vitrina digital *' },
-    { hrefSuffix: '/pagos', icon: Link2, label: 'Links de pago *' }, // Cambiado a Briefcase como ícono de "budget"
 ];
 
 

@@ -1,113 +1,144 @@
+// app/admin/_lib/actions/crm/conversacion.schemas.ts
+// (Asegúrate que la ruta sea la correcta para tus esquemas del CRM)
 import { z } from 'zod';
+import { InteraccionParteTipo } from '@prisma/client'; // Importar el enum de Prisma
 
-// Esquema para la información básica de un agente (ya definido)
+// Esquema para la información básica de un agente (ya lo tenías)
 export const agenteBasicoSchema = z.object({
     id: z.string().cuid(),
     nombre: z.string().nullable(),
 });
 export type AgenteBasicoData = z.infer<typeof agenteBasicoSchema>;
 
-// Esquema para los detalles de una conversación para el panel (ya definido)
+// Esquema para los detalles de una conversación para el panel (ya lo tenías)
 export const conversacionDetailsForPanelSchema = z.object({
     id: z.string().cuid(),
-    status: z.string(),
+    status: z.string(), // Podrías usar un z.enum si los estados son fijos
     leadId: z.string().cuid().nullable(),
     leadNombre: z.string().nullable(),
     agenteCrmActual: agenteBasicoSchema.nullable(),
+    // canalOrigen: z.string().nullable().optional(), // Si lo añades desde la acción
 });
 export type ConversationDetailsForPanelData = z.infer<typeof conversacionDetailsForPanelSchema>;
 
-// Esquema para los parámetros de entrada de obtenerDetallesConversacionAction (ya definido)
+// Esquema para los parámetros de entrada de obtenerDetallesConversacionAction (ya lo tenías)
 export const obtenerDetallesConversacionParamsSchema = z.object({
-    conversacionId: z.string().cuid(),
+    conversacionId: z.string().cuid("ID de conversación inválido."),
 });
 export type ObtenerDetallesConversacionParams = z.infer<typeof obtenerDetallesConversacionParamsSchema>;
 
-// Esquema para cada item en la vista previa de la lista de conversaciones (ya definido)
+// Esquema para cada item en la vista previa de la lista de conversaciones
+// Actualizado para usar mensajeTexto
 export const conversacionPreviewItemSchema = z.object({
     id: z.string().cuid(),
     leadId: z.string().cuid().nullable().optional(),
     leadName: z.string(),
-    lastMessagePreview: z.string(),
+    lastMessagePreview: z.string().nullable(), // Viene de mensajeTexto
     lastMessageTimestamp: z.date(),
     status: z.string(),
     avatarUrl: z.string().url().nullable().optional(),
-    canalOrigen: z.enum(['whatsapp', 'webchat', 'otro']).nullable().optional(),
+    canalOrigen: z.enum(['whatsapp', 'webchat', 'otro', 'desconocido']).nullable().optional(), // 'desconocido' como fallback
 });
 export type ConversacionPreviewItemData = z.infer<typeof conversacionPreviewItemSchema>;
 
-// Esquema para los parámetros de entrada de listarConversacionesAction (ya definido)
+// Esquema para los parámetros de entrada de listarConversacionesAction (ya lo tenías)
 export const listarConversacionesParamsSchema = z.object({
-    negocioId: z.string().cuid(),
+    negocioId: z.string().cuid("ID de negocio inválido."),
     searchTerm: z.string().nullable().optional(),
     filtroStatus: z.enum(['activas', 'archivadas', 'todas']).default('activas'),
     filtroPipelineId: z.string().cuid().nullable().optional(),
 });
 export type ListarConversacionesParams = z.infer<typeof listarConversacionesParamsSchema>;
 
+// --- ESQUEMAS PARA MENSAJES DE CHAT EN EL CRM (ChatComponent) ---
 
-// --- NUEVOS ESQUEMAS PARA ChatComponent ---
-
-// Esquema para un item de mensaje de chat (basado en tu ChatMessageItem type)
-export const chatMessageItemSchema = z.object({
+// Esquema para un item de mensaje de chat para el CRM
+// Similar a ChatMessageItemSchema de chatTest, pero específico para el CRM si es necesario.
+// Adaptado para la nueva estructura de Interaccion.
+export const chatMessageItemCrmSchema = z.object({
     id: z.string().cuid(),
     conversacionId: z.string().cuid(),
-    role: z.enum(['user', 'assistant', 'agent', 'system']),
-    mensaje: z.string().nullable(),
+    role: z.string(), // roles: user, assistant, agent, system, function. Validar más estrictamente si es necesario.
+
+    mensajeTexto: z.string().nullable().optional(),
+
+    // Campos estructurales de IA (opcionales para la UI, pero pueden estar en los datos)
+    parteTipo: z.nativeEnum(InteraccionParteTipo).default('TEXT').nullable().optional(),
+    functionCallNombre: z.string().nullable().optional(),
+    functionCallArgs: z.record(z.any()).nullable().optional(),
+    functionResponseData: z.record(z.any()).nullable().optional(),
+
     mediaUrl: z.string().url().nullable().optional(),
-    mediaType: z.string().nullable().optional(), // Podrías usar z.enum si los tipos son fijos
-    createdAt: z.date(), // Prisma devuelve Date, mantenlo así para evitar conversiones innecesarias
+    mediaType: z.string().nullable().optional(),
+    createdAt: z.preprocess((arg) => { // Para asegurar que Prisma Date o string se conviertan a Date
+        if (typeof arg === "string" || arg instanceof Date) return new Date(arg);
+        return arg;
+    }, z.date()),
     agenteCrm: agenteBasicoSchema.nullable().optional(),
 });
-export type ChatMessageItemData = z.infer<typeof chatMessageItemSchema>;
+export type ChatMessageItemCrmData = z.infer<typeof chatMessageItemCrmSchema>;
 
-// Esquema para los parámetros de entrada de la acción que obtiene los mensajes
-export const obtenerMensajesParamsSchema = z.object({
-    conversacionId: z.string().cuid(),
-    limit: z.number().int().positive().optional().default(50), // Límite por defecto
-    // Podrías añadir `cursor` o `skip` para paginación en el futuro
+// Esquema para los parámetros de entrada de la acción que obtiene los mensajes del CRM
+export const obtenerMensajesCrmParamsSchema = z.object({
+    conversacionId: z.string().cuid("ID de conversación inválido."),
+    limit: z.number().int().positive().optional().default(50),
+    // cursor: z.string().cuid().optional(), // Para paginación basada en cursor
 });
-export type ObtenerMensajesParams = z.infer<typeof obtenerMensajesParamsSchema>;
+export type ObtenerMensajesCrmParams = z.infer<typeof obtenerMensajesCrmParamsSchema>;
 
-// Esquema para los parámetros de entrada de la acción de enviar un mensaje
-export const enviarMensajeParamsSchema = z.object({
-    conversacionId: z.string().cuid(),
+// Esquema para los parámetros de entrada de la acción de enviar un mensaje desde el CRM
+export const enviarMensajeCrmParamsSchema = z.object({
+    conversacionId: z.string().cuid("ID de conversación inválido."),
     mensaje: z.string().min(1, { message: "El mensaje no puede estar vacío." }),
-    role: z.enum(['user', 'assistant', 'agent', 'system']), // 'agent' para mensajes desde el panel
-    agenteCrmId: z.string().cuid().nullable().optional(), // ID del Agente CRM que envía
-    // mediaUrl y mediaType podrían añadirse si se implementa subida de archivos aquí
+    // En el CRM, el 'role' probablemente siempre será 'agent' o 'system' si es una nota interna.
+    // Si el asistente también puede enviar desde aquí, incluir 'assistant'.
+    role: z.enum(['agent', 'system']),
+    agenteCrmId: z.string().cuid("Se requiere ID de agente para enviar mensaje desde CRM."),
+    // Se podrían añadir campos para adjuntos si se implementa
 });
-export type EnviarMensajeParams = z.infer<typeof enviarMensajeParamsSchema>;
+export type EnviarMensajeCrmParams = z.infer<typeof enviarMensajeCrmParamsSchema>;
 
 
-// Esquema para los parámetros de asignarAgenteConversacionAction
+// --- ESQUEMAS PARA OTRAS ACCIONES DE CONVERSACIÓN DEL CRM ---
+
 export const asignarAgenteConversacionParamsSchema = z.object({
     conversacionId: z.string().cuid(),
-    agenteCrmId: z.string().cuid().nullable(), // Puede ser null para desasignar
-    nombreAgenteQueAsigna: z.string().nullable().optional(),
+    agenteCrmId: z.string().cuid().nullable(),
+    nombreAgenteQueAsigna: z.string().nullable().optional(), // Nombre del admin/agente que realiza la acción
 });
 export type AsignarAgenteConversacionParams = z.infer<typeof asignarAgenteConversacionParamsSchema>;
-// Tipo de salida: conversacionDetailsForPanelSchema
 
-// Esquema para los parámetros de pausarAutomatizacionAction y reanudarAutomatizacionAction
 export const gestionarPausaAutomatizacionParamsSchema = z.object({
     conversacionId: z.string().cuid(),
-    // currentUserId y currentUserName se obtendrían del lado del servidor (sesión) o se pasarían si es estrictamente necesario
-    // Por ahora, asumamos que la action los puede obtener o la lógica de negocio no los requiere para la operación en BD.
-    // Si se pasan desde el cliente:
-    // agenteIdQueGestiona: z.string().cuid(), // ID del usuario o agente que realiza la acción
     nombreAgenteQueGestiona: z.string().nullable().optional(),
 });
 export type GestionarPausaAutomatizacionParams = z.infer<typeof gestionarPausaAutomatizacionParamsSchema>;
-// Tipo de salida: conversacionDetailsForPanelSchema
 
-// Esquema para los parámetros de archivarConversacionAction
 export const archivarConversacionParamsSchema = z.object({
     conversacionId: z.string().cuid(),
-    // Similar a pausar/reanudar, los IDs de quien archiva pueden ser manejados en servidor o pasados
-    // usuarioIdQueArchiva: z.string().cuid(), 
-    // agenteCrmIdQueArchiva: z.string().cuid().nullable().optional(),
     nombreUsuarioQueArchiva: z.string().nullable().optional(),
 });
 export type ArchivarConversacionParams = z.infer<typeof archivarConversacionParamsSchema>;
-// Tipo de salida: ActionResult<null> o un schema básico si devuelve algo.
+
+
+// Tipo para el historial que se pasaría a generarRespuestaAsistente
+// (Similar a HistorialTurnoParaGeminiSchema de chatTest.schemas.ts)
+// Si vas a usar generarRespuestaAsistente desde las acciones del CRM (ej. si un agente pide ayuda a la IA)
+// entonces necesitarás este tipo. Si no, puedes omitirlo de este archivo.
+export const HistorialCrmTurnoParaGeminiSchema = z.object({
+    role: z.enum(['user', 'model', 'function']),
+    parts: z.array(
+        z.object({
+            text: z.string().optional(),
+            functionCall: z.object({
+                name: z.string(),
+                args: z.record(z.string(), z.any()),
+            }).optional(),
+            functionResponse: z.object({
+                name: z.string(),
+                response: z.record(z.string(), z.any()),
+            }).optional(),
+        })
+    ),
+});
+export type HistorialCrmTurnoParaGemini = z.infer<typeof HistorialCrmTurnoParaGeminiSchema>;

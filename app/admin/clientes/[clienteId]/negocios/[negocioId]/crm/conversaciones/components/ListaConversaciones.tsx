@@ -1,29 +1,23 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/components/ListaConversaciones.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams } from 'next/navigation'; // usePathname para active state
 import { Search, Loader2, Inbox, RefreshCw, MessageSquare, Filter, ChevronDown } from 'lucide-react';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'; // RealtimeChannel para tipado
 import Image from 'next/image';
 
-// --- NUEVAS IMPORTS ---
-import { listarConversacionesAction } from '@/app/admin/_lib/actions/conversacion/conversacion.actions'; // Nueva ruta
-import type { ConversacionPreviewItemData, ListarConversacionesParams } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas'; // Nuevos tipos/schemas
-
-//! Mantener esta importación si la usas para los pipelines
-import {
-    obtenerPipelinesCrmAction
-} from '@/app/admin/_lib/actions/pipelineCrm/pipelineCrm.actions'; // Nueva ruta
-
-import { useDebounce } from '@/app/admin/_lib/hooks/useDebounce'; // Asumo que esta ruta es correcta
+import { listarConversacionesAction } from '@/app/admin/_lib/actions/conversacion/conversacion.actions';
+import type { ConversacionPreviewItemData, ListarConversacionesParams } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
+import { obtenerPipelinesCrmAction } from '@/app/admin/_lib/actions/pipelineCrm/pipelineCrm.actions';
+import { useDebounce } from '@/app/admin/_lib/hooks/useDebounce';
 
 interface PipelineSimple { id: string; nombre: string; }
 interface ListaConversacionesProps { negocioId: string; clienteId: string; }
 
 const WhatsAppIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-green-500"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" /></svg>);
 
-// Supabase client (sin cambios)
 let supabaseLista: SupabaseClient | null = null;
 if (typeof window !== 'undefined') {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,28 +30,30 @@ if (typeof window !== 'undefined') {
 }
 
 export default function ListaConversaciones({ negocioId, clienteId }: ListaConversacionesProps) {
-    // Usar el tipo inferido de Zod para el estado de las conversaciones
     const [conversations, setConversations] = useState<ConversacionPreviewItemData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
-    const [filtroStatus, setFiltroStatus] = useState<ListarConversacionesParams['filtroStatus']>('activas'); // Usar tipo del schema
-    const [filtroPipelineId, setFiltroPipelineId] = useState<string>('all'); // 'all' o un CUID
+    const [filtroStatus, setFiltroStatus] = useState<'activas' | 'archivadas'>('activas');
+    const [filtroPipelineId, setFiltroPipelineId] = useState<string>('all');
     const [pipelinesDisponibles, setPipelinesDisponibles] = useState<PipelineSimple[]>([]);
     const [isLoadingPipelines, setIsLoadingPipelines] = useState(true);
 
     const params = useParams();
-    const activeConversationId = params?.conversationId as string || '';
+    // const pathname = usePathname(); // Para determinar el estado activo de forma más fiable
+    const activeConversationId = params?.conversacionId as string || '';
 
     const fetchConversations = useCallback(async () => {
-        // console.log(`[ListaConversaciones] fetchConversations: negocioId=${negocioId}, término=${debouncedSearchTerm}, status=${filtroStatus}, pipeline=${filtroPipelineId}`);
-
-        // Mostrar spinner solo en la carga inicial o si se fuerza recarga y no hay datos
+        if (!negocioId) {
+            setError("ID de negocio no proporcionado.");
+            setIsLoading(false);
+            return;
+        }
+        // Mostrar spinner solo si es la carga inicial (no hay conversaciones y no hay error previo)
         if (conversations.length === 0 && !error) {
             setIsLoading(true);
         }
-        // No establecer setIsLoading(true) en cada fetch si ya hay datos, para evitar parpadeo
 
         const paramsForAction: ListarConversacionesParams = {
             negocioId,
@@ -66,94 +62,119 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
             filtroPipelineId: filtroPipelineId === 'all' ? null : filtroPipelineId,
         };
 
-        const result = await listarConversacionesAction(paramsForAction); // Llamada a la nueva action
+        const result = await listarConversacionesAction(paramsForAction);
 
         if (result.success && result.data) {
             setConversations(result.data);
-            setError(null);
+            setError(null); // Limpiar error si la carga es exitosa
         } else {
             setError(result.error || 'No se pudieron cargar las conversaciones.');
-            setConversations([]); // Limpiar en caso de error
+            setConversations([]);
         }
         setIsLoading(false);
-    }, [negocioId, debouncedSearchTerm, filtroStatus, filtroPipelineId, conversations.length, error]); // conversations.length y error para la lógica del spinner inicial
+    }, [negocioId, debouncedSearchTerm, filtroStatus, filtroPipelineId, conversations.length, error]);
 
-    // useEffect para cargar pipelines (sin cambios, asume que obtenerPipelinesCrmAction es correcta)
     useEffect(() => {
         async function loadPipelines() {
+            if (!negocioId) return;
             setIsLoadingPipelines(true);
-            const result = await obtenerPipelinesCrmAction(negocioId);
+            const result = await obtenerPipelinesCrmAction(negocioId); // Asume que el param es solo negocioId
             if (result.success && result.data) {
-                setPipelinesDisponibles(result.data);
+                console.log('[ListaConversaciones] Primeros 2 datos recibidos:', JSON.stringify(result.data.slice(0, 2), null, 2));
+                setPipelinesDisponibles(result.data.map(p => ({ id: p.id, nombre: p.nombre }))); // Mapear si es necesario
             } else {
                 console.error("Error cargando pipelines:", result.error);
-                // Podrías establecer un error para pipelines aquí si es necesario
             }
             setIsLoadingPipelines(false);
         }
-        if (negocioId) loadPipelines(); // Cargar solo si hay negocioId
+        loadPipelines();
     }, [negocioId]);
 
-    // useEffect para fetchConversations (sin cambios en su lógica de dependencia)
     useEffect(() => {
-        if (negocioId) fetchConversations(); // Cargar solo si hay negocioId
-    }, [fetchConversations, negocioId]); // Añadir negocioId por si cambia
+        fetchConversations();
+    }, [fetchConversations]); // fetchConversations ya incluye todas sus dependencias
 
-    // useEffect para Supabase Realtime
     useEffect(() => {
-        if (!supabaseLista) return;
-        const channelName = 'public:Conversacion';
-        console.log(`[ListaConversaciones Realtime] Suscribiéndose a: ${channelName}`);
+        if (!supabaseLista || !negocioId) return; // Asegurar que negocioId exista para el filtro
 
-        // --- CORRECCIÓN: No asignar 'channel' si no se usa ---
-        const subscription = supabaseLista.channel(channelName)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'Conversacion' },
-                (payload) => {
-                    console.log('[ListaConversaciones Realtime] Cambio detectado:', payload);
-                    fetchConversations();
-                }
-            )
+        // Escuchar cambios en la tabla Conversacion Y en Interaccion
+        // para actualizar la lista cuando llegue un nuevo mensaje (updatedAt de Conversacion)
+        // o cuando cambie el status de una Conversacion.
+        const conversacionChannelName = 'public:Conversacion';
+        const interaccionChannelName = 'public:Interaccion';
+
+        let conversacionSubscription: RealtimeChannel | null = null;
+        let interaccionSubscription: RealtimeChannel | null = null;
+
+        const handleDbChange = (payload: unknown) => { // 'unknown' para evitar 'any'
+            console.log('[ListaConversaciones Realtime] Cambio detectado:', payload);
+            // Aquí el filtro es más complejo. Necesitamos verificar si el cambio afecta
+            // a una conversación de ESTE negocioId.
+            // Si el payload tiene `negocioId` (o se puede inferir a través de `lead.crm.negocioId`), se puede filtrar.
+            // Por simplicidad, y dado que listarConversacionesAction ya filtra por negocioId,
+            // un fetch general es lo más seguro por ahora.
+            fetchConversations();
+        };
+
+        conversacionSubscription = supabaseLista.channel(conversacionChannelName)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'Conversacion' }, handleDbChange)
             .subscribe((status, err) => {
-                if (status === 'SUBSCRIBED') console.log(`Suscrito a ${channelName}`);
-                else if (err) console.error(`Error canal ${channelName}:`, err);
-                else console.log(`Estado canal ${channelName}: ${status}`);
+                if (status === 'SUBSCRIBED') console.log(`[CRM Lista] Suscrito a ${conversacionChannelName}`);
+                else if (err) console.error(`[CRM Lista] Error canal ${conversacionChannelName}:`, err);
             });
-        // --- FIN CORRECCIÓN ---
+
+        interaccionSubscription = supabaseLista.channel(interaccionChannelName)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Interaccion' }, handleDbChange)
+            .subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') console.log(`[CRM Lista] Suscrito a ${interaccionChannelName}`);
+                else if (err) console.error(`[CRM Lista] Error canal ${interaccionChannelName}:`, err);
+            });
 
         return () => {
-            // --- CORRECCIÓN: Usar 'subscription' para desuscribirse ---
-            if (supabaseLista && subscription) {
-                console.log(`[ListaConversaciones Realtime] Desuscribiéndose de ${channelName}`);
-                supabaseLista.removeChannel(subscription).catch(console.error);
+            if (supabaseLista && conversacionSubscription) {
+                supabaseLista.removeChannel(conversacionSubscription).catch(console.error);
             }
-            // --- FIN CORRECCIÓN ---
+            if (supabaseLista && interaccionSubscription) {
+                supabaseLista.removeChannel(interaccionSubscription).catch(console.error);
+            }
         };
-    }, [negocioId, fetchConversations]); // fetchConversations incluye los filtros
+    }, [negocioId, fetchConversations]);
 
     const handleRefresh = () => {
-        if (negocioId) fetchConversations();
+        fetchConversations();
     };
 
     const basePath = `/admin/clientes/${clienteId}/negocios/${negocioId}/crm/conversaciones`;
 
-    // Funciones getStatusColor y getChannelIcon (sin cambios)
-    const getStatusColor = (status: string) => { switch (status?.toLowerCase()) { case 'abierta': return 'bg-green-500'; case 'en_espera_agente': return 'bg-amber-500'; case 'hitl': return 'bg-sky-500'; case 'cerrada': return 'bg-zinc-600'; case 'archivada': return 'bg-gray-400'; default: return 'bg-zinc-500'; } };
-    const getChannelIcon = (canal: ConversacionPreviewItemData['canalOrigen']) => { if (canal === 'whatsapp') return <WhatsAppIcon />; if (canal === 'webchat') return <MessageSquare size={14} className="text-blue-400" />; return <MessageSquare size={14} className="text-gray-500" />; };
+    const getStatusColor = (status: string) => {
+        const s = status?.toLowerCase();
+        if (s === 'abierta') return 'bg-green-500';
+        if (s === 'en_espera_agente' || s === 'hitl_activo') return 'bg-amber-500'; // hitl_activo también ámbar
+        if (s === 'cerrada') return 'bg-zinc-600';
+        if (s === 'archivada') return 'bg-gray-400';
+        return 'bg-zinc-500';
+    };
+    const getChannelIcon = (canal: ConversacionPreviewItemData['canalOrigen']) => {
+        if (canal === 'whatsapp') return <WhatsAppIcon />;
+        if (canal === 'webchat') return <MessageSquare size={14} className="text-blue-400" />;
+        return <MessageSquare size={14} className="text-gray-500" />;
+    };
 
-    // Renderizado (el JSX principal no necesita muchos cambios, solo los tipos y la llamada a la action)
+    console.log('[ListaConversaciones Render] conversations state:', JSON.stringify(conversations.slice(0, 2), null, 2));
+    console.log('[ListaConversaciones Render] isLoading:', isLoading, 'error:', error);
+
     return (
-        <div className="p-3 flex flex-col h-full max-h-[calc(100vh-Xpx)] overflow-hidden"> {/* Ajusta Xpx según la altura de tu cabecera/nav principal del admin */}
-            {/* Cabecera y Filtros */}
+        <div className="p-3 flex flex-col h-full max-h-[calc(100vh-var(--admin-header-height,70px)-var(--admin-page-padding,40px))] overflow-hidden">
             <div className="mb-3 flex-shrink-0">
                 <div className="flex justify-between items-center mb-1 px-1">
                     <h3 className="text-lg font-semibold text-zinc-100">Conversaciones</h3>
                     <button onClick={handleRefresh} disabled={isLoading} className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50" title="Actualizar lista">
-                        <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+                        <RefreshCw size={16} className={isLoading && conversations.length === 0 ? "animate-spin" : ""} />
                     </button>
                 </div>
                 <div className="relative mt-1">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search size={16} className="text-zinc-500" /></div>
-                    <input type="text" placeholder="Buscar por nombre..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-3 py-2 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-blue-500 focus:border-blue-500 text-sm" />
+                    <input type="text" placeholder="Buscar por nombre, email, teléfono..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-3 py-2 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-blue-500 focus:border-blue-500 text-sm" />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 md:gap-4 text-xs border-b border-zinc-700 pb-3 mb-3">
                     <div>
@@ -170,7 +191,7 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
                             </button>
                         </div>
                     </div>
-                    <div className="relative flex-grow"> {/* Quitada md:flex-grow-0 para que tome más espacio si puede */}
+                    <div className="relative flex-grow">
                         <label htmlFor="pipelineFilter" className="sr-only">Pipeline</label>
                         <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
                             <Filter size={14} className="text-zinc-500" />
@@ -194,8 +215,7 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
                 </div>
             </div>
 
-            {/* Contenedor de la Lista con Scroll */}
-            <div className="flex-grow overflow-y-auto pr-1 -mr-1"> {/* Aquí va el scroll de la lista */}
+            <div className="flex-grow overflow-y-auto pr-1 -mr-1 custom-scrollbar">
                 {isLoading && conversations.length === 0 && (<div className="flex-grow flex items-center justify-center min-h-[200px]"><Loader2 size={24} className="animate-spin text-zinc-400" /></div>)}
                 {!isLoading && error && (<div className="flex-grow flex flex-col items-center justify-center text-red-400 p-3 text-center min-h-[200px]"><p className="font-medium">Error:</p><p className="text-sm">{error}</p><button onClick={handleRefresh} className="mt-2 text-xs text-blue-400 hover:underline">Reintentar</button></div>)}
                 {!isLoading && !error && conversations.length === 0 && (
@@ -205,15 +225,15 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
                             {
                                 debouncedSearchTerm || filtroPipelineId !== 'all' || filtroStatus !== 'activas' ?
                                     'No hay conversaciones que coincidan con los filtros.' :
-                                    (filtroStatus === 'archivadas' as 'activas' | 'archivadas' ?
-                                        'No hay conversaciones archivadas.' :
-                                        'No hay conversaciones activas.')}
+                                    (filtroStatus === 'activas'
+                                        ? 'No hay conversaciones archivadas.'
+                                        : 'No hay conversaciones activas.')}
                         </p>
                     </div>
                 )}
 
                 {!isLoading && !error && conversations.length > 0 && (
-                    <ul className="space-y-1"> {/* Quitado flex-grow y overflow-y-auto de aquí */}
+                    <ul className="space-y-1">
                         {conversations.map((conv) => {
                             const isActive = activeConversationId === conv.id;
                             return (

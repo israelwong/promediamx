@@ -23,7 +23,7 @@ export const NegocioEditableCoreSchema = z.object({
 export const ActualizarDetallesNegocioDataSchema = NegocioEditableCoreSchema;
 
 // Tipo inferido para los datos del formulario de edición.
-export type NegocioFormData = z.infer<typeof ActualizarDetallesNegocioDataSchema>;
+// export type NegocioFormData = z.infer<typeof ActualizarDetallesNegocioDataSchema>;
 
 // Si la acción `actualizarDetallesNegocio` devuelve datos específicos en `ActionResult<T>`
 // se definiría un esquema para T aquí. Por ahora, parece que solo devuelve success/error.
@@ -33,6 +33,72 @@ export const ActualizarNegocioSuccessPayloadSchema = z.object({
 });
 export type ActualizarNegocioSuccessPayload = z.infer<typeof ActualizarNegocioSuccessPayloadSchema>;
 
-// Esquema para el resultado de la acción de actualizar el logo del negocio.
-// El componente cliente principalmente necesita la nueva URL de la imagen.
+// Schema base para los datos del formulario de Negocio
+// Incluye el nuevo campo 'slug' como opcional
+export const NegocioFormDataSchema = z.object({
+    nombre: z.string().min(1, "El nombre del negocio es obligatorio.").max(100, "El nombre no puede exceder los 100 caracteres."),
+    slug: z.string()
+        .min(3, "El slug debe tener al menos 3 caracteres.")
+        .max(150, "El slug no puede exceder los 150 caracteres.")
+        .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido. Solo letras minúsculas, números y guiones. Sin espacios ni guiones al inicio/final.")
+        .optional()
+        .nullable(), // Permite que sea null si el negocio aún no tiene slug
+    slogan: z.string().max(150, "El slogan no puede exceder los 150 caracteres.").nullable().optional(),
+    descripcion: z.string().nullable().optional(),
+    telefonoLlamadas: z.string().max(20, "Teléfono demasiado largo.").nullable().optional(),
+    telefonoWhatsapp: z.string().max(20, "Teléfono WhatsApp demasiado largo.").nullable().optional(),
+    email: z.string().email("Email inválido.").nullable().optional(),
+    direccion: z.string().nullable().optional(),
+    googleMaps: z.string().url("Enlace de Google Maps inválido.").nullable().optional(),
+    paginaWeb: z.string().url("Página web inválida.").nullable().optional(),
+    garantias: z.string().nullable().optional(),
+    politicas: z.string().nullable().optional(),
+    avisoPrivacidad: z.string().nullable().optional(),
+    status: z.enum(['activo', 'inactivo']).default('inactivo'),
+    logo: z.string().url("URL de logo inválida.").nullable().optional(),
+    // clienteId: z.string().cuid().optional(), // Si lo manejaras desde aquí
+});
+export type NegocioFormData = z.infer<typeof NegocioFormDataSchema>;
 
+// Schema para la entrada de la acción de actualizar un negocio
+// Es similar a NegocioFormData pero todos los campos son opcionales para la actualización parcial.
+// El 'nombre' sigue siendo requerido si se edita desde un formulario que lo tiene como obligatorio.
+export const ActualizarNegocioInputSchema = NegocioFormDataSchema.extend({
+    nombre: z.string().min(1, "El nombre del negocio es obligatorio.").max(100).optional(), // Opcional para la actualización
+    status: z.enum(['activo', 'inactivo']).optional(),
+}).partial(); // .partial() hace todos los campos opcionales, pero redefinimos 'nombre' y 'status' arriba si queremos que tengan validaciones específicas incluso al ser opcionales.
+// Para una actualización más flexible donde cualquier campo es opcional:
+// export const ActualizarNegocioInputSchema = NegocioFormDataSchema.partial();
+export type ActualizarNegocioInput = z.infer<typeof ActualizarNegocioInputSchema>;
+
+
+// Schema para la entrada de la acción obtenerDetallesNegocioParaEditar
+// (No necesita cambios por el slug, ya que solo es un ID de entrada)
+export const ObtenerDetallesNegocioInputSchema = z.object({
+    negocioId: z.string().cuid("ID de negocio inválido."),
+});
+
+// Schema para la salida de la acción obtenerDetallesNegocioParaEditar
+// (Debe incluir el slug)
+export const NegocioDetallesParaEditarSchema = NegocioFormDataSchema.extend({
+    id: z.string().cuid(),
+    // slug: z.string().nullable(), // Ya está en NegocioFormDataSchema como opcional y nullable
+    // Otros campos específicos que no estén en NegocioFormData pero que se devuelvan
+    createdAt: z.date(),
+    updatedAt: z.date(),
+});
+export type NegocioDetallesParaEditar = z.infer<typeof NegocioDetallesParaEditarSchema>;
+
+
+// --- NUEVOS ESQUEMAS PARA LA VERIFICACIÓN DE SLUG ---
+export const VerificarSlugUnicoInputSchema = z.object({
+    slug: z.string().min(1, "El slug es requerido para la verificación."),
+    negocioIdActual: z.string().cuid("ID de negocio actual inválido.").optional(), // Para excluir el negocio actual al editar
+});
+export type VerificarSlugUnicoInput = z.infer<typeof VerificarSlugUnicoInputSchema>;
+
+export const VerificarSlugUnicoOutputSchema = z.object({
+    esUnico: z.boolean(),
+    sugerencia: z.string().optional(), // Sugerencia si no es único
+});
+export type VerificarSlugUnicoOutput = z.infer<typeof VerificarSlugUnicoOutputSchema>;

@@ -83,3 +83,19 @@ export const eliminarAgenteCrmParamsSchema = z.object({
     agenteId: z.string().cuid(),
 });
 export type EliminarAgenteCrmParams = z.infer<typeof eliminarAgenteCrmParamsSchema>;
+
+// Schema para la información básica de un agente (reutilizado)
+// Podrías importarlo desde conversacion.schemas.ts si prefieres tenerlo en un solo lugar
+export const agenteBasicoCrmSchema = z.object({
+    id: z.string().cuid(),
+    nombre: z.string().nullable(),
+    // Podrías añadir email o userId si es relevante para la UI
+    userId: z.string().cuid().optional().nullable(), // El userId del modelo Usuario global
+});
+export type AgenteBasicoCrmData = z.infer<typeof agenteBasicoCrmSchema>;
+
+export const ObtenerAgenteCrmPorUsuarioInputSchema = z.object({
+    usuarioId: z.string().cuid("ID de usuario inválido."),
+    negocioId: z.string().cuid("ID de negocio inválido."),
+});
+export type ObtenerAgenteCrmPorUsuarioInput = z.infer<typeof ObtenerAgenteCrmPorUsuarioInputSchema>;

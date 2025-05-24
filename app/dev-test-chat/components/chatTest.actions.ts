@@ -1,6 +1,7 @@
+// app/dev-test-chat/components/chatTest.actions.ts
 'use server';
 
-import prisma from '@/app/admin/_lib/prismaClient'; // Ajusta la ruta
+import prisma from '@/app/admin/_lib/prismaClient';
 import { z } from 'zod';
 import type { ActionResult } from '@/app/admin/_lib/types';
 import {
@@ -10,19 +11,19 @@ import {
     EnviarMensajeWebchatInputSchema,
     type EnviarMensajeWebchatInput,
     type EnviarMensajeWebchatOutput,
-    ChatMessageItemSchema, // Para validar la salida de obtenerUltimosMensajes
-    type ChatMessageItem
+    ChatMessageItemSchema,
+    type ChatMessageItem,
+    type HistorialTurnoParaGemini,
 } from './chatTest.schemas';
 
-// Importar las acciones de IA y ejecución de funciones
 import {
     generarRespuestaAsistente,
     obtenerTareasCapacidadParaAsistente
 } from '@/app/admin/_lib/ia/ia.actions';
 import { dispatchTareaEjecutadaAction } from '@/app/admin/_lib/ia/funcionesEjecucion.actions';
-import { Prisma } from '@prisma/client'; // Para tipos de Prisma como TransactionClient
+import { InteraccionParteTipo, Prisma } from '@prisma/client';
 
-// --- obtenerUltimosMensajesAction (Refactorizada) ---
+// --- obtenerUltimosMensajesAction ---
 export async function obtenerUltimosMensajesAction(
     conversationId: string,
     limit: number = 50
@@ -37,22 +38,39 @@ export async function obtenerUltimosMensajesAction(
                 id: true,
                 conversacionId: true,
                 role: true,
-                mensaje: true,
+                mensajeTexto: true,
+                parteTipo: true,
+                functionCallNombre: true,
+                functionCallArgs: true,
+                functionResponseData: true,
                 mediaUrl: true,
                 mediaType: true,
                 createdAt: true,
-                agenteCrmId: true, // Necesario si ChatMessageItemSchema lo espera
+                agenteCrmId: true,
                 agenteCrm: { select: { id: true, nombre: true } },
             },
             orderBy: { createdAt: 'asc' },
             take: limit > 0 ? limit : undefined,
         });
-
-        // Validar salida con Zod
-        const validationResult = z.array(ChatMessageItemSchema).safeParse(interacciones);
+        const interaccionesMapeadas = interacciones.map(i => {
+            let parsedArgs: Record<string, unknown> | null = null;
+            if (i.functionCallArgs && typeof i.functionCallArgs === 'object') {
+                parsedArgs = i.functionCallArgs as Record<string, unknown>;
+            } else if (typeof i.functionCallArgs === 'string') {
+                try { parsedArgs = JSON.parse(i.functionCallArgs); } catch (e) { console.warn("No se pudo parsear functionCallArgs para interaccion ID:", i.id, e); }
+            }
+            let parsedResponseData: Record<string, unknown> | null = null;
+            if (i.functionResponseData && typeof i.functionResponseData === 'object') {
+                parsedResponseData = i.functionResponseData as Record<string, unknown>;
+            } else if (typeof i.functionResponseData === 'string') {
+                try { parsedResponseData = JSON.parse(i.functionResponseData); } catch (e) { console.warn("No se pudo parsear functionResponseData para interaccion ID:", i.id, e); }
+            }
+            return { ...i, functionCallArgs: parsedArgs, functionResponseData: parsedResponseData };
+        });
+        const validationResult = z.array(ChatMessageItemSchema).safeParse(interaccionesMapeadas);
         if (!validationResult.success) {
-            console.error("Error Zod en obtenerUltimosMensajesAction:", validationResult.error.flatten());
-            return { success: false, error: "Formato de mensajes inesperado." };
+            console.error("Error Zod en obtenerUltimosMensajesAction:", validationResult.error.flatten().fieldErrors);
+            return { success: false, error: "Formato de mensajes inesperado al cargar historial." };
         }
         return { success: true, data: validationResult.data };
     } catch (error: unknown) {
@@ -61,52 +79,41 @@ export async function obtenerUltimosMensajesAction(
     }
 }
 
-// --- iniciarConversacionWebchatAction (Refactorizada) ---
-// (La lógica interna es similar a tu versión original en crmConversacion.actions.ts,
-// pero con validación Zod al inicio y ActionResult al final)
+
+// --- iniciarConversacionWebchatAction ---
 export async function iniciarConversacionWebchatAction(
     input: IniciarConversacionWebchatInput
 ): Promise<ActionResult<IniciarConversacionWebchatOutput>> {
-
     const validationResult = IniciarConversacionWebchatInputSchema.safeParse(input);
-
     if (!validationResult.success) {
         return { success: false, error: "Datos de entrada inválidos.", validationErrors: validationResult.error.flatten().fieldErrors };
     }
-
     const { asistenteId, mensajeInicial, remitenteIdWeb, nombreRemitenteSugerido } = validationResult.data;
 
-    let tareaEjecutadaCreadaId: string | null = null; // Para el dispatcher
+    let initialDbData: {
+        conversationIdVar: string;
+        leadIdVar: string;
+        mensajeUsuarioGuardadoVar?: ChatMessageItem;
+        asistenteNombre: string;
+        negocioNombre: string; // Nombre de la variable que se desestructura
+        asistenteDescripcion: string | null; // Nombre de la variable que se desestructura
+    } | null = null;
 
     try {
-        const asistente = await prisma.asistenteVirtual.findUnique({
-            where: { id: asistenteId },
-            include: { negocio: { include: { CRM: true } } }
-        });
+        const txResult = await prisma.$transaction(async (tx) => {
+            const asistente = await tx.asistenteVirtual.findUnique({
+                where: { id: asistenteId },
+                include: { negocio: { include: { CRM: true } } }
+            });
+            if (!asistente || !asistente.negocio || !asistente.negocio.CRM) {
+                throw new Error(`Asistente, Negocio o CRM no encontrado para Asistente ID: ${asistenteId}`);
+            }
+            const crmId = asistente.negocio.CRM.id;
 
-        if (!asistente || !asistente.negocio || !asistente.negocio.CRM) {
-            return { success: false, error: `Asistente, Negocio o CRM no encontrado para Asistente ID: ${asistenteId}` };
-        }
-
-        const crmId = asistente.negocio.CRM.id;
-        const negocioNombre = asistente.negocio.nombre;
-
-        // Variables para la respuesta
-        let leadIdVar: string = '';
-        let conversationIdVar: string = '';
-        let mensajeUsuarioGuardadoVar: ChatMessageItem | undefined;
-        let mensajeAsistenteGuardadoVar: ChatMessageItem | undefined;
-        let mensajeResultadoFuncionVar: ChatMessageItem | null = null;
-
-        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-            // Lógica para obtener/crear canalWebchatId (como en tu original)
             let canalWebchat = await tx.canalCRM.findFirst({ where: { crmId: crmId, nombre: "Webchat" } });
             if (!canalWebchat) {
                 canalWebchat = await tx.canalCRM.create({ data: { crmId: crmId, nombre: "Webchat", status: 'activo' } });
             }
-            const canalWebchatId = canalWebchat.id;
-
-            // Lógica para obtener/crear Lead (como en tu original)
             let lead = await tx.lead.findFirst({ where: { crmId: crmId, jsonParams: { path: ['webchatUserId'], equals: remitenteIdWeb } } });
             if (!lead) {
                 const primerPipeline = await tx.pipelineCRM.findFirst({ where: { crmId: crmId, status: 'activo' }, orderBy: { orden: 'asc' } });
@@ -115,197 +122,396 @@ export async function iniciarConversacionWebchatAction(
                     data: {
                         crmId: crmId,
                         nombre: nombreRemitenteSugerido || `Usuario Webchat ${remitenteIdWeb.substring(0, 8)}`,
-                        canalId: canalWebchatId,
+                        canalId: canalWebchat.id,
                         status: 'nuevo',
                         pipelineId: primerPipeline.id,
                         jsonParams: { webchatUserId: remitenteIdWeb }
                     },
                 });
             }
-            leadIdVar = lead.id;
-
-            // Crear Conversación e Interacción de Usuario
             const nuevaConversacion = await tx.conversacion.create({ data: { leadId: lead.id, asistenteVirtualId: asistente.id, status: 'abierta' } });
-            conversationIdVar = nuevaConversacion.id;
-            const interaccionUsuario = await tx.interaccion.create({ data: { conversacionId: conversationIdVar, role: 'user', mensaje: mensajeInicial } });
-            mensajeUsuarioGuardadoVar = ChatMessageItemSchema.parse(interaccionUsuario); // Validar/transformar
+            const interaccionUsuarioData: Prisma.InteraccionCreateInput = {
+                conversacion: { connect: { id: nuevaConversacion.id } },
+                role: 'user',
+                mensajeTexto: mensajeInicial,
+                parteTipo: InteraccionParteTipo.TEXT
+            };
+            const interaccionUsuario = await tx.interaccion.create({ data: interaccionUsuarioData });
 
-            // Obtener Tareas y llamar a IA (como en tu original)
-            const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistente.id, tx);
-
-            //! Generar respuesta IA y obtener función a ejecutar
-            const resultadoIA = await generarRespuestaAsistente({
-                historialConversacion: [], // Es el primer mensaje
-                mensajeUsuarioActual: mensajeInicial,
-                contextoAsistente: { /* ... */ nombreAsistente: asistente.nombre, nombreNegocio: negocioNombre },
-                tareasDisponibles: tareasDisponibles
+            // Parsear después de crear, asegurando que los campos de Prisma (como createdAt) estén presentes
+            const parsedUserMessage = ChatMessageItemSchema.parse({
+                ...interaccionUsuario,
+                functionCallArgs: null, // Asegurar que estos campos sean null si no aplican
+                functionResponseData: null,
             });
 
-            if (resultadoIA.success && resultadoIA.data) {
-                const respuestaIA = resultadoIA.data;
-                let respuestaAsistenteTextoVar = respuestaIA.respuestaTextual;
+            return {
+                conversationIdVar: nuevaConversacion.id,
+                leadIdVar: lead.id,
+                mensajeUsuarioGuardadoVar: parsedUserMessage,
+                asistenteNombre: asistente.nombre,
+                negocioNombre: asistente.negocio.nombre, // Coincide con la desestructuración
+                asistenteDescripcion: asistente.descripcion, // Coincide con la desestructuración
+            };
+        });
+        initialDbData = txResult;
 
-                if (respuestaAsistenteTextoVar) {
-                    const iaMsg = await tx.interaccion.create({ data: { conversacionId: conversationIdVar, role: 'assistant', mensaje: respuestaAsistenteTextoVar } });
-                    mensajeAsistenteGuardadoVar = ChatMessageItemSchema.parse(iaMsg);
-                }
+    } catch (error: unknown) {
+        console.error('[ChatTest Actions Iniciar] Error en la transacción inicial de DB:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Error al iniciar la conversación en la base de datos.';
+        if (errorMessage.includes("Pipeline inicial no configurado")) {
+            return { success: false, error: "Error de configuración: No hay un pipeline inicial definido para el CRM." };
+        }
+        return { success: false, error: errorMessage };
+    }
 
-                if (respuestaIA.llamadaFuncion) {
-                    const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === respuestaIA.llamadaFuncion?.nombreFuncion); // Usar nombre nuevo
-                    if (tareaCoincidente) {
-                        const te = await tx.tareaEjecutada.create({
-                            data: { /* ... como en tu original, usando respuestaIA.llamadaFuncion ... */
-                                asistenteVirtualId: asistente.id,
-                                tareaId: tareaCoincidente.id,
-                                fechaEjecutada: new Date(),
-                                metadata: JSON.stringify({
-                                    conversacionId: conversationIdVar,
-                                    leadId: leadIdVar,
-                                    asistenteVirtualId: asistente.id,
-                                    funcionLlamada: respuestaIA.llamadaFuncion.nombreFuncion,
-                                    argumentos: respuestaIA.llamadaFuncion.argumentos,
-                                    canalNombre: 'webchat'//! revissar
-                                })
-                            }
-                        });
-                        tareaEjecutadaCreadaId = te.id;
-                        if (!respuestaAsistenteTextoVar) { // Mensaje de "procesando" si no hubo texto
-                            respuestaAsistenteTextoVar = `Entendido. Procesando: ${respuestaIA.llamadaFuncion.nombreFuncion}.`;
-                            const iaMsgProcesando = await tx.interaccion.create({ data: { conversacionId: conversationIdVar, role: 'assistant', mensaje: respuestaAsistenteTextoVar } });
-                            mensajeAsistenteGuardadoVar = ChatMessageItemSchema.parse(iaMsgProcesando);
-                        }
-                    }
+    if (!initialDbData) {
+        return { success: false, error: 'Fallo la creación inicial de la conversación.' };
+    }
+
+    // Usar los nombres de variables correctos de la desestructuración
+    const { conversationIdVar, leadIdVar, mensajeUsuarioGuardadoVar,
+        asistenteNombre, negocioNombre, asistenteDescripcion } = initialDbData;
+
+    let mensajeAsistenteGuardadoVar: ChatMessageItem | undefined;
+    let tareaEjecutadaCreadaId: string | null = null;
+
+    try {
+        const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, prisma);
+        const resultadoIA = await generarRespuestaAsistente({
+            historialConversacion: [],
+            mensajeUsuarioActual: mensajeInicial,
+            contextoAsistente: {
+                nombreAsistente: asistenteNombre, // Usar la variable correcta
+                nombreNegocio: negocioNombre,     // Usar la variable correcta
+                descripcionAsistente: asistenteDescripcion // Usar la variable correcta
+            },
+            tareasDisponibles: tareasDisponibles
+        });
+
+        if (resultadoIA.success && resultadoIA.data) {
+            const respuestaIA = resultadoIA.data;
+            let respuestaAsistenteTextoVar = respuestaIA.respuestaTextual;
+            let iaMsgData: Prisma.InteraccionCreateInput;
+
+            if (respuestaIA.llamadaFuncion) {
+                console.log('[ChatTest Actions Iniciar] IA solicitó FunctionCall:', respuestaIA.llamadaFuncion.nombreFuncion);
+                iaMsgData = {
+                    conversacion: { connect: { id: conversationIdVar } },
+                    role: 'assistant', parteTipo: InteraccionParteTipo.FUNCTION_CALL,
+                    functionCallNombre: respuestaIA.llamadaFuncion.nombreFuncion,
+                    functionCallArgs: respuestaIA.llamadaFuncion.argumentos as Prisma.InputJsonValue,
+                    mensajeTexto: respuestaAsistenteTextoVar,
+                };
+                if (!respuestaAsistenteTextoVar && respuestaIA.llamadaFuncion.nombreFuncion) {
+                    respuestaAsistenteTextoVar = `Entendido. Procesando: ${respuestaIA.llamadaFuncion.nombreFuncion}.`;
+                    iaMsgData.mensajeTexto = respuestaAsistenteTextoVar;
                 }
+            } else if (respuestaAsistenteTextoVar) {
+                iaMsgData = {
+                    conversacion: { connect: { id: conversationIdVar } },
+                    role: 'assistant', parteTipo: InteraccionParteTipo.TEXT,
+                    mensajeTexto: respuestaAsistenteTextoVar,
+                };
             } else {
-                await tx.interaccion.create({ data: { conversacionId: conversationIdVar, role: 'system', mensaje: `Error IA: ${resultadoIA.error || 'Desconocido'}` } });
+                iaMsgData = {
+                    conversacion: { connect: { id: conversationIdVar } },
+                    role: 'assistant', parteTipo: InteraccionParteTipo.TEXT,
+                    mensajeTexto: '(Respuesta de IA vacía)',
+                };
             }
-            await tx.conversacion.update({ where: { id: conversationIdVar }, data: { updatedAt: new Date() } });
-        }); // Fin de la transacción
+            const iaMsg = await prisma.interaccion.create({ data: iaMsgData });
+            mensajeAsistenteGuardadoVar = ChatMessageItemSchema.parse({
+                ...iaMsg,
+                functionCallArgs: iaMsg.functionCallArgs ? iaMsg.functionCallArgs as Record<string, unknown> : null,
+                functionResponseData: iaMsg.functionResponseData ? iaMsg.functionResponseData as Record<string, unknown> : null,
+            });
+
+            if (respuestaIA.llamadaFuncion) {
+                const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === respuestaIA.llamadaFuncion?.nombreFuncion);
+                if (tareaCoincidente) {
+                    const te = await prisma.tareaEjecutada.create({
+                        data: {
+                            asistenteVirtualId: asistenteId,
+                            tareaId: tareaCoincidente.id,
+                            fechaEjecutada: new Date(),
+                            metadata: JSON.stringify({
+                                conversacionId: conversationIdVar, leadId: leadIdVar, asistenteVirtualId: asistenteId,
+                                funcionLlamada: respuestaIA.llamadaFuncion.nombreFuncion,
+                                argumentos: respuestaIA.llamadaFuncion.argumentos,
+                                canalNombre: 'webchat'
+                            })
+                        }
+                    });
+                    tareaEjecutadaCreadaId = te.id;
+                }
+            }
+        } else {
+            await prisma.interaccion.create({ data: { conversacionId: conversationIdVar, role: 'system', mensajeTexto: `Error IA: ${resultadoIA.error || 'Desconocido'}`, parteTipo: InteraccionParteTipo.TEXT } });
+        }
+        await prisma.conversacion.update({ where: { id: conversationIdVar }, data: { updatedAt: new Date() } });
 
         if (tareaEjecutadaCreadaId) {
-            const dispatchResult = await dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId);
-            if (dispatchResult.success && dispatchResult.data) {
-                mensajeResultadoFuncionVar = ChatMessageItemSchema.parse(dispatchResult.data);
-            }
+            await dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId);
         }
 
         return {
             success: true,
             data: {
                 conversationId: conversationIdVar,
-                interaccionUsuarioId: mensajeUsuarioGuardadoVar!.id, // Asumimos que se creó
+                interaccionUsuarioId: mensajeUsuarioGuardadoVar!.id,
                 leadId: leadIdVar,
                 mensajeUsuario: mensajeUsuarioGuardadoVar,
                 mensajeAsistente: mensajeAsistenteGuardadoVar,
-                mensajeResultadoFuncion: mensajeResultadoFuncionVar
+                mensajeResultadoFuncion: null
             }
         };
     } catch (error: unknown) {
-        // ... (manejo de error como en tu original) ...
-        console.error('[ChatTest Actions] Error en iniciarConversacionWebchatAction:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Error interno.' };
+        console.error('[ChatTest Actions Iniciar] Error después de la transacción inicial o en IA:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Error interno post-transacción.';
+        if (initialDbData && initialDbData.mensajeUsuarioGuardadoVar) { // Asegurar que mensajeUsuarioGuardadoVar exista
+            return {
+                success: false,
+                error: `Error procesando respuesta del asistente: ${errorMessage}`,
+                data: {
+                    conversationId: initialDbData.conversationIdVar,
+                    interaccionUsuarioId: initialDbData.mensajeUsuarioGuardadoVar.id,
+                    leadId: initialDbData.leadIdVar,
+                    mensajeUsuario: initialDbData.mensajeUsuarioGuardadoVar,
+                    mensajeAsistente: undefined,
+                    mensajeResultadoFuncion: null
+                }
+            };
+        }
+        return { success: false, error: errorMessage };
     }
 }
 
 
-// --- enviarMensajeWebchatAction (Refactorizada) ---
-// (Similar a iniciarConversacionWebchatAction en estructura de validación y retorno)
+// --- enviarMensajeWebchatAction ---
 export async function enviarMensajeWebchatAction(
     input: EnviarMensajeWebchatInput
 ): Promise<ActionResult<EnviarMensajeWebchatOutput>> {
-
     const validationResult = EnviarMensajeWebchatInputSchema.safeParse(input);
     if (!validationResult.success) {
         return { success: false, error: "Datos de entrada inválidos.", validationErrors: validationResult.error.flatten().fieldErrors };
     }
-    const { conversationId, mensaje } = validationResult.data; // remitenteIdWeb no se usa mucho después de iniciar si ya tenemos leadId
+    const { conversationId, mensaje } = validationResult.data;
 
+    let mensajeUsuarioGuardadoVar: ChatMessageItem | undefined;
+    let conversacionData: {
+        asistenteId: string;
+        estadoActual: string;
+        asistenteNombre: string; // Nombre de la variable que se desestructura
+        negocioNombre: string;   // Nombre de la variable que se desestructura
+        asistenteDescripcion: string | null; // Nombre de la variable que se desestructura
+        leadId: string | null;
+    } | null = null;
+
+    try {
+        const txResult = await prisma.$transaction(async (tx) => {
+            const interaccionUsuarioData: Prisma.InteraccionCreateInput = {
+                conversacion: { connect: { id: conversationId } },
+                role: 'user',
+                mensajeTexto: mensaje,
+                parteTipo: InteraccionParteTipo.TEXT
+            };
+            const interaccionUsuario = await tx.interaccion.create({ data: interaccionUsuarioData });
+            const parsedUserMessage = ChatMessageItemSchema.parse({
+                ...interaccionUsuario,
+                functionCallArgs: null,
+                functionResponseData: null,
+            });
+
+            const conversacion = await tx.conversacion.findUnique({
+                where: { id: conversationId },
+                include: { asistenteVirtual: { include: { negocio: true } }, lead: true },
+            });
+            if (!conversacion || !conversacion.asistenteVirtual || !conversacion.asistenteVirtual.negocio || !conversacion.lead) {
+                throw new Error("Conversación, asistente o lead no encontrado.");
+            }
+            await tx.conversacion.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
+
+            return {
+                mensajeUsuarioGuardadoVar: parsedUserMessage,
+                asistenteId: conversacion.asistenteVirtualId!,
+                estadoActual: conversacion.status,
+                asistenteNombre: conversacion.asistenteVirtual.nombre,
+                negocioNombre: conversacion.asistenteVirtual.negocio.nombre, // Coincide con la desestructuración
+                asistenteDescripcion: conversacion.asistenteVirtual.descripcion, // Coincide con la desestructuración
+                leadId: conversacion.leadId,
+            };
+        });
+        mensajeUsuarioGuardadoVar = txResult.mensajeUsuarioGuardadoVar;
+        conversacionData = txResult;
+
+    } catch (error: unknown) {
+        console.error('[ChatTest Actions Enviar] Error en la transacción inicial de DB:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Error al guardar el mensaje del usuario.' };
+    }
+
+    if (!conversacionData) {
+        return { success: false, error: 'Fallo al obtener datos de conversación post-transacción.' };
+    }
+
+    // Usar los nombres de variables correctos de la desestructuración
+    const { asistenteId, estadoActual,
+        asistenteNombre, negocioNombre, asistenteDescripcion, leadId } = conversacionData;
+
+    let mensajeAsistenteGuardadoVar: ChatMessageItem | undefined;
     let tareaEjecutadaCreadaId: string | null = null;
 
     try {
-        const conversacion = await prisma.conversacion.findUnique({
-            where: { id: conversationId },
-            include: { asistenteVirtual: { include: { negocio: true } }, lead: true },
-        });
-        if (!conversacion || !conversacion.asistenteVirtual || !conversacion.asistenteVirtual.negocio || !conversacion.lead) {
-            return { success: false, error: "Conversación, asistente o lead no encontrado." };
+        if (estadoActual === 'en_espera_agente' || estadoActual === 'hitl_activo') {
+            console.log(`[ChatTest Actions Enviar] Conversación ${conversationId} en espera de agente. No se llama a IA.`);
+            return {
+                success: true,
+                data: {
+                    interaccionUsuarioId: mensajeUsuarioGuardadoVar!.id,
+                    mensajeUsuario: mensajeUsuarioGuardadoVar,
+                    mensajeAsistente: undefined,
+                    mensajeResultadoFuncion: null
+                }
+            };
         }
-        const asistenteId = conversacion.asistenteVirtualId!;
-        const estadoActual = conversacion.status;
 
-        // Variables para la respuesta
-        let mensajeUsuarioGuardadoVar: ChatMessageItem | undefined;
-        let mensajeAsistenteGuardadoVar: ChatMessageItem | undefined;
-        let mensajeResultadoFuncionVar: ChatMessageItem | null = null;
-
-
-        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-            const interaccionUsuario = await tx.interaccion.create({ data: { conversacionId: conversationId, role: 'user', mensaje: mensaje } });
-            mensajeUsuarioGuardadoVar = ChatMessageItemSchema.parse(interaccionUsuario);
-
-            if (estadoActual === 'en_espera_agente' || estadoActual === 'hitl_activo') {
-                await tx.conversacion.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
-                return; // No llamar a IA
+        const historialInteraccionesDb = await prisma.interaccion.findMany({
+            where: { conversacionId: conversationId },
+            orderBy: { createdAt: 'asc' },
+            take: 20,
+            select: {
+                id: true, role: true, parteTipo: true, mensajeTexto: true,
+                functionCallNombre: true, functionCallArgs: true, functionResponseData: true,
             }
+        });
 
-            const historialInteracciones = await tx.interaccion.findMany({ where: { conversacionId: conversationId }, orderBy: { createdAt: 'asc' }, take: 20 });
-            const historialParaIA = historialInteracciones.map(i => ({ role: i.role as ChatMessageItem['role'], mensaje: i.mensaje }));
-            const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, tx);
+        const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
+            let geminiRole: HistorialTurnoParaGemini['role'];
+            const parts: HistorialTurnoParaGemini['parts'] = [];
+            switch (dbTurn.role) {
+                case 'user':
+                    geminiRole = 'user';
+                    parts.push({ text: dbTurn.mensajeTexto || "" });
+                    break;
+                case 'assistant':
+                    geminiRole = 'model';
+                    if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_CALL && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
+                        parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
+                    } else { parts.push({ text: dbTurn.mensajeTexto || "" }); }
+                    break;
+                case 'function':
+                    geminiRole = 'function';
+                    if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
+                        parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
+                    } else { parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunction", response: { content: dbTurn.mensajeTexto || "" } } }); }
+                    break;
+                default: return null;
+            }
+            return { role: geminiRole, parts };
+        }).filter(Boolean) as HistorialTurnoParaGemini[];
 
-            const resultadoIA = await generarRespuestaAsistente({
-                historialConversacion: historialParaIA.filter(h => h.role !== 'system'),
-                mensajeUsuarioActual: mensaje,
-                contextoAsistente: {
-                    nombreAsistente: conversacion.asistenteVirtual ? conversacion.asistenteVirtual.nombre : '',
-                    nombreNegocio: conversacion.asistenteVirtual && conversacion.asistenteVirtual.negocio ? conversacion.asistenteVirtual.negocio.nombre : ''
-                },
-                tareasDisponibles: tareasDisponibles,
+        console.log(`[ChatTest Actions Enviar] Historial para IA (últimos 5) para conv ${conversationId}:`, JSON.stringify(historialParaIA.slice(-5), null, 2));
+
+        const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, prisma);
+        const historialParaIAAdaptado = historialParaIA.map(item => {
+            // Map roles from Gemini to expected roles
+            let mappedRole: "user" | "assistant" | "agent" | "system";
+            switch (item.role) {
+                case "user":
+                    mappedRole = "user";
+                    break;
+                case "model":
+                    mappedRole = "assistant";
+                    break;
+                case "function":
+                    mappedRole = "agent";
+                    break;
+                default:
+                    mappedRole = "system";
+            }
+            // Extract mensaje from parts (prefer text, otherwise null)
+            const textPart = item.parts.find(p => typeof p.text === "string");
+            return {
+                role: mappedRole,
+                mensaje: textPart?.text ?? null
+            };
+        });
+
+        const resultadoIA = await generarRespuestaAsistente({
+            historialConversacion: historialParaIAAdaptado,
+            mensajeUsuarioActual: mensaje,
+            contextoAsistente: {
+                nombreAsistente: asistenteNombre, // Usar la variable correcta
+                nombreNegocio: negocioNombre,     // Usar la variable correcta
+                descripcionAsistente: asistenteDescripcion // Usar la variable correcta
+            },
+            tareasDisponibles: tareasDisponibles,
+        });
+
+        if (resultadoIA.success && resultadoIA.data) {
+            const respuestaIA = resultadoIA.data;
+            let respuestaAsistenteTextoVar = respuestaIA.respuestaTextual;
+            let iaMsgData: Prisma.InteraccionCreateInput;
+
+            if (respuestaIA.llamadaFuncion) {
+                console.log('[ChatTest Actions Enviar] IA solicitó FunctionCall:', respuestaIA.llamadaFuncion.nombreFuncion);
+                iaMsgData = {
+                    conversacion: { connect: { id: conversationId } },
+                    role: 'assistant', parteTipo: InteraccionParteTipo.FUNCTION_CALL,
+                    functionCallNombre: respuestaIA.llamadaFuncion.nombreFuncion,
+                    functionCallArgs: respuestaIA.llamadaFuncion.argumentos as Prisma.InputJsonValue,
+                    mensajeTexto: respuestaAsistenteTextoVar,
+                };
+                if (!respuestaAsistenteTextoVar && respuestaIA.llamadaFuncion.nombreFuncion) {
+                    respuestaAsistenteTextoVar = `Entendido. Procesando: ${respuestaIA.llamadaFuncion.nombreFuncion}.`;
+                    iaMsgData.mensajeTexto = respuestaAsistenteTextoVar;
+                }
+            } else if (respuestaAsistenteTextoVar) {
+                iaMsgData = {
+                    conversacion: { connect: { id: conversationId } },
+                    role: 'assistant', parteTipo: InteraccionParteTipo.TEXT,
+                    mensajeTexto: respuestaAsistenteTextoVar,
+                };
+            } else {
+                iaMsgData = {
+                    conversacion: { connect: { id: conversationId } },
+                    role: 'assistant', parteTipo: InteraccionParteTipo.TEXT,
+                    mensajeTexto: '(Respuesta de IA vacía)',
+                };
+            }
+            const iaMsg = await prisma.interaccion.create({ data: iaMsgData });
+            mensajeAsistenteGuardadoVar = ChatMessageItemSchema.parse({
+                ...iaMsg,
+                functionCallArgs: iaMsg.functionCallArgs ? iaMsg.functionCallArgs as Record<string, unknown> : null,
+                functionResponseData: iaMsg.functionResponseData ? iaMsg.functionResponseData as Record<string, unknown> : null,
             });
 
-            if (resultadoIA.success && resultadoIA.data) {
-                const respuestaIA = resultadoIA.data;
-                let respuestaAsistenteTextoVar = respuestaIA.respuestaTextual;
-                if (respuestaAsistenteTextoVar) {
-                    const iaMsg = await tx.interaccion.create({ data: { conversacionId: conversationId, role: 'assistant', mensaje: respuestaAsistenteTextoVar } });
-                    mensajeAsistenteGuardadoVar = ChatMessageItemSchema.parse(iaMsg);
-                }
-                if (respuestaIA.llamadaFuncion) {
-                    const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === respuestaIA.llamadaFuncion?.nombreFuncion);
-                    if (tareaCoincidente) {
-                        const te = await tx.tareaEjecutada.create({
-                            data: {
-                                asistenteVirtualId: asistenteId,
-                                tareaId: tareaCoincidente.id,
-                                fechaEjecutada: new Date(),
-                                metadata: JSON.stringify({
-                                    conversacionId: conversationId,
-                                    leadId: conversacion.leadId,
-                                    asistenteVirtualId: asistenteId,
-                                    funcionLlamada: respuestaIA.llamadaFuncion.nombreFuncion,
-                                    argumentos: respuestaIA.llamadaFuncion.argumentos,
-                                    canalNombre: 'webchat'//! revissar
-                                })
-                            }
-                        });
-                        tareaEjecutadaCreadaId = te.id;
-                        if (!respuestaAsistenteTextoVar) {
-                            respuestaAsistenteTextoVar = `Entendido. Procesando: ${respuestaIA.llamadaFuncion.nombreFuncion}.`;
-                            const iaMsgProcesando = await tx.interaccion.create({ data: { conversacionId: conversationId, role: 'assistant', mensaje: respuestaAsistenteTextoVar } });
-                            mensajeAsistenteGuardadoVar = ChatMessageItemSchema.parse(iaMsgProcesando);
+            if (respuestaIA.llamadaFuncion) {
+                const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === respuestaIA.llamadaFuncion?.nombreFuncion);
+                if (tareaCoincidente) {
+                    const te = await prisma.tareaEjecutada.create({
+                        data: {
+                            asistenteVirtualId: asistenteId,
+                            tareaId: tareaCoincidente.id,
+                            fechaEjecutada: new Date(),
+                            metadata: JSON.stringify({
+                                conversacionId: conversationId, leadId: leadId, asistenteVirtualId: asistenteId,
+                                funcionLlamada: respuestaIA.llamadaFuncion.nombreFuncion,
+                                argumentos: respuestaIA.llamadaFuncion.argumentos,
+                                canalNombre: 'webchat'
+                            })
                         }
-                    }
+                    });
+                    tareaEjecutadaCreadaId = te.id;
                 }
-            } else {
-                await tx.interaccion.create({ data: { conversacionId: conversationId, role: 'system', mensaje: `Error IA: ${resultadoIA.error || 'Desconocido'}` } });
             }
-            await tx.conversacion.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
-        }); // Fin de la transacción
+        } else {
+            await prisma.interaccion.create({ data: { conversacionId: conversationId, role: 'system', mensajeTexto: `Error IA: ${resultadoIA.error || 'Desconocido'}`, parteTipo: InteraccionParteTipo.TEXT } });
+        }
+        await prisma.conversacion.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
 
         if (tareaEjecutadaCreadaId) {
-            const dispatchResult = await dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId);
-            if (dispatchResult.success && dispatchResult.data) {
-                mensajeResultadoFuncionVar = ChatMessageItemSchema.parse(dispatchResult.data);
-            }
+            await dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId);
         }
 
         return {
@@ -314,13 +520,24 @@ export async function enviarMensajeWebchatAction(
                 interaccionUsuarioId: mensajeUsuarioGuardadoVar!.id,
                 mensajeUsuario: mensajeUsuarioGuardadoVar,
                 mensajeAsistente: mensajeAsistenteGuardadoVar,
-                mensajeResultadoFuncion: mensajeResultadoFuncionVar
-                // respuestaAsistente y interaccionAsistenteId podrían deducirse de mensajeAsistente
+                mensajeResultadoFuncion: null
             }
         };
     } catch (error: unknown) {
-        // ... (manejo de error)
-        console.error('[ChatTest Actions] Error en enviarMensajeWebchatAction:', error);
+        console.error('[ChatTest Actions Enviar] Error después de la transacción inicial o en IA:', error);
+        if (mensajeUsuarioGuardadoVar) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Error interno al procesar respuesta del asistente.',
+                data: {
+                    interaccionUsuarioId: mensajeUsuarioGuardadoVar.id,
+                    mensajeUsuario: mensajeUsuarioGuardadoVar,
+                    mensajeAsistente: undefined,
+                    mensajeResultadoFuncion: null
+                }
+            };
+        }
         return { success: false, error: error instanceof Error ? error.message : 'Error interno al enviar mensaje.' };
     }
 }
+

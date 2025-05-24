@@ -149,18 +149,16 @@ model Tarea {
   id                       String    @id @default(cuid())
   nombre                   String    @unique // Nombre único y descriptivo de la Tarea.
   orden                    Int?      // Para la organización visual en listas.
-  
   // --- Descripciones ---
   descripcionMarketplace   String?   //! Para mostrar al cliente en el Marketplace de Tareas (orientada al usuario).
-  descripcionTool          String?   //! se moueve a TareaFuncion
-  instruccion              String?   //! Instrucciones detalladas (opcional, para pruebas futuras o contextos complejos para la IA).
-
+  // descripcionTool          String?   //! se moueve a TareaFuncion
+  instruccion              String?   //! se depara para ver si sirve para algo
   // --- Configuración y Estado ---
   precio                   Float?    // Precio de la tarea si no es gratuita.
   status                   String    @default("activo") // Ej: "activo", "inactivo", "beta", "proximamente".
   esTareaPorDefecto        Boolean   @default(false)   // Si es una tarea base ofrecida por el sistema.
   iconoUrl                 String?   // URL del ícono para la UI.
-  
+
   // --- Clasificación y Contexto Adicional (Opcional) ---
   categoriaTareaId         String?
   CategoriaTarea           CategoriaTarea? @relation(fields: [categoriaTareaId], references: [id])
@@ -194,7 +192,7 @@ model TareaFuncion {
   nombre        String?     // Nombre de la función en camelCase (ej: agendarCita). 
                            // Este nombre se usará para la FunctionDeclaration de Gemini.
                            // Será único porque la función es única para la tarea.
-  descripcion   String?    //! Descripción interna/informativa para el administrador que configura la función. NO PARA LA IA.
+  descripcion   String?    //! definición para gemini tool
   orden         Int?       //! quitar no se necesita
 
   // --- Relación UNO-A-UNO Inversa con Tarea ---
@@ -332,7 +330,7 @@ model ParametroRequerido{ //! descontinuar
   funciones   TareaFuncionParametroRequerido[]
 }
 
-model TareaFuncionParametroRequerido { //!Descontinuaro
+model TareaFuncionParametroRequerido { //!Descontinuar
   tareaFuncionId       String
   parametroRequeridoId String
   esObligatorio        Boolean          @default(true) // Indica si este parámetro estándar es obligatorio para esta función específica
@@ -341,7 +339,6 @@ model TareaFuncionParametroRequerido { //!Descontinuaro
   @@id([tareaFuncionId, parametroRequeridoId])
   @@index([parametroRequeridoId]) // Índice para buscar funciones por parámetro
 }
-
 
 
 //! FACTURACIÓN
@@ -394,6 +391,7 @@ model Negocio{
   logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
   logoTamañoBytes Int? // Tamaño del logo en bytes
   nombre    String
+  slug      String?    @unique // NUEVO: Para la URL amigable. Debe ser único.
   slogan   String? //Lema, Tagline, Frase de Impacto.
   descripcion String? //Resumen Ejecutivo, Misión, Visión, Filosofía, Valores, Antecedentes.
   telefonoLlamadas String?
@@ -548,13 +546,21 @@ model NegocioConfiguracionPago {
   // Configuración de Stripe (si es el procesador principal)
   stripeCuentaConectada         Boolean   @default(false) // Si el negocio ha conectado su propia cuenta de Stripe (Stripe Connect)
   plataformaProcesaConSuStripe  Boolean   @default(true)  // Si la plataforma procesa con su Stripe y luego liquida (si stripeCuentaConectada = false)
+
+   // --- Stripe Connect Fields ---
+  stripeAccountId               String?   @unique
+  stripeAccountType             String?   
+  stripeOnboardingComplete      Boolean   @default(false) 
+  stripeChargesEnabled          Boolean   @default(false) 
+  stripePayoutsEnabled          Boolean   @default(false) 
   
   // Opciones de pago específicas
   aceptaTarjetasCreditoDebito   Boolean   @default(true) // Asumiendo que Stripe es la base
   aceptaMesesSinIntereses       Boolean   @default(false)
-  mesesPermitidos               Int[]     // Ej: [3, 6, 9, 12] - Almacenado como array de enteros
-  
+  mesesPermitidosMSI               Int[]   @default([])   // Ej: [3, 6, 9, 12] - Almacenado como array de enteros
   aceptaOxxoPay                 Boolean   @default(false) // Si se integra OXXO Pay
+
+  
   // oxxoPayComisionExtraCliente Float?    // Si hay una comisión adicional por usar OXXO que se traslada al cliente final
 
   aceptaTransferenciaBancaria   Boolean   @default(false)
@@ -567,7 +573,7 @@ model NegocioConfiguracionPago {
 }
 
 
-enum EstadoTransaccion { //!NUEVA
+enum EstadoTransaccion {
   PENDIENTE
   COMPLETADA
   FALLIDA
@@ -576,7 +582,7 @@ enum EstadoTransaccion { //!NUEVA
   EN_PROCESO
   CANCELADA
 }
-
+//! NEGOCIO TRANSACCIONES
 model NegocioTransaccion { 
   id                        String    @id @default(cuid())
   negocioId                 String
@@ -774,12 +780,16 @@ model Oferta {
   condiciones   String?   // Texto libre para describir condiciones adicionales (ej: "Compra mínima $500", "Solo nuevos clientes")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-
   linkPago      String? // El que acabas de añadir
-  
+
   ItemCatalogoOferta ItemCatalogoOferta[]
   OfertaGaleria      OfertaGaleria[]
   videos        OfertaVideos[]
+
+
+    detallesAdicionales      OfertaDetalle[]          // NUEVA: Detalles granulares de la oferta
+    PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // NUEVA: Preguntas sin respuesta relacionadas a esta oferta
+
 
   @@index([negocioId, status, fechaFin]) // Índice útil para buscar ofertas activas por negocio
   @@index([tipoOferta])
@@ -793,8 +803,6 @@ model ItemCatalogoOferta {
   itemCatalogo  ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Si se borra item, se borra vínculo
   ofertaId      String
   oferta        Oferta       @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Si se borra oferta, se borra vínculo
-
-  // Opcional: añadir campos específicos de esta relación si es necesario en el futuro
 
   @@unique([itemCatalogoId, ofertaId]) // Asegurar que un item solo se vincule una vez a la misma oferta
   @@index([itemCatalogoId])
@@ -830,6 +838,99 @@ model OfertaVideos {
   updatedAt   DateTime @updatedAt
 
   @@index([ofertaId])
+}
+
+
+// --- NUEVA ENTIDAD: OfertaDetalle ---
+model OfertaDetalle {
+  id                     String    @id @default(cuid())
+  ofertaId               String
+  oferta                 Oferta    @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  // Título o pregunta clave que este detalle responde. Crucial para el matching.
+  // Ej: "¿Cómo canjeo el descuento?", "Beneficios principales", "Requisitos para aplicar"
+  tituloDetalle          String    
+  contenido              String    @db.Text // La respuesta detallada, argumentos, FAQs, etc. (puede ser Markdown)
+  
+  // Opcional: para categorizar internamente o para la IA
+  tipoDetalle            String?   // Ej: "USO", "BENEFICIO", "FAQ_OFERTA", "CONDICION_ESPECIFICA" 
+  palabrasClave          String[]  // Para ayudar en la búsqueda o matching
+  orden                  Int?      // Para mostrar detalles en un orden específico si es necesario
+
+  // Multimedia específica para este detalle (limitada)
+  galeriaDetalle         OfertaDetalleGaleria[]
+  videoDetalle           OfertaDetalleVideo? // Asumiendo un solo video por detalle
+
+  // Estado de este detalle (útil para el flujo de preguntas pendientes)
+  // PENDIENTE_RESPUESTA_HUMANA, RESPONDIDO_POR_HUMANO, PUBLICADO, ARCHIVADO
+  estadoContenido        String    @default("PUBLICADO") 
+  preguntaOriginalUsuario String?  // Si este detalle se originó de una pregunta no respondida
+
+  creadoPorHumano        Boolean   @default(true) // Para diferenciar si fue creado por admin o por el sistema (pregunta pendiente)
+  notificacionEnviada    Boolean   @default(false) // Para controlar si ya se notificó al admin sobre este detalle pendiente
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // Relación a preguntas sin respuesta asociadas a este detalle
+
+  @@index([ofertaId, tipoDetalle])
+  @@index([ofertaId, estadoContenido])
+}
+
+// --- NUEVA ENTIDAD: OfertaDetalleGaleria (similar a TareaGaleria) ---
+model OfertaDetalleGaleria {
+  id                   String        @id @default(cuid())
+  ofertaDetalleId      String
+  ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
+  imageUrl             String
+  altText              String?
+  descripcion          String?
+  orden                Int?
+  createdAt            DateTime      @default(now())
+  // No tamañoBytes aquí, según tu indicación
+}
+
+// --- NUEVA ENTIDAD: OfertaDetalleVideo (similar, pero quizás @unique en ofertaDetalleId si es solo 1 video) ---
+model OfertaDetalleVideo {
+  id                   String        @id @default(cuid())
+  ofertaDetalleId      String        @unique // Si solo permites un video por OfertaDetalle
+  ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
+  videoUrl             String        // URL del video (YouTube, Vimeo, archivo directo)
+  tipoVideo            String?       // 'YOUTUBE', 'VIMEO', 'MP4_DIRECTO'
+  tituloVideo          String?
+  descripcionVideo     String?
+  createdAt            DateTime      @default(now())
+}
+
+// --- (Opcional pero Recomendado) NUEVA ENTIDAD: PreguntaSinRespuestaOferta ---
+// Para manejar explícitamente las preguntas no respondidas y su ciclo de vida
+model PreguntaSinRespuestaOferta {
+    id                  String @id @default(cuid())
+    ofertaId            String
+    oferta              Oferta @relation(fields: [ofertaId], references: [id], onDelete:Cascade)
+    conversacionId      String // Para saber de qué conversación vino la pregunta
+    // conversacion        Conversacion @relation(fields: [conversacionId], references: [id]) // Si tienes un modelo Conversacion
+    preguntaUsuario     String @db.Text // La pregunta exacta que no se pudo responder
+    
+    // Estado de esta pregunta pendiente
+    // PENDIENTE_REVISION, EN_PROCESO_RESPUESTA, RESPONDIDA_Y_NOTIFICADA, DESCARTADA
+    estado              String @default("PENDIENTE_REVISION") 
+    
+    // Quién la va a responder o quién la está revisando
+    asignadoAId         String? // Podría ser un Usuario admin o Agente
+    // asignadoA           Usuario? @relation(fields: [asignadoAId], references: [id])
+
+    // Referencia al OfertaDetalle que se creó para responderla (una vez que se crea)
+    ofertaDetalleRespuestaId String? @unique
+    ofertaDetalleRespuesta   OfertaDetalle? @relation(fields: [ofertaDetalleRespuestaId], references: [id], onDelete: SetNull)
+    
+    fechaCreacion       DateTime @default(now())
+    fechaRespuesta      DateTime? // Cuando el humano responde en el panel
+    fechaNotificacionUsuario DateTime? // Cuando se le notifica al usuario original (si es posible)
+
+    @@index([ofertaId, estado])
+    @@index([asignadoAId])
 }
 
 //! CATALOGO
@@ -1270,7 +1371,6 @@ model Conversacion {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt // Corregido
 
-  //! --- NUEVOS CAMPOS PARA ASIGNACIÓN DE AGENTE ---
   agenteCrmActualId  String?   // ID del Agente CRM actualmente asignado a esta conversación
   agenteCrmActual    Agente?   @relation("ConversacionesAsignadas", fields: [agenteCrmActualId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   // --- FIN DE NUEVOS CAMPOS ---
@@ -1282,7 +1382,14 @@ model Conversacion {
   @@index([asistenteVirtualId])
   @@index([status])
   @@index([updatedAt]) // Útil para buscar conversaciones recientes
-  @@index([agenteCrmActualId]) // !Nuevo índice para búsquedas por agente asignado
+  @@index([agenteCrmActualId]) 
+}
+
+//!INTERACCIÓN
+enum InteraccionParteTipo {
+  TEXT
+  FUNCTION_CALL
+  FUNCTION_RESPONSE
 }
 
 model Interaccion {
@@ -1291,20 +1398,33 @@ model Interaccion {
   conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
   messageId      String?   // ID del mensaje específico (ej: de WhatsApp)
   role           String    // user, assistant, agent, system
-  mensaje        String?   @db.Text // Usar Text para mensajes largos
+
+  //! Campos para la estructura de Gemini
+  parteTipo      InteraccionParteTipo @default(TEXT)
+  mensajeTexto   String?   @db.Text // Usado si parteTipo es TEXT, o como fallback
+
+  //! Para parteTipo = FUNCTION_CALL (role será 'assistant'/'model')
+  functionCallNombre String?
+  functionCallArgs   Json?   // Los argumentos que la IA generó
+
+  //! Para parteTipo = FUNCTION_RESPONSE (role será 'function')
+  functionResponseNombre String? // Nombre de la función que se invocó
+  functionResponseData Json? // El objeto de respuesta que tu sistema genera para la IA
+
+
+  mensaje        String?   @db.Text //!quitar
   // Metadatos de análisis (opcional)
   intencion      String?
   entidad        String?
   interes        String?
   sentimiento    String?
+
   // Datos adjuntos
   mediaUrl       String?   // URL del archivo adjunto (imagen, audio, etc.)
   mediaType      String?   // image, audio, video, document, sticker
   createdAt      DateTime  @default(now())
-
   agenteCrmId    String?   // ID del Agente CRM que realizó esta interacción (si role == 'agent')
   agenteCrm      Agente?   @relation("InteraccionesPorAgente", fields: [agenteCrmId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  // --- FIN DE NUEVO CAMPO OPCIONAL ---
 
   @@index([conversacionId, createdAt(sort: Asc)], map: "Interaccion_conversacionId_createdAt_unique_idx")
   @@index([agenteCrmId]) // Nuevo índice si añades agenteCrmId

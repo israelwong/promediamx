@@ -173,7 +173,7 @@ export default function ChatTestPanel() {
             id: tempUserMessageId,
             conversacionId: currentConversationId || "temp_conv_id",
             role: 'user',
-            mensaje: currentMessageText,
+            mensajeTexto: currentMessageText,
             createdAt: new Date(),
             // Los demás campos son opcionales o no aplican para el mensaje optimista
         };
@@ -271,10 +271,9 @@ export default function ChatTestPanel() {
                                 </span>)}
 
                                 <div className={`p-2.5 rounded-lg shadow ${getMessageBgColor(msg.role)} ${msg.role === "user" ? "rounded-br-none" : "rounded-bl-none"}`}>
-
-                                    {msg.mensaje && (msg.role === 'assistant' ?
-                                        (<div className="text-sm prose prose-sm prose-invert max-w-none chat-message-content" dangerouslySetInnerHTML={{ __html: msg.mensaje }} />) :
-                                        (<p className="text-sm whitespace-pre-wrap chat-message-content">{msg.mensaje}</p>)
+                                    {msg.mensajeTexto && (msg.role === 'assistant' ?
+                                        (<div className="text-sm prose prose-sm prose-invert max-w-none chat-message-content" dangerouslySetInnerHTML={{ __html: msg.mensajeTexto }} />) :
+                                        (<p className="text-sm whitespace-pre-wrap chat-message-content">{msg.mensajeTexto}</p>)
                                     )}
                                 </div>
 
@@ -282,7 +281,7 @@ export default function ChatTestPanel() {
 
                             </div>
 
-                        ) : (<div className={`py-1 ${getMessageBgColor(msg.role)}`}>{msg.mensaje}</div>)}
+                        ) : (<div className={`py-1 ${getMessageBgColor(msg.role)}`}>{msg.mensajeTexto}</div>)}
                         <span className={`text-xs text-zinc-500 mt-1 px-1 ${msg.role === "user" ? "self-end" : msg.role === "system" ? "self-center" : "self-start"}`}>
                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>

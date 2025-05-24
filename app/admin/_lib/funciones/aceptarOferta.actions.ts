@@ -81,20 +81,20 @@ export async function ejecutarAceptarOfertaAction(
             };
         }
 
-        let mensajeSiguientePaso = "";
+        const mensajeSiguientePaso = `¡Confirmado! Has elegido la oferta ${oferta.nombre}. ¿Estás listo para realizar el pago ahora?`;
 
-        if (oferta.linkPago) {
-            if (argumentos.canalNombre?.toLowerCase() === 'web chat' || argumentos.canalNombre?.toLowerCase() === 'webchat') {
-                // Estilo simple, puedes mejorarlo con clases CSS
-                // mensajeSiguientePaso = `¡Excelente! Puedes completar tu compra o activar la oferta "<span class="math-inline">\{oferta\.nombre\}" directamente haciendo clic aquí\: <a href\="</span>{oferta.linkPago}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">Ir al pago seguro</a>. Avísame si tienes algún problema.`;
-                mensajeSiguientePaso = `¡Excelente! Puedes completar tu compra o activar la oferta "${oferta.nombre}" directamente haciendo clic aquí: <a href="${oferta.linkPago}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">Ir al pago seguro</a>. Avísame si tienes algún problema.`;
-            } else {
-                // Para WhatsApp u otros canales de solo texto
-                mensajeSiguientePaso = `¡Excelente! Puedes completar tu compra o activar la oferta "${oferta.nombre}" directamente en este enlace de pago seguro: ${oferta.linkPago}`;
-            }
-        } else {
-            mensajeSiguientePaso = `¡Genial que quieras aprovechar la oferta "${oferta.nombre}"! Para continuar, un asesor se pondrá en contacto contigo a la brevedad para ayudarte a completarla.`;
-        }
+        // if (oferta.linkPago) {
+        //     if (argumentos.canalNombre?.toLowerCase() === 'web chat' || argumentos.canalNombre?.toLowerCase() === 'webchat') {
+        //         // Estilo simple, puedes mejorarlo con clases CSS
+        //         // mensajeSiguientePaso = `¡Excelente! Puedes completar tu compra o activar la oferta "<span class="math-inline">\{oferta\.nombre\}" directamente haciendo clic aquí\: <a href\="</span>{oferta.linkPago}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">Ir al pago seguro</a>. Avísame si tienes algún problema.`;
+        //         mensajeSiguientePaso = `¡Excelente! Puedes completar tu compra o activar la oferta "${oferta.nombre}" directamente haciendo clic aquí: <a href="${oferta.linkPago}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">Ir al pago seguro</a>. Avísame si tienes algún problema.`;
+        //     } else {
+        //         // Para WhatsApp u otros canales de solo texto
+        //         mensajeSiguientePaso = `¡Excelente! Puedes completar tu compra o activar la oferta "${oferta.nombre}" directamente en este enlace de pago seguro: ${oferta.linkPago}`;
+        //     }
+        // } else {
+        //     mensajeSiguientePaso = `¡Genial que quieras aprovechar la oferta "${oferta.nombre}"! Para continuar, un asesor se pondrá en contacto contigo a la brevedad para ayudarte a completarla.`;
+        // }
 
         await prisma.tareaEjecutada.update({
             where: { id: tareaEjecutadaId },

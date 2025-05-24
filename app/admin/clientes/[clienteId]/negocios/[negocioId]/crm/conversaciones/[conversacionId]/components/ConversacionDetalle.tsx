@@ -1,3 +1,4 @@
+//ruta actual: app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/[conversacionId]/components/ConversacionDetalle.tsx
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -7,11 +8,15 @@ import ToolsPanel from './ToolsPanel';
 // --- NUEVAS IMPORTS ---
 import { obtenerDetallesConversacionAction } from '@/app/admin/_lib/actions/conversacion/conversacion.actions'; // Nueva ruta
 import type { ConversationDetailsForPanelData } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas'; // Nuevo tipo de Zod
+import type { ChatMessageItemCrmData } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas'; // Nuevo tipo de Zod
 
 interface Props {
   clienteId: string;
   negocioId: string;
   conversacionId: string;
+  initialConversationDetails: ConversationDetailsForPanelData | null; // Opcional, si decides pasar los detalles iniciales
+  initialMessages: ChatMessageItemCrmData[]; // Opcional, si decides pasar los mensajes iniciales
+  initialError: string | null; // Opcional, si decides pasar un error inicial
 }
 
 export default function ConversacionDetalle({ clienteId, negocioId, conversacionId }: Props) {
@@ -83,13 +88,19 @@ export default function ConversacionDetalle({ clienteId, negocioId, conversacion
       // a menos que tengas una razón específica para el flex-basis 0.
       // El layout padre (LayoutConversaciones) ya usa flex-1 para esta área.
       >
-        <ChatComponent
-          conversacionId={conversacionId}
-          negocioId={negocioId} // ChatComponent podría necesitarlo para enviar mensajes con contexto de asistente
-          refreshTrigger={refreshChatTrigger}
-        // Podrías pasarle pageTitleData.agenteCrmActual si ChatComponent necesita saber el agente
-        // agenteActual={pageTitleData?.agenteCrmActual || null}
-        />
+        {pageTitleData && (
+          <ChatComponent
+            conversacionId={conversacionId}
+            negocioId={negocioId} // ChatComponent podría necesitarlo para enviar mensajes con contexto de asistente
+            refreshTrigger={refreshChatTrigger}
+            initialConversationDetails={pageTitleData}
+            initialMessages={[]} // Puedes reemplazar esto con un estado/método adecuado si tienes mensajes iniciales
+            initialTotalMessages={0} // Ajusta este valor si tienes el total real de mensajes
+            initialError={null} // Ajusta este valor si tienes un error inicial
+          // Podrías pasarle pageTitleData.agenteCrmActual si ChatComponent necesita saber el agente
+          // agenteActual={pageTitleData?.agenteCrmActual || null}
+          />
+        )}
       </div>
 
       <aside

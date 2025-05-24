@@ -8,6 +8,8 @@ const badgeVariants = {
         secondary: "border-transparent bg-zinc-600 text-zinc-300 hover:bg-zinc-600/80",
         destructive: "border-transparent bg-red-600 text-red-50 hover:bg-red-600/80",
         outline: "text-zinc-100 border-zinc-600",
+        warning: "border-transparent bg-yellow-500 text-yellow-900 hover:bg-yellow-500/80",
+        success: "border-transparent bg-green-600 text-green-50 hover:bg-green-600/80",
     },
 };
 

@@ -75,3 +75,17 @@ export const RespuestaAsistenteConHerramientasSchema = z.object({
     pensamientoIA: z.string().nullable().optional(), // Si decides usarlo
 });
 export type RespuestaAsistenteConHerramientas = z.infer<typeof RespuestaAsistenteConHerramientasSchema>;
+
+
+// Interfaz que HistorialTurnoParaGemini espera (debe estar definida en alguna parte, preferiblemente en ia.schemas.ts o un archivo de tipos compartido)
+// Esta es la que definimos DENTRO de generarRespuestaAsistente en el Canvas anterior.
+// Deberás asegurarte que el `historialParaIA` que construyes aquí se mapee a esa estructura.
+// La he incluido aquí para referencia, pero idealmente se importa.
+export interface HistorialTurnoParaGemini {
+    role: 'user' | 'assistant' | 'function' | 'agent' | 'system';
+    parteTipo?: 'TEXT' | 'FUNCTION_CALL' | 'FUNCTION_RESPONSE' | null;
+    mensajeTexto?: string | null;
+    functionCallNombre?: string | null;
+    functionCallArgs?: Record<string, unknown> | null;
+    functionResponseData?: { content: unknown } | Record<string, unknown> | null;
+}

@@ -11,8 +11,9 @@ import {
     crearAgenteCrmParamsSchema,
     editarAgenteCrmParamsSchema,
     eliminarAgenteCrmParamsSchema,
-    // Importar schema para validar salida si es necesario
-    // agenteCrmSchema
+    ObtenerAgenteCrmPorUsuarioInputSchema,
+    type AgenteBasicoCrmData, // Usamos el tipo del schema que acabamos de definir
+    agenteBasicoCrmSchema
 } from './agenteCrm.schemas';
 import { z } from 'zod';
 import bcrypt from 'bcrypt'; // Para hashear passwords
@@ -194,5 +195,61 @@ export async function eliminarAgenteCrmAction(
         }
         // P2003 podría ocurrir si hay otras relaciones que no son SetNull
         return { success: false, error: 'No se pudo eliminar el agente.' };
+    }
+}
+
+export async function obtenerAgenteCrmPorUsuarioAction(
+    usuarioId: string, // Simplificamos la entrada directa de los IDs
+    negocioId: string
+): Promise<ActionResult<AgenteBasicoCrmData | null>> {
+    const input = { usuarioId, negocioId };
+    const validationResult = ObtenerAgenteCrmPorUsuarioInputSchema.safeParse(input);
+
+    if (!validationResult.success) {
+        return {
+            success: false,
+            error: "Parámetros de entrada inválidos.",
+            errorDetails: validationResult.error.flatten().fieldErrors,
+            data: null,
+        };
+    }
+
+    try {
+        const agente = await prisma.agente.findFirst({
+            where: {
+                userId: validationResult.data.usuarioId,
+                crm: {
+                    negocioId: validationResult.data.negocioId,
+                },
+                status: 'activo', // Solo considerar agentes activos
+            },
+            select: {
+                id: true,
+                nombre: true,
+                userId: true,
+            },
+        });
+
+        if (!agente) {
+            // No es necesariamente un error, el usuario podría no ser un agente para ese negocio.
+            return { success: true, data: null };
+        }
+
+        // Validar la salida con el schema Zod
+        const parsedAgente = agenteBasicoCrmSchema.safeParse(agente);
+        if (!parsedAgente.success) {
+            console.error("Error Zod en salida de obtenerAgenteCrmPorUsuarioAction:", parsedAgente.error.flatten());
+            return { success: false, error: "Error al procesar datos del agente.", data: null };
+        }
+
+        return { success: true, data: parsedAgente.data };
+
+    } catch (error) {
+        console.error('Error en obtenerAgenteCrmPorUsuarioAction:', error);
+        return {
+            success: false,
+            error: 'No se pudo obtener la información del agente.',
+            data: null,
+        };
     }
 }

@@ -10,7 +10,10 @@ import {
     Tool,
     FunctionDeclaration,
     SchemaType,
-    Schema
+    Schema,
+    Content, // Importar Content para tipar el historial correctamente
+    FunctionCall, // Importar FunctionCall
+    FunctionResponse, // Importar FunctionResponse
 } from "@google/generative-ai";
 
 import {
@@ -171,10 +174,102 @@ Mantén siempre un tono amigable y eficiente.
             tools: tools,
         });
 
-        const chatHistory = input.historialConversacion.map(turn => ({
-            role: (turn.role === 'user' ? 'user' : 'model') as 'user' | 'model',
-            parts: [{ text: turn.mensaje || "" }],
-        }));
+        // const chatHistory = input.historialConversacion.map(turn => ({
+        //     role: (turn.role === 'user' ? 'user' : 'model') as 'user' | 'model',
+        //     parts: [{ text: turn.mensaje || "" }],
+        // }));
+
+        // --- INICIO DE LA MODIFICACIÓN AVANZADA PARA CONSTRUIR CHAT HISTORY ---
+        const chatHistory: Content[] = [];
+        for (let i = 0; i < input.historialConversacion.length; i++) {
+            const turn = input.historialConversacion[i];
+
+            // Ignorar roles 'agent' y 'system' del historial de ChatMessageItem para Gemini,
+            // ya que Gemini espera 'user', 'model', o 'function' (o 'tool').
+            if (turn.role === 'agent' || turn.role === 'system') {
+                console.log(`[IA Action History Reconstructor] Ignorando turno con rol: ${turn.role}`);
+                continue;
+            }
+
+            const geminiRole = (turn.role === 'user' ? 'user' : 'model') as 'user' | 'model';
+            // const turnParts: Content['parts'] = [{ text: turn.mensaje || "" }]; // Default a texto
+
+            if (geminiRole === 'model' && turn.mensaje) {
+                let parsedFunctionCallFromHistory: FunctionCall | null = null;
+                const jsonMatch = turn.mensaje.match(/```json\s*([\s\S]*?)\s*```/);
+
+                if (jsonMatch && jsonMatch[1]) {
+                    try {
+                        const parsedJson = JSON.parse(jsonMatch[1]);
+                        if (parsedJson.functionCall &&
+                            typeof parsedJson.functionCall.name === 'string' &&
+                            typeof parsedJson.functionCall.args === 'object') {
+                            parsedFunctionCallFromHistory = parsedJson.functionCall as FunctionCall;
+                        }
+                    } catch { /* No es JSON válido, se tratará como texto */ }
+                } else if (turn.mensaje.trim().startsWith('{"functionCall":')) {
+                    try {
+                        const parsedJson = JSON.parse(turn.mensaje.trim());
+                        if (parsedJson.functionCall &&
+                            typeof parsedJson.functionCall.name === 'string' &&
+                            typeof parsedJson.functionCall.args === 'object') {
+                            parsedFunctionCallFromHistory = parsedJson.functionCall as FunctionCall;
+                        }
+                    } catch { /* No es JSON válido, se tratará como texto */ }
+                }
+
+                if (parsedFunctionCallFromHistory) {
+                    console.log(`[IA Action History Reconstructor] Historial: Turno del 'model' interpretado como functionCall: ${parsedFunctionCallFromHistory.name}`);
+                    chatHistory.push({ role: 'model', parts: [{ functionCall: parsedFunctionCallFromHistory }] });
+
+                    // INTENTO DE INFERIR FUNCTION_RESPONSE DEL SIGUIENTE MENSAJE DEL MODELO
+                    // Esto es una heurística y depende de cómo tu dispatcher guarda los resultados.
+                    if (i + 1 < input.historialConversacion.length) {
+                        const nextTurn = input.historialConversacion[i + 1];
+                        // Si el siguiente mensaje también es del 'assistant' (model) y NO es otra functionCall,
+                        // lo asumimos como el resultado textual de la functionCall anterior.
+                        if ((nextTurn.role === 'assistant') && nextTurn.mensaje) {
+                            let nextTurnIsItselfAFunctionCall = false;
+                            const nextJsonMatchAttempt = nextTurn.mensaje.match(/```json\s*([\s\S]*?)\s*```/);
+                            if (nextJsonMatchAttempt && nextJsonMatchAttempt[1]) {
+                                try { const p = JSON.parse(nextJsonMatchAttempt[1]); if (p.functionCall) nextTurnIsItselfAFunctionCall = true; } catch { }
+                            } else if (nextTurn.mensaje.trim().startsWith('{"functionCall":')) {
+                                try { const p = JSON.parse(nextTurn.mensaje.trim()); if (p.functionCall) nextTurnIsItselfAFunctionCall = true; } catch { }
+                            }
+
+                            if (!nextTurnIsItselfAFunctionCall) {
+                                console.log(`[IA Action History Reconstructor] Historial: Asumiendo que el siguiente turno del 'model' es la functionResponse para ${parsedFunctionCallFromHistory.name}`);
+                                const functionResponsePart: FunctionResponse = {
+                                    name: parsedFunctionCallFromHistory.name,
+                                    response: {
+                                        // Gemini espera un objeto aquí. Si tu 'nextTurn.mensaje' es solo texto,
+                                        // envuélvelo en una estructura, por ejemplo, { "content": "texto del mensaje" }
+                                        // o { "messageForUser": "texto del mensaje" }
+                                        // Esto es CRUCIAL y debe coincidir con lo que tus funciones realmente devuelven
+                                        // y cómo quieres que la IA lo interprete.
+                                        // Para este ejemplo, asumimos que el mensaje es el contenido principal.
+                                        content: nextTurn.mensaje,
+                                        // Podrías añadir más estructura si tus funciones devuelven objetos más complejos
+                                        // y quieres que la IA los "vea" en el historial.
+                                    }
+                                };
+                                chatHistory.push({ role: 'function', parts: [{ functionResponse: functionResponsePart }] });
+                                i++; // Avanzamos el índice porque ya procesamos el siguiente turno
+                                continue; // Pasamos al siguiente turno del bucle principal
+                            }
+                        }
+                    }
+                } else {
+                    // Mensaje de texto normal del modelo
+                    chatHistory.push({ role: 'model', parts: [{ text: turn.mensaje || "" }] });
+                }
+            } else if (geminiRole === 'user') {
+                chatHistory.push({ role: 'user', parts: [{ text: turn.mensaje || "" }] });
+            }
+        }
+        // --- FIN DE LA MODIFICACIÓN AVANZADA ---
+
+        console.log("[IA Action] Historial RECONSTRUIDO para Gemini (v2):", JSON.stringify(chatHistory, null, 2));
 
         const chatSession = model.startChat({
             history: chatHistory,
@@ -311,10 +406,9 @@ export async function obtenerTareasCapacidadParaAsistente(
                 include: {
                     tareaFuncion: {
                         include: {
-                            parametros: true, // <-- CAMBIO: Incluir la relación directa 'parametros'
-                        },
+                            parametros: true,
+                        }
                     },
-                    // Mantener si TareaCampoPersonalizado sigue vigente y se usa:
                     camposPersonalizadosRequeridos: {
                         include: { crmCampoPersonalizado: true },
                     },
@@ -345,8 +439,8 @@ export async function obtenerTareasCapacidadParaAsistente(
             });
 
             funcionHerramienta = {
-                nombre: tf.nombre ?? '', // <-- CAMBIO: Usar el campo 'nombre' (camelCase) y asegurar que sea string
-                descripcion: tf.descripcion, // Descripción interna del admin (usada como fallback en construirHerramientasParaGemini)
+                nombre: tf.nombre ?? '',
+                descripcion: tf.descripcion,
                 parametros: parametrosFuncion,
             };
         }
@@ -371,8 +465,8 @@ export async function obtenerTareasCapacidadParaAsistente(
         tareasCapacidad.push({
             id: tareaDb.id,
             nombre: tareaDb.nombre, // Nombre de la Tarea
-            descripcionTool: tareaDb.descripcionTool, // <-- CAMBIO: Usar el campo Tarea.descripcionTool
-            instruccionParaIA: tareaDb.instruccion, // <-- CAMBIO: Usar el campo Tarea.instruccion
+            descripcionTool: tareaDb.tareaFuncion?.descripcion,
+            instruccionParaIA: tareaDb.instruccion,
             funcionHerramienta: funcionHerramienta,
             camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,
         });

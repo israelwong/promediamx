@@ -35,9 +35,16 @@ import { DarDireccionArgs, DarDireccionData } from '../funciones/darDireccionYUb
 import { InformarHorarioArgs, InformarHorarioData } from '../funciones/informarHorarioDeAtencion.schemas';
 import { ejecutarInformarHorarioAction } from '../funciones/informarHorarioDeAtencion.actions';
 
-
 import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacionDelNegocio.schemas';
 import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
+
+import {
+    // ProcesarPagoConStripeArgsSchema, 
+    type ProcesarPagoConStripeArgs,
+    type ProcesarPagoConStripeData
+} from '../funciones/procesarPagoConStripe.schemas'; // NUEVA
+import { ejecutarProcesarPagoConStripeAction } from '../funciones/procesarPagoConStripe.actions'; // NUEVA
+
 
 import { ChangedByType } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
 
@@ -51,6 +58,7 @@ async function enviarMensajeInternoAction(input: {
     conversacionId: string;
     mensaje: string;
     role: 'assistant' | 'system'; // Roles permitidos
+    nombreFuncionEjecutada?: string; // NUEVO: Nombre de la función que generó este resultado
 }): Promise<ActionResult<ChatMessageItem>> {
 
     try {
@@ -59,25 +67,30 @@ async function enviarMensajeInternoAction(input: {
         }
 
         // Crear la interacción en la base de datos
-        const nuevaInteraccion = await prisma.interaccion.create({
-            data: {
-                conversacionId: input.conversacionId,
-                mensaje: input.mensaje,
-                role: input.role,
-                // No se asocia agenteCrmId para mensajes de assistant/system generados aquí
-            },
-            // Seleccionar los campos necesarios para construir ChatMessageItem
-            select: {
-                id: true,
-                conversacionId: true,
-                role: true,
-                mensaje: true,
-                mediaUrl: true,
-                mediaType: true,
-                createdAt: true,
-                // agenteCrm: { select: { id: true, nombre: true } }, // No aplica aquí
-            }
-        });
+        const nuevaInteraccion =
+            await prisma.interaccion.create({
+                data: {
+                    conversacionId: input.conversacionId,
+                    // Para el historial de Gemini, esta interacción se convertirá a role: 'function'
+                    // pero en tu DB la puedes guardar como 'assistant' si así lo prefieres,
+                    // y marcarla con parteTipo: 'FUNCTION_RESPONSE'.
+                    role: 'assistant', // O 'function' si quieres ser más explícito en DB
+                    parteTipo: input.nombreFuncionEjecutada ? 'FUNCTION_RESPONSE' : 'TEXT',
+                    mensajeTexto: input.mensaje,
+                    functionResponseNombre: input.nombreFuncionEjecutada, // El nombre de la herramienta que se llamó
+                    functionResponseData: input.nombreFuncionEjecutada ? { content: input.mensaje } : undefined, // El resultado como objeto
+                },
+                // Seleccionar los campos necesarios para construir ChatMessageItem
+                select: {
+                    id: true,
+                    conversacionId: true,
+                    role: true,
+                    mensaje: true,
+                    mediaUrl: true,
+                    mediaType: true,
+                    createdAt: true,
+                }
+            });
 
         // Actualizar timestamp de la conversación
         await prisma.conversacion.update({
@@ -164,6 +177,57 @@ export async function dispatchTareaEjecutadaAction(
 
         console.log(`[Dispatcher] Despachando función: ${funcionLlamada}`);
         switch (funcionLlamada) {
+
+
+            //!PAGAR CON STRIPE
+            case 'procesarPagoConStripe': // NUEVO CASE
+                const asistentePago = await prisma.asistenteVirtual.findUnique({
+                    where: { id: asistenteVirtualId },
+                    select: { negocioId: true /*, otros campos si necesitas */ }
+                });
+                if (!asistentePago?.negocioId) {
+                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio para procesar el pago.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
+                    break;
+                }
+
+                // Obtener datos del Lead para prellenar info del cliente en Stripe (opcional)
+                const leadInfo = await prisma.lead.findUnique({
+                    where: { id: leadId },
+                    select: { email: true, jsonParams: true /* otros campos como stripeCustomerId si lo tienes en Lead */ }
+                });
+
+                const argsPago: ProcesarPagoConStripeArgs = {
+                    negocioId: asistentePago.negocioId,
+                    identificador_item_a_pagar: typeof argumentos.identificador_item_a_pagar === 'string' ? argumentos.identificador_item_a_pagar : '',
+                    tipo_item_a_pagar: (
+                        argumentos.tipo_item_a_pagar === 'oferta' ||
+                        argumentos.tipo_item_a_pagar === 'paquete' ||
+                        argumentos.tipo_item_a_pagar === 'producto_catalogo'
+                    ) ? argumentos.tipo_item_a_pagar : 'producto_catalogo', // Default o manejo de error
+                    emailClienteFinal: leadInfo?.email || undefined,
+                    canalNombre: canalNombre ?? '', // Nombre del canal conversacional
+                };
+
+                // Validar argumentos antes de pasarlos (Zod ya lo hace dentro de la acción, pero una verificación rápida aquí es buena)
+                if (!argsPago.identificador_item_a_pagar) {
+                    mensajeResultadoParaUsuario = "No pude identificar qué producto u oferta deseas pagar. ¿Podrías especificarlo?";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Falta identificador_item_a_pagar para procesarPagoConStripe");
+                    break;
+                }
+
+                resultadoEjecucion = await ejecutarProcesarPagoConStripeAction(argsPago, tareaEjecutadaId);
+                if (resultadoEjecucion.success && resultadoEjecucion.data) {
+                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as ProcesarPagoConStripeData).mensajeParaUsuario;
+                    if ((resultadoEjecucion.data as ProcesarPagoConStripeData).errorAlCrearLink) {
+                        // Si hubo un error creando el link pero queremos que el asistente diga el mensaje de error
+                        await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, (resultadoEjecucion.data as ProcesarPagoConStripeData).mensajeParaUsuario);
+                    }
+                } else {
+                    mensajeResultadoParaUsuario = resultadoEjecucion.error || "Hubo un problema al generar el link de pago.";
+                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, `Error en ejecutarProcesarPagoConStripeAction: ${resultadoEjecucion.error}`);
+                }
+                break;
 
             //!ENVIAR INFORMACIN NEGOCIO
             case 'brindarInformacionDelNegocio':
@@ -649,6 +713,7 @@ export async function dispatchTareaEjecutadaAction(
                 conversacionId: conversacionId,
                 mensaje: mensajeResultadoParaUsuario,
                 role: 'assistant', // El asistente informa el resultado
+                nombreFuncionEjecutada: funcionLlamada, // ¡Importante!
             });
             // *** FIN USO IMPLEMENTACIÓN REAL ***
             if (!envioMsgResult.success) {
