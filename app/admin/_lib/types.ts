@@ -238,6 +238,7 @@ export interface UsuarioExtendido extends Omit<Usuario, 'rol'> { // Omitir 'rol'
     token?: string;
 }
 
+
 // Tipo para una tarjeta Lead simplificada para el Kanban
 export type LeadCardData = Pick<Lead, 'id' | 'nombre' | 'createdAt' | 'updatedAt' | 'pipelineId'> & {
     // Opcional: Añadir más datos si los quieres mostrar en la tarjeta

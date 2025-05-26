@@ -1,6 +1,6 @@
+//ruta actual: app/scripts/whatsapp/whatsappHandler.js
 // Este archivo contiene la función para procesar la entrada de WhatsApp
 // y enviar respuestas a los mensajes recibidos.
-// tiene que ser default function
 import { obtenerIntencion } from "../gemini/intencion";
 import { obtenerInstrucciones } from "../prompt/instrucciones";
 import { obtenerConversacion } from "../prompt/conversaciones";

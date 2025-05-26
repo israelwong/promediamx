@@ -80,8 +80,8 @@ export async function obtenerTareasCapacidadParaAsistente(
         tareasCapacidad.push({
             id: tareaDb.id,
             nombre: tareaDb.nombre, // Nombre de la Tarea
-            descripcionTool: tareaDb.descripcionTool, // <-- CAMBIO: Usar el campo Tarea.descripcionTool
-            instruccionParaIA: tareaDb.instruccion, // <-- CAMBIO: Usar el campo Tarea.instruccion
+            descripcion: tareaDb.tareaFuncion?.descripcion,
+            // instruccionParaIA: tareaDb.instruccion,
             funcionHerramienta: funcionHerramienta,
             camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,
         });

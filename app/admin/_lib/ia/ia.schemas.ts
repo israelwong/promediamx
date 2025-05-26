@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { InteraccionParteTipo } from '@prisma/client'; // ¡Importante!
+
 
 // Esquema para AgenteBasico (podría estar en agente.schemas.ts e importarse aquí)
 export const AgenteBasicoSchema = z.object({
@@ -7,18 +9,30 @@ export const AgenteBasicoSchema = z.object({
 });
 export type AgenteBasico = z.infer<typeof AgenteBasicoSchema>;
 
-// Esquema para ChatMessageItem (usado en historialConversacion)
+// CHAT MESSAGE ITEM SCHEMA ACTUALIZADO
 export const ChatMessageItemSchema = z.object({
-    id: z.string().cuid().optional(), // ID es opcional para historial que se pasa a Gemini
-    conversacionId: z.string().cuid().optional(), // ID de la conversación, opcional para historial
-    role: z.enum(['user', 'assistant', 'agent', 'system']),
-    mensaje: z.string().nullable(),
-    mediaUrl: z.string().nullable().optional(),
+    id: z.string().cuid().optional(),
+    conversacionId: z.string().cuid().optional(),
+    role: z.string(), // user, assistant, agent, system, function
+
+    mensajeTexto: z.string().nullable().optional(), // Campo principal para UI
+
+    // Campos estructurales opcionales
+    parteTipo: z.nativeEnum(InteraccionParteTipo).default('TEXT').nullable().optional(),
+    functionCallNombre: z.string().nullable().optional(),
+    functionCallArgs: z.record(z.any()).nullable().optional(),
+    functionResponseData: z.record(z.any()).nullable().optional(),
+
+    mediaUrl: z.string().url().nullable().optional(),
     mediaType: z.string().nullable().optional(),
-    createdAt: z.date().optional(),
+    createdAt: z.preprocess((arg) => {
+        if (typeof arg === "string" || arg instanceof Date) return new Date(arg);
+        return arg;
+    }, z.date()).optional(), // Hacer opcional si no siempre está al parsear
     agenteCrm: AgenteBasicoSchema.nullable().optional(),
 });
 export type ChatMessageItem = z.infer<typeof ChatMessageItemSchema>;
+
 
 // Esquema para ParametroParaIA
 export const ParametroParaIASchema = z.object({
@@ -41,25 +55,13 @@ export type FuncionHerramientaIA = z.infer<typeof FuncionHerramientaIASchema>;
 export const TareaCapacidadIASchema = z.object({
     id: z.string().cuid(),
     nombre: z.string().optional(),
-    descripcionTool: z.string().nullable().optional(),
+    // descripcionTool: z.string().nullable().optional(),
+    descripcion: z.string().nullable().optional(),
     instruccionParaIA: z.string().nullable().optional(),
     funcionHerramienta: FuncionHerramientaIASchema.nullable().optional(),
     camposPersonalizadosRequeridos: z.array(ParametroParaIASchema).optional(),
 });
 export type TareaCapacidadIA = z.infer<typeof TareaCapacidadIASchema>;
-
-// Esquema para el input de generarRespuestaAsistente
-export const GenerarRespuestaAsistenteConHerramientasInputSchema = z.object({
-    historialConversacion: z.array(ChatMessageItemSchema.pick({ role: true, mensaje: true })), // Solo role y mensaje
-    mensajeUsuarioActual: z.string(),
-    contextoAsistente: z.object({
-        nombreAsistente: z.string(),
-        descripcionAsistente: z.string().nullable().optional(),
-        nombreNegocio: z.string(),
-    }),
-    tareasDisponibles: z.array(TareaCapacidadIASchema),
-});
-export type GenerarRespuestaAsistenteConHerramientasInput = z.infer<typeof GenerarRespuestaAsistenteConHerramientasInputSchema>;
 
 // Esquema para LlamadaFuncionDetectada
 export const LlamadaFuncionDetectadaSchema = z.object({
@@ -77,15 +79,37 @@ export const RespuestaAsistenteConHerramientasSchema = z.object({
 export type RespuestaAsistenteConHerramientas = z.infer<typeof RespuestaAsistenteConHerramientasSchema>;
 
 
-// Interfaz que HistorialTurnoParaGemini espera (debe estar definida en alguna parte, preferiblemente en ia.schemas.ts o un archivo de tipos compartido)
-// Esta es la que definimos DENTRO de generarRespuestaAsistente en el Canvas anterior.
-// Deberás asegurarte que el `historialParaIA` que construyes aquí se mapee a esa estructura.
-// La he incluido aquí para referencia, pero idealmente se importa.
-export interface HistorialTurnoParaGemini {
-    role: 'user' | 'assistant' | 'function' | 'agent' | 'system';
-    parteTipo?: 'TEXT' | 'FUNCTION_CALL' | 'FUNCTION_RESPONSE' | null;
-    mensajeTexto?: string | null;
-    functionCallNombre?: string | null;
-    functionCallArgs?: Record<string, unknown> | null;
-    functionResponseData?: { content: unknown } | Record<string, unknown> | null;
-}
+// Asegúrate que HistorialTurnoParaGeminiSchema esté definido así o similar:
+export const HistorialTurnoParaGeminiSchema = z.object({
+    role: z.enum(['user', 'model', 'function']),
+    parts: z.array(
+        z.object({ // Cada objeto en 'parts' puede ser uno de estos
+            text: z.string().optional(),
+            functionCall: z.object({
+                name: z.string(),
+                args: z.record(z.string(), z.any()),
+            }).optional(),
+            functionResponse: z.object({
+                name: z.string(),
+                response: z.record(z.string(), z.any()),
+            }).optional(),
+        }).refine(part => { // Asegurar que solo una propiedad de 'part' esté presente
+            const keys = Object.keys(part) as Array<keyof typeof part>;
+            const presentKeys = keys.filter(key => part[key] !== undefined);
+            return presentKeys.length === 1;
+        }, { message: "Cada parte debe tener exactamente una propiedad: text, functionCall, o functionResponse." })
+    ).min(1, "Parts array no puede estar vacío."), // parts no puede ser un array vacío
+});
+export type HistorialTurnoParaGemini = z.infer<typeof HistorialTurnoParaGeminiSchema>; // Este es el tipo Content de Gemini
+
+export const GenerarRespuestaAsistenteConHerramientasInputSchema = z.object({
+    historialConversacion: z.array(HistorialTurnoParaGeminiSchema),
+    mensajeUsuarioActual: z.string(),
+    contextoAsistente: z.object({
+        nombreAsistente: z.string(),
+        nombreNegocio: z.string(),
+        descripcionAsistente: z.string().nullable().optional(),
+    }),
+    tareasDisponibles: z.array(TareaCapacidadIASchema),
+});
+export type GenerarRespuestaAsistenteConHerramientasInput = z.infer<typeof GenerarRespuestaAsistenteConHerramientasInputSchema>;

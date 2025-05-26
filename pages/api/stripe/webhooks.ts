@@ -3,6 +3,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { stripe } from '@/app/lib/stripe'; // Tu cliente Stripe inicializado desde lib/stripe.ts
 import prisma from '@/app/admin/_lib/prismaClient'; // Tu cliente Prisma
+import { EnviarConfirmacionPagoInput } from '@/app/admin/_lib/actions/email//email.schemas'; // Tu esquema de validación
+import { enviarCorreoConfirmacionPagoAction } from '@/app/admin/_lib/actions/email//email.actions'; // Tu esquema de validación
+
 
 // Necesitas leer el cuerpo raw para la verificación de la firma
 export const config = {
@@ -154,6 +157,36 @@ export default async function handler(
                         },
                     });
                     console.log(`[Webhook] Transacción registrada para negocio ${negocioId}, sesión: ${session.id}`);
+
+                    const negocioParaCorreo = await prisma.negocio.findUnique({
+                        where: { id: negocioId }, // negocioId lo obtuviste de session.metadata
+                        select: { nombre: true, logo: true, email: true } // Asumiendo que 'email' es el de respuesta
+                    });
+
+                    if (negocioParaCorreo) {
+                        const inputCorreo: EnviarConfirmacionPagoInput = {
+                            emailComprador: session.customer_details?.email || session.customer_email || '', // Asegurar que sea string
+                            nombreComprador: session.customer_details?.name,
+                            nombreNegocio: negocioParaCorreo.nombre,
+                            logoNegocioUrl: negocioParaCorreo.logo,
+                            emailRespuestaNegocio: negocioParaCorreo.email || `soporte@${new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://promedia.mx').hostname}`,
+                            conceptoPrincipal: concepto, // El concepto que ya tenías
+                            montoPagado: montoBruto,
+                            moneda: moneda,
+                            idTransaccionStripe: referenciaProcesadorId, // El ID de la transacción de Stripe
+                            // nombrePlataforma: "ProMedia",
+                            // linkDetallesPedidoEnVitrina: `${process.env.NEXT_PUBLIC_APP_URL}/vd/${negocioParaCorreo.slug}/pedidos/${nuevaTransaccion.id}`, // Ejemplo
+                        };
+                        // Filtrar campos undefined antes de enviar a la acción de correo
+                        Object.keys(inputCorreo).forEach(key => (inputCorreo as Record<string, unknown>)[key] === undefined && delete (inputCorreo as Record<string, unknown>)[key]);
+
+                        if (inputCorreo.emailComprador) {
+                            await enviarCorreoConfirmacionPagoAction(inputCorreo);
+                        } else {
+                            console.warn(`[Webhook] No se pudo enviar correo de confirmación para sesión ${session.id} porque falta emailComprador.`);
+                        }
+                    }
+
                 } catch (dbError) {
                     console.error(`[Webhook] 'checkout.session.completed': Error al guardar la transacción en DB:`, dbError);
                     return res.status(500).json({ error: 'Error interno del servidor al procesar transacción.' });

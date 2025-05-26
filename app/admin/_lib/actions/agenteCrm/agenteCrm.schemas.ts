@@ -26,6 +26,8 @@ export const agenteCrmSchema = z.object({
 });
 export type AgenteCrmData = z.infer<typeof agenteCrmSchema>;
 
+
+
 // Esquema para el resultado de la acción que obtiene los agentes y el crmId
 export const obtenerAgentesCrmResultSchema = z.object({
     crmId: z.string().cuid().nullable(),

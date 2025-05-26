@@ -1,124 +1,101 @@
-//ruta actual: app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/[conversacionId]/components/ConversacionDetalle.tsx
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/[conversacionId]/components/ConversacionDetalle.tsx
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation'; // Importar useRouter si ToolsPanel lo necesita indirectamente para refresh
 import ChatComponent from './ChatComponent';
 import ToolsPanel from './ToolsPanel';
 
-// --- NUEVAS IMPORTS ---
-import { obtenerDetallesConversacionAction } from '@/app/admin/_lib/actions/conversacion/conversacion.actions'; // Nueva ruta
-import type { ConversationDetailsForPanelData } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas'; // Nuevo tipo de Zod
-import type { ChatMessageItemCrmData } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas'; // Nuevo tipo de Zod
+import type {
+  ConversationDetailsForPanelData,
+  ChatMessageItemCrmData
+} from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
+import { MessageSquareWarning } from 'lucide-react'; // Para estados de carga/error
 
-interface Props {
+interface ConversacionDetalleProps {
   clienteId: string;
   negocioId: string;
-  conversacionId: string;
-  initialConversationDetails: ConversationDetailsForPanelData | null; // Opcional, si decides pasar los detalles iniciales
-  initialMessages: ChatMessageItemCrmData[]; // Opcional, si decides pasar los mensajes iniciales
-  initialError: string | null; // Opcional, si decides pasar un error inicial
+  conversacionId: string; // Sigue siendo útil para pasar a ToolsPanel y como key
+  initialConversationDetails: ConversationDetailsForPanelData | null;
+  initialMessages: ChatMessageItemCrmData[];
+  initialError?: string | null; // Error general de carga (de detalles o mensajes)
 }
 
-export default function ConversacionDetalle({ clienteId, negocioId, conversacionId }: Props) {
-  const [refreshChatTrigger, setRefreshChatTrigger] = useState(0);
-  // Usar el nuevo tipo inferido de Zod
-  const [pageTitleData, setPageTitleData] = useState<ConversationDetailsForPanelData | null>(null);
-  const [isTitleDataLoading, setIsTitleDataLoading] = useState(true);
-  const [errorPageTitle, setErrorPageTitle] = useState<string | null>(null); // Estado para errores específicos de esta carga
+export default function ConversacionDetalle({
+  clienteId,
+  negocioId,
+  // conversacionId,
+  initialConversationDetails,
+  initialMessages,
+  initialError,
+}: ConversacionDetalleProps) {
 
-  const handleForceChatRefresh = useCallback(() => {
-    setRefreshChatTrigger(prev => prev + 1);
-  }, []);
+  console.log(initialConversationDetails)
 
+  // El estado del título del documento se maneja con lo que viene de las props
   useEffect(() => {
-    let isActive = true;
-    if (conversacionId) {
-      setIsTitleDataLoading(true);
-      setErrorPageTitle(null); // Limpiar error anterior
-
-      // Llamar a la nueva action con el parámetro encapsulado
-      obtenerDetallesConversacionAction({ conversacionId }).then(result => {
-        if (isActive) {
-          if (result.success && result.data) {
-            setPageTitleData(result.data);
-          } else {
-            setPageTitleData(null);
-            setErrorPageTitle(result.error || "No se pudieron cargar los datos para el título.");
-            console.error("Error al cargar datos para título:", result.error);
-          }
-          setIsTitleDataLoading(false);
-        }
-      });
-    } else {
-      setPageTitleData(null);
-      setIsTitleDataLoading(false);
+    let newTitle = "Chat"; // Título por defecto si no hay detalles
+    if (initialConversationDetails?.leadNombre) {
+      newTitle = `Chat con ${initialConversationDetails.leadNombre}`;
+    } else if (initialConversationDetails) { // Si hay detalles pero no nombre del lead
+      newTitle = `Conversación ${initialConversationDetails.id.substring(0, 8)}...`;
+    } else if (initialError) { // Si hubo un error cargando los detalles desde el padre
+      newTitle = "Error al Cargar Chat";
     }
-    return () => {
-      isActive = false;
-    };
-  }, [conversacionId]);
-
-  useEffect(() => {
-    let newTitle = "Conversaciones - CRM";
-
-    if (conversacionId) {
-      if (isTitleDataLoading) {
-        newTitle = "Cargando Chat...";
-      } else if (pageTitleData && pageTitleData.leadNombre) {
-        newTitle = `Chat con ${pageTitleData.leadNombre}`;
-      } else if (errorPageTitle) {
-        newTitle = "Error al cargar Chat";
-      }
-      else {
-        newTitle = "Chat";
-      }
-    }
-    // console.log(`[TitleEffect Set] Estableciendo título a: "${newTitle}"`); // Reducir verbosidad del log
+    // Si initialConversationDetails es null y no hay initialError, podría significar que aún está cargando en el padre,
+    // o que es un estado inválido. El padre page.tsx ya maneja el renderizado de error si no hay initialConversationDetails.
     document.title = newTitle;
-  }, [conversacionId, pageTitleData, isTitleDataLoading, errorPageTitle]);
+  }, [initialConversationDetails, initialError]);
 
-  // Si hay un error cargando los datos esenciales para el título, podrías mostrar un mensaje de error más prominente.
-  // Por ahora, el componente principal se renderizará y el título reflejará el estado de carga/error.
+  const router = useRouter(); // Para el refresh si ToolsPanel lo necesita
 
+  const handleActionCompleteInToolsPanel = useCallback(() => {
+    // Cuando una acción en ToolsPanel (ej. asignar agente, cambiar status) se completa,
+    // queremos que los datos se refresquen. router.refresh() re-ejecuta el Server Component padre.
+    console.log("[ConversacionDetalle] Acción completada en ToolsPanel. Refrescando datos...");
+    router.refresh();
+  }, [router]);
+
+
+  // Si initialConversationDetails es null, significa que el Server Component padre
+  // no pudo cargarlos. El padre ya debería haber renderizado un mensaje de error.
+  // Sin embargo, añadimos un fallback aquí por si acaso.
+  if (!initialConversationDetails) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+        <MessageSquareWarning size={64} className="text-red-500 mb-6" />
+        <h2 className="text-2xl font-semibold text-red-400 mb-2">Error al Cargar Datos</h2>
+        <p className="text-zinc-400 max-w-md">
+          {initialError || "No se pudieron obtener los detalles de la conversación para mostrar el chat."}
+        </p>
+      </div>
+    );
+  }
+
+  // Si llegamos aquí, initialConversationDetails SÍ tiene datos.
+  // Pasamos estos datos directamente a ChatComponent.
   return (
     <div className="flex h-full gap-4 md:gap-4">
       <div
         className="flex-grow flex flex-col bg-zinc-800 rounded-lg border border-zinc-700 overflow-hidden shadow-md"
-      // Quitado style={{ flexBasis: '0', minWidth: '60%' }} para que flex-grow funcione sin restricciones fijas de base,
-      // a menos que tengas una razón específica para el flex-basis 0.
-      // El layout padre (LayoutConversaciones) ya usa flex-1 para esta área.
       >
-        {pageTitleData && (
-          <ChatComponent
-            conversacionId={conversacionId}
-            negocioId={negocioId} // ChatComponent podría necesitarlo para enviar mensajes con contexto de asistente
-            refreshTrigger={refreshChatTrigger}
-            initialConversationDetails={pageTitleData}
-            initialMessages={[]} // Puedes reemplazar esto con un estado/método adecuado si tienes mensajes iniciales
-            initialTotalMessages={0} // Ajusta este valor si tienes el total real de mensajes
-            initialError={null} // Ajusta este valor si tienes un error inicial
-          // Podrías pasarle pageTitleData.agenteCrmActual si ChatComponent necesita saber el agente
-          // agenteActual={pageTitleData?.agenteCrmActual || null}
-          />
-        )}
+        <ChatComponent
+          initialConversationDetails={initialConversationDetails}
+          initialMessages={initialMessages}
+          initialError={initialError} // Pasar el error de mensajes si lo hubo
+          negocioId={negocioId}
+        />
       </div>
 
       <aside
-        className="w-[300px] md:max-w-sm lg:max-w-md xl:max-w-lg flex-shrink-0 bg-zinc-800 rounded-lg border border-zinc-700 p-4 overflow-y-auto shadow-md"
-      // Ajustado el ancho para ser más flexible con max-w-* en lugar de porcentajes fijos
-      // Quitado style={{ flexBasis: '0', minWidth: '300px' }} por la misma razón.
-      // El layout padre es flex, por lo que se ajustará.
+        className="w-[300px] md:w-[350px] lg:w-[400px] xl:max-w-md flex-shrink-0 bg-zinc-800 rounded-lg border border-zinc-700 p-4 overflow-y-auto shadow-md custom-scrollbar"
       >
         <ToolsPanel
-          conversacionId={conversacionId}
-          negocioId={negocioId} // ToolsPanel podría necesitarlo
-          clienteId={clienteId} // ToolsPanel podría necesitarlo
-          onActionComplete={handleForceChatRefresh}
-        // Pasar los detalles iniciales de la conversación al ToolsPanel
-        // para evitar que ToolsPanel tenga que hacer su propia llamada inicial para los mismos datos.
-        // Esto es opcional y depende de cómo esté estructurado ToolsPanel.
-        // initialConversationDetails={pageTitleData}
-        // isLoadingConversationDetails={isTitleDataLoading}
+          // conversacionId={conversacionId}
+          negocioId={negocioId}
+          clienteId={clienteId}
+          onActionComplete={handleActionCompleteInToolsPanel}
+          conversationDetails={initialConversationDetails}
         />
       </aside>
     </div>

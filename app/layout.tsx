@@ -1,4 +1,4 @@
-import { GoogleTagManager } from '@next/third-parties/google';
+// import { GoogleTagManager } from '@next/third-parties/google';
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
@@ -31,7 +31,7 @@ export default function RootLayout({
       <Script src="https://kit.fontawesome.com/74d1405387.js"></Script>
       <body className={'antialiased'}>
         {children}
-        <GoogleTagManager gtmId="GTM-M9ZT7HQ9" />
+        {/* <GoogleTagManager gtmId="GTM-M9ZT7HQ9" /> */}
       </body>
     </html>
   );

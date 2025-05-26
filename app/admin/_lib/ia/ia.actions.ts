@@ -10,24 +10,40 @@ import {
     Tool,
     FunctionDeclaration,
     SchemaType,
-    Schema,
-    Content, // Importar Content para tipar el historial correctamente
-    FunctionCall, // Importar FunctionCall
-    FunctionResponse, // Importar FunctionResponse
+    Schema, // Tipo genérico para propiedades de parámetros
+    Content,
+    // FunctionCall, 
+    // FunctionResponse, // No se usa directamente aquí si el historial ya está formateado
+    // Part, // No se usa directamente aquí si el historial ya está formateado
 } from "@google/generative-ai";
 
 import {
-    GenerarRespuestaAsistenteConHerramientasInput,
-    RespuestaAsistenteConHerramientas,
-    TareaCapacidadIA,
-    ParametroParaIA,
-} from '@/app/admin/_lib/ia/ia.schemas';
+    // Asumimos que GenerarRespuestaAsistenteConHerramientasInput ahora espera Content[]
+    type GenerarRespuestaAsistenteConHerramientasInput,
+    type RespuestaAsistenteConHerramientas,
+    type TareaCapacidadIA,
+    type ParametroParaIA,
+} from '@/app/admin/_lib/ia/ia.schemas'; // Asegúrate que este path es correcto
 
 import { ActionResult } from '@/app/admin/_lib/types';
 import { Prisma } from '@prisma/client';
 
+// Interfaz HistorialTurnoEstructurado (ya no se usa DENTRO de generarRespuestaAsistente,
+// pero se mantiene aquí como referencia de lo que las actions que llaman deben construir y luego transformar a Content[])
+// La transformación a Content[] debe ocurrir ANTES de llamar a generarRespuestaAsistente.
+export interface HistorialTurnoEstructurado {
+    role: string;
+    parteTipo?: 'TEXT' | 'FUNCTION_CALL' | 'FUNCTION_RESPONSE' | null;
+    mensajeTexto?: string | null;
+    functionCallNombre?: string | null;
+    functionCallArgs?: Record<string, unknown> | null;
+    functionResponseNombre?: string | null;
+    functionResponseData?: Record<string, unknown> | null;
+}
+
+
 const generationConfig: GenerationConfig = {
-    temperature: 0.1, // Temperatura baja para respuestas más predecibles y mejor seguimiento de formato
+    temperature: 0.1,
     maxOutputTokens: 2048,
 };
 
@@ -40,93 +56,86 @@ const safetySettings = [
 
 function mapTipoParametroToSchemaType(tipoDatoOriginal: string): SchemaType {
     if (!tipoDatoOriginal) {
-        console.warn(`[IA Actions] mapTipoParametroToSchemaType recibió un tipoDato nulo o undefined. Usando SchemaType.STRING.`);
+        console.warn(`[IA Actions mapTipo] tipoDato nulo/undefined. Usando STRING.`);
         return SchemaType.STRING;
     }
     const tipo = tipoDatoOriginal.toLowerCase().trim();
-
     switch (tipo) {
-        case 'string': // Si usas 'string' directamente
-            return SchemaType.STRING;
-
-        case 'number':        // Si usas 'number'
-            return SchemaType.NUMBER;
-
-        case 'integer':
-            return SchemaType.INTEGER;
-
-        case 'boolean':
-            return SchemaType.BOOLEAN;
-
-        case 'array':
-            return SchemaType.ARRAY;
+        case 'string': return SchemaType.STRING;
+        case 'number': return SchemaType.NUMBER;
+        case 'integer': return SchemaType.INTEGER;
+        case 'boolean': return SchemaType.BOOLEAN;
+        case 'array': return SchemaType.ARRAY; // Para ArraySchema, necesitarías definir 'items'
         default:
-            console.warn(`[IA Actions] Tipo de parámetro NO MAPEADO explícitamente: '${tipoDatoOriginal}' (normalizado a '${tipo}'). Usando SchemaType.STRING como default.`);
+            console.warn(`[IA Actions mapTipo] Tipo NO MAPEADO: '${tipoDatoOriginal}'. Usando STRING.`);
             return SchemaType.STRING;
     }
 }
 
 function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | undefined {
     const functionDeclarations: FunctionDeclaration[] = tareas
-        .filter(tarea => tarea.funcionHerramienta)
+        .filter(tarea => tarea.funcionHerramienta && tarea.funcionHerramienta.nombre)
         .map(tarea => {
             const funcion = tarea.funcionHerramienta!;
-            const properties: Record<string, { type: SchemaType; description?: string }> = {};
-            const requiredParams: string[] = [];
+            // El tipo para properties es Record<string, Schema>
+            // Schema es una unión de StringSchema, NumberSchema, ObjectSchema, etc.
+            const properties: Record<string, Schema> = {};
 
             funcion.parametros.forEach(param => {
-                properties[param.nombre] = {
-                    type: mapTipoParametroToSchemaType(param.tipo),
-                    description: param.descripcion || `Parámetro ${param.nombre}`,
-                };
-                if (param.esObligatorio) requiredParams.push(param.nombre);
+                if (param.nombre) {
+                    // Para tipos simples, la estructura { type: ..., description: ... } es válida
+                    // ya que StringSchema, NumberSchema, etc., tienen estas propiedades.
+                    properties[param.nombre] = {
+                        type: mapTipoParametroToSchemaType(param.tipo),
+                        description: param.descripcion || `Parámetro ${param.nombre}`,
+                        // Si mapTipoParametroToSchemaType devuelve SchemaType.ARRAY, necesitarías
+                        // añadir un campo 'items' aquí, ej: items: { type: SchemaType.STRING }
+                        // Si devuelve SchemaType.OBJECT, necesitarías un campo 'properties' anidado.
+                        // Por ahora, asumimos tipos simples.
+                    } as Schema; // Hacemos un cast a Schema para satisfacer a TypeScript
+                }
             });
 
             if (tarea.camposPersonalizadosRequeridos) {
                 tarea.camposPersonalizadosRequeridos.forEach(param => {
-                    if (!properties[param.nombre]) {
+                    if (param.nombre && !properties[param.nombre]) {
                         properties[param.nombre] = {
                             type: mapTipoParametroToSchemaType(param.tipo),
                             description: param.descripcion || `Campo personalizado ${param.nombre}`,
-                        };
-                        if (param.esObligatorio && !requiredParams.includes(param.nombre)) {
-                            requiredParams.push(param.nombre);
-                        }
+                        } as Schema;
                     }
                 });
             }
 
-            const funcDecl: FunctionDeclaration = {
+            return {
                 name: funcion.nombre,
                 description: tarea.descripcionTool || funcion.descripcion || `Ejecuta la acción ${funcion.nombre}`,
                 parameters: {
                     type: SchemaType.OBJECT,
-                    properties: Object.fromEntries(
-                        Object.entries(properties).map(([key, value]) => [key, { ...value, type: value.type as SchemaType } as Schema])
-                    ),
-                    //! required: requiredParams.length > 0 ? requiredParams : undefined, 
-                    //! omitido por estrategia
+                    properties: properties, // Esto ahora es Record<string, Schema>
                     required: []
                 },
             };
-            return funcDecl;
         });
 
-    if (functionDeclarations.length === 0) return undefined;
-    const tools: Tool[] = [{ functionDeclarations }];
-    return tools;
+    if (functionDeclarations.length === 0) {
+        // console.log("[IA Action construirHerramientas] No se generaron declaraciones de función.");
+        return undefined;
+    }
+    return [{ functionDeclarations }];
 }
 
 
 export async function generarRespuestaAsistente(
+    // Se espera que input.historialConversacion ya sea de tipo Content[]
+    // La transformación de tu estructura de DB a Content[] debe ocurrir ANTES de llamar a esta función.
     input: GenerarRespuestaAsistenteConHerramientasInput
 ): Promise<ActionResult<RespuestaAsistenteConHerramientas>> {
 
-    console.log("[IA Action] Iniciando generación de respuesta con Gemini SDK (con herramientas v3)..."); // Log versión
-    console.log("[IA Action] Mensaje Usuario:", input.mensajeUsuarioActual);
+    console.log("[IA Action] Iniciando generación de respuesta con Gemini SDK (v_final_alineada - historial pre-formateado)...");
+    console.log("[IA Action] Mensaje Usuario Actual:", input.mensajeUsuarioActual);
 
     const apiKey = process.env.GEMINI_API_KEY;
-
     if (!apiKey) {
         console.error("[IA Action] Error: GEMINI_API_KEY no está configurada.");
         return { success: false, error: "Configuración de IA incompleta en el servidor." };
@@ -146,7 +155,7 @@ Evalúa la consulta del usuario contra las herramientas (funciones) disponibles:
         * **NO** uses bloques de código Markdown.
         * Simplemente devuelve el objeto \`functionCall\` puro como lo define la API.
 
-* **SI has hecho una pregunta de confirmación al usuario para una acción de una herramienta (ej. '¿Confirmas que deseas X?') y el usuario responde afirmativamente:**
+* **SI has hecho una pregunta de confirmación al usuario para una acción de una herramienta (ej. '¿Confirmas que deseas X?') y el usuario responde afirmatirmativamente:**
     * DEBES volver a llamar a la MISMA herramienta que estabas procesando.
     * Asegúrate de incluir el parámetro de confirmación apropiado (ej. 'confirmacion_usuario_reagendar: true').
     * También DEBES incluir los identificadores clave que se estaban procesando (ej. 'cita_id_original').
@@ -159,213 +168,77 @@ Evalúa la consulta del usuario contra las herramientas (funciones) disponibles:
 Mantén siempre un tono amigable y eficiente.
 `;
 
-        //! Herramientas para Gemini
         const tools = construirHerramientasParaGemini(input.tareasDisponibles);
-        console.log("[IA Action] Herramientas DEFINITIVAS pasadas a Gemini:", JSON.stringify(tools, null, 2));
 
         const model = genAI.getGenerativeModel({
             model: "gemini-1.5-flash-latest",
-            systemInstruction: {
-                role: "system",
-                parts: [{ text: systemInstructionText }],
-            },
-            generationConfig: generationConfig, // generationConfig ahora incluye temperature
-            safetySettings: safetySettings,
-            tools: tools,
+            systemInstruction: { role: "system", parts: [{ text: systemInstructionText }] },
+            generationConfig, safetySettings, tools,
         });
 
-        // const chatHistory = input.historialConversacion.map(turn => ({
-        //     role: (turn.role === 'user' ? 'user' : 'model') as 'user' | 'model',
-        //     parts: [{ text: turn.mensaje || "" }],
-        // }));
+        // El historial ya debe venir formateado como Content[]
+        const chatHistory: Content[] = input.historialConversacion as Content[];
+        console.log("[IA Action] Historial RECIBIDO para Gemini (últimos 10):", JSON.stringify(chatHistory.slice(-10), null, 2));
 
-        // --- INICIO DE LA MODIFICACIÓN AVANZADA PARA CONSTRUIR CHAT HISTORY ---
-        const chatHistory: Content[] = [];
-        for (let i = 0; i < input.historialConversacion.length; i++) {
-            const turn = input.historialConversacion[i];
-
-            // Ignorar roles 'agent' y 'system' del historial de ChatMessageItem para Gemini,
-            // ya que Gemini espera 'user', 'model', o 'function' (o 'tool').
-            if (turn.role === 'agent' || turn.role === 'system') {
-                console.log(`[IA Action History Reconstructor] Ignorando turno con rol: ${turn.role}`);
-                continue;
-            }
-
-            const geminiRole = (turn.role === 'user' ? 'user' : 'model') as 'user' | 'model';
-            // const turnParts: Content['parts'] = [{ text: turn.mensaje || "" }]; // Default a texto
-
-            if (geminiRole === 'model' && turn.mensaje) {
-                let parsedFunctionCallFromHistory: FunctionCall | null = null;
-                const jsonMatch = turn.mensaje.match(/```json\s*([\s\S]*?)\s*```/);
-
-                if (jsonMatch && jsonMatch[1]) {
-                    try {
-                        const parsedJson = JSON.parse(jsonMatch[1]);
-                        if (parsedJson.functionCall &&
-                            typeof parsedJson.functionCall.name === 'string' &&
-                            typeof parsedJson.functionCall.args === 'object') {
-                            parsedFunctionCallFromHistory = parsedJson.functionCall as FunctionCall;
-                        }
-                    } catch { /* No es JSON válido, se tratará como texto */ }
-                } else if (turn.mensaje.trim().startsWith('{"functionCall":')) {
-                    try {
-                        const parsedJson = JSON.parse(turn.mensaje.trim());
-                        if (parsedJson.functionCall &&
-                            typeof parsedJson.functionCall.name === 'string' &&
-                            typeof parsedJson.functionCall.args === 'object') {
-                            parsedFunctionCallFromHistory = parsedJson.functionCall as FunctionCall;
-                        }
-                    } catch { /* No es JSON válido, se tratará como texto */ }
-                }
-
-                if (parsedFunctionCallFromHistory) {
-                    console.log(`[IA Action History Reconstructor] Historial: Turno del 'model' interpretado como functionCall: ${parsedFunctionCallFromHistory.name}`);
-                    chatHistory.push({ role: 'model', parts: [{ functionCall: parsedFunctionCallFromHistory }] });
-
-                    // INTENTO DE INFERIR FUNCTION_RESPONSE DEL SIGUIENTE MENSAJE DEL MODELO
-                    // Esto es una heurística y depende de cómo tu dispatcher guarda los resultados.
-                    if (i + 1 < input.historialConversacion.length) {
-                        const nextTurn = input.historialConversacion[i + 1];
-                        // Si el siguiente mensaje también es del 'assistant' (model) y NO es otra functionCall,
-                        // lo asumimos como el resultado textual de la functionCall anterior.
-                        if ((nextTurn.role === 'assistant') && nextTurn.mensaje) {
-                            let nextTurnIsItselfAFunctionCall = false;
-                            const nextJsonMatchAttempt = nextTurn.mensaje.match(/```json\s*([\s\S]*?)\s*```/);
-                            if (nextJsonMatchAttempt && nextJsonMatchAttempt[1]) {
-                                try { const p = JSON.parse(nextJsonMatchAttempt[1]); if (p.functionCall) nextTurnIsItselfAFunctionCall = true; } catch { }
-                            } else if (nextTurn.mensaje.trim().startsWith('{"functionCall":')) {
-                                try { const p = JSON.parse(nextTurn.mensaje.trim()); if (p.functionCall) nextTurnIsItselfAFunctionCall = true; } catch { }
-                            }
-
-                            if (!nextTurnIsItselfAFunctionCall) {
-                                console.log(`[IA Action History Reconstructor] Historial: Asumiendo que el siguiente turno del 'model' es la functionResponse para ${parsedFunctionCallFromHistory.name}`);
-                                const functionResponsePart: FunctionResponse = {
-                                    name: parsedFunctionCallFromHistory.name,
-                                    response: {
-                                        // Gemini espera un objeto aquí. Si tu 'nextTurn.mensaje' es solo texto,
-                                        // envuélvelo en una estructura, por ejemplo, { "content": "texto del mensaje" }
-                                        // o { "messageForUser": "texto del mensaje" }
-                                        // Esto es CRUCIAL y debe coincidir con lo que tus funciones realmente devuelven
-                                        // y cómo quieres que la IA lo interprete.
-                                        // Para este ejemplo, asumimos que el mensaje es el contenido principal.
-                                        content: nextTurn.mensaje,
-                                        // Podrías añadir más estructura si tus funciones devuelven objetos más complejos
-                                        // y quieres que la IA los "vea" en el historial.
-                                    }
-                                };
-                                chatHistory.push({ role: 'function', parts: [{ functionResponse: functionResponsePart }] });
-                                i++; // Avanzamos el índice porque ya procesamos el siguiente turno
-                                continue; // Pasamos al siguiente turno del bucle principal
-                            }
-                        }
-                    }
-                } else {
-                    // Mensaje de texto normal del modelo
-                    chatHistory.push({ role: 'model', parts: [{ text: turn.mensaje || "" }] });
-                }
-            } else if (geminiRole === 'user') {
-                chatHistory.push({ role: 'user', parts: [{ text: turn.mensaje || "" }] });
-            }
-        }
-        // --- FIN DE LA MODIFICACIÓN AVANZADA ---
-
-        console.log("[IA Action] Historial RECONSTRUIDO para Gemini (v2):", JSON.stringify(chatHistory, null, 2));
-
-        const chatSession = model.startChat({
-            history: chatHistory,
-        });
-
-        console.log("[IA Action] Enviando mensaje a Gemini:", input.mensajeUsuarioActual);
+        const chatSession = model.startChat({ history: chatHistory });
         const result = await chatSession.sendMessage(input.mensajeUsuarioActual);
         const response = result.response;
         const candidate = response.candidates?.[0];
 
-        console.log("[IA Action] Respuesta completa de Gemini:", JSON.stringify(response, null, 2));
+        console.log("[IA Action] Respuesta completa de Gemini (actual):", JSON.stringify(response, null, 2));
 
-        //! ***** variables para almacenar la respuesta textual y la llamada a función a devolver
         let respuestaTextual: string | null = null;
         let llamadaFuncion: RespuestaAsistenteConHerramientas['llamadaFuncion'] = null;
-
         const functionCallPart = candidate?.content?.parts?.find(part => part.functionCall);
 
         if (functionCallPart && functionCallPart.functionCall) {
-            // --- CASO IDEAL: functionCall ESTRUCTURADO ---
-            console.log("[IA Action] Gemini solicitó llamada a función estructurada.");
+            console.log("[IA Action] Gemini solicitó llamada a función ESTRUCTURADA (actual).");
             const fc = functionCallPart.functionCall;
-            const args = (fc.args || {}) as Record<string, unknown>;
             llamadaFuncion = {
                 nombreFuncion: fc.name,
-                argumentos: args,
+                argumentos: (fc.args || {}) as Record<string, unknown>,
             };
-            console.log(`[IA Action] Función a llamar: ${llamadaFuncion.nombreFuncion}, Argumentos:`, llamadaFuncion.argumentos);
             respuestaTextual = response.text() || null;
-
-            //! reemplazar con el texto de respuesta
             if (!respuestaTextual && llamadaFuncion) {
-                respuestaTextual = `Entendido, dame un momento.`;
-                // respuestaTextual = `Entendido, dame un momento. voy a proceder con la acción: ${llamadaFuncion.nombreFuncion}.`;
-                console.log(llamadaFuncion.nombreFuncion)
+                respuestaTextual = `Entendido, procesando tu solicitud para la acción: ${llamadaFuncion.nombreFuncion}.`;
             }
-            // --- FIN CASO IDEAL ---
-
         } else {
-            // --- CASO NO IDEAL: NO hay functionCall estructurado ---
-            console.log("[IA Action] No se encontró functionCall estructurado. Verificando respuesta textual...");
+            console.log("[IA Action] No se encontró functionCall ESTRUCTURADO (actual). Verificando respuesta textual y workaround...");
             respuestaTextual = response.text() || null;
-
-            // *** CAMBIO 3: INICIO WORKAROUND - Parsear JSON desde Texto ***
-            if (respuestaTextual && typeof respuestaTextual === 'string') { // Guarda de tipo
-
+            if (respuestaTextual && typeof respuestaTextual === 'string' && !llamadaFuncion) {
                 const jsonMatch = respuestaTextual.match(/```json\s*([\s\S]*?)\s*```/);
-
                 if (jsonMatch && jsonMatch[1]) {
-                    console.log("[IA Action] Workaround: Se encontró bloque JSON en texto.");
+                    console.log("[IA Action] Workaround: Se encontró bloque JSON en texto (actual).");
                     try {
                         const parsedJson = JSON.parse(jsonMatch[1]);
-
-                        // *** JSON ANIDADO ***
-                        // Verificar si el JSON parseado contiene la clave 'functionCall'
-                        // y si esa clave contiene 'name' y 'args'
                         if (parsedJson.functionCall &&
-                            typeof parsedJson.functionCall === 'object' &&
-                            parsedJson.functionCall !== null &&
                             typeof parsedJson.functionCall.name === 'string' &&
                             typeof parsedJson.functionCall.args === 'object' &&
-                            parsedJson.functionCall.args !== null) {
-
-                            console.warn("[IA Action] Workaround: Función recuperada desde JSON en texto (estructura anidada).");
+                            parsedJson.functionCall.args !== null
+                        ) {
+                            console.warn("[IA Action] Workaround: Función recuperada desde JSON en texto (actual).");
                             llamadaFuncion = {
-                                //! Asigna a llamadaFuncion
                                 nombreFuncion: parsedJson.functionCall.name,
                                 argumentos: parsedJson.functionCall.args as Record<string, unknown>,
                             };
-                            // const funcionRecuperada = true; // Asegúrate de tener esta bandera si la usas
-                            //!respuestaTextual
-                            console.log(`[IA Action] Workaround - Función recuperada: ${llamadaFuncion.nombreFuncion}, Args:`, llamadaFuncion.argumentos);
                             respuestaTextual = `Entendido. Procesando tu solicitud para: ${llamadaFuncion.nombreFuncion}.`;
-                            console.log("[IA Action] Workaround: respuestaTextual actualizada después de recuperar función desde JSON.");
-
                         } else {
-                            console.warn("[IA Action] Workaround: JSON parseado no tiene la estructura esperada { functionCall: { name, args } }.");
+                            console.warn("[IA Action] Workaround: JSON parseado no tiene la estructura esperada (actual).");
                         }
-                        // *** FIN DE CORRECCIÓN PARA JSON ANIDADO ***
-
                     } catch (parseError) {
-                        console.warn("[IA Action] Workaround: Error al parsear JSON encontrado en texto.", parseError);
+                        console.warn("[IA Action] Workaround: Error al parsear JSON encontrado en texto (actual).", parseError);
                     }
                 }
             }
-            // *** FIN WORKAROUND ***
 
-            // Manejo de razones de finalización (si no se recuperó una función)
             if (!llamadaFuncion) {
                 if (candidate?.finishReason === FinishReason.STOP || candidate?.finishReason === FinishReason.MAX_TOKENS) {
-                    console.log("[IA Action] Generación finalizada con texto (o JSON no parseable).");
+                    console.log("[IA Action] Generación finalizada con texto (o JSON no parseable) (actual).");
                 } else if (candidate?.finishReason === FinishReason.SAFETY) {
-                    console.error("[IA Action] Respuesta bloqueada por seguridad.");
+                    console.error("[IA Action] Respuesta bloqueada por seguridad (actual).");
                     return { success: false, error: "La respuesta fue bloqueada por razones de seguridad." };
                 } else {
-                    console.warn(`[IA Action] Razón de finalización inesperada: ${candidate?.finishReason}.`);
+                    console.warn(`[IA Action] Razón de finalización inesperada (actual): ${candidate?.finishReason}.`);
                     if (!respuestaTextual) {
                         return { success: false, error: `La IA no generó una respuesta válida (Razón: ${candidate?.finishReason || 'Desconocida'}).` };
                     }
@@ -373,13 +246,12 @@ Mantén siempre un tono amigable y eficiente.
             }
         }
 
-        // Construcción final del resultado
         const data: RespuestaAsistenteConHerramientas = {
             respuestaTextual: respuestaTextual ? respuestaTextual.trim() : null,
             llamadaFuncion: llamadaFuncion,
         };
 
-        console.log("[IA Action] Resultado procesado final:", data);
+        console.log("[IA Action] Resultado procesado final (actual):", data);
         return { success: true, data };
 
     } catch (error) {
@@ -390,10 +262,9 @@ Mantén siempre un tono amigable y eficiente.
     }
 }
 
-
 export async function obtenerTareasCapacidadParaAsistente(
     asistenteId: string,
-    tx: Prisma.TransactionClient // Prisma Client o Transaction Client
+    tx: Prisma.TransactionClient
 ): Promise<TareaCapacidadIA[]> {
     const suscripcionesTareas = await tx.asistenteTareaSuscripcion.findMany({
         where: {
@@ -418,34 +289,24 @@ export async function obtenerTareasCapacidadParaAsistente(
     });
 
     const tareasCapacidad: TareaCapacidadIA[] = [];
-
     for (const suscripcion of suscripcionesTareas) {
         const tareaDb = suscripcion.tarea;
         if (!tareaDb) continue;
-
         let funcionHerramienta: TareaCapacidadIA['funcionHerramienta'] = null;
         if (tareaDb.tareaFuncion) {
-            const tf = tareaDb.tareaFuncion; // Alias para TareaFuncion
-
-            // Mapear los nuevos TareaFuncionParametro a ParametroParaIA
-            const parametrosFuncion: ParametroParaIA[] = tf.parametros.map(p => {
-                // 'p' aquí es un objeto TareaFuncionParametro
-                return {
-                    nombre: p.nombre, // Este es el nombre snake_case para la IA
-                    tipo: p.tipoDato,
-                    descripcion: p.descripcionParaIA, // Descripción específica para la IA
-                    esObligatorio: p.esObligatorio,
-                };
-            });
-
+            const tf = tareaDb.tareaFuncion;
+            const parametrosFuncion: ParametroParaIA[] = tf.parametros.map(p => ({
+                nombre: p.nombre,
+                tipo: p.tipoDato,
+                descripcion: p.descripcionParaIA,
+                esObligatorio: p.esObligatorio,
+            }));
             funcionHerramienta = {
                 nombre: tf.nombre ?? '',
                 descripcion: tf.descripcion,
                 parametros: parametrosFuncion,
             };
         }
-
-        // Mapeo de campos personalizados (sin cambios si la lógica se mantiene)
         const camposPersonalizadosTarea: ParametroParaIA[] = tareaDb.camposPersonalizadosRequeridos
             .filter(cp => cp.crmCampoPersonalizado)
             .map(cp => {
@@ -456,15 +317,13 @@ export async function obtenerTareasCapacidadParaAsistente(
                 return {
                     nombre: nombreCampo,
                     tipo: cp.crmCampoPersonalizado.tipo,
-                    // Usar crmCampoPersonalizado.descripcionParaIA si existe, o crmCampoPersonalizado.nombre como fallback
                     descripcion: cp.crmCampoPersonalizado.descripcionParaIA || cp.crmCampoPersonalizado.nombre,
                     esObligatorio: cp.esRequerido,
                 };
             });
-
         tareasCapacidad.push({
             id: tareaDb.id,
-            nombre: tareaDb.nombre, // Nombre de la Tarea
+            nombre: tareaDb.nombre,
             descripcionTool: tareaDb.tareaFuncion?.descripcion,
             instruccionParaIA: tareaDb.instruccion,
             funcionHerramienta: funcionHerramienta,

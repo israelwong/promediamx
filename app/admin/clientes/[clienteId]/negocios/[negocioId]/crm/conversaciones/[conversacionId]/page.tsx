@@ -17,26 +17,6 @@ export const metadata: Metadata = {
     description: 'Detalles de la conversación seleccionada.',
 };
 
-// Metadata dinámica basada en la conversación (opcional, pero buena práctica)
-// export async function generateMetadata({ params }: { params: { clienteId: string; negocioId: string; conversacionId: string } }): Promise<Metadata> {
-//     const { conversacionId } = params;
-//     const detailsResult = await obtenerDetallesConversacionAction({ conversacionId });
-
-//     let title = "Chat";
-//     if (detailsResult.success && detailsResult.data?.leadNombre) {
-//         title = `Chat con ${detailsResult.data.leadNombre}`;
-//     } else if (detailsResult.success && detailsResult.data) {
-//         title = `Conversación ${detailsResult.data.id.substring(0, 8)}...`;
-//     } else {
-//         title = "Error al cargar chat";
-//     }
-
-//     return {
-//         title: title,
-//         description: `Detalles y mensajes de la conversación ${conversacionId}.`,
-//     };
-// }
-
 interface ConversationDetailPageParams {
     clienteId: string;
     negocioId: string;
@@ -50,6 +30,7 @@ interface ConversationDetailPageParams {
 export default async function ConversationDetailPage({ params }: { params: Promise<ConversationDetailPageParams> }) {
     const { clienteId, negocioId, conversacionId } = await params;
 
+    // console.log(conversacionId)
     // Cargar datos iniciales en el Server Component
     // Usamos Promise.all para cargar en paralelo
     const [detailsResult, messagesResult] = await Promise.all([
@@ -57,13 +38,15 @@ export default async function ConversationDetailPage({ params }: { params: Promi
         obtenerMensajesCrmAction({ conversacionId, limit: 50 }) // Cargar los primeros 50 mensajes
     ]);
 
-    console.log('[ConversationDetailPage] Resultado de obtenerMensajesCrmAction:', messagesResult);
+    // console.log('[ConversationDetailPage] Resultado de obtenerMensajesCrmAction:', messagesResult);
     if (messagesResult.success) {
-        console.log('[ConversationDetailPage] InitialMessages (primeros 2):', JSON.stringify(messagesResult.data?.slice(0, 2), null, 2));
+        //! console.log('[ConversationDetailPage] InitialMessages (primeros 2):', JSON.stringify(messagesResult.data?.slice(0, 2), null, 2));
     }
 
     const initialConversationDetails: ConversationDetailsForPanelData | null = detailsResult.success ? (detailsResult.data ?? null) : null;
     const initialMessages: ChatMessageItemCrmData[] = messagesResult.success && messagesResult.data ? messagesResult.data : [];
+
+    console.log(initialConversationDetails);
 
     // Determinar si hubo un error crítico al cargar los detalles (sin los cuales el chat no tiene sentido)
     const criticalError = !detailsResult.success ? (detailsResult.error || "Error desconocido al cargar detalles.") : null;

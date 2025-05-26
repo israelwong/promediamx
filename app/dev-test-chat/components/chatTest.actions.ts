@@ -385,60 +385,91 @@ export async function enviarMensajeWebchatAction(
             }
         });
 
+        // const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
+        //     let geminiRole: HistorialTurnoParaGemini['role'];
+        //     const parts: HistorialTurnoParaGemini['parts'] = [];
+        //     switch (dbTurn.role) {
+        //         case 'user':
+        //             geminiRole = 'user';
+        //             parts.push({ text: dbTurn.mensajeTexto || "" });
+        //             break;
+        //         case 'assistant':
+        //             geminiRole = 'model';
+        //             if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_CALL && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
+        //                 parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
+        //             } else { parts.push({ text: dbTurn.mensajeTexto || "" }); }
+        //             break;
+        //         case 'function':
+        //             geminiRole = 'function';
+        //             if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
+        //                 parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
+        //             } else { parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunction", response: { content: dbTurn.mensajeTexto || "" } } }); }
+        //             break;
+        //         default: return null;
+        //     }
+        //     return { role: geminiRole, parts };
+        // }).filter(Boolean) as HistorialTurnoParaGemini[];
+
+
         const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
-            let geminiRole: HistorialTurnoParaGemini['role'];
             const parts: HistorialTurnoParaGemini['parts'] = [];
-            switch (dbTurn.role) {
-                case 'user':
-                    geminiRole = 'user';
-                    parts.push({ text: dbTurn.mensajeTexto || "" });
-                    break;
-                case 'assistant':
-                    geminiRole = 'model';
-                    if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_CALL && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
-                        parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
-                    } else { parts.push({ text: dbTurn.mensajeTexto || "" }); }
-                    break;
-                case 'function':
-                    geminiRole = 'function';
-                    if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
-                        parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
-                    } else { parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunction", response: { content: dbTurn.mensajeTexto || "" } } }); }
-                    break;
-                default: return null;
+            let roleForGemini: HistorialTurnoParaGemini['role'] | null = null;
+
+            if (dbTurn.role === 'user') {
+                roleForGemini = 'user';
+                if (dbTurn.mensajeTexto) parts.push({ text: dbTurn.mensajeTexto });
+            } else if (dbTurn.role === 'assistant') {
+                roleForGemini = 'model';
+                if (dbTurn.parteTipo === 'FUNCTION_CALL' && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
+                    parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
+                } else if (dbTurn.mensajeTexto) {
+                    parts.push({ text: dbTurn.mensajeTexto });
+                }
+            } else if (dbTurn.role === 'function') { // Asumiendo que guardas las respuestas de función con este rol
+                roleForGemini = 'function';
+                if (dbTurn.parteTipo === 'FUNCTION_RESPONSE' && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
+                    parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
+                } else if (dbTurn.mensajeTexto) { // Fallback
+                    parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunctionExecuted", response: { content: dbTurn.mensajeTexto } } });
+                }
             }
-            return { role: geminiRole, parts };
+
+            if (roleForGemini && parts.length > 0) {
+                return { role: roleForGemini, parts };
+            }
+            return null; // Para filtrar turnos no válidos
         }).filter(Boolean) as HistorialTurnoParaGemini[];
+
 
         console.log(`[ChatTest Actions Enviar] Historial para IA (últimos 5) para conv ${conversationId}:`, JSON.stringify(historialParaIA.slice(-5), null, 2));
 
         const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, prisma);
-        const historialParaIAAdaptado = historialParaIA.map(item => {
-            // Map roles from Gemini to expected roles
-            let mappedRole: "user" | "assistant" | "agent" | "system";
-            switch (item.role) {
-                case "user":
-                    mappedRole = "user";
-                    break;
-                case "model":
-                    mappedRole = "assistant";
-                    break;
-                case "function":
-                    mappedRole = "agent";
-                    break;
-                default:
-                    mappedRole = "system";
-            }
-            // Extract mensaje from parts (prefer text, otherwise null)
-            const textPart = item.parts.find(p => typeof p.text === "string");
-            return {
-                role: mappedRole,
-                mensaje: textPart?.text ?? null
-            };
-        });
+        // const historialParaIAAdaptado = historialParaIA.map(item => {
+        //     // Map roles from Gemini to expected roles
+        //     let mappedRole: "user" | "assistant" | "agent" | "system";
+        //     switch (item.role) {
+        //         case "user":
+        //             mappedRole = "user";
+        //             break;
+        //         case "model":
+        //             mappedRole = "assistant";
+        //             break;
+        //         case "function":
+        //             mappedRole = "agent";
+        //             break;
+        //         default:
+        //             mappedRole = "system";
+        //     }
+        //     // Extract mensaje from parts (prefer text, otherwise null)
+        //     const textPart = item.parts.find(p => typeof p.text === "string");
+        //     return {
+        //         role: mappedRole,
+        //         mensaje: textPart?.text ?? null
+        //     };
+        // });
 
         const resultadoIA = await generarRespuestaAsistente({
-            historialConversacion: historialParaIAAdaptado,
+            historialConversacion: historialParaIA,
             mensajeUsuarioActual: mensaje,
             contextoAsistente: {
                 nombreAsistente: asistenteNombre, // Usar la variable correcta
