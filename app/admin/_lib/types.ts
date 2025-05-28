@@ -1,6 +1,6 @@
 // Ruta actual del archivo desde app: admin/_lib/types.ts
 
-export interface ActionResult<T> {
+export interface ActionResult<T> {//!usada globalmente en varios archivos
     success: boolean;
     error?: string;
     errorDetails?: Record<string, string[]>;
@@ -9,6 +9,19 @@ export interface ActionResult<T> {
     // Nota: No existe la propiedad 'validationErrors', usa 'errorDetails'
     validationErrors?: Record<string, string[]>; // Errores de validación específicos
 }
+
+export interface SimpleFuncionContext {
+    canalNombre: string; // 'whatsapp', 'webchat', etc. (Hacer no opcional)
+    negocioId: string;
+    asistenteId: string;
+    leadId: string;
+    idiomaLocale?: string; // ej. 'es-MX'
+    monedaNegocio?: string; // ej. 'MXN'
+    // Cualquier otro dato relevante que el dispatcher pueda y deba pasar.
+    // Por ejemplo, si el dispatcher tiene acceso fácil al token del asistente,
+    // y alguna función lo necesitara (aunque para enviar a WA ya lo hace el sender).
+}
+
 
 // Tipo para mostrar una cita existente en la lista
 export interface CitaExistente {
@@ -27,6 +40,8 @@ export interface CitaExistente {
     asignadoANombre?: string | null;
     tipoDeCitaNombre?: string | null; // Added property
 }
+
+
 
 // Tipo para los datos del formulario de nueva cita
 export type NuevaCitaFormData = Pick<

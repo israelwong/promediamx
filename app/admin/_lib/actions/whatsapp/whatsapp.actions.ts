@@ -12,21 +12,20 @@ import {
     type EnviarMensajeWhatsAppApiInput
 } from './whatsapp.schemas';
 import {
-    ChatMessageItemSchema,
     type ChatMessageItem,
-    type HistorialTurnoParaGemini, // Importado de chatTest.schemas.ts
-    // HistorialTurnoParaGeminiSchema // Schema Zod para validar si es necesario
-} from '@/app/dev-test-chat/components/chatTest.schemas';
+    type HistorialTurnoParaGemini,
+    ChatMessageItemSchema
+} from '@/app/admin/_lib/ia/ia.schemas';
 
 import {
     generarRespuestaAsistente,
     obtenerTareasCapacidadParaAsistente
 } from '@/app/admin/_lib/ia/ia.actions';
 import { dispatchTareaEjecutadaAction } from '@/app/admin/_lib/ia/funcionesEjecucion.actions';
-// import { z } from 'zod'; // Para usar z.array().safeParse() si es necesario
 
 const WHATSAPP_CHANNEL_NAME = "WhatsApp";
 
+// --- procesarMensajeWhatsAppEntranteAction (Mantenida como en la versión anterior del Canvas) ---
 export async function procesarMensajeWhatsAppEntranteAction(
     input: ProcesarMensajeWhatsAppInput
 ): Promise<ActionResult<ProcesarMensajeWhatsAppOutput | null>> {
@@ -39,7 +38,6 @@ export async function procesarMensajeWhatsAppEntranteAction(
     }
     const { negocioPhoneNumberId, usuarioWaId, nombrePerfilUsuario, mensajeUsuario } = validation.data;
 
-    // Variables que se poblarán en la transacción y se usarán después
     let conversationId: string | undefined;
     let leadId: string | undefined;
     let asistenteId: string | undefined;
@@ -48,7 +46,6 @@ export async function procesarMensajeWhatsAppEntranteAction(
     let asistenteDescripcion: string | null | undefined;
     let estadoActualConversacion: string = '';
     let mensajeUsuarioGuardado: ChatMessageItem | undefined;
-
 
     try {
         const initialSetupResult = await prisma.$transaction(async (tx) => {
@@ -62,7 +59,6 @@ export async function procesarMensajeWhatsAppEntranteAction(
             }
 
             const crmId = asistente.negocio.CRM.id;
-            // Asignar a variables del ámbito superior
             asistenteId = asistente.id;
             asistenteNombre = asistente.nombre;
             negocioNombre = asistente.negocio.nombre;
@@ -124,18 +120,22 @@ export async function procesarMensajeWhatsAppEntranteAction(
                 mensajeTexto: mensajeUsuario,
                 parteTipo: InteraccionParteTipo.TEXT,
             };
-            const interaccionUsuario = await tx.interaccion.create({ data: interaccionUsuarioData });
-            const parsedUserMsg = ChatMessageItemSchema.safeParse({
-                ...interaccionUsuario,
-                // Asegurar que los campos JSON se pasen como null si no existen, para que Zod no falle
-                functionCallArgs: interaccionUsuario.functionCallArgs || null,
-                functionResponseData: interaccionUsuario.functionResponseData || null,
+            const interaccionUsuario = await tx.interaccion.create({
+                data: interaccionUsuarioData,
+                select: {
+                    id: true, conversacionId: true, role: true, mensajeTexto: true,
+                    parteTipo: true, functionCallNombre: true, functionCallArgs: true,
+                    functionResponseData: true, functionResponseNombre: true,
+                    mediaUrl: true, mediaType: true, createdAt: true,
+                    agenteCrm: { select: { id: true, nombre: true } },
+                }
             });
+
+            const parsedUserMsg = ChatMessageItemSchema.safeParse(interaccionUsuario);
             if (!parsedUserMsg.success) {
                 console.error("[WhatsApp Actions] Error Zod parseando mensaje de usuario guardado:", parsedUserMsg.error.flatten());
                 throw new Error("Error al parsear mensaje de usuario guardado.");
             }
-
             return { userInteraction: parsedUserMsg.data };
         });
 
@@ -147,14 +147,16 @@ export async function procesarMensajeWhatsAppEntranteAction(
     }
 
     if (estadoActualConversacion === 'en_espera_agente' || estadoActualConversacion === 'hitl_activo') {
-        console.log(`[WhatsApp Actions] Conversación ${mensajeUsuarioGuardado?.conversacionId ?? 'desconocida'} en espera. No se llama a IA.`);
+        console.log(`[WhatsApp Actions] Conversación ${conversationId} en espera. No se llama a IA.`);
         return {
             success: true,
             data: {
-                conversationId: mensajeUsuarioGuardado!.conversacionId ?? conversationId!,
-                interaccionUsuarioId: mensajeUsuarioGuardado!.id,
-                leadId: leadId!, // leadId ahora se asigna desde el ámbito superior
-                mensajeUsuarioGuardado: mensajeUsuarioGuardado
+                conversationId: conversationId!,
+                interaccionUsuarioId: mensajeUsuarioGuardado && mensajeUsuarioGuardado.id ? mensajeUsuarioGuardado.id : '',
+                leadId: leadId!,
+                mensajeUsuarioGuardado: mensajeUsuarioGuardado && mensajeUsuarioGuardado.id && mensajeUsuarioGuardado.createdAt && mensajeUsuarioGuardado.conversacionId
+                    ? mensajeUsuarioGuardado as Required<typeof mensajeUsuarioGuardado>
+                    : undefined
             }
         };
     }
@@ -163,45 +165,20 @@ export async function procesarMensajeWhatsAppEntranteAction(
     let tareaEjecutadaCreadaId: string | null = null;
 
     try {
-        // Esperar a que conversationId esté asignado antes de usarlo
-        if (!conversationId) {
-            throw new Error("conversationId no está asignado antes de consultar interacciones.");
+        if (!conversationId || !asistenteId || !asistenteNombre || !negocioNombre) {
+            throw new Error("Faltan variables críticas (conversationId, asistenteId, etc.) antes de llamar a la IA.");
         }
 
         const historialInteraccionesDb = await prisma.interaccion.findMany({
-            where: { conversacionId: conversationId as string },
+            where: { conversacionId: conversationId },
             orderBy: { createdAt: 'asc' },
             take: 20,
             select: {
-                id: true, role: true, parteTipo: true, mensajeTexto: true,
-                functionCallNombre: true, functionCallArgs: true, functionResponseData: true,
+                role: true, parteTipo: true, mensajeTexto: true,
+                functionCallNombre: true, functionCallArgs: true,
+                functionResponseNombre: true, functionResponseData: true,
             }
         });
-
-        // const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
-        //     let geminiRole: HistorialTurnoParaGemini['role'];
-        //     const parts: HistorialTurnoParaGemini['parts'] = [];
-        //     switch (dbTurn.role) {
-        //         case 'user':
-        //             geminiRole = 'user';
-        //             parts.push({ text: dbTurn.mensajeTexto || "" });
-        //             break;
-        //         case 'assistant':
-        //             geminiRole = 'model';
-        //             if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_CALL && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
-        //                 parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
-        //             } else { parts.push({ text: dbTurn.mensajeTexto || "" }); }
-        //             break;
-        //         case 'function':
-        //             geminiRole = 'function';
-        //             if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
-        //                 parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
-        //             } else { parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunction", response: { content: dbTurn.mensajeTexto || "Respuesta procesada." } } }); }
-        //             break;
-        //         default: return null;
-        //     }
-        //     return { role: geminiRole, parts };
-        // }).filter(Boolean) as HistorialTurnoParaGemini[];
 
         const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
             const parts: HistorialTurnoParaGemini['parts'] = [];
@@ -217,11 +194,11 @@ export async function procesarMensajeWhatsAppEntranteAction(
                 } else if (dbTurn.mensajeTexto) {
                     parts.push({ text: dbTurn.mensajeTexto });
                 }
-            } else if (dbTurn.role === 'function') { // Asumiendo que guardas las respuestas de función con este rol
+            } else if (dbTurn.role === 'function') {
                 roleForGemini = 'function';
                 if (dbTurn.parteTipo === 'FUNCTION_RESPONSE' && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
                     parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
-                } else if (dbTurn.mensajeTexto) { // Fallback
+                } else if (dbTurn.mensajeTexto) {
                     parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunctionExecuted", response: { content: dbTurn.mensajeTexto } } });
                 }
             }
@@ -229,22 +206,18 @@ export async function procesarMensajeWhatsAppEntranteAction(
             if (roleForGemini && parts.length > 0) {
                 return { role: roleForGemini, parts };
             }
-            return null; // Para filtrar turnos no válidos
+            return null;
         }).filter(Boolean) as HistorialTurnoParaGemini[];
-
 
         console.log(`[WhatsApp Actions] Historial para IA (conv ${conversationId}, últimos 5):`, JSON.stringify(historialParaIA.slice(-5), null, 2));
 
-        if (!asistenteId) {
-            throw new Error("asistenteId no está definido antes de obtener tareas de capacidad.");
-        }
-        const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, prisma); // Usar asistenteId del ámbito superior
+        const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, prisma);
         const resultadoIA = await generarRespuestaAsistente({
-            historialConversacion: historialParaIA, // Este debe ser HistorialTurnoParaGemini[]
+            historialConversacion: historialParaIA,
             mensajeUsuarioActual: mensajeUsuario,
             contextoAsistente: {
-                nombreAsistente: asistenteNombre ?? '',
-                nombreNegocio: negocioNombre ?? '',
+                nombreAsistente: asistenteNombre,
+                nombreNegocio: negocioNombre,
                 descripcionAsistente: asistenteDescripcion
             },
             tareasDisponibles: tareasDisponibles,
@@ -276,19 +249,28 @@ export async function procesarMensajeWhatsAppEntranteAction(
             } else {
                 iaMsgData = { conversacion: { connect: { id: conversationId } }, role: 'assistant', parteTipo: InteraccionParteTipo.TEXT, mensajeTexto: '(Respuesta IA vacía)' };
             }
-            const iaMsg = await prisma.interaccion.create({ data: iaMsgData });
-            const parsedAssistantMsg = ChatMessageItemSchema.safeParse({ ...iaMsg, functionCallArgs: null, functionResponseData: null });
+            const iaMsg = await prisma.interaccion.create({
+                data: iaMsgData, select: { /* ... select completo ... */
+                    id: true, conversacionId: true, role: true, mensajeTexto: true,
+                    parteTipo: true, functionCallNombre: true, functionCallArgs: true,
+                    functionResponseData: true, functionResponseNombre: true,
+                    mediaUrl: true, mediaType: true, createdAt: true,
+                    agenteCrm: { select: { id: true, nombre: true } },
+                }
+            });
+            const parsedAssistantMsg = ChatMessageItemSchema.safeParse(iaMsg);
             if (parsedAssistantMsg.success) mensajeAsistenteGuardado = parsedAssistantMsg.data;
-
+            else console.error("[WhatsApp Actions] Error Zod parseando mensaje de asistente guardado:", parsedAssistantMsg.error.flatten());
 
             if (!respuestaIA.llamadaFuncion && respuestaAsistenteTextoVar) {
-                const asistenteToken = (await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, select: { token: true } }))?.token;
-                if (asistenteToken) {
+                const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, select: { token: true } });
+                if (asistente?.token) {
                     await enviarMensajeWhatsAppApiAction({
                         destinatarioWaId: usuarioWaId,
-                        mensajeTexto: respuestaAsistenteTextoVar,
+                        mensajeTexto: respuestaAsistenteTextoVar, // Solo enviar texto si no hay llamada a función
                         negocioPhoneNumberIdEnvia: negocioPhoneNumberId,
-                        tokenAccesoAsistente: asistenteToken
+                        tokenAccesoAsistente: asistente.token,
+                        tipoMensaje: 'text' // Asegurar que el tipo sea 'text'
                     });
                 } else { console.error(`[WhatsApp Actions] No se encontró token para asistente ${asistenteId}.`); }
             }
@@ -316,13 +298,14 @@ export async function procesarMensajeWhatsAppEntranteAction(
             }
         } else {
             await prisma.interaccion.create({ data: { conversacionId: conversationId, role: 'system', mensajeTexto: `Error IA: ${resultadoIA.error || 'Desconocido'}`, parteTipo: InteraccionParteTipo.TEXT } });
-            const asistenteToken = (await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, select: { token: true } }))?.token;
-            if (asistenteToken) {
+            const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, select: { token: true } });
+            if (asistente?.token) {
                 await enviarMensajeWhatsAppApiAction({
                     destinatarioWaId: usuarioWaId,
                     mensajeTexto: "Lo siento, estoy teniendo algunos problemas técnicos. Un agente se pondrá en contacto contigo pronto.",
                     negocioPhoneNumberIdEnvia: negocioPhoneNumberId,
-                    tokenAccesoAsistente: asistenteToken
+                    tokenAccesoAsistente: asistente.token,
+                    tipoMensaje: 'text'
                 });
             }
         }
@@ -335,76 +318,113 @@ export async function procesarMensajeWhatsAppEntranteAction(
             success: true,
             data: {
                 conversationId: conversationId,
-                interaccionUsuarioId: mensajeUsuarioGuardado!.id,
-                leadId: leadId!, // leadId ahora se asigna desde el ámbito superior
-                mensajeUsuarioGuardado: mensajeUsuarioGuardado,
-                mensajeAsistenteGuardado: mensajeAsistenteGuardado
+                interaccionUsuarioId: mensajeUsuarioGuardado && mensajeUsuarioGuardado.id ? mensajeUsuarioGuardado.id : '',
+                leadId: leadId!,
+                mensajeUsuarioGuardado: mensajeUsuarioGuardado && mensajeUsuarioGuardado.id && mensajeUsuarioGuardado.createdAt && mensajeUsuarioGuardado.conversacionId
+                    ? mensajeUsuarioGuardado as Required<typeof mensajeUsuarioGuardado>
+                    : undefined,
+                mensajeAsistenteGuardado: mensajeAsistenteGuardado && mensajeAsistenteGuardado.id && mensajeAsistenteGuardado.conversacionId && mensajeAsistenteGuardado.createdAt
+                    ? mensajeAsistenteGuardado as Required<typeof mensajeAsistenteGuardado>
+                    : undefined
             }
         };
 
     } catch (error: unknown) {
         console.error('[WhatsApp Actions] Error en el procesamiento principal post-TX:', error);
-        if (mensajeUsuarioGuardado) {
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Error interno al procesar respuesta del asistente.',
-                data: {
-                    conversationId: conversationId!, // Asumimos que conversationId se asignó
-                    interaccionUsuarioId: mensajeUsuarioGuardado.id,
-                    leadId: leadId!, // Asumimos que leadId se asignó
-                    mensajeUsuarioGuardado: mensajeUsuarioGuardado,
-                    mensajeAsistenteGuardado: undefined,
-                }
-            };
-        }
         return { success: false, error: error instanceof Error ? error.message : 'Error interno al procesar mensaje de WhatsApp.' };
     }
 }
 
-// --- enviarMensajeWhatsAppApiAction (Mantenida como en la versión anterior del Canvas) ---
+
 export async function enviarMensajeWhatsAppApiAction(
-    input: EnviarMensajeWhatsAppApiInput
+    input: EnviarMensajeWhatsAppApiInput // Usa el schema actualizado
 ): Promise<ActionResult<string | null>> {
     const validation = EnviarMensajeWhatsAppApiInputSchema.safeParse(input);
     if (!validation.success) {
+        console.error("[WhatsApp API Sender] Input inválido:", validation.error.flatten().fieldErrors);
         return { success: false, error: "Datos de entrada inválidos para enviar mensaje WhatsApp." };
     }
-    const { destinatarioWaId, mensajeTexto, negocioPhoneNumberIdEnvia, tokenAccesoAsistente } = validation.data;
+    // Desestructurar todos los campos del input validado
+    const {
+        destinatarioWaId,
+        mensajeTexto,
+        negocioPhoneNumberIdEnvia,
+        tokenAccesoAsistente,
+        tipoMensaje,
+        mediaUrl,
+        caption,
+        filename
+    } = validation.data;
 
     const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v19.0';
     const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${negocioPhoneNumberIdEnvia}/messages`;
 
-    const payload = {
+    const messagePayload: Record<string, unknown> = {
         messaging_product: "whatsapp",
         to: destinatarioWaId,
-        type: "text",
-        text: {
-            preview_url: false,
-            body: mensajeTexto,
-        },
+        type: tipoMensaje,
     };
 
+    switch (tipoMensaje) {
+        case 'text':
+            if (!mensajeTexto) { // Validación adicional, aunque Zod ya lo hace con .refine
+                return { success: false, error: "mensajeTexto es requerido para tipo 'text'." };
+            }
+            messagePayload.text = { preview_url: false, body: mensajeTexto };
+            break;
+        case 'image':
+            if (!mediaUrl) return { success: false, error: "mediaUrl es requerido para tipo 'image'." };
+            messagePayload.image = { link: mediaUrl } as { link: string; caption?: string };
+            if (caption) (messagePayload.image as { link: string; caption?: string }).caption = caption;
+            break;
+        case 'video':
+            if (!mediaUrl) return { success: false, error: "mediaUrl es requerido para tipo 'video'." };
+            messagePayload.video = { link: mediaUrl } as { link: string; caption?: string };
+            if (caption) (messagePayload.video as { link: string; caption?: string }).caption = caption;
+            break;
+        case 'document':
+            if (!mediaUrl) return { success: false, error: "mediaUrl es requerido para tipo 'document'." };
+            messagePayload.document = { link: mediaUrl };
+            if (caption) (messagePayload.document as { link: string; caption?: string; filename?: string }).caption = caption;
+            if (filename) (messagePayload.document as { link: string; caption?: string; filename?: string }).filename = filename;
+            break;
+        case 'audio':
+            if (!mediaUrl) return { success: false, error: "mediaUrl es requerido para tipo 'audio'." };
+            messagePayload.audio = { link: mediaUrl };
+            // Audio no soporta caption
+            break;
+        default:
+            return { success: false, error: `Tipo de mensaje no soportado: ${tipoMensaje}` };
+    }
+
+    console.log(`[WhatsApp API Sender] Preparando para enviar. Payload.to: "${destinatarioWaId}", Tipo: "${tipoMensaje}"`);
+    if (tipoMensaje === 'text') console.log(`   Mensaje: "${mensajeTexto?.substring(0, 50)}..."`);
+    else console.log(`   MediaURL: "${mediaUrl}", Caption: "${caption?.substring(0, 30)}..."`);
+
+
     try {
-        console.log(`[WhatsApp API Sender] Enviando a ${destinatarioWaId} desde ${negocioPhoneNumberIdEnvia}: "${mensajeTexto.substring(0, 50)}..."`);
         const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${tokenAccesoAsistente}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(messagePayload),
         });
 
         const responseData = await response.json();
 
         if (!response.ok) {
             console.error("[WhatsApp API Sender] Error de API Meta:", JSON.stringify(responseData, null, 2));
+            if (responseData.error?.error_data?.details) {
+                console.error("[WhatsApp API Sender] Detalles del error de Meta:", responseData.error.error_data.details);
+            }
             const errorMsg = responseData.error?.message || `Error HTTP ${response.status} al enviar mensaje.`;
             return { success: false, error: errorMsg };
         }
 
         const messageId = responseData.messages?.[0]?.id;
-        console.log(`[WhatsApp API Sender] Mensaje enviado. ID de WhatsApp: ${messageId}`);
+        console.log(`[WhatsApp API Sender] Mensaje tipo '${tipoMensaje}' enviado. ID de WhatsApp: ${messageId}`);
         return { success: true, data: messageId || null };
 
     } catch (error) {

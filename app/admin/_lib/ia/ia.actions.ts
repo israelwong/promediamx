@@ -109,7 +109,7 @@ function construirHerramientasParaGemini(tareas: TareaCapacidadIA[]): Tool[] | u
 
             return {
                 name: funcion.nombre,
-                description: tarea.descripcionTool || funcion.descripcion || `Ejecuta la acción ${funcion.nombre}`,
+                description: funcion.descripcion || `Ejecuta la acción ${funcion.nombre}`,
                 parameters: {
                     type: SchemaType.OBJECT,
                     properties: properties, // Esto ahora es Record<string, Schema>
@@ -324,7 +324,7 @@ export async function obtenerTareasCapacidadParaAsistente(
         tareasCapacidad.push({
             id: tareaDb.id,
             nombre: tareaDb.nombre,
-            descripcionTool: tareaDb.tareaFuncion?.descripcion,
+            descripcion: tareaDb.tareaFuncion?.descripcion,
             instruccionParaIA: tareaDb.instruccion,
             funcionHerramienta: funcionHerramienta,
             camposPersonalizadosRequeridos: camposPersonalizadosTarea.length > 0 ? camposPersonalizadosTarea : undefined,

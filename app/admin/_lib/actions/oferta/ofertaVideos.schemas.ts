@@ -1,13 +1,28 @@
 // Sugerencia de Ruta: @/app/admin/_lib/actions/oferta/ofertaVideos.schemas.ts
 import { z } from 'zod';
-import { SharedTipoVideoEnumSchema } from '@/app/admin/components/shared/SharedVideoManager'; // Reutilizar el enum
+
+// import { SharedTipoVideoEnumSchema } from '@/app/admin/components/shared/SharedVideoManager'
+
+import {
+    SharedTipoVideoEnumSchema,
+    // SharedTipoVideoType
+} from '@/app/admin/_lib/schemas/sharedCommon.schemas'
+
+
+export enum TipoVideo {
+    YOUTUBE = 'YOUTUBE',
+    VIMEO = 'VIMEO',
+    SUBIDO = 'SUBIDO',
+    OTRO_URL = 'OTRO_URL'
+}
+
 
 // Esquema para un ítem de video de una Oferta
 export const OfertaVideoItemSchema = z.object({
     id: z.string().cuid(),
     ofertaId: z.string().cuid(),
     videoUrl: z.string().url({ message: "URL de video inválida." }),
-    tipoVideo: SharedTipoVideoEnumSchema, // Usar el enum compartido
+    tipoVideo: z.nativeEnum(TipoVideo), // Usar el enum compartido
     titulo: z.string().max(150).nullable().optional(),
     descripcion: z.string().max(500).nullable().optional(),
     orden: z.number().int().min(0).default(0).nullable().optional(),
@@ -20,7 +35,7 @@ export type OfertaVideoItemType = z.infer<typeof OfertaVideoItemSchema>;
 // Esquema para los datos al añadir/actualizar un video de Oferta
 // Reutilizar SharedUpsertVideoDataSchema o crear uno específico si hay diferencias
 export const UpsertOfertaVideoSchema = z.object({
-    tipoVideo: SharedTipoVideoEnumSchema,
+    tipoVideo: z.nativeEnum(TipoVideo), // Usar el enum compartido
     videoUrl: z.string().max(1024).optional().nullable(),
     titulo: z.string().max(150).optional().nullable(),
     descripcion: z.string().max(500).optional().nullable(),

@@ -1,4 +1,4 @@
-// app/dev-test-chat/components/chatTest.actions.ts
+// ruta: 'app/admin/_lib/actions/webchat_test/chatTest.actions.ts'
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
@@ -11,16 +11,16 @@ import {
     EnviarMensajeWebchatInputSchema,
     type EnviarMensajeWebchatInput,
     type EnviarMensajeWebchatOutput,
-    ChatMessageItemSchema,
-    type ChatMessageItem,
     type HistorialTurnoParaGemini,
 } from './chatTest.schemas';
+
+import { ChatMessageItemSchema, type ChatMessageItem } from '@/app/admin/_lib/schemas/sharedCommon.schemas';
 
 import {
     generarRespuestaAsistente,
     obtenerTareasCapacidadParaAsistente
 } from '@/app/admin/_lib/ia/ia.actions';
-import { dispatchTareaEjecutadaAction } from '@/app/admin/_lib/ia/funcionesEjecucion.actions';
+import { dispatchTareaEjecutadaAction } from '../../ia/funcionesEjecucion.actions';
 import { InteraccionParteTipo, Prisma } from '@prisma/client';
 
 // --- obtenerUltimosMensajesAction ---

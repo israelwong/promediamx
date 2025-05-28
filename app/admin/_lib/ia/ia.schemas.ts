@@ -1,3 +1,5 @@
+//rur actual: app/admin/_lib/ia/ia.schemas.ts
+
 import { z } from 'zod';
 import { InteraccionParteTipo } from '@prisma/client'; // ¡Importante!
 
@@ -30,6 +32,8 @@ export const ChatMessageItemSchema = z.object({
         return arg;
     }, z.date()).optional(), // Hacer opcional si no siempre está al parsear
     agenteCrm: AgenteBasicoSchema.nullable().optional(),
+    functionResponseNombre: z.string().nullable().optional(), // AÑADIR ESTO
+
 });
 export type ChatMessageItem = z.infer<typeof ChatMessageItemSchema>;
 

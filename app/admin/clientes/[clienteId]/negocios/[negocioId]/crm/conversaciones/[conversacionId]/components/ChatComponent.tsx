@@ -2,45 +2,51 @@
 'use client';
 
 import React, { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
-import { Send, Paperclip, Loader2, User, Bot, MessageSquareWarning, ShieldCheck, Image as ImageIcon } from 'lucide-react';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import Cookies from 'js-cookie';
 import { useRouter, useParams } from 'next/navigation';
+import { JSX } from 'react';
 
+// Lucide Icons
+import { Loader2, MessageSquareWarning, User, Bot, ShieldCheck } from 'lucide-react';
+
+// Lightbox
 import Lightbox from "yet-another-react-lightbox";
+import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
 
-import {
-    enviarMensajeCrmAction,
-} from '@/app/admin/_lib/actions/conversacion/conversacion.actions';
-import type {
-    ChatMessageItemCrmData,
-    EnviarMensajeCrmParams,
-    ConversationDetailsForPanelData,
-    // AgenteBasicoData, // Se usará AgenteBasicoCrmData
-} from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
-import { chatMessageItemCrmSchema } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
-
+// Actions
+import { enviarMensajeCrmAction } from '@/app/admin/_lib/actions/conversacion/conversacion.actions';
 import { obtenerAgenteCrmPorUsuarioAction } from '@/app/admin/_lib/actions/agenteCrm/agenteCrm.actions';
-import type { AgenteBasicoCrmData } from '@/app/admin/_lib/actions/agenteCrm/agenteCrm.schemas';
-
-import { type UsuarioExtendido, UserTokenPayloadSchema } from '@/app/admin/_lib/actions/usuario/usuario.schemas';
 import { verifyToken } from '@/app/lib/auth';
 
+// Schemas y Tipos
+import type {
+    ChatMessageItemCrmData,
+    // EnviarMensajeCrmParams,
+    ConversationDetailsForPanelData,
+    // MediaItem ya se importa en los subcomponentes que lo usan
+} from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
+import { chatMessageItemCrmSchema } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
+import type { AgenteBasicoCrmData } from '@/app/admin/_lib/actions/agenteCrm/agenteCrm.schemas';
+import { type UsuarioExtendido, UserTokenPayloadSchema } from '@/app/admin/_lib/actions/usuario/usuario.schemas';
+import { InteraccionParteTipo } from '@prisma/client';
+
+// Subcomponentes
+import ChatHeader from './ChatHeader';
+import ChatInputArea from './ChatInputArea';
+import ChatMessageBubble from '@/app/components/chat/ChatMessageBubble'; //!reutilizado
+// ClientTime se importa dentro de ChatMessageBubble si solo se usa allí, o aquí si se usa en más lugares.
+// Para este ejemplo, asumimos que ChatMessageBubble importa ClientTime.
+
+// Definición de InteraccionRealtimePayload (si no está en un archivo de tipos global)
 interface InteraccionRealtimePayload {
-    id: string;
-    conversacionId: string;
-    role: string;
-    mensajeTexto: string | null;
+    id: string; conversacionId: string; role: string; mensajeTexto: string | null;
     parteTipo?: 'TEXT' | 'FUNCTION_CALL' | 'FUNCTION_RESPONSE' | null;
-    functionCallNombre?: string | null;
-    functionCallArgs?: unknown | null;
-    functionResponseData?: unknown | null;
-    mediaUrl?: string | null;
-    mediaType?: string | null;
-    createdAt: string;
-    agenteCrmId?: string | null;
+    functionCallNombre?: string | null; functionCallArgs?: unknown | null;
+    functionResponseData?: unknown | null; mediaUrl?: string | null; mediaType?: string | null;
+    createdAt: string; agenteCrmId?: string | null;
     agenteCrm?: { id: string; nombre: string | null; } | null;
 }
 
@@ -58,21 +64,11 @@ if (typeof window !== 'undefined') {
     if (supabaseUrl && supabaseAnonKey) {
         supabase = createClient(supabaseUrl, supabaseAnonKey);
     } else {
-        console.warn("[ChatComponent CRM] Supabase URL o Anon Key no definidas. Realtime no funcionará.");
+        console.warn("[ChatComponent CRM V4] Supabase URL o Anon Key no definidas. Realtime no funcionará.");
     }
 }
 
-const ClientTime = ({ date }: { date: Date | string }) => {
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => setMounted(true), []);
-
-    if (!mounted) {
-        try {
-            return <>{new Date(date).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })}</>;
-        } catch { return <>--:--</>; }
-    }
-    return <>{new Date(date).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}</>;
-};
+const ADMIN_ROLE_NAME = 'Administrador'; // Definir constante para el rol
 
 export default function ChatComponent({
     initialConversationDetails,
@@ -81,89 +77,124 @@ export default function ChatComponent({
     negocioId,
 }: ChatComponentProps) {
 
-    console.log(initialConversationDetails, initialMessages, initialError);
-
-    // useEffect(() => {
-    // console.log("[ChatComponent MOUNT/PROPS UPDATE] Props recibidas:", { 
-    //     detailsId: initialConversationDetails?.id, 
-    //     messagesCount: initialMessages?.length,
-    //     error: initialError 
-    // });
-    // }, [initialConversationDetails, initialMessages, initialError]);
+    console.log("[ChatComponent CRM V4 - Refactorizado] Props iniciales:", { initialConversationDetailsId: initialConversationDetails?.id, initialMessagesCount: initialMessages?.length });
 
     const [messages, setMessages] = useState<ChatMessageItemCrmData[]>(initialMessages || []);
     const [conversationDetails, setConversationDetails] = useState<ConversationDetailsForPanelData | null>(initialConversationDetails);
     const [error, setError] = useState<string | null>(initialError || null);
-
     const [newMessage, setNewMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
-    const fileInputRef = useRef<null | HTMLInputElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null); // Para el listener de clics del lightbox HTML
+
     const router = useRouter();
-    const params = useParams();
+    const params = useParams(); // { clienteId, negocioId, conversacionId }
 
     const [user, setUser] = useState<UsuarioExtendido | null>(null);
     const [currentAgentInfo, setCurrentAgentInfo] = useState<AgenteBasicoCrmData | null>(null);
     const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
     const [isOwner, setIsOwner] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+
     const currentConversationId = conversationDetails?.id;
 
     const [lightboxOpen, setLightboxOpen] = useState(false);
-    const [lightboxSlides, setLightboxSlides] = useState<{ src: string; alt?: string }[]>([]);
+    const [lightboxSlides, setLightboxSlides] = useState<{ src: string; alt?: string; type?: "image" }[]>([]);
     const [lightboxIndex, setLightboxIndex] = useState(0);
-    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null);
 
-    const ADMIN_ROLE_NAME = 'Administrador'; // O importarlo de constantes
-
+    // EFECTO: Actualizar estado cuando las props iniciales cambian
     useEffect(() => {
+        const prevConvId = conversationDetails?.id; // Guardar ID previo para comparación
+        console.log(`[ChatComponent V4] Props update. PrevConvId: ${prevConvId}, NewInitialConvId: ${initialConversationDetails?.id}`);
         setConversationDetails(initialConversationDetails);
         setMessages(initialMessages || []);
         setError(initialError || null);
 
-        if (initialConversationDetails?.id !== conversationDetails?.id) {
+        if (initialConversationDetails?.id !== prevConvId) {
+            console.log("[ChatComponent V4] ID de conversación cambió. Reseteando permisos.");
             setIsLoadingPermissions(true);
             setCurrentAgentInfo(null);
-            // Limpiar errores de permisos anteriores si la conversación cambia
-            if (error === "No tienes permiso para enviar mensajes en este chat." ||
-                error === "No se pudo determinar la autorización (faltan datos de contexto para permisos)." ||
-                error === "No autenticado para esta conversación.") {
-                setError(null);
+            setIsOwner(false);
+            setIsAdmin(false);
+            if (error && (error.includes("permiso") || error.includes("autorización") || error.includes("autenticado"))) {
+                setError(null); // Limpiar errores de permisos viejos
             }
         }
-    }, [initialConversationDetails, initialMessages, initialError, conversationDetails?.id, error]);
+    }, [initialConversationDetails, initialMessages, initialError, conversationDetails?.id, error]); // Añadido conversationDetails?.id y error para cumplir con las dependencias de React.
 
+    // FUNCIÓN PARA ABRIR LIGHTBOX (pasada a los subcomponentes)
+    const openLightboxWithSlides = useCallback((slides: { src: string; alt?: string; type?: "image" }[], index: number) => {
+        console.log("[ChatComponent V4] Abriendo Lightbox. Slides Count:", slides.length, "Índice:", index);
+        // Filtrar por si acaso, aunque MediaItemDisplay ya debería hacerlo
+        const imageSlidesOnly = slides.filter(slide => slide.type === 'image' && slide.src);
+        if (imageSlidesOnly.length > 0) {
+            setLightboxSlides(imageSlidesOnly);
+            setLightboxIndex(index >= 0 && index < imageSlidesOnly.length ? index : 0);
+            setLightboxOpen(true);
+        } else {
+            console.warn("[ChatComponent V4] openLightboxWithSlides: No hay slides de imagen válidos para mostrar.");
+        }
+    }, []);
 
+    // EFECTO: Lightbox para contenido HTML (webchat)
     useEffect(() => {
         const container = messagesContainerRef.current;
-        if (!container) return;
+        if (!container || conversationDetails?.canalOrigen !== 'webchat') return;
+
         const handleClick = (event: MouseEvent) => {
             const targetElement = event.target as HTMLElement;
-            const triggerLink = targetElement.closest('a.chat-image-lightbox-trigger') as HTMLAnchorElement | null;
-            if (triggerLink && conversationDetails?.canalOrigen === 'webchat') {
+            let hrefForLightbox: string | null = null;
+            let altForLightbox: string | null = null;
+
+            const anchorTrigger = targetElement.closest('a.chat-image-lightbox-trigger');
+            const imgTrigger = targetElement.closest('img.chat-image-lightbox-trigger');
+
+            if (anchorTrigger) {
+                hrefForLightbox = (anchorTrigger as HTMLAnchorElement).href;
+                altForLightbox = (anchorTrigger as HTMLElement).dataset.alt || anchorTrigger.querySelector('img')?.alt || "Imagen Webchat";
+            } else if (imgTrigger && imgTrigger.tagName === 'IMG') { // Clic directo en IMG con la clase
+                hrefForLightbox = (imgTrigger as HTMLImageElement).src;
+                altForLightbox = (imgTrigger as HTMLImageElement).alt || "Imagen Webchat";
+            }
+
+            if (hrefForLightbox && conversationDetails?.canalOrigen === 'webchat') { // conversationDetails para CRM, o siempre true para ChatTestPanel
                 event.preventDefault();
-                const messageHtmlContentContainer = triggerLink.closest('.prose');
-                if (messageHtmlContentContainer) {
-                    const allImageLinksInMessage = Array.from(messageHtmlContentContainer.querySelectorAll<HTMLAnchorElement>('a.chat-image-lightbox-trigger'));
-                    const slides = allImageLinksInMessage.map(link => ({ src: link.href, alt: link.dataset.alt || "Imagen" }));
-                    const clickedImageIndex = allImageLinksInMessage.findIndex(link => link.href === triggerLink.href);
-                    if (slides.length > 0) {
-                        setLightboxSlides(slides);
-                        setLightboxIndex(clickedImageIndex >= 0 ? clickedImageIndex : 0);
-                        setLightboxOpen(true);
-                    }
-                } else {
-                    setLightboxSlides([{ src: triggerLink.href, alt: triggerLink.dataset.alt || "Imagen" }]);
-                    setLightboxIndex(0);
-                    setLightboxOpen(true);
+                console.log("[ChatComponent/TestPanel] Click en trigger de lightbox HTML. URL:", hrefForLightbox);
+
+                // Lógica para encontrar todos los slides en el mensaje actual
+                const messageContentElement = targetElement.closest('.chat-message-content'); // Asume que este div envuelve el contenido del mensaje
+                let slides: { src: string; alt?: string; type?: "image" }[] = [];
+                let clickedImageIndex = -1;
+
+                if (messageContentElement) {
+                    // Buscar todas las imágenes o anclas que son triggers dentro de este mensaje
+                    const allTriggers = Array.from(
+                        messageContentElement.querySelectorAll('img.chat-image-lightbox-trigger, a.chat-image-lightbox-trigger')
+                    );
+
+                    slides = allTriggers.map(trigger => {
+                        if (trigger.tagName === 'A') return { src: (trigger as HTMLAnchorElement).href, alt: (trigger as HTMLAnchorElement).dataset.alt || trigger.querySelector('img')?.alt || "Imagen", type: 'image' as const };
+                        if (trigger.tagName === 'IMG') return { src: (trigger as HTMLImageElement).src, alt: (trigger as HTMLImageElement).alt || "Imagen", type: 'image' as const };
+                        return null;
+                    }).filter(Boolean) as { src: string; alt?: string; type?: "image" }[];
+
+                    clickedImageIndex = slides.findIndex(slide => slide.src === hrefForLightbox);
+                } else { // Fallback: solo la imagen clickeada
+                    slides = [{ src: hrefForLightbox, alt: altForLightbox || "Imagen Webchat", type: 'image' as const }];
+                    clickedImageIndex = 0;
+                }
+
+                if (slides.length > 0) {
+                    openLightboxWithSlides(slides, clickedImageIndex >= 0 ? clickedImageIndex : 0);
                 }
             }
         };
         container.addEventListener('click', handleClick);
         return () => { if (container) container.removeEventListener('click', handleClick); };
-    }, [messages, conversationDetails?.canalOrigen]);
+    }, [messages, conversationDetails?.canalOrigen, openLightboxWithSlides]); // Depende de messages para re-atachar handlers
 
+    // EFECTO: Validar token de usuario
     useEffect(() => {
         async function validarToken() {
             const currentToken = Cookies.get('token');
@@ -171,93 +202,51 @@ export default function ChatComponent({
                 try {
                     const response = await verifyToken(currentToken);
                     const parsedPayload = UserTokenPayloadSchema.safeParse(response.payload);
-
                     if (parsedPayload.success) {
                         const tokenData = parsedPayload.data;
-                        // Construir UsuarioExtendido con los campos del token y los demás como opcionales/undefined
-                        const userData: UsuarioExtendido = {
-                            id: tokenData.id,
-                            username: tokenData.username,
-                            email: tokenData.email,
-                            rolNombre: tokenData.rol,
-                            token: currentToken,
-                            // Los demás campos de UsuarioExtendido son opcionales según su schema Zod
-                        };
-                        setUser(userData);
-                    } else {
-                        console.error("Error parseando payload del token con Zod:", parsedPayload.error);
-                        Cookies.remove('token');
-                        router.push('/login');
-                    }
-                } catch (e) {
-                    console.error("Error en verifyToken:", e);
-                    Cookies.remove('token');
-                    router.push('/login');
-                }
-            } else {
-                console.log("[ChatComponent] No hay token, redirigiendo a login.");
-                router.push('/login');
-            }
+                        setUser({ id: tokenData.id, username: tokenData.username, email: tokenData.email, rolNombre: tokenData.rol, token: currentToken });
+                    } else { Cookies.remove('token'); router.push('/login'); }
+                } catch { Cookies.remove('token'); router.push('/login'); }
+            } else { router.push('/login'); }
         }
         validarToken();
     }, [router]);
 
+    // EFECTO: Verificar permisos del usuario/agente
     useEffect(() => {
-        const clienteIdFromRoute = params?.clienteId as string | undefined;
+        const clienteIdFromRoute = params?.clienteId as string | undefined; // clienteId del dueño del negocio
+        const controller = new AbortController();
+
         async function checkPermissions() {
-            if (user?.id && negocioId && clienteIdFromRoute && currentConversationId) {
-                setIsLoadingPermissions(true); // Indicar que estamos cargando permisos
-                let currentErrorState = error;
-                if (currentErrorState === "No tienes permiso para enviar mensajes en este chat." ||
-                    currentErrorState === "No se pudo determinar la autorización (faltan datos de contexto para permisos)." ||
-                    currentErrorState === "No autenticado para esta conversación.") {
-                    currentErrorState = null;
-                }
-
-                let canSendPerm = false;
-                if (user.rolNombre === ADMIN_ROLE_NAME) { setIsAdmin(true); canSendPerm = true; }
-                if (user.id === clienteIdFromRoute) { setIsOwner(true); canSendPerm = true; }
-
-                const result = await obtenerAgenteCrmPorUsuarioAction(user.id, negocioId);
-                if (result.success && result.data) {
-                    setCurrentAgentInfo(result.data); // result.data es AgenteBasicoCrmData
-                    canSendPerm = true;
-                } else if (!canSendPerm && result.error && !currentErrorState && !initialError) {
-                    currentErrorState = result.error;
-                }
-
-                if (!canSendPerm && !currentErrorState && !initialError) {
-                    currentErrorState = "No tienes permiso para enviar mensajes en este chat.";
-                }
-                setError(currentErrorState); // Actualizar error solo si es relevante para permisos
-                setIsLoadingPermissions(false);
-            } else if (user !== null && currentConversationId) { // User cargado, hay conversación, pero faltan IDs de ruta
-                setIsLoadingPermissions(false);
-                if (!error && !initialError) setError("No se pudo determinar la autorización (faltan datos de contexto para permisos).");
-            } else if (!currentConversationId && user) { // Hay usuario pero no conversación (ej. página base del CRM)
-                setIsLoadingPermissions(false); // No hay permisos específicos de conversación que cargar
-            } else if (!user && !Cookies.get('token') && currentConversationId) { // No hay usuario, no hay token, pero sí conversación
-                setIsLoadingPermissions(false);
-                if (!error && !initialError) setError("No autenticado para esta conversación.");
-            } else { // Otros casos (ej. user es null pero hay token, se está validando)
-                if (!Cookies.get('token') && !user) { // Si no hay token y no hay usuario, marcar permisos como no cargando
-                    setIsLoadingPermissions(false);
-                }
+            if (!user?.id || !negocioId || !clienteIdFromRoute || !currentConversationId) {
+                setIsLoadingPermissions(false); return;
             }
-        }
-        // Solo ejecutar checkPermissions si user está definido Y currentConversationId está definido
-        // Y si isLoadingPermissions es true (para evitar re-ejecuciones innecesarias)
-        if (user && currentConversationId && isLoadingPermissions) {
-            checkPermissions();
-        } else if (!currentConversationId && user) { // Si hay usuario pero no conversación, no hay permisos que cargar
+            setIsLoadingPermissions(true);
+            let canSendPerm = false;
+            if (user.rolNombre === ADMIN_ROLE_NAME) { setIsAdmin(true); canSendPerm = true; }
+            if (user.id === clienteIdFromRoute) { setIsOwner(true); canSendPerm = true; }
+
+            try {
+                const result = await obtenerAgenteCrmPorUsuarioAction(user.id, negocioId);
+                if (controller.signal.aborted) return;
+                if (result.success && result.data) { setCurrentAgentInfo(result.data); canSendPerm = true; }
+            } catch (e) { if (controller.signal.aborted) return; console.error("Error checkPermissions:", e); }
+
+            if (!canSendPerm) setError("No tienes permiso para enviar mensajes en este chat.");
+            else setError(null); // Limpiar error de permisos si ahora sí tiene
             setIsLoadingPermissions(false);
         }
 
-    }, [user, negocioId, params?.clienteId, ADMIN_ROLE_NAME, error, initialError, currentConversationId, isLoadingPermissions]);
+        if (user && currentConversationId) { checkPermissions(); }
+        else { setIsLoadingPermissions(false); }
+        return () => { controller.abort(); };
+    }, [user, negocioId, params?.clienteId, currentConversationId]);
 
+    // EFECTO: Scroll al final
     const scrollToBottom = useCallback(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, []);
-    useEffect(() => { if (messages.length > 0) scrollToBottom(); }, [messages, scrollToBottom]);
+    useEffect(() => { if (messages.length > 0) { setTimeout(scrollToBottom, 100); } }, [messages, scrollToBottom]); // Pequeño delay
 
+    // EFECTO: Realtime para nuevos mensajes
     useEffect(() => {
         if (!supabase || !currentConversationId) return;
         const channelName = `interacciones-conv-${currentConversationId}`;
@@ -268,311 +257,143 @@ export default function ChatComponent({
                 (payload) => {
                     if (payload.eventType === 'INSERT' && payload.new) {
                         const nuevaInteraccionRt = payload.new;
-                        setMessages(prevMessages => {
-                            if (prevMessages.some(msg => msg.id === nuevaInteraccionRt.id)) return prevMessages;
-                            const agenteDelPayload = nuevaInteraccionRt.agenteCrmId && nuevaInteraccionRt.agenteCrm
-                                ? { id: nuevaInteraccionRt.agenteCrm.id, nombre: nuevaInteraccionRt.agenteCrm.nombre || null }
-                                : null;
-                            let parsedArgsRt: Record<string, unknown> | null | undefined = undefined;
-                            if (nuevaInteraccionRt.functionCallArgs && typeof nuevaInteraccionRt.functionCallArgs === 'string') {
-                                try {
-                                    const parsed = JSON.parse(nuevaInteraccionRt.functionCallArgs);
-                                    parsedArgsRt = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed as Record<string, unknown> : { error: "parse_failed" };
-                                } catch {
-                                    parsedArgsRt = { error: "parse_failed" };
-                                }
-                            } else if (nuevaInteraccionRt.functionCallArgs && typeof nuevaInteraccionRt.functionCallArgs === 'object' && !Array.isArray(nuevaInteraccionRt.functionCallArgs)) {
-                                parsedArgsRt = nuevaInteraccionRt.functionCallArgs as Record<string, unknown>;
-                            } else if (nuevaInteraccionRt.functionCallArgs == null) {
-                                parsedArgsRt = null;
-                            }
-                            let parsedResponseDataRt: Record<string, unknown> | null | undefined = undefined;
-                            if (nuevaInteraccionRt.functionResponseData && typeof nuevaInteraccionRt.functionResponseData === 'string') {
-                                try {
-                                    const parsed = JSON.parse(nuevaInteraccionRt.functionResponseData);
-                                    parsedResponseDataRt = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed as Record<string, unknown> : { error: "parse_failed" };
-                                } catch {
-                                    parsedResponseDataRt = { error: "parse_failed" };
-                                }
-                            } else if (nuevaInteraccionRt.functionResponseData && typeof nuevaInteraccionRt.functionResponseData === 'object' && !Array.isArray(nuevaInteraccionRt.functionResponseData)) {
-                                parsedResponseDataRt = nuevaInteraccionRt.functionResponseData as Record<string, unknown>;
-                            } else if (nuevaInteraccionRt.functionResponseData == null) {
-                                parsedResponseDataRt = null;
-                            }
-                            const nuevaChatMessage: Partial<ChatMessageItemCrmData> = {
-                                id: nuevaInteraccionRt.id,
-                                conversacionId: nuevaInteraccionRt.conversacionId,
-                                role: nuevaInteraccionRt.role,
-                                mensajeTexto: nuevaInteraccionRt.mensajeTexto ?? null,
-                                parteTipo: nuevaInteraccionRt.parteTipo ?? 'TEXT',
-                                functionCallNombre: nuevaInteraccionRt.functionCallNombre,
-                                functionCallArgs: parsedArgsRt,
-                                functionResponseData: parsedResponseDataRt,
-                                mediaUrl: nuevaInteraccionRt.mediaUrl ?? undefined,
-                                mediaType: nuevaInteraccionRt.mediaType ?? undefined,
-                                createdAt: new Date(nuevaInteraccionRt.createdAt),
-                                agenteCrm: agenteDelPayload,
-                            };
-                            const validation = chatMessageItemCrmSchema.safeParse(nuevaChatMessage);
-                            if (validation.success) return [...prevMessages, validation.data];
-                            else { console.error("[CRM Realtime] Error Zod:", validation.error.flatten().fieldErrors, "Payload:", nuevaChatMessage); return prevMessages; }
-                        });
+                        // Parsear JSONs que vienen de la BD
+                        let parsedFRD = null;
+                        if (nuevaInteraccionRt.functionResponseData) {
+                            try { parsedFRD = typeof nuevaInteraccionRt.functionResponseData === 'string' ? JSON.parse(nuevaInteraccionRt.functionResponseData) : nuevaInteraccionRt.functionResponseData; }
+                            catch (e) { console.error("Error parseando FRD de Realtime:", e); parsedFRD = { errorParsing: true, raw: nuevaInteraccionRt.functionResponseData }; }
+                        }
+                        let parsedFCA = null;
+                        if (nuevaInteraccionRt.functionCallArgs) {
+                            try { parsedFCA = typeof nuevaInteraccionRt.functionCallArgs === 'string' ? JSON.parse(nuevaInteraccionRt.functionCallArgs) : nuevaInteraccionRt.functionCallArgs; }
+                            catch { parsedFCA = { errorParsing: true }; }
+                        }
+
+                        const nuevaChatMessageDraft = {
+                            id: nuevaInteraccionRt.id, conversacionId: nuevaInteraccionRt.conversacionId, role: nuevaInteraccionRt.role,
+                            mensajeTexto: nuevaInteraccionRt.mensajeTexto ?? null,
+                            parteTipo: nuevaInteraccionRt.parteTipo ?? InteraccionParteTipo.TEXT,
+                            functionCallNombre: nuevaInteraccionRt.functionCallNombre, functionCallArgs: parsedFCA,
+                            functionResponseData: parsedFRD, // Usar el objeto parseado
+                            mediaUrl: nuevaInteraccionRt.mediaUrl ?? undefined, mediaType: nuevaInteraccionRt.mediaType ?? undefined,
+                            createdAt: new Date(nuevaInteraccionRt.createdAt),
+                            agenteCrm: nuevaInteraccionRt.agenteCrmId && nuevaInteraccionRt.agenteCrm ? { id: nuevaInteraccionRt.agenteCrm.id, nombre: nuevaInteraccionRt.agenteCrm.nombre || null, userId: null } : null,
+                        };
+                        const validation = chatMessageItemCrmSchema.safeParse(nuevaChatMessageDraft);
+                        if (validation.success) {
+                            setMessages(prevMessages => {
+                                if (prevMessages.some(msg => msg.id === validation.data.id)) return prevMessages;
+                                return [...prevMessages, validation.data];
+                            });
+                        } else { console.error("[CRM Realtime V4] Error Zod validando mensaje de Realtime:", validation.error.flatten().fieldErrors, "Draft:", nuevaChatMessageDraft); }
                     }
                 }
-            )
-            .subscribe((status, err) => {
-                if (status === 'SUBSCRIBED') console.log(`[CRM Realtime] Suscrito a ${channelName}`);
-                else if (err) console.error(`[CRM Realtime] Error canal ${channelName}:`, err);
-            });
-        return () => { if (supabase && channel) { supabase.removeChannel(channel).catch(console.error); } };
+            ).subscribe(/* ... tu lógica de subscribe ... */);
+        return () => { if (supabase && channel) supabase.removeChannel(channel).catch(console.error); };
     }, [currentConversationId]);
 
+    // HANDLER: Enviar mensaje
     const handleSendMessage = async (e: FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() && !fileInputRef.current?.files?.length) return;
-        if (!currentConversationId) { setError("Error: No hay una conversación activa."); return; }
-
-        const canSend = currentAgentInfo?.id || isOwner || isAdmin; // Usar los estados de permiso reales
+        if (!newMessage.trim() || !currentConversationId) return;
+        const canSend = !!(currentAgentInfo?.id || isOwner || isAdmin);
         if (!canSend) { setError("No tienes permiso para enviar mensajes."); return; }
-
-        const senderAgentId = currentAgentInfo?.id;
-
         setIsSending(true); setError(null);
         const textToSend = newMessage.trim();
-        const paramsForAction: EnviarMensajeCrmParams = {
-            conversacionId: currentConversationId,
-            mensaje: textToSend,
-            role: 'agent',
-            agenteCrmId: senderAgentId || null,
-        };
-
-        if (paramsForAction.role === 'agent' && !paramsForAction.agenteCrmId && !isOwner && !isAdmin) {
-            setError("No se pudo identificar al agente remitente. Por favor, recarga la página.");
-            setIsSending(false);
-            return;
-        }
-
         setNewMessage('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        const result = await enviarMensajeCrmAction(paramsForAction);
+        const result = await enviarMensajeCrmAction({
+            conversacionId: currentConversationId, mensaje: textToSend, role: 'agent',
+            agenteCrmId: currentAgentInfo?.id || null, // Si es owner/admin y no agente, será null
+        });
         setIsSending(false);
         if (!result.success) {
-            setError(result.error || 'Error al enviar mensaje.');
-            if (result.errorDetails) console.error("Errores de validación:", result.errorDetails);
-            setNewMessage(textToSend);
+            setError(result.error || 'Error al enviar mensaje.'); setNewMessage(textToSend);
         }
     };
 
-    const getMessageSenderIcon = (role: ChatMessageItemCrmData['role'], agente?: AgenteBasicoCrmData | null) => {
+    // HELPERS DE UI (pasados a ChatMessageBubble)
+    const getMessageSenderIcon = useCallback((role: ChatMessageItemCrmData['role'], agente?: AgenteBasicoCrmData | null): JSX.Element => {
+        const localUser = user; const localCurrentAgentInfo = currentAgentInfo;
         let agentDisplayName: string | null = null;
-        const localUser = user;
-        const localCurrentAgentInfo = currentAgentInfo;
-
-        if (role === 'agent') {
-            if (agente?.id && localCurrentAgentInfo?.id && agente.id === localCurrentAgentInfo.id) {
-                agentDisplayName = localCurrentAgentInfo.nombre || localUser?.username || "Tú";
-            } else if (agente) {
-                agentDisplayName = agente.nombre || `Agente (${agente.id.substring(0, 4)}...)`;
-            } else if (isOwner || isAdmin) {
-                agentDisplayName = localUser?.username || (isAdmin ? "Admin" : "Propietario");
-            } else {
-                agentDisplayName = "Soporte";
-            }
-        }
-        const displayName =
-            role === 'user' ? (conversationDetails?.leadNombre || 'Cliente') :
-                (role === 'assistant' ? 'Asistente IA' : agentDisplayName);
-
+        if (role === 'agent') { if (agente?.id && localCurrentAgentInfo?.id && agente.id === localCurrentAgentInfo.id) agentDisplayName = localCurrentAgentInfo.nombre || localUser?.username || "Tú (Agente)"; else if (agente) agentDisplayName = agente.nombre || `Agente (${agente.id.substring(0, 4)}...)`; else if (isOwner || isAdmin) agentDisplayName = localUser?.username || (isAdmin ? "Admin" : "Propietario"); else agentDisplayName = "Soporte/Agente"; }
+        const displayName = role === 'user' ? (conversationDetails?.leadNombre || 'Cliente') : (role === 'assistant' ? (conversationDetails?.asistenteNombre || 'Asistente IA') : agentDisplayName);
         if (role === 'user') return <span title={displayName || undefined}><User size={18} className="text-blue-300" /></span>;
         if (role === 'assistant') return <span title={displayName || undefined}><Bot size={18} className="text-zinc-400" /></span>;
-        if (role === 'agent' && (isOwner || isAdmin) && (!agente || agente?.userId === localUser?.id)) {
-            return <span title={`${localUser?.username} (${isAdmin ? "Admin" : "Propietario"})`}><ShieldCheck size={18} className="text-emerald-400" /></span>;
-        }
+        if (role === 'agent' && (isOwner || isAdmin) && (!agente?.id || (agente?.userId === localUser?.id && localUser?.id))) return <span title={displayName || undefined}><ShieldCheck size={18} className="text-emerald-400" /></span>;
         if (role === 'agent') return <span title={displayName || undefined}><User size={18} className="text-purple-300" /></span>;
-        return null;
-    };
+        return <MessageSquareWarning size={18} className="text-amber-400" />;
+    }, [user, currentAgentInfo, isAdmin, isOwner, conversationDetails?.leadNombre, conversationDetails?.asistenteNombre]);
 
-    const copiarIdConversacion = (id: string | undefined) => {
+    const copiarIdConversacion = useCallback((id: string | undefined) => {
         if (id) {
             navigator.clipboard.writeText(id);
             setMensajeCopiado('ID copiado!');
             setTimeout(() => { setMensajeCopiado(null); }, 2000);
         }
-    };
+    }, []);
 
-    const canSendPermission = !!(currentAgentInfo?.id || isOwner || isAdmin);
-    const isSendDisabledFinal = isSending || isLoadingPermissions || !canSendPermission || !currentConversationId;
+    const getMessageAlignment = useCallback((role: string): string => (role === 'user' ? 'items-end' : (role === 'assistant' || role === 'agent' ? 'items-start' : 'items-center justify-center')), []);
+    const getMessageBgColor = useCallback((role: string): string => (role === 'user' ? 'bg-blue-700/80 hover:bg-blue-700 text-blue-50' : (role === 'assistant' ? 'bg-zinc-700/70 hover:bg-zinc-700 text-zinc-100' : (role === 'agent' ? 'bg-purple-700/80 hover:bg-purple-700 text-purple-50' : (role === 'system' ? 'bg-zinc-600/50 text-zinc-300 text-center' : 'bg-zinc-800 text-zinc-100')))), []);
 
-    function getMessageAlignment(role: string) {
-        switch (role) {
-            case 'user': return 'items-end';
-            case 'assistant': case 'agent': return 'items-start';
-            case 'system': return 'items-center';
-            default: return 'items-start';
-        }
-    }
-    function getMessageBgColor(role: string) {
-        switch (role) {
-            case 'user': return 'bg-blue-800 text-blue-100';
-            case 'assistant': return 'bg-zinc-700 text-zinc-100';
-            case 'agent': return 'bg-purple-700 text-purple-100';
-            case 'system': return 'bg-zinc-600 text-zinc-200';
-            default: return 'bg-zinc-800 text-zinc-100';
-        }
-    }
-
-    if (!conversationDetails) {
-        let message = "Cargando datos de la conversación...";
-        let icon = <Loader2 size={32} className="animate-spin text-zinc-400" />;
-        let textColor = "text-zinc-500";
-        if (error) {
-            message = `Error al cargar la conversación: ${error}`;
-            icon = <MessageSquareWarning size={32} className="mb-2 text-red-400" />;
-            textColor = "text-red-400";
-        }
-        return (
-            <div className="flex flex-col items-center justify-center h-full p-4" style={{ maxHeight: 'calc(100vh - 120px)' }}>
-                {icon}
-                <p className={`mt-2 ${textColor}`}>{message}</p>
-            </div>
-        );
-    }
-
+    // Contenido del área de chat
     let chatAreaContent;
-    if (isLoadingPermissions && messages.length === 0 && !error) {
-        chatAreaContent = (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-500">
-                <Loader2 size={32} className="animate-spin text-zinc-400" />
-                <p className="mt-2">Verificando permisos y cargando mensajes...</p>
-            </div>
-        );
-    } else if (error && messages.length === 0 && !isLoadingPermissions) {
-        chatAreaContent = (
-            <div className="flex flex-col items-center justify-center h-full text-red-400">
-                <MessageSquareWarning size={32} className="mb-2" />
-                <p className="font-medium">Error:</p>
-                <p className="text-sm">{error}</p>
-            </div>
-        );
-    } else if (messages.length === 0 && !error && !isLoadingPermissions) {
-        chatAreaContent = (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-500">
-                <MessageSquareWarning size={32} className="mb-2" />
-                <p>No hay mensajes en esta conversación.</p>
-            </div>
-        );
+    if (!conversationDetails && !initialError && isLoadingPermissions) {
+        chatAreaContent = (<div className="flex flex-col items-center justify-center h-full p-4 text-zinc-500"> <Loader2 size={32} className="animate-spin text-zinc-400" /> <p className="mt-2">Cargando conversación...</p> </div>);
+    } else if (!conversationDetails && (error || initialError)) {
+        chatAreaContent = (<div className="flex flex-col items-center justify-center h-full p-4 text-red-400"> <MessageSquareWarning size={32} className="mb-2" /> <p className="font-medium">Error:</p> <p className="text-sm">{error || initialError}</p> </div>);
+    } else if (messages.length === 0 && !isLoadingPermissions) {
+        chatAreaContent = (<div className="flex flex-col items-center justify-center h-full text-zinc-500"> <MessageSquareWarning size={32} className="mb-2" /> <p>No hay mensajes.</p> </div>);
     } else if (messages.length > 0) {
         chatAreaContent = messages.map((msg) => (
-            <div key={msg.id} className={`flex flex-col ${getMessageAlignment(msg.role)} ${msg.role === 'system' ? 'items-center' : ''}`}>
-                {msg.role !== 'system' ? (
-                    <div className={`flex items-end gap-2 max-w-[80%] sm:max-w-[70%] md:max-w-[65%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                        {(msg.role === 'assistant' || msg.role === 'agent') && (
-                            <div className={`flex-shrink-0 self-end p-1.5 rounded-full w-7 h-7 flex items-center justify-center ${msg.role === 'agent' ? (msg.agenteCrm?.id === currentAgentInfo?.id && (isAdmin || isOwner) ? 'bg-emerald-700' : 'bg-purple-700') : 'bg-zinc-700'}`}>
-                                {getMessageSenderIcon(msg.role, msg.agenteCrm)}
-                            </div>
-                        )}
-                        <div className={`p-2.5 md:p-3 rounded-lg shadow ${getMessageBgColor(msg.role)} ${msg.role === 'user' ? 'rounded-br-none' : 'rounded-bl-none'}`}>
-                            {(msg.role === 'agent' && msg.agenteCrm?.nombre && !(currentAgentInfo?.id === msg.agenteCrm.id && (isAdmin || isOwner))) && (
-                                <div className="flex items-center gap-1.5 mb-1 text-xs font-medium">
-                                    <span className='text-purple-300'>{msg.agenteCrm.nombre}</span>
-                                </div>
-                            )}
-                            {(msg.role === 'assistant') && (
-                                <div className="flex items-center gap-1.5 mb-1 text-xs font-medium">
-                                    <span className='text-zinc-400'>Asistente IA</span>
-                                </div>
-                            )}
-                            {msg.mensajeTexto ? (
-                                (conversationDetails?.canalOrigen === 'webchat' && msg.mensajeTexto.includes('<a href') && msg.mensajeTexto.includes('chat-image-lightbox-trigger')) ||
-                                    (msg.role === 'assistant' && (msg.parteTipo === 'FUNCTION_CALL' || msg.parteTipo === 'FUNCTION_RESPONSE')) ?
-                                    (<div className="text-sm prose prose-sm prose-invert max-w-none chat-message-content" dangerouslySetInnerHTML={{ __html: msg.mensajeTexto }} />) :
-                                    (<p className="text-sm whitespace-pre-wrap chat-message-content">{msg.mensajeTexto}</p>)
-                            ) : (
-                                <p className="text-sm italic text-zinc-500">[Mensaje sin contenido de texto]</p>
-                            )}
-                            {msg.mediaUrl && conversationDetails?.canalOrigen === 'whatsapp' && (
-                                <div className="mt-2">
-                                    <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-sm flex items-center gap-1">
-                                        <ImageIcon size={14} /> Ver Imagen/Adjunto
-                                    </a>
-                                </div>
-                            )}
-                        </div>
-                        {msg.role === 'user' && (
-                            <div className="flex-shrink-0 self-end text-blue-300 p-1.5 bg-blue-800 rounded-full w-7 h-7 flex items-center justify-center">
-                                {getMessageSenderIcon(msg.role, msg.agenteCrm)}
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className={`${getMessageBgColor(msg.role)} px-3 py-1 text-xs rounded-full`}>
-                        {msg.mensajeTexto || '[Mensaje de sistema vacío]'}
-                    </div>
-                )}
-                <span className={`text-[0.7rem] text-zinc-500 mt-1 px-1 ${msg.role === 'user' ? 'self-end' : (msg.role === 'system' ? 'self-center' : 'self-start')}`}>
-                    <ClientTime date={msg.createdAt} />
-                </span>
-            </div>
+            <ChatMessageBubble
+                key={msg.id || `msg-${Math.random()}`} // Asegurar key única
+                msg={msg}
+                conversationDetails={conversationDetails}
+                currentAgentInfo={currentAgentInfo}
+                isAdmin={isAdmin}
+                isOwner={isOwner}
+                getMessageAlignment={getMessageAlignment}
+                getMessageBgColor={getMessageBgColor}
+                getMessageSenderIcon={getMessageSenderIcon}
+                openLightboxWithSlides={openLightboxWithSlides}
+            />
         ));
     } else {
-        chatAreaContent = <div className="flex-1 flex items-center justify-center text-zinc-500">Preparando chat...</div>;
+        chatAreaContent = (<div className="flex flex-col items-center justify-center h-full p-4 text-zinc-500"> <Loader2 size={32} className="animate-spin text-zinc-400" /> <p className="mt-2">Cargando mensajes...</p> </div>);
     }
 
     return (
-        <div className="flex flex-col h-full bg-zinc-800" style={{ maxHeight: 'calc(100vh - 120px)' }}>
-            <div className="p-3 md:p-4 border-b border-zinc-700 bg-zinc-800 flex-shrink-0 justify-between flex items-center">
-                <h4 className="text-base md:text-lg font-semibold text-zinc-100 truncate pr-2" title={conversationDetails?.leadNombre || 'Chat'}>
-                    Chat con {conversationDetails?.leadNombre || 'Contacto'}
-                </h4>
-                <div>
-                    {mensajeCopiado && (<span className="text-xs text-green-400 mr-2">{mensajeCopiado}</span>)}
-                    <span
-                        className="text-sm text-zinc-400 hover:text-zinc-200 cursor-pointer inline-flex items-center gap-1 px-2 py-1 bg-zinc-700 rounded-md"
-                        onClick={() => copiarIdConversacion(currentConversationId)}
-                        title="Copiar ID Conversación"
-                    >
-                        ID: {currentConversationId?.substring(0, 8)}...
-                    </span>
-                </div>
-            </div>
-
-            <div ref={messagesContainerRef} className="flex-1 min-h-0 p-3 md:p-4 space-y-3 overflow-y-auto bg-zinc-900">
+        <div className="flex flex-col h-full bg-zinc-800" style={{ maxHeight: 'calc(100vh - 110px)' }}>
+            <ChatHeader
+                conversationDetails={conversationDetails}
+                currentConversationId={currentConversationId}
+                mensajeCopiado={mensajeCopiado}
+                copiarIdConversacion={copiarIdConversacion}
+            />
+            <div ref={messagesContainerRef} className="flex-1 min-h-0 p-3 md:p-4 space-y-0 overflow-y-auto bg-zinc-900/80 custom-scrollbar">
                 {chatAreaContent}
                 <div ref={messagesEndRef} />
             </div>
-
-            <form onSubmit={handleSendMessage} className="p-3 md:p-4 border-t border-zinc-700 bg-zinc-800 flex-shrink-0">
-                {!isSending && error && !error.startsWith("No tienes permiso") && !error.startsWith("No se pudo determinar") && !error.startsWith("No autenticado") &&
-                    <p className="text-xs mb-2 text-red-400">{error}</p>
-                }
-                <div className="flex items-center gap-2 md:gap-3">
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-zinc-400 hover:text-zinc-100 rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-1 focus:ring-blue-500" aria-label="Adjuntar archivo" disabled={isSendDisabledFinal}><Paperclip size={20} /></button>
-                    <input type="file" ref={fileInputRef} className="hidden" onChange={() => { /* TODO */ }} disabled={isSendDisabledFinal} />
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder={isSendDisabledFinal && isLoadingPermissions ? "Verificando permisos..." : (isSendDisabledFinal ? "No puedes enviar mensajes" : "Escribe un mensaje como agente...")}
-                        className="flex-grow px-3 py-2.5 rounded-lg text-sm bg-zinc-900 border border-zinc-700 text-zinc-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-zinc-500 disabled:cursor-not-allowed"
-                        disabled={isSendDisabledFinal}
-                    />
-                    <button
-                        type="submit"
-                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed"
-                        disabled={isSendDisabledFinal || (!newMessage.trim() && (!fileInputRef.current || !fileInputRef.current.files || fileInputRef.current.files.length === 0))}
-                    >
-                        {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                        <span className="hidden sm:inline">Enviar</span>
-                    </button>
-                </div>
-                {/* Mensaje de permisos restaurado */}
-                {!isLoadingPermissions && !canSendPermission && user !== null && (
-                    <p className="text-xs text-amber-500 bg-amber-900/30 border border-amber-700/50 p-1.5 rounded mt-2 text-center">
-                        No tienes permiso para enviar mensajes en este chat.
-                    </p>
-                )}
-            </form>
-            {lightboxOpen && (<Lightbox open={lightboxOpen} close={() => setLightboxOpen(false)} slides={lightboxSlides} index={lightboxIndex} />)}
+            <ChatInputArea
+                newMessage={newMessage}
+                setNewMessage={setNewMessage}
+                handleSendMessage={handleSendMessage}
+                isSending={isSending}
+                isLoadingPermissions={isLoadingPermissions}
+                canSendPermission={!!(currentAgentInfo?.id || isOwner || isAdmin)}
+                currentConversationId={currentConversationId}
+                error={error}
+            // user={user} // Pasar user si ChatInputArea lo necesita explícitamente
+            />
+            {lightboxOpen && (<Lightbox
+                open={lightboxOpen}
+                close={() => setLightboxOpen(false)}
+                slides={lightboxSlides} // Ya no necesita 'as ...' si openLightboxWithSlides lo setea correctamente
+                index={lightboxIndex}
+                plugins={[Thumbnails]}
+                thumbnails={{}}
+                styles={{ container: { backgroundColor: "rgba(0, 0, 0, .9)" }, thumbnail: { backgroundColor: "#222", borderColor: "#444" } }}
+            />)}
         </div>
     );
 }

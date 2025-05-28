@@ -9,7 +9,8 @@ const nextConfig:
       {
         protocol: "https",
         hostname: "sfsjdyuwttrcgchbsxim.supabase.co",
-        pathname: "/**",
+        port: '', // Dejar vacío si es el puerto estándar (443 para https)
+        pathname: '/storage/v1/object/public/ProMedia/**', // Permite cualquier imagen dentro de tu bucket ProMedia
       },
     ],
   },

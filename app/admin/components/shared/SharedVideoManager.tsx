@@ -13,8 +13,13 @@ import { z } from 'zod';
 import { ActionResult } from '@/app/admin/_lib/types';
 
 // --- Tipos Genéricos y Schemas Base ---
-export const SharedTipoVideoEnumSchema = z.enum(['SUBIDO', 'YOUTUBE', 'VIMEO', 'OTRO_URL']);
-export type SharedTipoVideoType = z.infer<typeof SharedTipoVideoEnumSchema>;
+// export const SharedTipoVideoEnumSchema = z.enum(['SUBIDO', 'YOUTUBE', 'VIMEO', 'OTRO_URL']);
+// export type SharedTipoVideoType = z.infer<typeof SharedTipoVideoEnumSchema>;
+
+import {
+    SharedTipoVideoEnumSchema,
+    SharedTipoVideoType
+} from '@/app/admin/_lib/schemas/sharedCommon.schemas'
 
 export interface SharedVideoItemBase {
     id: string;

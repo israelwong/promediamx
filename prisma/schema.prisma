@@ -1411,6 +1411,12 @@ model Interaccion {
   functionResponseNombre String? // Nombre de la función que se invocó
   functionResponseData Json? // El objeto de respuesta que tu sistema genera para la IA
 
+ // NUEVO CAMPO PROPUESTO:
+  uiComponentPayload      Json?   // Nombre más específico que "uiPayload" quizás
+                                  // Ejemplo: si functionResponseData.content es texto plano y 
+                                  // functionResponseData.media es para WhatsApp,
+                                  // uiComponentPayload es para el JSON del WebChat.
+
 
   mensaje        String?   @db.Text //!quitar
   // Metadatos de análisis (opcional)

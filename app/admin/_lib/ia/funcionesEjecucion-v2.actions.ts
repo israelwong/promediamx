@@ -8,8 +8,8 @@ import { ChatMessageItem } from './ia.schemas';
 import { MostrarOfertasArgs, MostrarOfertasData } from '../funciones/mostrarOfertas.schemas';
 import { ejecutarMostrarOfertasAction } from '../funciones/mostrarOfertas.actions';
 
-import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta.schemas';
-import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta.actions';
+import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta/mostrarDetalleOferta.schemas';
+import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta/mostrarDetalleOferta.actions';
 
 import { AceptarOfertaArgs, AceptarOfertaData } from '../funciones/aceptarOferta.schemas';
 import { ejecutarAceptarOfertaAction } from '../funciones/aceptarOferta.actions';
@@ -39,78 +39,112 @@ import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacio
 import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
 
 import {
-    // ProcesarPagoConStripeArgsSchema, 
     type ProcesarPagoConStripeArgs,
     type ProcesarPagoConStripeData
 } from '../funciones/procesarPagoConStripe.schemas'; // NUEVA
 import { ejecutarProcesarPagoConStripeAction } from '../funciones/procesarPagoConStripe.actions'; // NUEVA
 
+import { ChatMessageItemSchema } from './ia.schemas';
+import { enviarMensajeWhatsAppApiAction } from '../actions/whatsapp/whatsapp.actions';
+import { InteraccionParteTipo } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
+import { Prisma, ChangedByType } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
 
-import { ChangedByType } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
-
-/**
- * Guarda un mensaje interno (del asistente o sistema) en la conversación.
- * @param input Datos del mensaje a guardar.
- * @returns ActionResult con el ChatMessageItem creado.
- */
-
+// --- Modificar enviarMensajeInternoAction ---
 async function enviarMensajeInternoAction(input: {
     conversacionId: string;
     mensaje: string;
-    role: 'assistant' | 'system'; // Roles permitidos
-    nombreFuncionEjecutada?: string; // NUEVO: Nombre de la función que generó este resultado
+    role: 'assistant' | 'system';
+    nombreFuncionEjecutada?: string; // Para marcar la FunctionResponse
+    canalOriginal?: string | null; // Ej: "WhatsApp", "Webchat"
+    destinatarioWaId?: string | null; // WAID del usuario
+    negocioPhoneNumberIdEnvia?: string | null; // PNID del negocio
 }): Promise<ActionResult<ChatMessageItem>> {
-
     try {
         if (!input.conversacionId || !input.mensaje || !input.role) {
             return { success: false, error: 'Faltan datos para enviar el mensaje interno.' };
         }
 
-        // Crear la interacción en la base de datos
-        const nuevaInteraccion =
-            await prisma.interaccion.create({
-                data: {
-                    conversacionId: input.conversacionId,
-                    // Para el historial de Gemini, esta interacción se convertirá a role: 'function'
-                    // pero en tu DB la puedes guardar como 'assistant' si así lo prefieres,
-                    // y marcarla con parteTipo: 'FUNCTION_RESPONSE'.
-                    role: 'assistant', // O 'function' si quieres ser más explícito en DB
-                    parteTipo: input.nombreFuncionEjecutada ? 'FUNCTION_RESPONSE' : 'TEXT',
-                    mensajeTexto: input.mensaje,
-                    functionResponseNombre: input.nombreFuncionEjecutada, // El nombre de la herramienta que se llamó
-                    functionResponseData: input.nombreFuncionEjecutada ? { content: input.mensaje } : undefined, // El resultado como objeto
-                },
-                // Seleccionar los campos necesarios para construir ChatMessageItem
-                select: {
-                    id: true,
-                    conversacionId: true,
-                    role: true,
-                    mensaje: true,
-                    mediaUrl: true,
-                    mediaType: true,
-                    createdAt: true,
-                }
-            });
+        const dataToCreate: Prisma.InteraccionCreateInput = {
+            conversacion: { connect: { id: input.conversacionId } },
+            role: input.role, // 'assistant' o 'system'
+            mensajeTexto: input.mensaje,
+            parteTipo: InteraccionParteTipo.TEXT, // Por defecto
+        };
 
-        // Actualizar timestamp de la conversación
+        if (input.role === 'assistant' && input.nombreFuncionEjecutada) {
+            // Si es una respuesta de una función, la marcamos como tal
+            dataToCreate.parteTipo = InteraccionParteTipo.FUNCTION_RESPONSE;
+            // El nombre de la función original se guarda en functionCallNombre para asociar la respuesta
+            dataToCreate.functionCallNombre = input.nombreFuncionEjecutada;
+            dataToCreate.functionResponseData = { content: input.mensaje } as Prisma.InputJsonValue; // Estructura simple
+            // En el historial de Gemini, esto se presentará con role: 'function'
+        }
+
+        const nuevaInteraccion = await prisma.interaccion.create({
+            data: dataToCreate,
+            select: { /* ... tu select para ChatMessageItem ... */
+                id: true, conversacionId: true, role: true, mensajeTexto: true,
+                parteTipo: true, functionCallNombre: true, functionCallArgs: true, functionResponseData: true,
+                mediaUrl: true, mediaType: true, createdAt: true,
+                agenteCrm: { select: { id: true, nombre: true } },
+            }
+        });
+
         await prisma.conversacion.update({
             where: { id: input.conversacionId },
             data: { updatedAt: new Date() }
         });
 
-        // Construir y devolver el objeto ChatMessageItem
-        const data: ChatMessageItem = {
-            id: nuevaInteraccion.id,
-            conversacionId: nuevaInteraccion.conversacionId,
-            role: nuevaInteraccion.role as ChatMessageItem['role'], // Casteo seguro
-            mensaje: nuevaInteraccion.mensaje,
-            mediaUrl: nuevaInteraccion.mediaUrl,
-            mediaType: nuevaInteraccion.mediaType,
-            createdAt: nuevaInteraccion.createdAt,
-            agenteCrm: null, // No hay agente CRM asociado directamente
-        };
-        console.log(`[Mensaje Interno] Mensaje ${data.role} guardado en BD para conv ${data.conversacionId}, ID: ${data.id}`);
-        return { success: true, data };
+        // --- BLOQUE CRÍTICO PARA ENVIAR A WHATSAPP ---
+        if (input.canalOriginal?.toLowerCase() === 'whatsapp' &&
+            input.destinatarioWaId &&
+            input.negocioPhoneNumberIdEnvia &&
+            input.role === 'assistant' &&
+            input.mensaje
+        ) {
+            console.log(`[enviarMensajeInternoAction] DETECTADO CANAL WHATSAPP. Intentando enviar respuesta a ${input.destinatarioWaId} desde ${input.negocioPhoneNumberIdEnvia}. Mensaje: "${input.mensaje.substring(0, 70)}..."`);
+
+            const asistente = await prisma.asistenteVirtual.findFirst({
+                where: { phoneNumberId: input.negocioPhoneNumberIdEnvia, status: 'activo' },
+                select: { token: true, id: true }
+            });
+
+            if (asistente?.token) {
+                console.log(`[enviarMensajeInternoAction] Token encontrado para Asistente ID: ${asistente.id} (PNID ${input.negocioPhoneNumberIdEnvia}). Procediendo a enviar.`);
+                const resultadoEnvioWhatsApp = await enviarMensajeWhatsAppApiAction({
+                    destinatarioWaId: input.destinatarioWaId,
+                    mensajeTexto: input.mensaje,
+                    negocioPhoneNumberIdEnvia: input.negocioPhoneNumberIdEnvia,
+                    tokenAccesoAsistente: asistente.token
+                });
+                if (!resultadoEnvioWhatsApp.success) {
+                    console.error(`[enviarMensajeInternoAction] FALLÓ el envío a WhatsApp para ${input.destinatarioWaId}:`, resultadoEnvioWhatsApp.error);
+                } else {
+                    console.log(`[enviarMensajeInternoAction] Mensaje ENVIADO a WhatsApp para ${input.destinatarioWaId}. ID de mensaje de WA: ${resultadoEnvioWhatsApp.data}`);
+                }
+            } else {
+                console.error(`[enviarMensajeInternoAction] No se encontró token para PNID ${input.negocioPhoneNumberIdEnvia} o asistente inactivo. No se pudo enviar mensaje a WhatsApp.`);
+            }
+        } else {
+            console.log(`[enviarMensajeInternoAction] NO SE CUMPLE CONDICIÓN para enviar a WhatsApp. Detalles:`, {
+                canalOriginal: input.canalOriginal,
+                destinatarioWaId: input.destinatarioWaId,
+                negocioPhoneNumberIdEnvia: input.negocioPhoneNumberIdEnvia,
+                role: input.role,
+                mensaje: !!input.mensaje
+            });
+        }
+
+        const parsedData = ChatMessageItemSchema.safeParse({
+            ...nuevaInteraccion,
+            functionCallArgs: nuevaInteraccion.functionCallArgs ? nuevaInteraccion.functionCallArgs as Record<string, unknown> : null,
+            functionResponseData: nuevaInteraccion.functionResponseData ? nuevaInteraccion.functionResponseData as Record<string, unknown> : null,
+        });
+        if (!parsedData.success) {
+            console.error("[enviarMensajeInternoAction] Error Zod al parsear nueva interaccion:", parsedData.error);
+            return { success: false, error: "Error al procesar mensaje interno." };
+        }
+        return { success: true, data: parsedData.data };
 
     } catch (error) {
         console.error(`[Mensaje Interno] Error al guardar mensaje ${input.role} para conv ${input.conversacionId}:`, error);

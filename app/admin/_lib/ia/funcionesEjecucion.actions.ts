@@ -1,840 +1,342 @@
-// Ruta sugerida: app/admin/_lib/funciones/ia/funcionesEjecucion.actions.ts
+// app/admin/_lib/ia/funcionesEjecucion.actions.ts
 'use server';
 
 import prisma from '../prismaClient';
-import { ActionResult } from '../types';
-import { ChatMessageItem } from './ia.schemas';
+import { type ActionResult } from '../types'; // Asegúrate que la ruta es correcta
+import { ChatMessageItemSchema, type ChatMessageItem } from './ia.schemas'; // Este schema DEBE incluir functionResponseNombre
+import { InteraccionParteTipo, Prisma } from '@prisma/client';
+import { z } from 'zod';
 
-import { MostrarOfertasArgs, MostrarOfertasData } from '../funciones/mostrarOfertas.schemas';
-import { ejecutarMostrarOfertasAction } from '../funciones/mostrarOfertas.actions';
+import { enviarMensajeWhatsAppApiAction } from '../actions/whatsapp/whatsapp.actions';
+import type { EnviarMensajeWhatsAppApiInput } from '../actions/whatsapp/whatsapp.schemas';
 
-import { MostrarDetalleOfertaArgs, MostrarDetalleOfertaData } from '../funciones/mostrarDetalleOferta.schemas';
-import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta.actions';
-
-import { AceptarOfertaArgs, AceptarOfertaData } from '../funciones/aceptarOferta.schemas';
-import { ejecutarAceptarOfertaAction } from '../funciones/aceptarOferta.actions';
-
-import { AgendarCitaArgs, ConfiguracionAgendaDelNegocio } from '../funciones/agendarCita.schemas';
-import { ejecutarAgendarCitaAction } from '../funciones/agendarCita.actions';
-
-import { ListarServiciosAgendaArgs } from '../funciones/listarServiciosAgenda.schemas';
-import { ejecutarListarServiciosAgendaAction } from '../funciones/listarServiciosAgenda.actions';
-
-import { ListarHorariosDisponiblesArgs } from '../funciones/listarHorariosDisponiblesAgenda.schemas';
-import { ejecutarListarHorariosDisponiblesAction } from '../funciones/listarHorariosDisponiblesAgenda.actions';
-
-import { ejecutarCancelarCitaAction } from '../funciones/cancelarCita.actions';
-import { CancelarCitaArgs } from '../funciones/cancelarCita.schemas';
-
-import { ReagendarCitaArgs } from '../funciones/reagendarCita.schemas';
-import { ejecutarReagendarCitaAction } from '../funciones/reagendarCita.actions';
-
-import { ejecutarDarDireccionAction } from '../funciones/darDireccionYUbicacion.actions';
-import { DarDireccionArgs, DarDireccionData } from '../funciones/darDireccionYUbicacion.schemas';
-
-import { InformarHorarioArgs, InformarHorarioData } from '../funciones/informarHorarioDeAtencion.schemas';
-import { ejecutarInformarHorarioAction } from '../funciones/informarHorarioDeAtencion.actions';
-
-import { BrindarInfoArgs, BrindarInfoData } from '../funciones/brindarInformacionDelNegocio.schemas';
-import { ejecutarBrindarInfoNegocioAction } from '../funciones/brindarInformacionDelNegocio.actions';
+// Importaciones de tus funciones...
+// ... (como las tenías)
+import {
+    // EjecutarMostrarDetalleOfertaParamsSchema, // Ya no se usa aquí, la función lo valida internamente
+} from '../funciones/mostrarDetalleOferta/mostrarDetalleOferta.schemas'; // Solo para referencia de la ruta
+import { ejecutarMostrarDetalleOfertaAction } from '../funciones/mostrarDetalleOferta/mostrarDetalleOferta.actions';
 
 import {
-    // ProcesarPagoConStripeArgsSchema, 
-    type ProcesarPagoConStripeArgs,
-    type ProcesarPagoConStripeData
-} from '../funciones/procesarPagoConStripe.schemas'; // NUEVA
-import { ejecutarProcesarPagoConStripeAction } from '../funciones/procesarPagoConStripe.actions'; // NUEVA
+    type FunctionResponseMediaData,
+    type MediaItem
+} from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
 
-import { ChatMessageItemSchema } from './ia.schemas';
-import { enviarMensajeWhatsAppApiAction } from '../actions/whatsapp/whatsapp.actions';
-import { InteraccionParteTipo } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
+import { type SimpleFuncionContext } from "@/app/admin/_lib/types";
 
-
-
-import { Prisma, ChangedByType } from '@prisma/client'; // Asegúrate de que este tipo esté definido correctamente
-
-/**
- * Guarda un mensaje interno (del asistente o sistema) en la conversación.
- * @param input Datos del mensaje a guardar.
- * @returns ActionResult con el ChatMessageItem creado.
- */
-
-// async function enviarMensajeInternoAction(input: {
-//     conversacionId: string;
-//     mensaje: string;
-//     role: 'assistant' | 'system'; // Roles permitidos
-//     nombreFuncionEjecutada?: string; // NUEVO: Nombre de la función que generó este resultado
-// }): Promise<ActionResult<ChatMessageItem>> {
-
-//     try {
-//         if (!input.conversacionId || !input.mensaje || !input.role) {
-//             return { success: false, error: 'Faltan datos para enviar el mensaje interno.' };
-//         }
-
-//         // Crear la interacción en la base de datos
-//         const nuevaInteraccion =
-//             await prisma.interaccion.create({
-//                 data: {
-//                     conversacionId: input.conversacionId,
-//                     // Para el historial de Gemini, esta interacción se convertirá a role: 'function'
-//                     // pero en tu DB la puedes guardar como 'assistant' si así lo prefieres,
-//                     // y marcarla con parteTipo: 'FUNCTION_RESPONSE'.
-//                     role: 'assistant', // O 'function' si quieres ser más explícito en DB
-//                     parteTipo: input.nombreFuncionEjecutada ? 'FUNCTION_RESPONSE' : 'TEXT',
-//                     mensajeTexto: input.mensaje,
-//                     functionResponseNombre: input.nombreFuncionEjecutada, // El nombre de la herramienta que se llamó
-//                     functionResponseData: input.nombreFuncionEjecutada ? { content: input.mensaje } : undefined, // El resultado como objeto
-//                 },
-//                 // Seleccionar los campos necesarios para construir ChatMessageItem
-//                 select: {
-//                     id: true,
-//                     conversacionId: true,
-//                     role: true,
-//                     mensaje: true,
-//                     mediaUrl: true,
-//                     mediaType: true,
-//                     createdAt: true,
-//                 }
-//             });
-
-//         // Actualizar timestamp de la conversación
-//         await prisma.conversacion.update({
-//             where: { id: input.conversacionId },
-//             data: { updatedAt: new Date() }
-//         });
-
-//         // Construir y devolver el objeto ChatMessageItem
-//         const data: ChatMessageItem = {
-//             id: nuevaInteraccion.id,
-//             conversacionId: nuevaInteraccion.conversacionId,
-//             role: nuevaInteraccion.role as ChatMessageItem['role'], // Casteo seguro
-//             mensaje: nuevaInteraccion.mensaje,
-//             mediaUrl: nuevaInteraccion.mediaUrl,
-//             mediaType: nuevaInteraccion.mediaType,
-//             createdAt: nuevaInteraccion.createdAt,
-//             agenteCrm: null, // No hay agente CRM asociado directamente
-//         };
-//         console.log(`[Mensaje Interno] Mensaje ${data.role} guardado en BD para conv ${data.conversacionId}, ID: ${data.id}`);
-//         return { success: true, data };
-
-//     } catch (error) {
-//         console.error(`[Mensaje Interno] Error al guardar mensaje ${input.role} para conv ${input.conversacionId}:`, error);
-//         return { success: false, error: 'No se pudo guardar el mensaje interno.' };
-//     }
-// }
-
-// --- Modificar enviarMensajeInternoAction ---
-async function enviarMensajeInternoAction(input: {
+// -----------------------------------------------------------------------------
+// enviarMensajeInternoYWhatsAppAction AJUSTADO
+// -----------------------------------------------------------------------------
+async function enviarMensajeInternoYWhatsAppAction(input: {
     conversacionId: string;
-    mensaje: string;
+    contentFuncion: string | null;
+    mediaItemsFuncion?: MediaItem[] | null;
     role: 'assistant' | 'system';
-    nombreFuncionEjecutada?: string; // Para marcar la FunctionResponse
-    // --- NUEVOS PARÁMETROS PARA WHATSAPP ---
-    canalOriginal?: string | null; // Ej: "WhatsApp", "Webchat"
-    destinatarioWaId?: string | null; // WAID del usuario
-    negocioPhoneNumberIdEnvia?: string | null; // PNID del negocio
-    // --- FIN NUEVOS PARÁMETROS ---
-}): Promise<ActionResult<ChatMessageItem>> {
+    nombreFuncionEjecutada?: string;
+    canalOriginal?: string | null;
+    destinatarioWaId?: string | null;
+    negocioPhoneNumberIdEnvia?: string | null;
+}): Promise<ActionResult<ChatMessageItem | null>> { // Asegurar que todas las rutas devuelvan esto
+    const timestampInicio = Date.now(); // Lo usaremos en el log final
+    console.log(`[enviarMensajeInterno V4] Tarea (función ${input.nombreFuncionEjecutada || 'N/A'}) - INICIO para conv ${input.conversacionId}. Rol: ${input.role}, Canal: ${input.canalOriginal}`);
+    // ... (otros logs como los tenías) ...
+
     try {
-        if (!input.conversacionId || !input.mensaje || !input.role) {
-            return { success: false, error: 'Faltan datos para enviar el mensaje interno.' };
+        if (!input.conversacionId || !input.role) {
+            console.warn(`[enviarMensajeInterno V4] Faltan datos críticos (conversacionId, role). Abortando.`);
+            return { success: false, error: 'Faltan datos (conversacionId, role).', data: null }; // AJUSTADO: Devolver ActionResult
         }
 
-        const dataToCreate: Prisma.InteraccionCreateInput = {
+        const tieneContentValido = input.contentFuncion && input.contentFuncion.trim() !== "";
+        const tieneMediaValida = Array.isArray(input.mediaItemsFuncion) && input.mediaItemsFuncion.length > 0 && input.mediaItemsFuncion.some(m => m.url && m.tipo);
+
+        if (!tieneContentValido && !tieneMediaValida) {
+            console.warn(`[enviarMensajeInterno V4] No hay content ni media válida para enviar para conv ${input.conversacionId}. Abortando.`);
+            return { success: false, error: 'Se requiere content o media válida para enviar.', data: null }; // AJUSTADO: Devolver ActionResult
+        }
+
+        const textoPrincipalInteraccion = input.contentFuncion ||
+            (tieneMediaValida ? (input.mediaItemsFuncion![0].caption || `[Media: ${input.mediaItemsFuncion![0].tipo}]`) : "[Respuesta sin texto visible]");
+
+        const dataToCreateInDB: Prisma.InteraccionCreateInput = {
             conversacion: { connect: { id: input.conversacionId } },
-            role: input.role, // 'assistant' o 'system'
-            mensajeTexto: input.mensaje,
-            parteTipo: InteraccionParteTipo.TEXT, // Por defecto
+            role: input.role,
+            mensajeTexto: textoPrincipalInteraccion,
+            mediaUrl: null,
+            mediaType: null,
         };
 
         if (input.role === 'assistant' && input.nombreFuncionEjecutada) {
-            // Si es una respuesta de una función, la marcamos como tal
-            dataToCreate.parteTipo = InteraccionParteTipo.FUNCTION_RESPONSE;
-            // El nombre de la función original se guarda en functionCallNombre para asociar la respuesta
-            dataToCreate.functionCallNombre = input.nombreFuncionEjecutada;
-            dataToCreate.functionResponseData = { content: input.mensaje } as Prisma.InputJsonValue; // Estructura simple
-            // En el historial de Gemini, esto se presentará con role: 'function'
+            dataToCreateInDB.parteTipo = InteraccionParteTipo.FUNCTION_RESPONSE;
+            dataToCreateInDB.functionResponseNombre = input.nombreFuncionEjecutada;
+            dataToCreateInDB.functionResponseData = {
+                content: input.contentFuncion,
+                media: input.mediaItemsFuncion || null,
+            } as Prisma.InputJsonValue;
+        } else if (input.role === 'assistant' && (tieneContentValido || tieneMediaValida)) {
+            dataToCreateInDB.parteTipo = InteraccionParteTipo.TEXT;
+            if (tieneMediaValida) {
+                dataToCreateInDB.functionResponseData = {
+                    content: input.contentFuncion,
+                    media: input.mediaItemsFuncion || null,
+                } as Prisma.InputJsonValue;
+            }
         }
 
         const nuevaInteraccion = await prisma.interaccion.create({
-            data: dataToCreate,
-            select: { /* ... tu select para ChatMessageItem ... */
+            data: dataToCreateInDB,
+            select: {
                 id: true, conversacionId: true, role: true, mensajeTexto: true,
-                parteTipo: true, functionCallNombre: true, functionCallArgs: true, functionResponseData: true,
+                parteTipo: true, functionCallNombre: true, functionCallArgs: true,
+                functionResponseData: true, functionResponseNombre: true, // Este campo debe existir en el SELECT y en el tipo ChatMessageItem
                 mediaUrl: true, mediaType: true, createdAt: true,
                 agenteCrm: { select: { id: true, nombre: true } },
             }
         });
 
-        await prisma.conversacion.update({
-            where: { id: input.conversacionId },
-            data: { updatedAt: new Date() }
-        });
+        const parsedNuevaInteraccion = ChatMessageItemSchema.safeParse(nuevaInteraccion);
+        const interaccionPrincipalGuardada: ChatMessageItem | null = parsedNuevaInteraccion.success ? parsedNuevaInteraccion.data : null;
 
-        // --- NUEVO: ENVIAR RESPUESTA A WHATSAPP SI CORRESPONDE ---
-        if (input.canalOriginal?.toLowerCase() === 'whatsapp' && input.destinatarioWaId && input.negocioPhoneNumberIdEnvia && input.role === 'assistant') {
-            console.log(`[enviarMensajeInternoAction] Detectado canal WhatsApp. Intentando enviar respuesta a ${input.destinatarioWaId}`);
-            const asistente = await prisma.asistenteVirtual.findFirst({
-                where: { phoneNumberId: input.negocioPhoneNumberIdEnvia },
-                select: { token: true } // El token de acceso para la API de WhatsApp
-            });
+        if (!parsedNuevaInteraccion.success) {
+            console.error(`[enviarMensajeInterno V4] Error Zod parseando interacción guardada (ID: ${nuevaInteraccion.id}):`, parsedNuevaInteraccion.error.flatten().fieldErrors);
+        } else {
+            // AJUSTADO: Asegurarse que ChatMessageItemSchema tenga functionResponseNombre
+            console.log(`[enviarMensajeInterno V4] Interacción guardada en DB (ID: ${interaccionPrincipalGuardada?.id}), ParteTipo: ${interaccionPrincipalGuardada?.parteTipo}, FN Resp Nombre: ${interaccionPrincipalGuardada?.functionResponseNombre}`);
+        }
+
+        await prisma.conversacion.update({ where: { id: input.conversacionId }, data: { updatedAt: new Date() } });
+
+        const esCanalWhatsApp = input.canalOriginal?.toLowerCase().includes('whatsapp') ?? false;
+        if (esCanalWhatsApp && input.destinatarioWaId && input.negocioPhoneNumberIdEnvia && input.role === 'assistant') {
+            const asistente = await prisma.asistenteVirtual.findFirst({ where: { phoneNumberId: input.negocioPhoneNumberIdEnvia, status: 'activo' }, select: { token: true, id: true } });
+
             if (asistente?.token) {
-                await enviarMensajeWhatsAppApiAction({
+                const commonWhatsAppParams: Pick<EnviarMensajeWhatsAppApiInput, "destinatarioWaId" | "negocioPhoneNumberIdEnvia" | "tokenAccesoAsistente"> = {
                     destinatarioWaId: input.destinatarioWaId,
-                    mensajeTexto: input.mensaje,
                     negocioPhoneNumberIdEnvia: input.negocioPhoneNumberIdEnvia,
-                    tokenAccesoAsistente: asistente.token
-                });
-            } else {
-                console.error(`[enviarMensajeInternoAction] No se encontró token para PNID ${input.negocioPhoneNumberIdEnvia}. No se pudo enviar mensaje a WhatsApp.`);
-            }
-        }
-        // --- FIN NUEVO ---
+                    tokenAccesoAsistente: asistente.token,
+                };
 
-        const parsedData = ChatMessageItemSchema.safeParse({
-            ...nuevaInteraccion,
-            functionCallArgs: nuevaInteraccion.functionCallArgs ? nuevaInteraccion.functionCallArgs as Record<string, unknown> : null,
-            functionResponseData: nuevaInteraccion.functionResponseData ? nuevaInteraccion.functionResponseData as Record<string, unknown> : null,
-        });
-        if (!parsedData.success) {
-            console.error("[enviarMensajeInternoAction] Error Zod al parsear nueva interaccion:", parsedData.error);
-            return { success: false, error: "Error al procesar mensaje interno." };
-        }
-        return { success: true, data: parsedData.data };
+                if (tieneContentValido) {
+                    const resultadoEnvioTexto = await enviarMensajeWhatsAppApiAction({ // AJUSTADO: Usar resultadoEnvioTexto
+                        ...commonWhatsAppParams, tipoMensaje: 'text', mensajeTexto: input.contentFuncion!,
+                    });
+                    if (resultadoEnvioTexto.success) console.log(`[enviarMensajeInterno V4] WHATSAPP: TEXTO enviado a ${input.destinatarioWaId}. MsgID: ${resultadoEnvioTexto.data}`);
+                    else console.warn(`[enviarMensajeInterno V4] WHATSAPP: Fallo al enviar TEXTO a ${input.destinatarioWaId}. Error: ${resultadoEnvioTexto.error}`);
+                    if (tieneMediaValida) await new Promise(resolve => setTimeout(resolve, 700));
+                }
 
-    } catch (error) {
-        console.error(`[Mensaje Interno] Error al guardar mensaje ${input.role} para conv ${input.conversacionId}:`, error);
-        return { success: false, error: 'No se pudo guardar el mensaje interno.' };
+                if (tieneMediaValida) {
+                    for (let i = 0; i < input.mediaItemsFuncion!.length; i++) {
+                        const media = input.mediaItemsFuncion![i];
+                        if (!media.url || !media.tipo) continue;
+
+                        const mediaInput: EnviarMensajeWhatsAppApiInput = {
+                            ...commonWhatsAppParams,
+                            tipoMensaje: media.tipo,
+                            mediaUrl: media.url,
+                            caption: media.caption ?? undefined, // AJUSTADO: Convertir null a undefined
+                            filename: media.tipo === 'document' ? (media.filename || "documento") : undefined,
+                        };
+                        const resultadoEnvioMedia = await enviarMensajeWhatsAppApiAction(mediaInput); // AJUSTADO: Usar resultadoEnvioMedia
+                        if (resultadoEnvioMedia.success) console.log(`[enviarMensajeInterno V4] WHATSAPP: Media ${i + 1} (${media.tipo}) enviado a ${input.destinatarioWaId}. MsgID: ${resultadoEnvioMedia.data}`);
+                        else console.warn(`[enviarMensajeInterno V4] WHATSAPP: Fallo al enviar media ${i + 1} (${media.tipo}) a ${input.destinatarioWaId}. Error: ${resultadoEnvioMedia.error}, MediaInput:`, mediaInput);
+                        if (input.mediaItemsFuncion!.length > 1 && i < input.mediaItemsFuncion!.length - 1) await new Promise(resolve => setTimeout(resolve, 900));
+                    }
+                }
+            } else { console.error(`[enviarMensajeInterno V4] WHATSAPP: No token/asistente para PNID ${input.negocioPhoneNumberIdEnvia}.`); }
+        }
+        console.log(`[enviarMensajeInterno V4] Tarea (función ${input.nombreFuncionEjecutada || 'N/A'}) - FIN para conv ${input.conversacionId}. Duración: ${Date.now() - timestampInicio}ms`); // AJUSTADO: Usar timestampInicio
+        return { success: true, data: interaccionPrincipalGuardada }; // AJUSTADO: Devolver ActionResult
+    } catch (e: unknown) { // AJUSTADO: Nombrar la variable de error para usarla
+        const errorMsg = e instanceof Error ? e.message : "Error desconocido al guardar/enviar mensaje interno.";
+        console.error(`[enviarMensajeInterno V4] Error catastrófico para conv ${input.conversacionId}:`, e);
+        return { success: false, error: errorMsg, data: null }; // AJUSTADO: Devolver ActionResult
     }
 }
 
+// -----------------------------------------------------------------------------
+// dispatchTareaEjecutadaAction AJUSTADO
+// -----------------------------------------------------------------------------
 export async function dispatchTareaEjecutadaAction(
     tareaEjecutadaId: string
 ): Promise<ActionResult<null>> {
-    console.log(`[Dispatcher] Iniciando despacho para TareaEjecutada ${tareaEjecutadaId}`);
-
-    let tareaEjecutada;
+    const timestampInicio = Date.now();
+    console.log(`[Dispatcher V4] Tarea ${tareaEjecutadaId} - INICIO.`);
+    let metadataObj: Record<string, unknown> = {};
+    let funcionContext: SimpleFuncionContext | undefined = undefined;
+    // AJUSTADO: Declarar resultadoEjecucionDeFuncion en un scope más alto
+    let resultadoEjecucionDeFuncion: ActionResult<FunctionResponseMediaData | unknown> | null = null;
 
     try {
-        // 1. Obtener la Tarea Ejecutada
-        tareaEjecutada = await prisma.tareaEjecutada.findUnique({
-            where: { id: tareaEjecutadaId },
-        });
+        const tareaEjecutada = await prisma.tareaEjecutada.findUnique({ where: { id: tareaEjecutadaId } });
+        if (!tareaEjecutada) { return { success: false, error: `TareaEjecutada ID ${tareaEjecutadaId} no encontrada.` }; }
+        // ... (parseo de metadata como lo tenías, asegurando que metadataObj se pueble)
+        if (typeof tareaEjecutada.metadata === 'string') {
+            try { metadataObj = JSON.parse(tareaEjecutada.metadata); } catch { await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Error al parsear metadata.", null); return { success: false, error: "Error al parsear metadatos." }; }
+        } else if (typeof tareaEjecutada.metadata === 'object' && tareaEjecutada.metadata !== null) {
+            metadataObj = tareaEjecutada.metadata as Record<string, unknown>;
+        } else { await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Metadata en formato inesperado.", null); return { success: false, error: "Metadatos en formato inesperado." }; }
 
-        if (!tareaEjecutada) {
-            console.error(`[Dispatcher] TareaEjecutada con ID ${tareaEjecutadaId} no encontrada.`);
-            return { success: false, error: `TareaEjecutada con ID ${tareaEjecutadaId} no encontrada.` };
-        }
-        if (!tareaEjecutada.metadata) {
-            console.error(`[Dispatcher] TareaEjecutada ${tareaEjecutadaId} no tiene metadatos.`);
-            return { success: false, error: `TareaEjecutada ${tareaEjecutadaId} no tiene metadatos para despachar.` };
-        }
-
-        // 2. Parsear los Metadatos
-        let parsedMetadata: unknown;
-        try {
-            parsedMetadata = JSON.parse(tareaEjecutada.metadata);
-        } catch (parseError) {
-            console.error(`[Dispatcher] Error al parsear metadata de TareaEjecutada ${tareaEjecutadaId}:`, parseError);
-            return { success: false, error: "Metadatos de tarea inválidos." };
+        const { funcionLlamada, argumentos: argsFromIA, conversacionId, leadId, asistenteVirtualId, canalNombre, destinatarioWaId, negocioPhoneNumberIdEnvia } = metadataObj;
+        if (typeof funcionLlamada !== 'string' || typeof argsFromIA === 'undefined' || typeof conversacionId !== 'string' || typeof asistenteVirtualId !== 'string' || typeof leadId !== 'string') {
+            const errorMsg = "Metadata incompleta o con tipos incorrectos.";
+            await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, errorMsg, metadataObj);
+            return { success: false, error: errorMsg };
         }
 
-        if (typeof parsedMetadata !== 'object' || parsedMetadata === null) {
-            console.error(`[Dispatcher] Metadata parseada no es un objeto para TareaEjecutada ${tareaEjecutadaId}:`, parsedMetadata);
-            return { success: false, error: "Metadatos de tarea con formato incorrecto." };
-        }
+        let responseContentParaUsuario: string | null = null;
+        let responseMediaParaEnviar: MediaItem[] | null = null;
 
-        const metadataObj = parsedMetadata as Record<string, unknown>;
-        console.log(`[Dispatcher] Metadata parseada:`, metadataObj);
-
-        const funcionLlamada = typeof metadataObj.funcionLlamada === 'string' ? metadataObj.funcionLlamada : undefined;
-        const argumentos = typeof metadataObj.argumentos === 'object' && metadataObj.argumentos !== null ? metadataObj.argumentos as Record<string, unknown> : undefined;
-        const conversacionId = typeof metadataObj.conversacionId === 'string' ? metadataObj.conversacionId : undefined;
-        const leadId = typeof metadataObj.leadId === 'string' ? metadataObj.leadId : undefined;
-        const asistenteVirtualId = typeof metadataObj.asistenteVirtualId === 'string' ? metadataObj.asistenteVirtualId : undefined;
-        const canalNombre = typeof metadataObj.canalNombre === 'string' ? metadataObj.canalNombre : undefined;//!revisar
-
-
-        if (!funcionLlamada || !argumentos || !conversacionId || !leadId || !asistenteVirtualId) {
-            console.error(`[Dispatcher] Metadata incompleta o inválida en TareaEjecutada ${tareaEjecutadaId}:`, metadataObj);
-            await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Metadata incompleta o inválida.");
-            return { success: false, error: "Faltan datos o son inválidos en los metadatos de la tarea para despachar." };
-        }
-
-        // 3. Ejecutar la Función Correspondiente (Dispatcher)
-        let resultadoEjecucion: ActionResult<unknown> | null = null;
-        let mensajeResultadoParaUsuario: string | null = null;
-
-        console.log(`[Dispatcher] Despachando función: ${funcionLlamada}`);
-        switch (funcionLlamada) {
-
-
-            //!PAGAR CON STRIPE
-            case 'procesarPagoConStripe': // NUEVO CASE
-                const asistentePago = await prisma.asistenteVirtual.findUnique({
-                    where: { id: asistenteVirtualId },
-                    select: { negocioId: true /*, otros campos si necesitas */ }
-                });
-                if (!asistentePago?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio para procesar el pago.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-
-                // Obtener datos del Lead para prellenar info del cliente en Stripe (opcional)
-                const leadInfo = await prisma.lead.findUnique({
-                    where: { id: leadId },
-                    select: { email: true, jsonParams: true /* otros campos como stripeCustomerId si lo tienes en Lead */ }
-                });
-
-                const argsPago: ProcesarPagoConStripeArgs = {
-                    negocioId: asistentePago.negocioId,
-                    identificador_item_a_pagar: typeof argumentos.identificador_item_a_pagar === 'string' ? argumentos.identificador_item_a_pagar : '',
-                    tipo_item_a_pagar: (
-                        argumentos.tipo_item_a_pagar === 'oferta' ||
-                        argumentos.tipo_item_a_pagar === 'paquete' ||
-                        argumentos.tipo_item_a_pagar === 'producto_catalogo'
-                    ) ? argumentos.tipo_item_a_pagar : 'producto_catalogo', // Default o manejo de error
-                    emailClienteFinal: leadInfo?.email || undefined,
-                    canalNombre: canalNombre ?? '', // Nombre del canal conversacional
-                };
-
-                // Validar argumentos antes de pasarlos (Zod ya lo hace dentro de la acción, pero una verificación rápida aquí es buena)
-                if (!argsPago.identificador_item_a_pagar) {
-                    mensajeResultadoParaUsuario = "No pude identificar qué producto u oferta deseas pagar. ¿Podrías especificarlo?";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Falta identificador_item_a_pagar para procesarPagoConStripe");
-                    break;
-                }
-
-                resultadoEjecucion = await ejecutarProcesarPagoConStripeAction(argsPago, tareaEjecutadaId);
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as ProcesarPagoConStripeData).mensajeParaUsuario;
-                    if ((resultadoEjecucion.data as ProcesarPagoConStripeData).errorAlCrearLink) {
-                        // Si hubo un error creando el link pero queremos que el asistente diga el mensaje de error
-                        await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, (resultadoEjecucion.data as ProcesarPagoConStripeData).mensajeParaUsuario);
+        const asistenteDb = await prisma.asistenteVirtual.findUnique({
+            where: { id: asistenteVirtualId },
+            include: {
+                negocio: {
+                    include: {
+                        AgendaConfiguracion: true,
+                        cliente: { select: { stripeCustomerId: true, email: true } },
+                        configuracionPago: true // <-- Añadido para incluir configuracionPago
                     }
-                } else {
-                    mensajeResultadoParaUsuario = resultadoEjecucion.error || "Hubo un problema al generar el link de pago.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, `Error en ejecutarProcesarPagoConStripeAction: ${resultadoEjecucion.error}`);
                 }
-                break;
-
-            //!ENVIAR INFORMACIN NEGOCIO
-            case 'brindarInformacionDelNegocio':
-                const asistenteInfo = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
-                if (!asistenteInfo?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-                const argsInfo: BrindarInfoArgs = {
-                    ...argumentos,
-                    negocioId: asistenteInfo.negocioId,
-                    tema: typeof argumentos.tema === 'string' ? argumentos.tema : undefined,
-                };
-                resultadoEjecucion = await ejecutarBrindarInfoNegocioAction(argsInfo, tareaEjecutadaId);
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as BrindarInfoData).informacionEncontrada;
-                } else {
-                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al obtener la información: ${resultadoEjecucion.error || 'Error desconocido.'}`;
-                }
-                break;
-
-            //!INFORMAR HORARIO DE ATENCION
-            case 'informarHorarioDeAtencion':
-                const asistenteHorario = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
-                if (!asistenteHorario?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-                const argsHorario: InformarHorarioArgs = {
-                    ...argumentos,
-                    negocioId: asistenteHorario.negocioId,
-                    diaEspecifico: typeof argumentos.diaEspecifico === 'string' ? argumentos.diaEspecifico : undefined,
-                    verificarAbiertoAhora: typeof argumentos.verificarAbiertoAhora === 'boolean' ? argumentos.verificarAbiertoAhora : undefined,
-                };
-                resultadoEjecucion = await ejecutarInformarHorarioAction(argsHorario, tareaEjecutadaId);
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as InformarHorarioData).respuestaHorario;
-                } else {
-                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al obtener el horario: ${resultadoEjecucion.error || 'Error desconocido.'}`;
-                }
-                break;
-
-            //!DAR DIRECCION Y UBICACION
-            case 'darDireccionYUbicacion': // <-- NUEVO CASE
-                const asistenteDir = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
-                if (!asistenteDir?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado al asistente.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-                const argsDir: DarDireccionArgs = {
-                    ...argumentos, // Pasar argumentos extraídos por IA si los hubiera (aunque no se usen directamente)
-                    negocioId: asistenteDir.negocioId,
-                };
-                resultadoEjecucion = await ejecutarDarDireccionAction(argsDir, tareaEjecutadaId);
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as DarDireccionData).mensajeRespuesta;
-                } else {
-                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al obtener la dirección: ${resultadoEjecucion.error || 'Error desconocido.'}`;
-                }
-                break;
-
-            //!MOSTRAR OFERTAS ?? listo
-            case 'mostrarOfertas': // <-- NUEVO CASE
-                const asistenteOfertas = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteVirtualId }, select: { negocioId: true } });
-                if (!asistenteOfertas?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado al asistente para mostrar ofertas.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-                const argsOfertas: MostrarOfertasArgs = {
-                    // No hay argumentos extraídos de la IA para esta función específica
-                    negocioId: asistenteOfertas.negocioId,
-                };
-                resultadoEjecucion = await ejecutarMostrarOfertasAction(argsOfertas, tareaEjecutadaId);
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as MostrarOfertasData).mensajeRespuesta;
-                } else {
-                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al consultar las ofertas: ${resultadoEjecucion.error || 'Error desconocido.'}`;
-                }
-                break;
-
-            //!MOSTRAR DETALLE OFERTA  ?? listo
-            case 'mostrarDetalleOferta':
-                const asistenteConCanal = await prisma.asistenteVirtual.findUnique({
-                    where: { id: asistenteVirtualId },
-                    select: {
-                        negocioId: true,
-                        canalConversacional: { // Incluir el canal conversacional
-                            select: { nombre: true }
-                        }
-                    }
-                });
-
-                if (!asistenteConCanal?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado para detallar la oferta.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-
-                // Extraer el parámetro con el nombre correcto de los args de Gemini
-                const nombreDeLaOfertaExtraido = typeof argumentos.nombre_de_la_oferta === 'string' ? argumentos.nombre_de_la_oferta : undefined;
-
-                if (!nombreDeLaOfertaExtraido) {
-                    mensajeResultadoParaUsuario = "No especificaste claramente qué oferta te interesa. ¿Podrías indicarme el nombre?";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Falta el parámetro 'nombre_de_la_oferta' en los argumentos de IA.");
-                    break;
-                }
-
-                const argsDetalleOferta: MostrarDetalleOfertaArgs = {
-                    negocioId: asistenteConCanal.negocioId,
-                    nombre_de_la_oferta: nombreDeLaOfertaExtraido,
-                    // canalNombre: asistenteConCanal.canalConversacional?.nombre, // <-- PASAR EL NOMBRE DEL CANAL
-                    canalNombre: canalNombre
-                };
-
-                resultadoEjecucion = await ejecutarMostrarDetalleOfertaAction(argsDetalleOferta, tareaEjecutadaId);
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as MostrarDetalleOfertaData).mensajeRespuesta;
-                } else {
-                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al obtener los detalles de la oferta: ${resultadoEjecucion.error || 'Error desconocido.'}`;
-                }
-                break;
-
-            //!ACEPTAR OFERTA
-            case 'aceptarOferta': // Asumiendo que el nombreInterno de la TareaFuncion es "aceptarOferta"
-
-                const asistenteAceptarOferta = await prisma.asistenteVirtual.findUnique({
-                    where: { id: asistenteVirtualId },
-                    select: {
-                        negocioId: true,
-                        canalConversacional: { // Incluir el canal
-                            select: { nombre: true }
-                        }
-                    }
-                });
-
-                if (!asistenteAceptarOferta?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio asociado para procesar la oferta.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-
-                // Extraer 'oferta_id' de los argumentos de Gemini
-                const ofertaIdExtraida = typeof argumentos.oferta_id === 'string' ? argumentos.oferta_id : undefined;
-
-                if (!ofertaIdExtraida) {
-                    mensajeResultadoParaUsuario = "No pude identificar claramente qué oferta deseas aceptar. ¿Podrías intentarlo de nuevo especificando la oferta?";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Falta el parámetro 'oferta_id' en los argumentos de IA para aceptarOferta.");
-                    break;
-                }
-
-                const argsAceptarOferta: AceptarOfertaArgs = {
-                    negocioId: asistenteAceptarOferta.negocioId,
-                    oferta_id: ofertaIdExtraida,
-                    canalNombre: asistenteAceptarOferta.canalConversacional?.nombre, // <-- PASAR EL NOMBRE DEL CANAL
-                };
-
-                resultadoEjecucion = await ejecutarAceptarOfertaAction(argsAceptarOferta, tareaEjecutadaId);
-
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as AceptarOfertaData).mensajeSiguientePaso;
-                } else {
-                    mensajeResultadoParaUsuario = `Lo siento, hubo un problema al intentar procesar tu aceptación de la oferta: ${resultadoEjecucion.error || 'Error desconocido.'}`;
-                }
-                break;
-
-            //!AGENDAR CITA
-            case 'agendarCita':
-                const asistenteContext = await prisma.asistenteVirtual.findUnique({
-                    where: { id: asistenteVirtualId },
-                    select: {
-                        negocioId: true,
-                        canalConversacional: {
-                            select: {
-                                id: true,
-                                nombre: true
-                            }
-                        },
-                        negocio: {
-                            select: {
-                                AgendaConfiguracion: {
-                                    select: {
-                                        aceptaCitasPresenciales: true,
-                                        aceptaCitasVirtuales: true,
-                                        requiereTelefonoParaCita: true,
-                                        requiereEmailParaCita: true,
-                                        requiereNombreParaCita: true,
-                                        bufferMinutos: true,
-                                        metodosPagoTexto: true,
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                // Si existe agendaConfiguracion, usarla en vez de los campos legacy de negocio
-                // (esto requiere ajustar más abajo la construcción de configAgenda)
-                if (!asistenteContext?.negocioId || !asistenteContext.negocio) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo encontrar el negocio para agendar la cita.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-
-                // Definir el actor que realiza la acción
-                const actor = {
-                    type: ChangedByType.ASSISTANT, // Ya que esta lógica es para el asistente virtual
-                    id: asistenteVirtualId
-                };
-                // Construir el objeto de configuración del negocio
-                if (!asistenteContext.negocio.AgendaConfiguracion) {
-                    mensajeResultadoParaUsuario = "Error interno: No se encontró la configuración de agenda del negocio.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break;
-                }
-                const configAgenda: ConfiguracionAgendaDelNegocio = {
-                    negocioId: asistenteContext.negocioId,
-                    aceptaCitasVirtuales: asistenteContext.negocio.AgendaConfiguracion.aceptaCitasVirtuales,
-                    aceptaCitasPresenciales: asistenteContext.negocio.AgendaConfiguracion.aceptaCitasPresenciales,
-                    requiereEmail: asistenteContext.negocio.AgendaConfiguracion.requiereEmailParaCita,
-                    requiereTelefono: asistenteContext.negocio.AgendaConfiguracion.requiereTelefonoParaCita,
-                    requiereNombre: asistenteContext.negocio.AgendaConfiguracion.requiereNombreParaCita ?? true,
-                    bufferMinutos: asistenteContext.negocio.AgendaConfiguracion.bufferMinutos ?? 0, // Asignar un valor predeterminado si es null
-                };
-
-                // Extraer y preparar los argumentos para ejecutarAgendarCitaAction
-                // Asegúrate que 'leadId' y 'asistenteVirtualId' estén disponibles en este scope
-                const argsAgendarCita: AgendarCitaArgs = {
-                    negocioId: asistenteContext.negocioId,//!
-                    asistenteId: asistenteVirtualId, //! 
-                    leadId: leadId, //!
-                    fecha_hora_deseada: typeof argumentos.fecha_hora_deseada === 'string' && argumentos.fecha_hora_deseada.trim() !== ''
-                        ? argumentos.fecha_hora_deseada
-                        : '', //!
-                    motivo_de_reunion: typeof argumentos.motivo_de_reunion === 'string' ? argumentos.motivo_de_reunion : null,
-                    tipo_cita_modalidad_preferida: typeof argumentos.tipo_cita_modalidad_preferida === 'string' && (argumentos.tipo_cita_modalidad_preferida === 'presencial' || argumentos.tipo_cita_modalidad_preferida === 'virtual') ? argumentos.tipo_cita_modalidad_preferida : undefined,
-                    nombre_contacto: typeof argumentos.nombre_contacto === 'string' ? argumentos.nombre_contacto : undefined,
-                    email_contacto: typeof argumentos.email_contacto === 'string' ? argumentos.email_contacto : null,
-                    telefono_contacto: typeof argumentos.telefono_contacto === 'string' ? argumentos.telefono_contacto : null,
-                    servicio_nombre: typeof argumentos.servicio_nombre === 'string' ? argumentos.servicio_nombre : '', // <-- NUEVO y CRUCIAL
-                };
-
-                resultadoEjecucion = await ejecutarAgendarCitaAction(
-                    argsAgendarCita,
-                    tareaEjecutadaId,
-                    configAgenda, // Objeto de configuración del negocio
-                    actor         // Información del actor
-                );
-
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
-                } else {
-                    // Si la acción de negocio falló internamente (ej. error no manejado en ejecutarAgendarCitaAction)
-                    // o si success es false por alguna otra razón, usar el mensaje de error o uno genérico.
-                    mensajeResultadoParaUsuario = resultadoEjecucion.error || 'Lo siento, hubo un problema al procesar tu solicitud de cita.';
-                }
-
-                break;
-
-            //!LISTAR SERVICIOS AGENDA
-            case 'listarServiciosAgenda':
-                // Obtener el negocioId del contexto del asistente (similar a como lo haces para agendarCita)
-                const contextoAsistenteParaListar = await prisma.asistenteVirtual.findUnique({
-                    where: { id: asistenteVirtualId }, // asistenteVirtualId debe estar en scope
-                    select: {
-                        negocioId: true,
-                    }
-                });
-
-                if (!contextoAsistenteParaListar?.negocioId) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo determinar el negocio para listar los servicios.";
-                    // Aquí podrías llamar a tu función 'actualizarTareaEjecutadaFallidaDispatcher'
-                    // await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario, argumentos);
-                    break;
-                }
-
-                const argsListarServicios: ListarServiciosAgendaArgs = {
-                    negocioId: contextoAsistenteParaListar.negocioId,
-                };
-
-                resultadoEjecucion = await ejecutarListarServiciosAgendaAction(
-                    argsListarServicios,
-                    tareaEjecutadaId // El ID de la TareaEjecutada actual
-                );
-
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
-                } else {
-                    mensajeResultadoParaUsuario = resultadoEjecucion.error || 'Lo siento, hubo un problema al obtener la lista de servicios.';
-                }
-                break;
-
-            //! LISTAR HORARIOS DISPONIBLES
-            case 'listarHorariosDisponiblesAgenda':
-                // Obtener el contexto del negocio y su configuración de agenda
-                const contextoNegocioParaListarHorarios = await prisma.asistenteVirtual.findUnique({
-                    where: { id: asistenteVirtualId }, // asistenteVirtualId debe estar en scope
-                    select: {
-                        negocioId: true,
-                        negocio: {
-                            select: {
-                                AgendaConfiguracion: {
-                                    select: {
-                                        aceptaCitasPresenciales: true,
-                                        aceptaCitasVirtuales: true,
-                                        requiereTelefonoParaCita: true,
-                                        requiereEmailParaCita: true,
-                                        requiereNombreParaCita: true,
-                                        bufferMinutos: true,
-                                        metodosPagoTexto: true,
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                if (!contextoNegocioParaListarHorarios?.negocioId || !contextoNegocioParaListarHorarios.negocio) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo determinar la configuración del negocio para listar horarios.";
-                    // await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario, argumentos);
-                    break;
-                }
-
-                if (!contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion) {
-                    mensajeResultadoParaUsuario = "Error interno: No se encontró la configuración de agenda del negocio para listar horarios.";
-                    break;
-                }
-                const configAgendaParaListar: ConfiguracionAgendaDelNegocio = {
-                    negocioId: contextoNegocioParaListarHorarios.negocioId,
-                    aceptaCitasVirtuales: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.aceptaCitasVirtuales,
-                    aceptaCitasPresenciales: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.aceptaCitasPresenciales,
-                    requiereEmail: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.requiereEmailParaCita,
-                    requiereTelefono: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.requiereTelefonoParaCita,
-                    requiereNombre: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.requiereNombreParaCita ?? true,
-                    bufferMinutos: contextoNegocioParaListarHorarios.negocio.AgendaConfiguracion.bufferMinutos ?? 0,
-                };
-
-                // Verificar directamente los argumentos recibidos de Gemini
-                const servicioRecibido = argumentos.servicio_nombre_horario_interes;
-                const fechaRecibida = argumentos.fecha_deseada_horario_servicio_interes;
-                // console.log(`[Dispatcher Debug] Recibido de Gemini para listarHorariosDisponiblesAgenda: servicio_nombre_horario_interes='${servicioRecibido}' (tipo: ${typeof servicioRecibido}), fecha_deseada_horario_servicio_interes='${fechaRecibida}' (tipo: ${typeof fechaRecibida})`);
-
-                if (typeof servicioRecibido !== 'string' || !servicioRecibido.trim() ||
-                    typeof fechaRecibida !== 'string' || !fechaRecibida.trim()) {
-                    mensajeResultadoParaUsuario = "Para buscar horarios disponibles, necesito saber para qué servicio y en qué fecha te gustaría.";
-                    // Opcional: Log más detallado si la validación falla
-                    // await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, "Faltan servicio_nombre_horario_interes o fecha_deseada_horario_servicio_interes en argumentos de Gemini.", argumentos);
-                    break;
-                }
-
-                // Si pasamos la validación, los argumentos son válidos para construir argsListarHorarios
-                const argsListarHorarios: ListarHorariosDisponiblesArgs = {
-                    negocioId: contextoNegocioParaListarHorarios.negocioId,
-                    servicio_nombre_interes: servicioRecibido.trim(),
-                    fecha_deseada: fechaRecibida.trim(),
-                };
-
-                resultadoEjecucion = await ejecutarListarHorariosDisponiblesAction(
-                    argsListarHorarios,
-                    tareaEjecutadaId,
-                    configAgendaParaListar
-                );
-
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
-                } else {
-                    mensajeResultadoParaUsuario = resultadoEjecucion.error || 'Lo siento, hubo un problema al buscar los horarios disponibles.';
-                }
-                break;
-
-            //! CANCELAR CITA
-            case 'cancelarCita':
-
-                console.log('[Dispatcher Debug] Objeto "argumentos" recibido de IA para cancelarCita:', JSON.stringify(argumentos, null, 2)); // DEBUG VITAL
-
-                const argsCancelar: CancelarCitaArgs = {
-                    cita_id_cancelar: typeof argumentos.cita_id_cancelar === 'string' ? argumentos.cita_id_cancelar : undefined,
-                    detalle_cita_para_cancelar: typeof argumentos.detalle_cita_para_cancelar === 'string' ? argumentos.detalle_cita_para_cancelar : undefined,
-                    confirmacion_usuario_cancelar: typeof argumentos.confirmacion_usuario_cancelar === 'boolean' ? argumentos.confirmacion_usuario_cancelar : undefined,
-                    motivo_cancelacion: typeof argumentos.motivo_cancelacion === 'string' ? argumentos.motivo_cancelacion : undefined,
-                    leadId: leadId,
-                    asistenteVirtualId: asistenteVirtualId,
-                };
-                console.log('[Dispatcher Debug] "argsCancelar" construidos:', JSON.stringify(argsCancelar, null, 2));
-
-                resultadoEjecucion = await ejecutarCancelarCitaAction(argsCancelar, tareaEjecutadaId);
-
-                if (resultadoEjecucion.success && resultadoEjecucion.data) {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
-                } else {
-                    mensajeResultadoParaUsuario = resultadoEjecucion.error || "Hubo un problema al intentar procesar la cancelación.";
-                }
-                break;
-
-            case 'reagendarCita':
-                // Obtener ConfiguracionAgendaDelNegocio (necesaria para verificarDisponibilidadSlot)
-                // y definir el actor
-                const asistenteCtxReagendar = await prisma.asistenteVirtual.findUnique({
-                    where: { id: asistenteVirtualId },
-                    select: {
-                        negocio: {
-                            select: {
-                                id: true, // <-- Agregar esta línea para incluir el id del negocio
-                                AgendaConfiguracion: {
-                                    select: {
-                                        aceptaCitasPresenciales: true,
-                                        aceptaCitasVirtuales: true,
-                                        requiereTelefonoParaCita: true,
-                                        requiereEmailParaCita: true,
-                                        requiereNombreParaCita: true,
-                                        bufferMinutos: true,
-                                        metodosPagoTexto: true,
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                if (!asistenteCtxReagendar?.negocio) {
-                    mensajeResultadoParaUsuario = "Error interno: No se pudo obtener la configuración del negocio para reagendar la cita.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, mensajeResultadoParaUsuario);
-                    break; // Sale del switch
-                }
-
-                const configAgendaReagendar: ConfiguracionAgendaDelNegocio = {
-                    negocioId: asistenteCtxReagendar.negocio.id,
-                    aceptaCitasVirtuales: asistenteCtxReagendar.negocio.AgendaConfiguracion?.aceptaCitasVirtuales ?? false,
-                    aceptaCitasPresenciales: asistenteCtxReagendar.negocio.AgendaConfiguracion?.aceptaCitasPresenciales ?? false,
-                    requiereEmail: asistenteCtxReagendar.negocio.AgendaConfiguracion?.requiereEmailParaCita ?? true,
-                    requiereTelefono: asistenteCtxReagendar.negocio.AgendaConfiguracion?.requiereTelefonoParaCita ?? false,
-                    requiereNombre: asistenteCtxReagendar.negocio.AgendaConfiguracion?.requiereNombreParaCita ?? true, // Default a true si es null/undefined
-                    bufferMinutos: asistenteCtxReagendar.negocio.AgendaConfiguracion?.bufferMinutos ?? 0,
-                };
-
-                const actorReagendar = { type: ChangedByType.ASSISTANT, id: asistenteVirtualId };
-
-                // Construir los argumentos para ejecutarReagendarCitaAction
-                const argsReagendar: ReagendarCitaArgs = {
-                    cita_id_original: typeof argumentos.cita_id_original === 'string' ? argumentos.cita_id_original : undefined,
-                    detalle_cita_original_para_reagendar: typeof argumentos.detalle_cita_original_para_reagendar === 'string' ? argumentos.detalle_cita_original_para_reagendar : undefined,
-                    nueva_fecha_hora_deseada: typeof argumentos.nueva_fecha_hora_deseada === 'string' ? argumentos.nueva_fecha_hora_deseada : undefined,
-                    confirmacion_usuario_reagendar: typeof argumentos.confirmacion_usuario_reagendar === 'boolean' ? argumentos.confirmacion_usuario_reagendar : undefined,
-                    servicio_nombre: typeof argumentos.servicio_nombre === 'string' ? argumentos.servicio_nombre : undefined,
-                    nombre_contacto: typeof argumentos.nombre_contacto === 'string' ? argumentos.nombre_contacto : undefined,
-                    email_contacto: typeof argumentos.email_contacto === 'string' ? argumentos.email_contacto : undefined,
-                    telefono_contacto: typeof argumentos.telefono_contacto === 'string' ? argumentos.telefono_contacto : undefined,
-                    leadId: leadId, // Desde las variables del dispatcher
-                    asistenteVirtualId: asistenteVirtualId, // Desde las variables del dispatcher
-                };
-
-                console.log('[Dispatcher v2.1] "argsReagendar" construidos para la acción:', JSON.stringify(argsReagendar, null, 2));
-                resultadoEjecucion = await ejecutarReagendarCitaAction(argsReagendar, tareaEjecutadaId, configAgendaReagendar, actorReagendar);
-
-                if (resultadoEjecucion.success && resultadoEjecucion.data && typeof (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario === 'string') {
-                    mensajeResultadoParaUsuario = (resultadoEjecucion.data as { mensajeParaUsuario: string }).mensajeParaUsuario;
-                } else if (!resultadoEjecucion.success) {
-                    mensajeResultadoParaUsuario = resultadoEjecucion.error || "Hubo un problema al intentar reagendar tu cita.";
-                    await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, `Error en ejecutarReagendarCitaAction: ${resultadoEjecucion.error}`);
-                } else {
-                    // Success true, pero data no tiene mensajeParaUsuario o es inesperada
-                    mensajeResultadoParaUsuario = "Se procesó tu solicitud de reagendamiento, pero no hay un mensaje de respuesta detallado."; // O null si prefieres
-                    console.warn(`[Dispatcher v2.1] La acción reagendarCita tuvo éxito pero 'data' o 'mensajeParaUsuario' fue inesperado. Data:`, resultadoEjecucion.data);
-                }
-                break;
-
-            //! default
-            default:
-                console.warn(`[Dispatcher] Función desconocida encontrada en TareaEjecutada ${tareaEjecutadaId}: ${funcionLlamada}`);
-                mensajeResultadoParaUsuario = `No sé cómo procesar la acción: ${funcionLlamada}. Notificaré a un agente.`;
-                await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, `Función desconocida: ${funcionLlamada}`);
-                break;
-        }
-
-        // 4. Enviar Resultado de Vuelta a la Conversación
-        if (mensajeResultadoParaUsuario) {
-            console.log(`[Dispatcher] Enviando resultado a conversación ${conversacionId}: ${mensajeResultadoParaUsuario}`);
-            // *** USAR LA IMPLEMENTACIÓN REAL ***
-            const envioMsgResult = await enviarMensajeInternoAction({
-                conversacionId: conversacionId,
-                mensaje: mensajeResultadoParaUsuario,
-                role: 'assistant', // El asistente informa el resultado
-                nombreFuncionEjecutada: funcionLlamada, // ¡Importante!
-            });
-            // *** FIN USO IMPLEMENTACIÓN REAL ***
-            if (!envioMsgResult.success) {
-                console.error(`[Dispatcher] Error al enviar mensaje de resultado a la conversación ${conversacionId}: ${envioMsgResult.error}`);
             }
+        });
+        if (!asistenteDb?.negocioId || !asistenteDb.negocio) {
+            responseContentParaUsuario = "Error: Configuración de negocio no encontrada para el asistente.";
+            // await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, responseContentParaUsuario, metadataObj); // Se maneja más abajo
         } else {
-            console.log(`[Dispatcher] No se generó mensaje de resultado para TareaEjecutada ${tareaEjecutadaId}.`);
+            const idiomaDelNegocio = (asistenteDb.negocio as { idiomaCliente?: string })?.idiomaCliente || 'es-MX';
+            const monedaDelNegocio = asistenteDb.negocio.configuracionPago?.monedaPrincipal || 'MXN';
+            funcionContext = {
+                canalNombre: typeof canalNombre === 'string' ? canalNombre : "webchat",
+                negocioId: asistenteDb.negocioId, asistenteId: asistenteVirtualId, leadId: leadId,
+                idiomaLocale: idiomaDelNegocio, monedaNegocio: monedaDelNegocio,
+            };
+
+            try {
+                switch (funcionLlamada) {
+                    case 'mostrarDetalleOferta': {
+                        console.log(`[Dispatcher V4] Tarea ${tareaEjecutadaId} - Llamando ejecutarMostrarDetalleOfertaAction con args:`, argsFromIA, "y contexto:", funcionContext);
+                        // AJUSTADO: La función ahora devuelve ActionResult<FunctionResponseMediaData>
+                        // y usa 'success' en lugar de 'ok'
+                        resultadoEjecucionDeFuncion = await ejecutarMostrarDetalleOfertaAction(argsFromIA, funcionContext);
+
+                        console.log(`[Dispatcher V4] Tarea ${tareaEjecutadaId} - Resultado de ${funcionLlamada}:`, JSON.stringify(resultadoEjecucionDeFuncion, null, 2));
+
+                        // AJUSTADO: Verificar 'success' y que 'data' exista
+                        if (resultadoEjecucionDeFuncion && resultadoEjecucionDeFuncion.success && resultadoEjecucionDeFuncion.data) {
+                            const data = resultadoEjecucionDeFuncion.data as FunctionResponseMediaData; // Cast a FunctionResponseMediaData
+                            responseContentParaUsuario = data.content ?? null;
+                            responseMediaParaEnviar = data.media ?? null;
+                        } else if (resultadoEjecucionDeFuncion) { // Si hay resultado pero no fue exitoso
+                            responseContentParaUsuario = resultadoEjecucionDeFuncion.error || `No pude procesar '${funcionLlamada}'.`;
+                        } else { // Si resultadoEjecucionDeFuncion es null (no debería pasar si la función siempre devuelve ActionResult)
+                            responseContentParaUsuario = `Respuesta inesperada de '${funcionLlamada}'.`;
+                        }
+                        break;
+                    }
+                    // ... tus otros cases, adaptados de forma similar ...
+                    default:
+                        responseContentParaUsuario = `La acción '${funcionLlamada}' aún no está configurada.`;
+                        break;
+                }
+            } catch (error: unknown) { /* ... manejo de error Zod/ejecución ... */
+                console.error(`[Dispatcher V2] Tarea ${tareaEjecutadaId} - Error en Zod/ejecución para "${funcionLlamada}":`, error);
+                if (error instanceof z.ZodError) {
+                    responseContentParaUsuario = `Problema con datos para ${funcionLlamada}.`; console.error(`[Dispatcher V2] ZodError ${funcionLlamada}:`, error.flatten().fieldErrors);
+                } else if (error instanceof Error) {
+                    responseContentParaUsuario = `Error procesando ${funcionLlamada}: ${error.message}`;
+                } else { responseContentParaUsuario = `Error inesperado procesando ${funcionLlamada}.`; }
+                await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, `Error en case ${funcionLlamada}: ${responseContentParaUsuario}`, metadataObj);
+            }
         }
 
-        return { success: true, data: null };
-
-    } catch (error) {
-        console.error(`[Dispatcher] Error catastrófico al despachar TareaEjecutada ${tareaEjecutadaId}:`, error);
-        if (tareaEjecutadaId) {
-            await actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId, error instanceof Error ? error.message : "Error desconocido en dispatcher.");
+        if (responseContentParaUsuario || (responseMediaParaEnviar && responseMediaParaEnviar.length > 0)) {
+            await enviarMensajeInternoYWhatsAppAction({
+                conversacionId: conversacionId,
+                contentFuncion: responseContentParaUsuario,
+                mediaItemsFuncion: responseMediaParaEnviar,
+                role: 'assistant',
+                nombreFuncionEjecutada: funcionLlamada,
+                canalOriginal: typeof canalNombre === 'string' ? canalNombre : undefined,
+                destinatarioWaId: typeof destinatarioWaId === 'string' ? destinatarioWaId : undefined,
+                negocioPhoneNumberIdEnvia: typeof negocioPhoneNumberIdEnvia === 'string' ? negocioPhoneNumberIdEnvia : undefined,
+            });
+        } else {
+            console.warn(`[Dispatcher V4] Tarea ${tareaEjecutadaId} - No se generó content ni media para función "${funcionLlamada}".`);
+            // Si hubo un error en la función y responseContentParaUsuario ya tiene el error, se enviará ese error.
+            // Si la función simplemente no produjo output (content y media son null/vacío), no se envía nada.
+            // Considera si quieres enviar un mensaje de error genérico si !resultadoEjecucionDeFuncion?.success aquí.
+            if (resultadoEjecucionDeFuncion && !resultadoEjecucionDeFuncion.success && !responseContentParaUsuario) {
+                // Si la función falló pero no se asignó responseContentParaUsuario (ej. error muy genérico)
+                responseContentParaUsuario = resultadoEjecucionDeFuncion.error || "Ocurrió un error procesando tu solicitud.";
+                // Podrías llamar a enviarMensajeInternoYWhatsAppAction aquí con este mensaje de error.
+            }
         }
-        return { success: false, error: error instanceof Error ? error.message : "Error interno al despachar la tarea." };
-    }
-}
 
-
-// Función auxiliar interna para marcar la tarea como fallida desde el dispatcher
-async function actualizarTareaEjecutadaFallidaDispatcher(tareaEjecutadaId: string, mensajeError: string) {
-    try {
+        // AJUSTADO: Ahora resultadoEjecucionDeFuncion está en el scope correcto
+        const ejecucionFuncionOk = resultadoEjecucionDeFuncion?.success ?? false; // Default a false si es null
         await prisma.tareaEjecutada.update({
             where: { id: tareaEjecutadaId },
             data: {
-                metadata: JSON.stringify({ error_dispatcher: mensajeError })
+                metadata: JSON.stringify({
+                    ...metadataObj,
+                    resultadoDispatcher: {
+                        contentEnviado: !!responseContentParaUsuario,
+                        mediaEnviadaCount: responseMediaParaEnviar?.length || 0,
+                        errorFuncionOriginal: !ejecucionFuncionOk && resultadoEjecucionDeFuncion ? resultadoEjecucionDeFuncion.error : null,
+                    },
+                    ejecucionFuncionOk: ejecucionFuncionOk, // Guardar si la función original tuvo éxito
+                })
             }
         });
+
+        console.log(`[Dispatcher V4] Tarea ${tareaEjecutadaId} - FIN. Duración: ${Date.now() - timestampInicio}ms`);
+        return { success: true, data: null };
+    } catch (error: unknown) {
+        // Manejo de error catastrófico
+        const errorMsg = error instanceof Error ? error.message : "Error desconocido en dispatcher.";
+        console.error(`[Dispatcher V4] Error catastrófico para tarea ${tareaEjecutadaId}:`, error);
+        return { success: false, error: errorMsg, data: null };
+    }
+    // Retorno por defecto para cubrir todos los caminos de ejecución
+    return { success: false, error: "Error desconocido: no se alcanzó ningún return explícito.", data: null };
+}
+
+async function actualizarTareaEjecutadaFallidaDispatcher(
+    tareaEjecutadaId: string,
+    mensajeError: string,
+    metadataOriginal?: Record<string, unknown> | null
+) {
+    // ... (sin cambios respecto a la versión anterior que te di)
+    console.warn(`[Dispatcher V2] Fallo en Tarea ${tareaEjecutadaId}. Error: ${mensajeError}. Metadata Original:`, metadataOriginal);
+    try {
+        let finalMetadata: Record<string, unknown> = {
+            ...(metadataOriginal || {}),
+            error_dispatcher: mensajeError,
+            ejecucionDispatcherExitosa: false,
+        };
+        if (!metadataOriginal && tareaEjecutadaId) {
+            const tareaActual = await prisma.tareaEjecutada.findUnique({
+                where: { id: tareaEjecutadaId },
+                select: { metadata: true }
+            });
+            if (tareaActual?.metadata) {
+                let parsedExistingMetadata = {};
+                if (typeof tareaActual.metadata === 'string') {
+                    try { parsedExistingMetadata = JSON.parse(tareaActual.metadata); } catch (e) {
+                        console.error(`[Dispatcher V2] Error parseando metadata (string) para Tarea ${tareaEjecutadaId} en fallo:`, e);
+                    }
+                } else if (typeof tareaActual.metadata === 'object' && tareaActual.metadata !== null) {
+                    parsedExistingMetadata = tareaActual.metadata as Record<string, unknown>;
+                }
+                finalMetadata = { ...parsedExistingMetadata, ...finalMetadata };
+            }
+        }
+        await prisma.tareaEjecutada.update({
+            where: { id: tareaEjecutadaId },
+            data: { metadata: JSON.stringify(finalMetadata) }
+        });
     } catch (updateError) {
-        console.error(`[Dispatcher] Error al actualizar TareaEjecutada ${tareaEjecutadaId} como fallida:`, updateError);
+        console.error(`[Dispatcher V2] Error crítico al actualizar TareaEjecutada ${tareaEjecutadaId} como fallida:`, updateError);
     }
 }

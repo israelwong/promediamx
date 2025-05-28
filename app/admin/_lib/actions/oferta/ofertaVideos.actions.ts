@@ -16,7 +16,12 @@ import {
 } from './ofertaVideos.schemas'; // Ajustar ruta si es necesario
 
 // import { SharedTipoVideoEnumSchema } from '@/app/admin/components/shared/SharedVideoManager'; // Reutilizar el enum
-import { SharedTipoVideoEnumSchema } from '@/app/admin/components/shared/SharedVideoManager'; // Reutilizar el enum
+// import { SharedTipoVideoEnumSchema } from '@/app/admin/components/shared/SharedVideoManager'; // Reutilizar el enum
+import {
+    SharedTipoVideoEnumSchema,
+    // SharedTipoVideoType
+} from '@/app/admin/_lib/schemas/sharedCommon.schemas'
+
 
 
 const MAX_VIDEO_SIZE_MB_SERVER = 50;
@@ -61,7 +66,13 @@ export async function guardarVideoOfertaAction(
 
     const validation = UpsertOfertaVideoSchema.safeParse(data);
     if (!validation.success) {
-        return { success: false, error: "Datos de video inválidos.", errorDetails: validation.error.flatten().fieldErrors };
+        return {
+            success: false,
+            error: "Datos de video inválidos.",
+            errorDetails: validation.error.flatten().fieldErrors,
+            // errorMessage: validation.error.message, // Mensaje general del error
+            // errorStack: validation.error.stack // Stack trace si está disponible
+        };
     }
     const validatedData = validation.data;
     let videoUrlToSave = validatedData.videoUrl;

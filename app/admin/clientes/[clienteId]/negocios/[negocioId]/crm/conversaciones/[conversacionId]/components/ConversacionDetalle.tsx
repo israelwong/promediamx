@@ -30,7 +30,7 @@ export default function ConversacionDetalle({
   initialError,
 }: ConversacionDetalleProps) {
 
-  console.log(initialConversationDetails)
+  //! console.log(initialConversationDetails)
 
   // El estado del título del documento se maneja con lo que viene de las props
   useEffect(() => {
