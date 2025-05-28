@@ -39,5 +39,6 @@ export const ChatMessageItemSchema = z.object({
     }, z.date()),
     nombreRemitente: z.string().nullable().optional(),
     agenteCrm: z.custom<AgenteBasico>().nullable().optional(),
+    uiComponentPayload: z.record(z.any()).nullable().optional(), // Payload para componentes UI personalizados
 });
 export type ChatMessageItem = z.infer<typeof ChatMessageItemSchema>;

@@ -52,7 +52,7 @@ export default function ConversacionDetalle({
   const handleActionCompleteInToolsPanel = useCallback(() => {
     // Cuando una acción en ToolsPanel (ej. asignar agente, cambiar status) se completa,
     // queremos que los datos se refresquen. router.refresh() re-ejecuta el Server Component padre.
-    console.log("[ConversacionDetalle] Acción completada en ToolsPanel. Refrescando datos...");
+    // console.log("[ConversacionDetalle] Acción completada en ToolsPanel. Refrescando datos...");
     router.refresh();
   }, [router]);
 

@@ -64,3 +64,57 @@ export type EjecutarMostrarDetalleOfertaParams = z.infer<typeof EjecutarMostrarD
 // NOTA: MediaItemSchema y el schema para FunctionResponseData (que tiene content y media)
 // se importarán desde el archivo global de schemas de conversación, por ejemplo:
 // import { MediaItemSchema, FunctionResponseMediaDataSchema } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
+
+
+
+
+
+
+
+export interface OfferDisplayPayloadData {
+    id: string;
+    nombre: string;
+    descripcionGeneral: string | null; // La descripción principal de la oferta
+    precioFormateado: string | null;
+    moneda: string | null;
+    condiciones: string | null;
+    linkPago?: string | null; // Si la oferta tiene un link de pago directo
+
+    imagenPrincipal?: { // Opcional, para destacar una imagen
+        url: string;
+        altText?: string | null;
+        caption?: string | null;
+    } | null;
+
+    galeriaImagenes: Array<{ // Imágenes adicionales
+        url: string;
+        altText?: string | null;
+        caption?: string | null;
+    }>;
+
+    videos: Array<{ // Videos asociados
+        tipoVideo: 'YOUTUBE' | 'VIMEO' | 'SUBIDO' | 'OTRO_URL'; // Usar SharedTipoVideoType
+        videoUrl: string;
+        titulo?: string | null;
+        descripcion?: string | null; // Podría ser útil para un caption del video
+    }>;
+
+    detallesAdicionales: Array<{ // Para FAQs, beneficios, etc. que vengan de OfertaDetalle
+        tituloDetalle: string;
+        contenido: string;
+        tipoDetalle?: string | null; // Para que el frontend decida cómo mostrarlo
+    }>;
+
+    // Podríamos añadir CTAs (Call to Actions) si es necesario
+    // callToActions?: Array<{ label: string; actionType: string; actionPayload: any; style?: string }>;
+}
+
+export interface UiComponentPayload {
+    componentType: 'OfferDisplay'; // Identificador del componente que el frontend debe usar
+    data: OfferDisplayPayloadData;
+}
+
+export interface UiComponentPayloadContent { // Cambié el nombre para evitar colisión con el tipo global UiComponentPayload
+    componentType: 'OfferDisplay';
+    data: OfferDisplayPayloadData;
+}

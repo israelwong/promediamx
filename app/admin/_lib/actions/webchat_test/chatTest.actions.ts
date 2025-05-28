@@ -43,6 +43,7 @@ export async function obtenerUltimosMensajesAction(
                 functionCallNombre: true,
                 functionCallArgs: true,
                 functionResponseData: true,
+                uiComponentPayload: true,     // <-- ¡¡CRUCIAL!! Seleccionar el nuevo campo
                 mediaUrl: true,
                 mediaType: true,
                 createdAt: true,
@@ -53,18 +54,22 @@ export async function obtenerUltimosMensajesAction(
             take: limit > 0 ? limit : undefined,
         });
         const interaccionesMapeadas = interacciones.map(i => {
+
             let parsedArgs: Record<string, unknown> | null = null;
+
             if (i.functionCallArgs && typeof i.functionCallArgs === 'object') {
                 parsedArgs = i.functionCallArgs as Record<string, unknown>;
             } else if (typeof i.functionCallArgs === 'string') {
                 try { parsedArgs = JSON.parse(i.functionCallArgs); } catch (e) { console.warn("No se pudo parsear functionCallArgs para interaccion ID:", i.id, e); }
             }
+
             let parsedResponseData: Record<string, unknown> | null = null;
             if (i.functionResponseData && typeof i.functionResponseData === 'object') {
                 parsedResponseData = i.functionResponseData as Record<string, unknown>;
             } else if (typeof i.functionResponseData === 'string') {
                 try { parsedResponseData = JSON.parse(i.functionResponseData); } catch (e) { console.warn("No se pudo parsear functionResponseData para interaccion ID:", i.id, e); }
             }
+
             return { ...i, functionCallArgs: parsedArgs, functionResponseData: parsedResponseData };
         });
         const validationResult = z.array(ChatMessageItemSchema).safeParse(interaccionesMapeadas);
@@ -384,32 +389,6 @@ export async function enviarMensajeWebchatAction(
                 functionCallNombre: true, functionCallArgs: true, functionResponseData: true,
             }
         });
-
-        // const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
-        //     let geminiRole: HistorialTurnoParaGemini['role'];
-        //     const parts: HistorialTurnoParaGemini['parts'] = [];
-        //     switch (dbTurn.role) {
-        //         case 'user':
-        //             geminiRole = 'user';
-        //             parts.push({ text: dbTurn.mensajeTexto || "" });
-        //             break;
-        //         case 'assistant':
-        //             geminiRole = 'model';
-        //             if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_CALL && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
-        //                 parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
-        //             } else { parts.push({ text: dbTurn.mensajeTexto || "" }); }
-        //             break;
-        //         case 'function':
-        //             geminiRole = 'function';
-        //             if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
-        //                 parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
-        //             } else { parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunction", response: { content: dbTurn.mensajeTexto || "" } } }); }
-        //             break;
-        //         default: return null;
-        //     }
-        //     return { role: geminiRole, parts };
-        // }).filter(Boolean) as HistorialTurnoParaGemini[];
-
 
         const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
             const parts: HistorialTurnoParaGemini['parts'] = [];

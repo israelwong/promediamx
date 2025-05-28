@@ -7,7 +7,7 @@ export interface ActionResult<T> {//!usada globalmente en varios archivos
     data?: T;
     errors?: string[]; // Array de errores si es necesario
     // Nota: No existe la propiedad 'validationErrors', usa 'errorDetails'
-    validationErrors?: Record<string, string[]>; // Errores de validación específicos
+    validationErrors?: Record<string, string[] | undefined>; // Coincide con Zod flatten().fieldErrors y ActionResult
 }
 
 export interface SimpleFuncionContext {

@@ -1,19 +1,27 @@
-// app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/[conversacionId]/components/ChatMessageBubble.tsx
+// app/components/chat/ui/ChatMessageBubble.tsx
 'use client';
 
 import React from 'react';
 import { JSX } from 'react';
 import { InteraccionParteTipo } from '@prisma/client';
 import type {
-    ChatMessageItemCrmData,
+    ChatMessageItemCrmData, // Este tipo ya debe incluir uiComponentPayload opcional
     ConversationDetailsForPanelData,
     MediaItem,
 } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
 import { FunctionResponseMediaDataSchema } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
 import type { AgenteBasicoCrmData } from '@/app/admin/_lib/actions/agenteCrm/agenteCrm.schemas';
 
-import ClientTime from './ClientTime'; // Subcomponente para la hora
-import MediaItemDisplay from './MediaItemDisplay'; // Subcomponente para la media
+// Importar los tipos para el UiComponentPayload
+import type {
+    UiComponentPayload,
+    OfferDisplayPayloadData
+} from '@/app/admin/_lib/ui-payloads.types'; // AJUSTA LA RUTA a donde guardaste estos tipos
+
+// Subcomponentes
+import ClientTime from './ClientTime';
+import MediaItemDisplay from './MediaItemDisplay';
+import OfferDisplayComponent from '@/app/components/chat/rich_elements/OfferDisplayComponent'; // Asegúrate que la ruta sea correcta
 
 export interface ChatMessageBubbleProps {
     msg: ChatMessageItemCrmData;
@@ -44,69 +52,109 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     getMessageSenderIcon,
     openLightboxWithSlides,
 }) => {
-    let assistantSentMedia: MediaItem[] = [];
-    let contentToDisplay = msg.mensajeTexto; // Fallback al mensajeTexto original del objeto msg
+    console.log(msg)
+    // --- Lógica para determinar el contenido y media ---
+    let uiPayloadToRender: UiComponentPayload<OfferDisplayPayloadData> | null = null;
+    let fallbackContent: string | null | undefined = msg.mensajeTexto; // Fallback inicial
+    let fallbackMedia: MediaItem[] = [];
 
-    // Procesar functionResponseData para extraer content y media del asistente
-    if (msg.role === 'assistant' && msg.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && msg.functionResponseData) {
-        const parsedResponse = FunctionResponseMediaDataSchema.safeParse(msg.functionResponseData);
-        if (parsedResponse.success) {
-            // Priorizar el 'content' de functionResponseData si existe
-            contentToDisplay = parsedResponse.data.content || msg.mensajeTexto; // Usar content, o fallback a mensajeTexto si content es vacío
-            if (parsedResponse.data.media && parsedResponse.data.media.length > 0) {
-                assistantSentMedia = parsedResponse.data.media;
+    if (msg.role === 'assistant' && msg.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE) {
+        // 1. Intentar usar uiComponentPayload si existe y es del tipo esperado
+        if (msg.uiComponentPayload &&
+            typeof msg.uiComponentPayload === 'object' &&
+            (msg.uiComponentPayload as UiComponentPayload).componentType === 'OfferDisplay' &&
+            (msg.uiComponentPayload as UiComponentPayload<OfferDisplayPayloadData>).data
+        ) {
+            uiPayloadToRender = msg.uiComponentPayload as UiComponentPayload<OfferDisplayPayloadData>;
+            console.log(`[ChatMessageBubble] Msg ID ${msg.id}: Renderizando con uiComponentPayload (OfferDisplay).`);
+            // Si hay uiComponentPayload, el 'content' de functionResponseData puede ser un texto introductorio
+            // o un fallback si el uiComponent no se pudiera renderizar.
+            if (msg.functionResponseData) {
+                const parsedFallbackResponse = FunctionResponseMediaDataSchema.safeParse(msg.functionResponseData);
+                if (parsedFallbackResponse.success) {
+                    fallbackContent = parsedFallbackResponse.data.content || msg.mensajeTexto;
+                    // No necesitamos fallbackMedia si uiPayloadToRender se va a usar,
+                    // a menos que quieras mostrar ambos, lo cual sería raro.
+                }
             }
-            // console.log(`[ChatMessageBubble] Msg ID ${msg.id}: functionResponseData procesado. Content: ${contentToDisplay?.substring(0,50)}..., Media: ${assistantSentMedia.length} items.`);
-        } else {
-            console.warn(`[ChatMessageBubble] Msg ID ${msg.id}: Falla al parsear functionResponseData con Zod:`, parsedResponse.error.flatten().fieldErrors, "Raw data:", msg.functionResponseData);
-            // contentToDisplay se queda con msg.mensajeTexto como fallback
-            // assistantSentMedia se queda vacío
+        } else if (msg.functionResponseData) {
+            // 2. Si no hay uiComponentPayload válido, usar functionResponseData para content y media (lógica anterior)
+            const parsedResponse = FunctionResponseMediaDataSchema.safeParse(msg.functionResponseData);
+            if (parsedResponse.success) {
+                fallbackContent = parsedResponse.data.content || msg.mensajeTexto;
+                if (parsedResponse.data.media && parsedResponse.data.media.length > 0) {
+                    fallbackMedia = parsedResponse.data.media;
+                }
+                // console.log(`[ChatMessageBubble] Msg ID ${msg.id}: Usando fallback functionResponseData. Content: ${fallbackContent?.substring(0,50)}..., Media: ${fallbackMedia.length} items.`);
+            } else {
+                console.warn(`[ChatMessageBubble] Msg ID ${msg.id}: Falla al parsear functionResponseData con Zod (fallback):`, parsedResponse.error.flatten().fieldErrors);
+                // fallbackContent se queda con msg.mensajeTexto
+            }
         }
     }
+    // Para otros roles o parteTipos, contentToDisplay es simplemente msg.mensajeTexto
+    // y no habrá assistantSentMedia (fallbackMedia).
 
-    const renderContent = () => {
-        if (!contentToDisplay && assistantSentMedia.length === 0 && msg.parteTipo !== InteraccionParteTipo.FUNCTION_CALL) {
-            // Si no hay texto, ni media del asistente, y no es un FUNCTION_CALL (que puede tener mensajeTexto "Procesando...")
-            return <p className="text-sm italic text-zinc-400">[Mensaje sin contenido visible]</p>;
-        }
-        if (!contentToDisplay && assistantSentMedia.length > 0) {
-            // Si hay media pero no hay texto de acompañamiento (contentToDisplay es null/undefined/vacío)
-            // No renderizamos nada aquí para el texto, solo la media se mostrará después.
-            return null;
-        }
-        if (!contentToDisplay && msg.parteTipo === InteraccionParteTipo.FUNCTION_CALL) {
-            // Si es un FUNCTION_CALL sin mensajeTexto (raro, usualmente tiene "Procesando...")
-            return <p className="text-sm italic text-zinc-400">[Llamada a función sin texto]</p>;
+    const renderMessageBody = () => {
+        if (uiPayloadToRender) {
+            // Renderizar el componente rico
+            return <OfferDisplayComponent
+                data={uiPayloadToRender.data}
+                openLightboxWithSlides={openLightboxWithSlides}
+            />;
         }
 
-
-        // Determinar si el contentToDisplay debe ser renderizado como HTML
-        // 1. Es un FUNCTION_CALL (el mensajeTexto podría ser un placeholder que a veces es HTML)
-        // 2. Es una FUNCTION_RESPONSE, el canal original fue 'webchat', Y no hay 'assistantSentMedia' separada (implica que el content es el HTML principal)
-        const shouldRenderAsHtml =
+        // Si no hay uiComponentPayload, usar la lógica de fallback (content y media)
+        const shouldRenderHtml =
             (msg.role === 'assistant' && msg.parteTipo === InteraccionParteTipo.FUNCTION_CALL) ||
             (msg.role === 'assistant' &&
                 msg.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE &&
                 conversationDetails?.canalOrigen === 'webchat' &&
-                assistantSentMedia.length === 0);
+                fallbackMedia.length === 0); // Si es webchat y NO hay media separada, el content es HTML
 
-        if (shouldRenderAsHtml && contentToDisplay) {
-            // Asegurarse que las imágenes dentro de este HTML también puedan activar el lightbox si tienen la clase correcta.
-            // El useEffect en ChatComponent principal maneja los 'a.chat-image-lightbox-trigger'.
-            return (
+        const textContentElement = fallbackContent ? (
+            shouldRenderHtml ? (
                 <div
                     className="text-sm prose prose-sm prose-zinc dark:prose-invert max-w-none chat-message-content"
-                    dangerouslySetInnerHTML={{ __html: contentToDisplay }}
+                    dangerouslySetInnerHTML={{ __html: fallbackContent }}
                 />
-            );
+            ) : (
+                <p className="text-sm whitespace-pre-wrap chat-message-content">{fallbackContent}</p>
+            )
+        ) : (
+            // No mostrar "[Mensaje sin texto principal]" si es una FUNCTION_RESPONSE y SÍ tiene fallbackMedia
+            (msg.role !== 'assistant' || msg.parteTipo !== InteraccionParteTipo.FUNCTION_RESPONSE || fallbackMedia.length === 0) &&
+            !uiPayloadToRender && // Solo si no estamos renderizando un uiPayload que podría ser autosuficiente
+            <p className="text-sm italic text-zinc-400">[Mensaje sin contenido de texto]</p>
+        );
+
+        const mediaElement = fallbackMedia.length > 0 ? (
+            <div className="mt-2 flex flex-col gap-1">
+                {fallbackMedia.map((item, idx) => (
+                    <MediaItemDisplay
+                        key={`${msg.id}-fm-${idx}`}
+                        mediaItem={item}
+                        itemIndex={idx}
+                        messageId={msg.id!}
+                        allMediaForLightbox={fallbackMedia}
+                        openLightboxWithSlides={openLightboxWithSlides}
+                    />
+                ))}
+            </div>
+        ) : null;
+
+        if (!textContentElement && !mediaElement && !uiPayloadToRender && msg.parteTipo !== InteraccionParteTipo.FUNCTION_CALL) {
+            return <p className="text-sm italic text-zinc-400">[Mensaje sin contenido visible]</p>;
         }
 
-        if (contentToDisplay) {
-            return <p className="text-sm whitespace-pre-wrap chat-message-content">{contentToDisplay}</p>;
-        }
-
-        return null; // No hay texto que mostrar
+        return (
+            <>
+                {textContentElement}
+                {mediaElement}
+            </>
+        );
     };
+
 
     return (
         <div className={`flex flex-col mb-3 group/message ${getMessageAlignment(msg.role)} ${msg.role === 'system' ? 'my-2' : ''}`}>
@@ -120,63 +168,39 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                     <div className={`p-3 rounded-xl shadow-md ${getMessageBgColor(msg.role)} ${msg.role === 'user' ? 'rounded-br-none' : 'rounded-bl-none'}`}>
                         {/* Sender Name */}
                         {(msg.role === 'agent' && msg.agenteCrm?.nombre && !(currentAgentInfo?.id === msg.agenteCrm.id && (isAdmin || isOwner))) && (
-                            <div className="flex items-center gap-1.5 mb-1 text-xs font-medium">
-                                <span className='text-purple-200'>{msg.agenteCrm.nombre}</span>
-                            </div>
+                            <div className="flex items-center gap-1.5 mb-1 text-xs font-medium"> <span className='text-purple-200'>{msg.agenteCrm.nombre}</span> </div>
                         )}
                         {(msg.role === 'assistant' && conversationDetails?.asistenteNombre) && (
-                            <div className="flex items-center gap-1.5 mb-1 text-xs font-medium">
-                                <span className='text-zinc-300'>{conversationDetails.asistenteNombre}</span>
-                            </div>
+                            <div className="flex items-center gap-1.5 mb-1 text-xs font-medium"> <span className='text-zinc-300'>{conversationDetails.asistenteNombre}</span> </div>
                         )}
 
-                        {/* Content (Text or HTML) */}
-                        {renderContent()}
+                        {/* Cuerpo del Mensaje (UI Rica o Fallback) */}
+                        {renderMessageBody()}
 
-                        {/* Media Enviada por Usuario (directamente de msg.mediaUrl) */}
+                        {/* Media Enviada por Usuario (si la estructura de msg lo soporta directamente) */}
                         {msg.role === 'user' && msg.mediaUrl && msg.mediaType && (
                             <div className="mt-2">
                                 <MediaItemDisplay
                                     mediaItem={{
                                         url: msg.mediaUrl,
-                                        tipo: msg.mediaType as MediaItem['tipo'], // Cast, asegurar que msg.mediaType sea compatible
+                                        tipo: msg.mediaType as MediaItem['tipo'],
                                         caption: (msg.mensajeTexto && msg.mediaUrl) ? msg.mensajeTexto : "Adjunto del usuario",
                                         filename: (msg.mensajeTexto && msg.mediaType === 'document') ? msg.mensajeTexto : undefined,
                                     }}
-                                    itemIndex={0} // Solo hay un mediaUrl/mediaType por mensaje de usuario en la estructura actual
+                                    itemIndex={0}
                                     messageId={msg.id!}
                                     allMediaForLightbox={[{ url: msg.mediaUrl, tipo: msg.mediaType as MediaItem['tipo'], caption: (msg.mensajeTexto && msg.mediaUrl) ? msg.mensajeTexto : "Adjunto del usuario" }]}
                                     openLightboxWithSlides={openLightboxWithSlides}
                                 />
                             </div>
                         )}
-
-                        {/* Media Enviada por Asistente (desde assistantSentMedia procesado de functionResponseData.media) */}
-                        {assistantSentMedia.length > 0 && (
-                            <div className="mt-2 flex flex-col gap-1">
-                                {assistantSentMedia.map((item, idx) => (
-                                    <MediaItemDisplay
-                                        key={`${msg.id}-asm-${idx}`}
-                                        mediaItem={item}
-                                        itemIndex={idx}
-                                        messageId={msg.id!}
-                                        allMediaForLightbox={assistantSentMedia} // Pasa el array completo de media de este mensaje
-                                        openLightboxWithSlides={openLightboxWithSlides}
-                                    />
-                                ))}
-                            </div>
-                        )}
                     </div>
-                    {msg.role === 'user' && (
-                        <div className="flex-shrink-0 self-end text-blue-100 p-1.5 bg-blue-600 rounded-full w-8 h-8 flex items-center justify-center shadow-md">
-                            {getMessageSenderIcon(msg.role, msg.agenteCrm)}
-                        </div>
-                    )}
+                    {msg.role === 'user' && (<div className="flex-shrink-0 self-end text-blue-100 p-1.5 bg-blue-600 rounded-full w-8 h-8 flex items-center justify-center shadow-md"> {getMessageSenderIcon(msg.role, msg.agenteCrm)} </div>)}
                 </div>
             ) : (
                 // Mensaje de Sistema
                 <div className={`my-2 ${getMessageBgColor(msg.role)} px-3 py-1.5 text-xs rounded-lg shadow-sm max-w-md mx-auto`}>
-                    {contentToDisplay || '[Mensaje de sistema vacío]'}
+                    {fallbackContent || msg.mensajeTexto || '[Mensaje de sistema vacío]'}
                 </div>
             )}
             {/* Timestamp */}
@@ -185,7 +209,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
             </span>
         </div>
     );
-}
+};
 
 ChatMessageBubble.displayName = 'ChatMessageBubble';
 export default ChatMessageBubble;

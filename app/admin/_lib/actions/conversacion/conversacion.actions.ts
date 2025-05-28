@@ -34,7 +34,7 @@ function determinarInfoCanal(
     let canalOrigen: ConversationDetailsForPanelData['canalOrigen'] = 'desconocido';
     let canalIconoDeterminado: string | null = null;
 
-    console.log(`[determinarInfoCanal V3] Inputs: NombreAsistente="${canalNombreAsistente}", IconoAsistente="${canalIconoAsistente}", ConvWhatsappId="${conversacionWhatsappId}", ConvPhoneNumberId="${conversacionPhoneNumberId}"`);
+    // console.log(`[determinarInfoCanal V3] Inputs: NombreAsistente="${canalNombreAsistente}", IconoAsistente="${canalIconoAsistente}", ConvWhatsappId="${conversacionWhatsappId}", ConvPhoneNumberId="${conversacionPhoneNumberId}"`);
 
     // Prioridad 1: Si la conversación tiene identificadores de WhatsApp
     if (conversacionWhatsappId || conversacionPhoneNumberId) {
@@ -46,7 +46,7 @@ function determinarInfoCanal(
         } else {
             canalIconoDeterminado = 'whatsapp'; // O un valor que tu frontend interprete como el icono de WhatsApp
         }
-        console.log(`[determinarInfoCanal V3] Determinado como 'whatsapp' por IDs de conversación. Icono: ${canalIconoDeterminado}`);
+        // console.log(`[determinarInfoCanal V3] Determinado como 'whatsapp' por IDs de conversación. Icono: ${canalIconoDeterminado}`);
         return { canalOrigen, canalIcono: canalIconoDeterminado };
     }
 
@@ -61,11 +61,11 @@ function determinarInfoCanal(
             canalOrigen = 'otro';
         }
         canalIconoDeterminado = canalIconoAsistente || null;
-        console.log(`[determinarInfoCanal V3] Determinado como '${canalOrigen}' por nombre de canal del asistente. Icono: ${canalIconoDeterminado}`);
+        // console.log(`[determinarInfoCanal V3] Determinado como '${canalOrigen}' por nombre de canal del asistente. Icono: ${canalIconoDeterminado}`);
         return { canalOrigen, canalIcono: canalIconoDeterminado };
     }
 
-    console.log(`[determinarInfoCanal V3] No se pudo determinar un canal específico. Fallback a 'desconocido'.`);
+    // console.log(`[determinarInfoCanal V3] No se pudo determinar un canal específico. Fallback a 'desconocido'.`);
     return { canalOrigen, canalIcono: null }; // Fallback
 }
 
@@ -110,7 +110,16 @@ export async function listarConversacionesAction(
                 phoneNumberId: true, // Seleccionar para determinar canal
                 asistenteVirtual: { select: { canalConversacional: { select: { nombre: true, icono: true } } } },
                 lead: { select: { id: true, nombre: true, /* avatarUrl: true, */ } },
-                Interaccion: { orderBy: { createdAt: 'desc' }, take: 1, select: { mensajeTexto: true, mensaje: true, createdAt: true } },
+                Interaccion: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                    select: {
+                        mensajeTexto: true,
+                        uiComponentPayload: true, // Asegúrate de que este campo esté seleccionado
+                        mensaje: true,
+                        createdAt: true
+                    }
+                },
             },
             orderBy: { updatedAt: 'desc' },
             take: 100,
@@ -154,7 +163,7 @@ export async function obtenerDetallesConversacionAction(
         return { success: false, error: "ID de conversación inválido.", errorDetails: validation.error.flatten().fieldErrors };
     }
     const { conversacionId } = validation.data;
-    console.log(`[obtenerDetallesConversacionAction V3] Buscando detalles para convId: ${conversacionId}`);
+    // console.log(`[obtenerDetallesConversacionAction V3] Buscando detalles para convId: ${conversacionId}`);
 
     try {
         const conversacion = await prisma.conversacion.findUnique({
@@ -176,13 +185,13 @@ export async function obtenerDetallesConversacionAction(
         });
 
         if (!conversacion) {
-            console.warn(`[obtenerDetallesConversacionAction V3] Conversación no encontrada: ${conversacionId}`);
+            // console.warn(`[obtenerDetallesConversacionAction V3] Conversación no encontrada: ${conversacionId}`);
             return { success: false, error: 'Conversación no encontrada.' };
         }
 
         const canalNombreAsistente = conversacion.asistenteVirtual?.canalConversacional?.nombre;
         const canalIconoAsistente = conversacion.asistenteVirtual?.canalConversacional?.icono;
-        console.log(`[obtenerDetallesConversacionAction V3] Datos de conv ${conversacionId}: whatsappId="${conversacion.whatsappId}", phoneNumberId="${conversacion.phoneNumberId}", CanalAsistenteNombre="${canalNombreAsistente}"`);
+        // console.log(`[obtenerDetallesConversacionAction V3] Datos de conv ${conversacionId}: whatsappId="${conversacion.whatsappId}", phoneNumberId="${conversacion.phoneNumberId}", CanalAsistenteNombre="${canalNombreAsistente}"`);
 
         const { canalOrigen, canalIcono } = determinarInfoCanal(
             canalNombreAsistente,
@@ -208,11 +217,11 @@ export async function obtenerDetallesConversacionAction(
 
         const parsedData = conversacionDetailsForPanelSchema.safeParse(data);
         if (!parsedData.success) {
-            console.error("[obtenerDetallesConversacionAction V3] Error Zod en datos de salida:", parsedData.error.flatten());
-            console.error("[obtenerDetallesConversacionAction V3] Datos que fallaron validación Zod:", data);
+            // console.error("[obtenerDetallesConversacionAction V3] Error Zod en datos de salida:", parsedData.error.flatten());
+            // console.error("[obtenerDetallesConversacionAction V3] Datos que fallaron validación Zod:", data);
             return { success: false, error: "Error al procesar datos de detalle de conversación." };
         }
-        console.log(`[obtenerDetallesConversacionAction V3] Detalles procesados para conv ${conversacionId}:`, parsedData.data);
+        // console.log(`[obtenerDetallesConversacionAction V3] Detalles procesados para conv ${conversacionId}:`, parsedData.data);
         return { success: true, data: parsedData.data };
 
     } catch (error) {
@@ -238,6 +247,7 @@ export async function obtenerMensajesCrmAction(
                 mensajeTexto: true, mensaje: true,
                 parteTipo: true, functionCallNombre: true, functionCallArgs: true,
                 functionResponseData: true, mediaUrl: true, mediaType: true,
+                uiComponentPayload: true, //! <-- ASEGÚRATE DE ESTAR SELECCIONANDO ESTE CAMPO DE LA BD
                 createdAt: true, agenteCrmId: true,
                 agenteCrm: { select: { id: true, nombre: true, userId: true } },
             },
@@ -282,6 +292,7 @@ export async function obtenerMensajesCrmAction(
                 functionCallNombre: interaccion.functionCallNombre,
                 functionCallArgs: parsedArgs,
                 functionResponseData: parsedResponseData,
+                uiComponentPayload: interaccion.uiComponentPayload,
                 mediaUrl: interaccion.mediaUrl,
                 mediaType: interaccion.mediaType,
                 createdAt: interaccion.createdAt,

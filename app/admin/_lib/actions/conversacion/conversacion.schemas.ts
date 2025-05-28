@@ -17,6 +17,7 @@ export const FunctionResponseMediaDataSchema = z.object({
     content: z.string().nullable().optional(), // El texto principal que la función generó
     media: z.array(MediaItemSchema).nullable().optional(), // El array de media items
     additionalData: z.record(z.any()).nullable().optional(), // Otros datos que la función guardó
+    uiComponentPayload: z.record(z.any()).nullable().optional(), // Payload para componentes UI personalizados
 });
 export type FunctionResponseMediaData = z.infer<typeof FunctionResponseMediaDataSchema>;
 
@@ -60,25 +61,22 @@ export const listarConversacionesParamsSchema = z.object({
 });
 export type ListarConversacionesParams = z.infer<typeof listarConversacionesParamsSchema>;
 
+
 export const chatMessageItemCrmSchema = z.object({
     id: z.string().cuid(),
     conversacionId: z.string().cuid(),
-    role: z.string(), // 'user', 'assistant', 'agent', 'system'
-    mensajeTexto: z.string().nullable().optional(), // Texto principal visible
+    role: z.string(),
+    mensajeTexto: z.string().nullable().optional(),
     parteTipo: z.nativeEnum(InteraccionParteTipo).default('TEXT').nullable().optional(),
-
-    // Para function calls hechas por el asistente
     functionCallNombre: z.string().nullable().optional(),
-    functionCallArgs: z.record(z.any()).nullable().optional(), // Argumentos del function call
+    functionCallArgs: z.record(z.string(), z.any()).nullable().optional(), // Claves string
+    functionResponseData: FunctionResponseMediaDataSchema.nullable().optional(), // Este es el objeto que contiene content, media, y el uiComponentPayload ANIDADO
 
-    // Para function responses (cuando el asistente responde DESPUÉS de ejecutar una función)
-    // Ahora usamos un schema más específico para el contenido de functionResponseData
-    functionResponseData: FunctionResponseMediaDataSchema.nullable().optional(),
+    // NUEVO CAMPO DE PRIMER NIVEL (si el backend lo puebla así directamente en Interaccion)
+    uiComponentPayload: z.record(z.string(), z.any()).nullable().optional(), // Claves string
 
-    // Para media enviada directamente por el usuario (o si el asistente envía media simple fuera de una función)
     mediaUrl: z.string().url().nullable().optional(),
-    mediaType: z.string().nullable().optional(), // 'image', 'video', 'document', 'audio' (debe coincidir con MediaItem['tipo'])
-
+    mediaType: z.string().nullable().optional(),
     createdAt: z.preprocess((arg) => {
         if (typeof arg === "string" || arg instanceof Date) return new Date(arg);
         return arg;

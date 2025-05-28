@@ -46,7 +46,7 @@ export default async function ConversationDetailPage({ params }: { params: Promi
     const initialConversationDetails: ConversationDetailsForPanelData | null = detailsResult.success ? (detailsResult.data ?? null) : null;
     const initialMessages: ChatMessageItemCrmData[] = messagesResult.success && messagesResult.data ? messagesResult.data : [];
 
-    // console.log(initialConversationDetails);
+    console.log(initialConversationDetails);
 
     // Determinar si hubo un error crítico al cargar los detalles (sin los cuales el chat no tiene sentido)
     const criticalError = !detailsResult.success ? (detailsResult.error || "Error desconocido al cargar detalles.") : null;
