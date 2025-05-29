@@ -1417,6 +1417,8 @@ model Interaccion {
                                   // functionResponseData.media es para WhatsApp,
                                   // uiComponentPayload es para el JSON del WebChat.
 
+  canalInteraccion        String?   // Ej: "whatsapp", "webchat_test", "crm", "webchat_publico", "api_directa"
+
 
   mensaje        String?   @db.Text //!quitar
   // Metadatos de análisis (opcional)

@@ -18,9 +18,15 @@ import {
     asignarAgenteConversacionParamsSchema,
     gestionarPausaAutomatizacionParamsSchema,
     archivarConversacionParamsSchema,
-    desarchivarConversacionParamsSchema
+    desarchivarConversacionParamsSchema,
+    EnviarMensajeCrmParams
 } from './conversacion.schemas';
 import { z } from 'zod';
+
+// Importar la acción para enviar mensajes de WhatsApp y su tipo de input
+import { enviarMensajeWhatsAppApiAction } from '../whatsapp/whatsapp.actions'; // Ajusta la ruta si es diferente
+import type { EnviarMensajeWhatsAppApiInput } from '../whatsapp/whatsapp.schemas'; // Ajusta la ruta si es diferente
+
 
 // --- FUNCIÓN AUXILIAR CON LOGS MEJORADOS ---
 function determinarInfoCanal(
@@ -33,7 +39,6 @@ function determinarInfoCanal(
 ): { canalOrigen: ConversationDetailsForPanelData['canalOrigen'], canalIcono: string | null } {
     let canalOrigen: ConversationDetailsForPanelData['canalOrigen'] = 'desconocido';
     let canalIconoDeterminado: string | null = null;
-
     // console.log(`[determinarInfoCanal V3] Inputs: NombreAsistente="${canalNombreAsistente}", IconoAsistente="${canalIconoAsistente}", ConvWhatsappId="${conversacionWhatsappId}", ConvPhoneNumberId="${conversacionPhoneNumberId}"`);
 
     // Prioridad 1: Si la conversación tiene identificadores de WhatsApp
@@ -248,6 +253,7 @@ export async function obtenerMensajesCrmAction(
                 parteTipo: true, functionCallNombre: true, functionCallArgs: true,
                 functionResponseData: true, mediaUrl: true, mediaType: true,
                 uiComponentPayload: true, //! <-- ASEGÚRATE DE ESTAR SELECCIONANDO ESTE CAMPO DE LA BD
+                canalInteraccion: true, // <-- AÑADIR AL SELECT
                 createdAt: true, agenteCrmId: true,
                 agenteCrm: { select: { id: true, nombre: true, userId: true } },
             },
@@ -293,6 +299,7 @@ export async function obtenerMensajesCrmAction(
                 functionCallArgs: parsedArgs,
                 functionResponseData: parsedResponseData,
                 uiComponentPayload: interaccion.uiComponentPayload,
+                canalInteraccion: interaccion.canalInteraccion, // <-- AÑADIR AL MAPEO
                 mediaUrl: interaccion.mediaUrl,
                 mediaType: interaccion.mediaType,
                 createdAt: interaccion.createdAt,
@@ -327,61 +334,165 @@ export async function obtenerMensajesCrmAction(
     }
 }
 
+
 export async function enviarMensajeCrmAction(
-    params: z.infer<typeof enviarMensajeCrmParamsSchema>
-): Promise<ActionResult<ChatMessageItemCrmData>> {
+    params: EnviarMensajeCrmParams // Usar el tipo inferido por Zod directamente es más simple
+): Promise<ActionResult<ChatMessageItemCrmData | null>> { // Devolver ChatMessageItemCrmData o null si el parseo Zod falla
+
+    const actionName = "enviarMensajeCrmAction V4"; // Para versionar los logs
+    console.log(`[${actionName}] Iniciando. Params:`, params);
+
     const validation = enviarMensajeCrmParamsSchema.safeParse(params);
     if (!validation.success) {
-        return { success: false, error: "Datos de mensaje inválidos.", errorDetails: validation.error.flatten().fieldErrors };
+        console.error(`[${actionName}] Error de validación Zod de entrada:`, validation.error.flatten().fieldErrors);
+        return {
+            success: false,
+            error: "Datos de mensaje inválidos.",
+            validationErrors: validation.error.flatten().fieldErrors,
+            data: null,
+        };
     }
     const { conversacionId, mensaje, role, agenteCrmId } = validation.data;
+
     try {
-        const updateConversationStatusData: Prisma.ConversacionUpdateInput = {
+        const updateConversationData: Prisma.ConversacionUpdateInput = {
             updatedAt: new Date(),
         };
+
+        // Si el mensaje es de un 'agent', pausamos la IA cambiando el estado.
+        // 'hitl_activo' (Human In The Loop activo) es un buen estado para esto.
         if (role === 'agent') {
-            updateConversationStatusData.status = 'en_espera_agente';
+            updateConversationData.status = 'hitl_activo';
+            console.log(`[${actionName}] Agente interviniendo. Conversación ${conversacionId} cambiará a: ${updateConversationData.status}`);
         }
-        const nuevaInteraccion = await prisma.$transaction(async (tx) => {
+
+        // Usar una transacción para asegurar atomicidad: guardar interacción Y actualizar conversación
+        const nuevaInteraccionDb = await prisma.$transaction(async (tx) => {
             const interaccion = await tx.interaccion.create({
                 data: {
                     conversacionId: conversacionId,
                     mensajeTexto: mensaje,
-                    role: role,
-                    parteTipo: InteraccionParteTipo.TEXT,
-                    agenteCrmId: agenteCrmId,
+                    role: role, // 'agent'
+                    parteTipo: InteraccionParteTipo.TEXT, // Mensajes de agente son texto
+                    agenteCrmId: agenteCrmId, // Puede ser null si es admin/owner general
+                    canalInteraccion: "crm", // Mensaje originado desde el CRM
+                    // uiComponentPayload y functionResponseData serían null para mensajes directos de agente
                 },
-                select: {
+                select: { // Seleccionar todos los campos necesarios para ChatMessageItemCrmData
                     id: true, conversacionId: true, role: true, mensajeTexto: true,
-                    parteTipo: true, functionCallNombre: true, functionCallArgs: true, functionResponseData: true,
+                    parteTipo: true, functionCallNombre: true, functionCallArgs: true,
+                    functionResponseData: true, uiComponentPayload: true, // Seleccionar aunque sean null
                     mediaUrl: true, mediaType: true, createdAt: true,
                     agenteCrm: { select: { id: true, nombre: true, userId: true } },
+                    canalInteraccion: true,
                 }
             });
+
             await tx.conversacion.update({
                 where: { id: conversacionId },
-                data: updateConversationStatusData
+                data: updateConversationData
             });
+            console.log(`[${actionName}] Conversación ${conversacionId} actualizada. Nuevo estado: ${updateConversationData.status || '(sin cambio de estado)'}, UpdatedAt: ${updateConversationData.updatedAt}`);
             return interaccion;
         });
-        const dataToParse = {
-            ...nuevaInteraccion,
-            functionCallArgs: nuevaInteraccion.functionCallArgs ? nuevaInteraccion.functionCallArgs as Record<string, unknown> : null,
-            functionResponseData: nuevaInteraccion.functionResponseData ? nuevaInteraccion.functionResponseData as Record<string, unknown> : null,
-            agenteCrm: nuevaInteraccion.agenteCrm ? { ...nuevaInteraccion.agenteCrm, userId: nuevaInteraccion.agenteCrm.userId ?? null } : null,
+
+        // Parsear la interacción al tipo esperado por el frontend
+        // Es importante hacer el parseo DESPUÉS de que Prisma haya asignado todos los valores (como createdAt)
+        const dataToParseForZod = {
+            ...nuevaInteraccionDb,
+            // Prisma devuelve los campos JSON como objetos si están bien guardados.
+            // Si fueran strings, aquí necesitarías JSON.parse.
+            // Para el agenteCrm, si userId es opcional en AgenteBasicoCrmData, asegúrate de manejar el null.
+            agenteCrm: nuevaInteraccionDb.agenteCrm ? {
+                ...nuevaInteraccionDb.agenteCrm,
+                userId: nuevaInteraccionDb.agenteCrm.userId ?? null
+            } : null,
         };
-        const parsedData = chatMessageItemCrmSchema.safeParse(dataToParse);
+        const parsedData = chatMessageItemCrmSchema.safeParse(dataToParseForZod);
+
         if (!parsedData.success) {
-            console.error("[enviarMensajeCrmAction V3] Error de validación Zod en salida:", parsedData.error.flatten());
-            return { success: false, error: "Error al procesar datos del mensaje enviado desde CRM." };
+            console.error(`[${actionName}] Error de validación Zod en la interacción creada (ID: ${nuevaInteraccionDb.id}):`, parsedData.error.flatten());
+            // Aunque el guardado en BD fue exitoso, el formato para el frontend no es el esperado.
+            // Se podría considerar esto un error parcial. La interacción se creó.
+            // El Realtime del frontend podría tener problemas si el schema no coincide.
+            return { success: true, error: "Mensaje guardado pero hubo un problema al procesar su formato para la UI.", data: null };
         }
+        console.log(`[${actionName}] Interacción de agente (ID: ${parsedData.data.id}) guardada y parseada exitosamente.`);
+
+        // Obtener datos actualizados de la conversación para el posible envío a WhatsApp
+        const conversacionParaWhatsApp = await prisma.conversacion.findUnique({
+            where: { id: conversacionId },
+            include: {
+                lead: { select: { telefono: true, nombre: true } }, // Nombre del lead para logs
+                asistenteVirtual: { select: { phoneNumberId: true, token: true, nombre: true } } // Nombre del asistente para logs
+            }
+        });
+
+        if (!conversacionParaWhatsApp) {
+            console.error(`[${actionName}] No se pudo recargar la conversación ${conversacionId} para el envío a WhatsApp.`);
+            return { success: true, data: parsedData.data, error: "Mensaje guardado en CRM, pero error al preparar datos para WhatsApp." };
+        }
+
+        // Determinar el canal de respuesta usando la función auxiliar
+        const { canalOrigen: canalDeRespuesta } = determinarInfoCanal(
+            conversacionParaWhatsApp.asistenteVirtual?.nombre,
+            null, // No tenemos icono aquí, puedes ajustar si lo necesitas
+            conversacionParaWhatsApp.whatsappId,
+            conversacionParaWhatsApp.asistenteVirtual?.phoneNumberId
+        );
+
+        if (canalDeRespuesta?.toLowerCase() === 'whatsapp') {
+            console.log(`[${actionName}] Canal de respuesta es WhatsApp para Lead "${conversacionParaWhatsApp.lead?.nombre}". Intentando enviar mensaje del agente vía API.`);
+
+            const destinatarioWaId = conversacionParaWhatsApp.lead?.telefono;
+            const negocioPhoneNumberIdEnvia = conversacionParaWhatsApp.asistenteVirtual?.phoneNumberId;
+            const tokenAccesoAsistente = conversacionParaWhatsApp.asistenteVirtual?.token;
+
+            if (destinatarioWaId && negocioPhoneNumberIdEnvia && tokenAccesoAsistente) {
+                const inputWhatsapp: EnviarMensajeWhatsAppApiInput = {
+                    destinatarioWaId,
+                    negocioPhoneNumberIdEnvia,
+                    tokenAccesoAsistente,
+                    mensajeTexto: mensaje, // El mensaje del agente
+                    tipoMensaje: 'text', // Mensajes de agente son de texto por ahora
+                };
+
+                console.log(`[${actionName}] Llamando a enviarMensajeWhatsAppApiAction desde Asistente "${conversacionParaWhatsApp.asistenteVirtual?.nombre}" para WA ID ${destinatarioWaId}.`);
+                const resultadoEnvioWhatsapp = await enviarMensajeWhatsAppApiAction(inputWhatsapp);
+
+                if (resultadoEnvioWhatsapp.success) {
+                    console.log(`[${actionName}] Mensaje de agente ENVIADO a WhatsApp ${destinatarioWaId}. MsgID de WhatsApp: ${resultadoEnvioWhatsapp.data}`);
+                } else {
+                    console.warn(`[${actionName}] FALLO al enviar mensaje de agente a WhatsApp ${destinatarioWaId}:`, resultadoEnvioWhatsapp.error);
+                    // Considerar devolver este error en el ActionResult si es crítico para el agente saberlo.
+                    // Por ahora, la acción principal de guardar en el CRM fue exitosa.
+                    // Podrías añadirlo al 'message' de la respuesta exitosa:
+                    // return { success: true, data: parsedData.data, message: `Mensaje guardado en CRM, pero falló el envío a WhatsApp: ${resultadoEnvioWhatsapp.error}` };
+                }
+            } else {
+                console.warn(`[${actionName}] Faltan datos para enviar mensaje de agente a WhatsApp: destinatario=${!!destinatarioWaId}, pnid=${!!negocioPhoneNumberIdEnvia}, token=${!!tokenAccesoAsistente}`);
+            }
+        } else {
+            console.log(`[${actionName}] Canal de respuesta NO es WhatsApp (es "${canalDeRespuesta}"). No se envía por API de WhatsApp.`);
+        }
+
+        // La interacción guardada es la que se propagará por Realtime al CRM.
         return { success: true, data: parsedData.data };
-    } catch (error) {
-        console.error('[enviarMensajeCrmAction V3] Error:', error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-            return { success: false, error: 'Error: El ID del agente o conversación no es válido.' };
+
+    } catch (error: unknown) {
+        console.error(`[${actionName}] Error general:`, error);
+        let errorMessage = 'No se pudo enviar el mensaje desde CRM.';
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === 'P2003') { // Foreign key constraint failed
+                errorMessage = 'Error: El ID del agente o de la conversación no es válido o no existe.';
+            } else if (error.code === 'P2025') { // Record to update not found
+                errorMessage = 'Error: No se encontró la conversación para actualizar.';
+            }
+            // Puedes añadir más códigos de error de Prisma si es necesario
+        } else if (error instanceof Error) {
+            errorMessage = error.message;
         }
-        return { success: false, error: 'No se pudo enviar el mensaje desde CRM.' };
+        return { success: false, error: errorMessage, data: null };
     }
 }
 

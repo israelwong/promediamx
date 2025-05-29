@@ -52,7 +52,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     getMessageSenderIcon,
     openLightboxWithSlides,
 }) => {
-    console.log(msg)
+    console.log(msg.canalInteraccion)
     // --- Lógica para determinar el contenido y media ---
     let uiPayloadToRender: UiComponentPayload<OfferDisplayPayloadData> | null = null;
     let fallbackContent: string | null | undefined = msg.mensajeTexto; // Fallback inicial

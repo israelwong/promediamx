@@ -44,6 +44,7 @@ export async function obtenerUltimosMensajesAction(
                 functionCallArgs: true,
                 functionResponseData: true,
                 uiComponentPayload: true,     // <-- ¡¡CRUCIAL!! Seleccionar el nuevo campo
+                canalInteraccion: true, // <-- AÑADIR AL SELECT
                 mediaUrl: true,
                 mediaType: true,
                 createdAt: true,
@@ -70,7 +71,13 @@ export async function obtenerUltimosMensajesAction(
                 try { parsedResponseData = JSON.parse(i.functionResponseData); } catch (e) { console.warn("No se pudo parsear functionResponseData para interaccion ID:", i.id, e); }
             }
 
-            return { ...i, functionCallArgs: parsedArgs, functionResponseData: parsedResponseData };
+            return {
+                ...i,
+                functionCallArgs: parsedArgs,
+                functionResponseData: parsedResponseData,
+                uiComponentPayload: i.uiComponentPayload as Record<string, unknown> | null,
+                canalInteraccion: i.canalInteraccion, // <-- AÑADIR AL MAPEO
+            };
         });
         const validationResult = z.array(ChatMessageItemSchema).safeParse(interaccionesMapeadas);
         if (!validationResult.success) {
@@ -139,7 +146,8 @@ export async function iniciarConversacionWebchatAction(
                 conversacion: { connect: { id: nuevaConversacion.id } },
                 role: 'user',
                 mensajeTexto: mensajeInicial,
-                parteTipo: InteraccionParteTipo.TEXT
+                parteTipo: InteraccionParteTipo.TEXT,
+                canalInteraccion: "webchat", // <-- AÑADIR (o "webchat" genérico)
             };
             const interaccionUsuario = await tx.interaccion.create({ data: interaccionUsuarioData });
 
@@ -319,7 +327,8 @@ export async function enviarMensajeWebchatAction(
                 conversacion: { connect: { id: conversationId } },
                 role: 'user',
                 mensajeTexto: mensaje,
-                parteTipo: InteraccionParteTipo.TEXT
+                parteTipo: InteraccionParteTipo.TEXT,
+                canalInteraccion: "webchat", // <-- AÑADIR (o "webchat" genérico)
             };
             const interaccionUsuario = await tx.interaccion.create({ data: interaccionUsuarioData });
             const parsedUserMessage = ChatMessageItemSchema.parse({

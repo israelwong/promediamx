@@ -88,6 +88,7 @@ async function enviarMensajeInternoYWhatsAppAction(input: {
             parteTipo: InteraccionParteTipo.TEXT, // Default, se cambiará si es FUNCTION_RESPONSE
             uiComponentPayload: undefined, // Inicializar
             functionResponseData: undefined, // Inicializar
+            canalInteraccion: input.canalOriginal || undefined, // <-- AÑADIR (usa el canal original del input)
         };
 
         if (input.role === 'assistant' && input.nombreFuncionEjecutada) {
@@ -132,6 +133,7 @@ async function enviarMensajeInternoYWhatsAppAction(input: {
                 uiComponentPayload: true, // Asegurar que se selecciona
                 mediaUrl: true, mediaType: true, createdAt: true,
                 agenteCrm: { select: { id: true, nombre: true } },
+                canalInteraccion: true, // <-- ASEGÚRATE DE SELECCIONARLO
             }
         });
 
@@ -233,7 +235,6 @@ export async function dispatchTareaEjecutadaAction(
     tareaEjecutadaId: string
 ): Promise<ActionResult<null>> {
     const timestampInicio = Date.now();
-    console.log(`[Dispatcher V5] Tarea ${tareaEjecutadaId} - INICIO.`);
 
     let metadataObj: Record<string, unknown> = {};
     let funcionContext: SimpleFuncionContext; // No será opcional, se construirá o habrá error.
@@ -246,7 +247,6 @@ export async function dispatchTareaEjecutadaAction(
 
     try {
         const tareaEjecutada = await prisma.tareaEjecutada.findUnique({ where: { id: tareaEjecutadaId } });
-
         if (!tareaEjecutada) {
             console.error(`[Dispatcher V5] Tarea ${tareaEjecutadaId} - NO ENCONTRADA.`);
             return { success: false, error: `TareaEjecutada con ID ${tareaEjecutadaId} no encontrada.`, data: null };
@@ -344,13 +344,14 @@ export async function dispatchTareaEjecutadaAction(
             idiomaLocale: idiomaDelNegocio,
             monedaNegocio: monedaDelNegocio,
         };
-        console.log(`[Dispatcher V5] Tarea ${tareaEjecutadaId} - FuncionContext construido:`, funcionContext);
-        console.log(`[Dispatcher V5] Tarea ${tareaEjecutadaId} - Despachando función: "${funcionLlamada}" con ArgsFromIA:`, argsFromIA);
+        // console.log(`[Dispatcher V5] Tarea ${tareaEjecutadaId} - FuncionContext construido:`, funcionContext);
+        // console.log(`[Dispatcher V5] Tarea ${tareaEjecutadaId} - Despachando función: "${funcionLlamada}" con ArgsFromIA:`, argsFromIA);
 
         try {
             // El switch para llamar a la función de acción correspondiente
             switch (funcionLlamada) {
-                case 'mostrarDetalleOferta':
+
+                case 'mostrarDetalleOferta'://!
                     // argsFromIA son los parámetros que la IA pensó que la función necesita (ej. { ofertaId: "..." } o { nombre_de_la_oferta: "..." })
                     // ejecutarMostrarDetalleOfertaAction ya valida estos 'argsFromIA' internamente con su propio Zod schema.
                     {
@@ -388,11 +389,17 @@ export async function dispatchTareaEjecutadaAction(
                 // Todas deben aceptar (argsFromIA, funcionContext) y devolver Promise<ActionResult<FunctionResponseMediaData | any>>
 
                 default:
-                    console.warn(`[Dispatcher V5] Tarea ${tareaEjecutadaId} - Función desconocida o no manejada en switch: "${funcionLlamada}"`);
+                    console.warn(`[Dispatcher V5] Tarea <span class="math-inline">\{tareaEjecutadaId\} \- Función desconocida o no manejada en switch\: "</span>{funcionLlamada}"`);
+                    responseContentParaUsuario = `La acción solicitada '${funcionLlamada}' no está configurada o no es reconocida en este momento.`;
+                    // Establecer un resultado explícito de error para la función
                     resultadoEjecucionDeFuncion = {
                         success: false,
-                        error: `La acción solicitada '${funcionLlamada}' no está configurada o no es reconocida.`,
-                        data: null // Asegurar que data sea null en este caso
+                        error: responseContentParaUsuario,
+                        data: { // Aseguramos que 'data' exista y sus campos sean null
+                            content: responseContentParaUsuario, // El mensaje de error será el content
+                            media: null,
+                            uiComponentPayload: null // Explícitamente null
+                        } as FunctionResponseMediaData // Cast para asegurar la estructura
                     };
                     break;
             }

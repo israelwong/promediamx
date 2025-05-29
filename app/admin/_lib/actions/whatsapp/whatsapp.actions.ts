@@ -119,6 +119,7 @@ export async function procesarMensajeWhatsAppEntranteAction(
                 role: 'user',
                 mensajeTexto: mensajeUsuario,
                 parteTipo: InteraccionParteTipo.TEXT,
+                canalInteraccion: "whatsapp", // <-- AÑADIR
             };
             const interaccionUsuario = await tx.interaccion.create({
                 data: interaccionUsuarioData,

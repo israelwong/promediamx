@@ -32,6 +32,10 @@ export const conversacionDetailsForPanelSchema = z.object({
     canalOrigen: z.enum(['whatsapp', 'webchat', 'otro', 'desconocido']).nullable().optional(),
     canalIcono: z.string().nullable().optional(),
     asistenteNombre: z.string().nullable().optional(), // Nombre del asistente si aplica
+    updatedAt: z.preprocess((arg) => { // Añadir preproceso para convertir string a Date
+        if (typeof arg === "string" || arg instanceof Date) return new Date(arg);
+        return arg;
+    }, z.date()).optional(), // <-- AÑADIR ESTE CAMPO (hazlo opcional si puede no venir siempre)
 });
 export type ConversationDetailsForPanelData = z.infer<typeof conversacionDetailsForPanelSchema>;
 
@@ -82,6 +86,7 @@ export const chatMessageItemCrmSchema = z.object({
         return arg;
     }, z.date()),
     agenteCrm: agenteBasicoCrmSchema.nullable().optional(),
+    canalInteraccion: z.string().nullable().optional(),
 });
 export type ChatMessageItemCrmData = z.infer<typeof chatMessageItemCrmSchema>;
 
