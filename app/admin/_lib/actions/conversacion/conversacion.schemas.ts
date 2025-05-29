@@ -49,6 +49,7 @@ export const conversacionPreviewItemSchema = z.object({
     avatarUrl: z.string().url().nullable().optional(),
     canalOrigen: z.enum(['whatsapp', 'webchat', 'otro', 'desconocido']).nullable().optional(),
     canalIcono: z.string().nullable().optional(),
+    canalesInvolucrados: z.array(z.string()).optional().nullable(), // Array de strings con los nombres de los canales
 });
 export type ConversacionPreviewItemData = z.infer<typeof conversacionPreviewItemSchema>;
 

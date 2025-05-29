@@ -130,30 +130,91 @@ export async function listarConversacionesAction(
             take: 100,
         });
 
-        const dataPromises = conversacionesPrisma.map(async (conv) => {
+        if (conversacionesPrisma.length === 0) {
+            return { success: true, data: [] };
+        }
+
+        // Obtener todos los IDs de las conversaciones recuperadas
+        const conversationIds = conversacionesPrisma.map(conv => conv.id);
+
+        // Obtener todos los canales de interacción únicos para estas conversaciones
+        const interaccionesConCanal = await prisma.interaccion.findMany({
+            where: {
+                conversacionId: { in: conversationIds },
+                canalInteraccion: { not: null } // Solo nos interesan los que tienen canal
+            },
+            select: {
+                conversacionId: true,
+                canalInteraccion: true,
+            },
+            orderBy: {
+                createdAt: 'asc'
+            },
+            distinct: ['conversacionId', 'canalInteraccion'] // Obtener combinaciones únicas
+        });
+
+        // Mapear los canales a cada conversación
+        const canalesPorConversacionMap = new Map<string, Set<string>>();
+        interaccionesConCanal.forEach(ic => {
+            if (!canalesPorConversacionMap.has(ic.conversacionId)) {
+                canalesPorConversacionMap.set(ic.conversacionId, new Set<string>());
+            }
+            if (ic.canalInteraccion) { // Asegurarse que no sea null antes de añadir
+                canalesPorConversacionMap.get(ic.conversacionId)!.add(ic.canalInteraccion);
+            }
+        });
+
+        // Mapear los datos de conversación al formato de preview
+        const data = conversacionesPrisma.map((conv): ConversacionPreviewItemData => {
+            // ... (lógica para ultimaInteraccion, infoCanalPrincipal, previewText) ...
             const ultimaInteraccion = conv.Interaccion[0];
-            const { canalOrigen, canalIcono } = determinarInfoCanal(
-                conv.asistenteVirtual?.canalConversacional?.nombre,
-                conv.asistenteVirtual?.canalConversacional?.icono,
-                conv.whatsappId,
-                conv.phoneNumberId
-            );
-            const previewText = ultimaInteraccion?.mensajeTexto ?? ultimaInteraccion?.mensaje ?? null;
+            const infoCanalPrincipal = determinarInfoCanal( /*...*/); // Tu lógica actual
+            const previewText = ultimaInteraccion?.mensajeTexto ?? null;
+
+
+            // REVISADO: Obtener los canales involucrados del map.
+            // El map ahora contiene un array ordenado de la secuencia de canales.
+            const canalesInvolucradosArray = canalesPorConversacionMap.get(conv.id) || [];
+
+            // Si quieres mostrar solo los únicos pero manteniendo el orden de la *primera aparición* de cada canal:
+            const canalesUnicosOrdenados: string[] = [];
+            const setDeCanalesVistos = new Set<string>();
+            for (const canal of canalesInvolucradosArray) { // `canalesInvolucradosArray` ya tiene la secuencia de cambios
+                if (!setDeCanalesVistos.has(canal)) {
+                    canalesUnicosOrdenados.push(canal);
+                    setDeCanalesVistos.add(canal);
+                }
+            }
+            // Si quieres solo los N más recientes canales únicos que se usaron (ej. los últimos 2 diferentes):
+            // const canalesRecientesUnicos = [...new Set(canalesInvolucradosArray.reverse())].slice(0, 2).reverse();
+            // Por ahora, usemos canalesUnicosOrdenados que respeta el orden de primera aparición.
+
             return {
-                id: conv.id, leadId: conv.lead?.id, leadName: conv.lead?.nombre ?? 'Contacto desconocido',
-                lastMessagePreview: previewText ? previewText.substring(0, 70) : (ultimaInteraccion ? '[Media/Sin texto]' : '...'),
+                id: conv.id,
+                leadId: conv.lead?.id,
+                leadName: conv.lead?.nombre ?? 'Contacto desconocido',
+                lastMessagePreview: previewText,
                 lastMessageTimestamp: ultimaInteraccion?.createdAt ?? conv.updatedAt,
-                status: conv.status ?? 'desconocido', canalOrigen: canalOrigen, canalIcono: canalIcono,
-                avatarUrl: undefined,
+                status: conv.status ?? 'desconocido',
+                canalOrigen: infoCanalPrincipal.canalOrigen,
+                canalIcono: infoCanalPrincipal.canalIcono,
+                // Usar el array de canales únicos ordenados
+                canalesInvolucrados: canalesUnicosOrdenados.length > 0 ? canalesUnicosOrdenados : null,
+                avatarUrl: null,
             };
         });
-        const data = await Promise.all(dataPromises);
+
+        // Validar con el schema que ahora incluye 'canalesInvolucrados'
         const parsedData = z.array(conversacionPreviewItemSchema).safeParse(data);
         if (!parsedData.success) {
-            console.error("[listarConversacionesAction V3] Error Zod en datos de salida:", parsedData.error.flatten().fieldErrors);
+            console.error("[listarConversacionesAction V4] Error Zod en datos de salida:", parsedData.error.flatten().fieldErrors);
+            // Loguear el primer item que falló para más detalle
+            const firstFailingItem = data.find(d => !conversacionPreviewItemSchema.safeParse(d).success);
+            console.error("[listarConversacionesAction V4] Primer item que falla validación Zod:", firstFailingItem);
             return { success: false, error: "Error al procesar datos de conversaciones." };
         }
         return { success: true, data: parsedData.data };
+
     } catch (error) {
         console.error('[listarConversacionesAction V3] Error general:', error);
         return { success: false, error: 'No se pudieron cargar las conversaciones.' };

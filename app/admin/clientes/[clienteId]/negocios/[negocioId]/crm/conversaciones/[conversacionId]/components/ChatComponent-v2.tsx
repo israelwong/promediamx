@@ -1,15 +1,17 @@
 // app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/[conversacionId]/components/ChatComponent.tsx
 'use client';
 
-import React, { useState, useEffect, useRef, FormEvent, useCallback, JSX } from 'react';
-import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import React, { useState, useEffect, useRef, FormEvent, useCallback, memo, JSX } from 'react';
+import {
+    createClient, SupabaseClient, RealtimeChannel
+} from '@supabase/supabase-js';
 import Cookies from 'js-cookie';
 import { useRouter, useParams } from 'next/navigation';
-import { Loader2, MessageSquareWarning, User, Bot, ShieldCheck } from 'lucide-react'; // Añadido Volume2
+import { Loader2, MessageSquareWarning, User, Bot, ShieldCheck } from 'lucide-react';
 
 // Lightbox
 import Lightbox from "yet-another-react-lightbox";
-import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails"; // Asegúrate que esté instalado
+import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
 
@@ -21,34 +23,38 @@ import { verifyToken } from '@/app/lib/auth';
 // Schemas y Tipos
 import type {
     ChatMessageItemCrmData,
-    // EnviarMensajeCrmParams, // Necesario para handleSendMessage
     ConversationDetailsForPanelData,
-    // MediaItem se usa en ChatMessageBubble y sus hijos
+    // EnviarMensajeCrmParams,
+    // MediaItem, // Usado en ChatMessageBubble
 } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
-import { chatMessageItemCrmSchema } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
+import {
+    chatMessageItemCrmSchema,
+} from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
 import type { AgenteBasicoCrmData } from '@/app/admin/_lib/actions/agenteCrm/agenteCrm.schemas';
 import { type UsuarioExtendido, UserTokenPayloadSchema } from '@/app/admin/_lib/actions/usuario/usuario.schemas';
 import { InteraccionParteTipo } from '@prisma/client';
 
-// Subcomponentes (Asegúrate que las rutas sean correctas)
-import ChatHeader from './ChatHeader'; // Asumiendo que está en el mismo directorio
-import ChatInputArea from './ChatInputArea'; // Asumiendo que está en el mismo directorio
-import ChatMessageBubble from '@/app/components/chat/ChatMessageBubble'; // Desde la carpeta compartida
+// Subcomponentes
+import ChatHeader from './ChatHeader';
+import ChatInputArea from './ChatInputArea';
+import ChatMessageBubble from '@/app/components/chat/ChatMessageBubble';
 
-// Definición de InteraccionRealtimePayload
 interface InteraccionRealtimePayload {
     id: string; conversacionId: string; role: string; mensajeTexto: string | null;
     parteTipo?: 'TEXT' | 'FUNCTION_CALL' | 'FUNCTION_RESPONSE' | null;
     functionCallNombre?: string | null; functionCallArgs?: unknown | null;
-    functionResponseData?: unknown | null; uiComponentPayload?: unknown | null; // Añadir uiComponentPayload
+    functionResponseData?: unknown | null; uiComponentPayload?: unknown | null;
     mediaUrl?: string | null; mediaType?: string | null;
     createdAt: string; agenteCrmId?: string | null;
-    agenteCrm?: { id: string; nombre: string | null; } | null;
+    agenteCrm?: { id: string; nombre: string | null; userId?: string | null };
+    canalInteraccion?: string | null;
 }
 
 interface ChatComponentProps {
-    initialConversationDetails: ConversationDetailsForPanelData | null;
+    // Esta prop DEBE ser actualizada en tiempo real por el componente padre (ConversacionDetalle.tsx)
+    conversationDetails: ConversationDetailsForPanelData | null;
     initialMessages: ChatMessageItemCrmData[];
+    // Este error es para la carga inicial de mensajes o si la carga de detalles falló en el padre
     initialError?: string | null;
     negocioId: string;
 }
@@ -60,24 +66,36 @@ if (typeof window !== 'undefined') {
     if (supabaseUrl && supabaseAnonKey) {
         supabase = createClient(supabaseUrl, supabaseAnonKey);
     } else {
-        console.warn("[ChatComponent CRM V5] Supabase URL o Anon Key no definidas.");
+        console.warn("[ChatComponent CRM UltraFinal V2] Supabase URL o Anon Key no definidas.");
     }
 }
 
 const ADMIN_ROLE_NAME = 'Administrador';
 
+const ClientTime = memo(({ date }: { date: Date | string | undefined | null }) => {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+    if (!date) return <>--:--</>;
+    let displayDate: Date;
+    try {
+        displayDate = new Date(date);
+        if (isNaN(displayDate.getTime())) return <>--:--</>;
+    } catch { return <>--:--</>; }
+    if (!mounted) return <>{displayDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })}</>;
+    return <>{displayDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true })}</>;
+});
+ClientTime.displayName = 'ClientTime';
+
 export default function ChatComponent({
-    initialConversationDetails,
+    conversationDetails, // Esta prop se asume actualizada en tiempo real por ConversacionDetalle.tsx
     initialMessages,
     initialError,
     negocioId,
 }: ChatComponentProps) {
 
-    console.log(`[ChatComponent CRM V5] Props iniciales. ConvID: ${initialConversationDetails?.id}, Msgs: ${initialMessages?.length}`);
-
     const [messages, setMessages] = useState<ChatMessageItemCrmData[]>(initialMessages || []);
-    const [conversationDetails, setConversationDetails] = useState<ConversationDetailsForPanelData | null>(initialConversationDetails);
-    const [error, setError] = useState<string | null>(initialError || null);
+    // Estado para errores que se muestran en la UI, priorizando el de permisos.
+    const [displayError, setDisplayError] = useState<string | null>(initialError || null);
 
     const [newMessage, setNewMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -89,10 +107,13 @@ export default function ChatComponent({
     const params = useParams();
 
     const [user, setUser] = useState<UsuarioExtendido | null>(null);
-    const [currentAgentInfo, setCurrentAgentInfo] = useState<AgenteBasicoCrmData | null>(null);
+    const [currentAgentInfo, setCurrentAgentInfo] = useState<AgenteBasicoCrmData | null>(null); // Info del agente si el user es agente
     const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
-    const [isOwner, setIsOwner] = useState(false);
-    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Estados para los roles específicos del usuario actual
+    const [isUserAdmin, setIsUserAdmin] = useState(false);
+    const [isUserOwner, setIsUserOwner] = useState(false);
+    const [isUserCrmAgent, setIsUserCrmAgent] = useState(false); // Si el usuario es un agente CRM para este negocio
 
     const currentConversationId = conversationDetails?.id;
 
@@ -101,7 +122,16 @@ export default function ChatComponent({
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null);
 
-    //! EFECTO: Validar token de usuario
+    // EFECTO: Sincronizar mensajes y error general si las props iniciales cambian
+    useEffect(() => {
+        setMessages(initialMessages || []);
+        // Solo actualizar displayError con initialError si no hay ya un error de permiso
+        if (!displayError?.includes("permiso")) {
+            setDisplayError(initialError || null);
+        }
+    }, [initialMessages, initialError, displayError]); // Agregado displayError a dependencias para cumplir con reglas de React
+
+    // EFECTO: Validar token de usuario
     useEffect(() => {
         async function validarToken() {
             const currentToken = Cookies.get('token');
@@ -110,8 +140,7 @@ export default function ChatComponent({
                     const response = await verifyToken(currentToken);
                     const parsedPayload = UserTokenPayloadSchema.safeParse(response.payload);
                     if (parsedPayload.success) {
-                        const tokenData = parsedPayload.data;
-                        setUser({ id: tokenData.id, username: tokenData.username, email: tokenData.email, rolNombre: tokenData.rol, token: currentToken });
+                        setUser(parsedPayload.data);
                     } else { Cookies.remove('token'); router.push('/login'); }
                 } catch { Cookies.remove('token'); router.push('/login'); }
             } else { router.push('/login'); }
@@ -119,40 +148,19 @@ export default function ChatComponent({
         validarToken();
     }, [router]);
 
-    // EFECTO: Actualizar estado con props cambiantes
-    useEffect(() => {
-        const prevConvId = conversationDetails?.id;
-        setConversationDetails(initialConversationDetails);
-        setMessages(initialMessages || []);
-        setError(initialError || null);
-        if (initialConversationDetails?.id !== prevConvId) {
-            setIsLoadingPermissions(true); setCurrentAgentInfo(null); setIsOwner(false); setIsAdmin(false);
-            if (error && (error.includes("permiso") || error.includes("autorización"))) setError(null);
-        }
-    }, [initialConversationDetails, initialMessages, initialError, conversationDetails?.id, error]);
-
     // FUNCIÓN PARA ABRIR LIGHTBOX
-    const openLightboxWithSlides = useCallback((slides: { src: string; alt?: string; type?: "image" }[], index: number, caller?: string) => {
-        console.log(`[ChatComponent V5 - openLightbox] Caller: ${caller || 'Unknown'}, Slides: ${slides.length}, Index: ${index}`);
+    const openLightboxWithSlides = useCallback((slides: { src: string; alt?: string; type?: "image" }[], index: number) => {
+        // console.log(`[ChatComponent UltraFinal V2 - openLightbox] Caller: ${caller || 'N/A'}, Slides: ${slides.length}, Index: ${index}`);
         const imageSlidesOnly = slides.filter(slide => slide.type === 'image' && slide.src);
         if (imageSlidesOnly.length > 0) {
             setLightboxSlides(imageSlidesOnly);
             const validIndex = index >= 0 && index < imageSlidesOnly.length ? index : 0;
             setLightboxIndex(validIndex);
-            setLightboxOpen(true); // Abrir explícitamente
-        } else {
-            console.warn("[ChatComponent V5 - openLightbox] No hay slides de imagen válidos.");
+            setLightboxOpen(true);
         }
     }, []);
 
-    // EFECTO PARA MONITOREAR LIGHTBOXOPEN (PARA DEBUG)
-    useEffect(() => {
-        console.log('[ChatComponent V5 - Lightbox STATE] lightboxOpen AHORA ES:', lightboxOpen);
-        // if (lightboxOpen) { debugger; } // Descomenta para usar el debugger del navegador
-    }, [lightboxOpen]);
-
     // EFECTO: Lightbox para contenido HTML (webchat)
-    // Este listener es para el contenido que se renderiza con dangerouslySetInnerHTML
     useEffect(() => {
         const container = messagesContainerRef.current;
         if (!container || messages.length === 0 || conversationDetails?.canalOrigen !== 'webchat') {
@@ -177,7 +185,7 @@ export default function ChatComponent({
                 } else { slides = [{ src: triggerAnchor.href, alt: triggerAnchor.querySelector('img')?.alt || triggerAnchor.dataset.alt || "Imagen Webchat", type: 'image' as const }]; clickedImageIndex = 0; }
 
                 if (slides.length > 0) {
-                    openLightboxWithSlides(slides, clickedImageIndex >= 0 ? clickedImageIndex : 0, 'HTML_USE_EFFECT_CLICK');
+                    openLightboxWithSlides(slides, clickedImageIndex >= 0 ? clickedImageIndex : 0);
                 }
             }
         };
@@ -187,40 +195,77 @@ export default function ChatComponent({
     }, [messages, conversationDetails?.canalOrigen, openLightboxWithSlides]);
 
 
-    // EFECTO: Permisos
+    // EFECTO: Verificar permisos del usuario/agente
     useEffect(() => {
-        const clienteIdFromRoute = params?.clienteId as string | undefined; // clienteId del dueño del negocio
+        const clienteIdFromRoute = params?.clienteId as string | undefined;
         const controller = new AbortController();
 
         async function checkPermissions() {
-            if (!user?.id || !negocioId || !clienteIdFromRoute || !currentConversationId) {
-                setIsLoadingPermissions(false); return;
+            // Resetear todos los estados de permiso al inicio de la verificación
+            setIsUserAdmin(false);
+            setIsUserOwner(false);
+            setIsUserCrmAgent(false);
+            setCurrentAgentInfo(null);
+            // Limpiar error de permiso previo solo si no es un error de carga inicial más general
+            if (displayError?.includes("permiso") && !initialError) {
+                setDisplayError(null);
             }
+
+            if (!user?.id || !negocioId || !clienteIdFromRoute || !currentConversationId) {
+                setIsLoadingPermissions(false);
+                return;
+            }
+
             setIsLoadingPermissions(true);
-            let canSendPerm = false;
-            if (user.rolNombre === ADMIN_ROLE_NAME) { setIsAdmin(true); canSendPerm = true; }
-            if (user.id === clienteIdFromRoute) { setIsOwner(true); canSendPerm = true; }
 
-            try {
-                const result = await obtenerAgenteCrmPorUsuarioAction(user.id, negocioId);
-                if (controller.signal.aborted) return;
-                if (result.success && result.data) { setCurrentAgentInfo(result.data); canSendPerm = true; }
-            } catch (e) { if (controller.signal.aborted) return; console.error("Error checkPermissions:", e); }
+            const isAdminRole = user.rolNombre === ADMIN_ROLE_NAME;
+            const isOwnerRole = user.id === clienteIdFromRoute;
 
-            if (!canSendPerm) setError("No tienes permiso para enviar mensajes en este chat.");
-            else setError(null); // Limpiar error de permisos si ahora sí tiene
+            setIsUserAdmin(isAdminRole);
+            setIsUserOwner(isOwnerRole);
+
+            let isAgentRole = false;
+            if (!isAdminRole && !isOwnerRole) { // Solo buscar si es agente si no es admin ni owner
+                try {
+                    const result = await obtenerAgenteCrmPorUsuarioAction(user.id, negocioId);
+                    if (!controller.signal.aborted && result.success && result.data) {
+                        setCurrentAgentInfo(result.data);
+                        isAgentRole = true;
+                    } else {
+                        setCurrentAgentInfo(null);
+                    }
+                } catch {
+                    if (!controller.signal.aborted) setCurrentAgentInfo(null);
+                }
+            } else {
+                setCurrentAgentInfo(null); // No es necesario si es admin/owner para el permiso base
+            }
+            setIsUserCrmAgent(isAgentRole);
+
+            const hasBasePermission = isAdminRole || isOwnerRole || isAgentRole;
+
+            if (!hasBasePermission && !initialError) {
+                setDisplayError("No tienes permiso para enviar mensajes en este chat.");
+            }
+
             setIsLoadingPermissions(false);
         }
 
-        if (user && currentConversationId) { checkPermissions(); }
-        else { setIsLoadingPermissions(false); }
+        checkPermissions();
         return () => { controller.abort(); };
-    }, [user, negocioId, params?.clienteId, currentConversationId]);
+    }, [user, negocioId, params?.clienteId, currentConversationId, initialError, displayError]);
 
     // EFECTO: Scroll al final
     const scrollToBottom = useCallback(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, []);
-    useEffect(() => { if (messages.length > 0) { setTimeout(scrollToBottom, 100); } }, [messages, scrollToBottom]); // Pequeño delay
+    useEffect(() => { if (messages.length > 0) setTimeout(scrollToBottom, 150); }, [messages, scrollToBottom]);
 
+    useEffect(() => {
+        console.log(`[ChatComponent DebugMsgLoad] useEffect[initialMessages, initialError] disparado. New initialMessages count: ${initialMessages?.length}. Estado actual de messages: ${messages.length}`);
+        setMessages(initialMessages || []);
+        if (!displayError?.includes("permiso")) {
+            setDisplayError(initialError || null);
+        }
+    }, [initialMessages, initialError, displayError, messages.length]);
 
     // EFECTO: Realtime
     useEffect(() => {
@@ -269,22 +314,35 @@ export default function ChatComponent({
     }, [currentConversationId]);
     // HANDLER: Enviar mensaje
 
-    // HELPERS DE UI
+    // HANDLER: Enviar mensaje
     const handleSendMessage = async (e: FormEvent) => {
         e.preventDefault();
         if (!newMessage.trim() || !currentConversationId) return;
-        const canSend = !!(currentAgentInfo?.id || isOwner || isAdmin);
-        if (!canSend) { setError("No tienes permiso para enviar mensajes."); return; }
-        setIsSending(true); setError(null);
+
+        const hasRolePerm = isUserAdmin || isUserOwner || isUserCrmAgent;
+        // Un agente/admin/owner SÍ puede enviar mensajes si el estado es 'hitl_activo' o 'en_espera_agente'.
+        // Solo no puede enviar si está 'cerrada'.
+        const canSendByConvStatus = conversationDetails?.status !== 'cerrada';
+
+        if (!hasRolePerm) {
+            setDisplayError("No tienes los permisos necesarios para enviar mensajes.");
+            return;
+        }
+        if (!canSendByConvStatus) {
+            setDisplayError(`La conversación está en estado '${conversationDetails?.status}' y no permite nuevos mensajes de este tipo.`);
+            return;
+        }
+
+        setIsSending(true); setDisplayError(null);
         const textToSend = newMessage.trim();
         setNewMessage('');
         const result = await enviarMensajeCrmAction({
             conversacionId: currentConversationId, mensaje: textToSend, role: 'agent',
-            agenteCrmId: currentAgentInfo?.id || null, // Si es owner/admin y no agente, será null
+            agenteCrmId: currentAgentInfo?.id || null,
         });
         setIsSending(false);
         if (!result.success) {
-            setError(result.error || 'Error al enviar mensaje.'); setNewMessage(textToSend);
+            setDisplayError(result.error || 'Error al enviar mensaje.'); setNewMessage(textToSend);
         }
     };
 
@@ -296,18 +354,17 @@ export default function ChatComponent({
         if (role === 'agent') {
             if (agente?.id && localCurrentAgentInfo?.id && agente.id === localCurrentAgentInfo.id) agentDisplayName = localCurrentAgentInfo.nombre || localUser?.username || "Tú (Agente)";
             else if (agente) agentDisplayName = agente.nombre || `Agente (${agente.id.substring(0, 4)}...)`;
-            else if (isOwner || isAdmin) agentDisplayName = localUser?.username || (isAdmin ? "Admin" : "Propietario");
+            else if (isUserOwner || isUserAdmin) agentDisplayName = localUser?.username || (isUserAdmin ? "Admin" : "Propietario");
             else agentDisplayName = "Soporte/Agente";
         }
         const displayName = role === 'user' ? (conversationDetails?.leadNombre || 'Cliente') :
             (role === 'assistant' ? (conversationDetails?.asistenteNombre || 'Asistente IA') : agentDisplayName);
         if (role === 'user') return <span title={displayName || undefined}><User size={18} className="text-blue-300" /></span>;
         if (role === 'assistant') return <span title={displayName || undefined}><Bot size={18} className="text-zinc-400" /></span>;
-        if (role === 'agent' && (isOwner || isAdmin) && (!agente?.id || (agente?.userId === localUser?.id && localUser?.id))) return <span title={displayName || undefined}><ShieldCheck size={18} className="text-emerald-400" /></span>;
+        if (role === 'agent' && (isUserOwner || isUserAdmin) && (!agente?.id || (agente?.userId === localUser?.id && localUser?.id))) return <span title={displayName || undefined}><ShieldCheck size={18} className="text-emerald-400" /></span>;
         if (role === 'agent') return <span title={displayName || undefined}><User size={18} className="text-purple-300" /></span>;
         return <MessageSquareWarning size={18} className="text-amber-400" />;
-    }, [user, currentAgentInfo, conversationDetails, isAdmin, isOwner]);
-
+    }, [user, currentAgentInfo, conversationDetails, isUserAdmin, isUserOwner]);
 
     const copiarIdConversacion = useCallback((id: string | undefined) => {
         if (id) {
@@ -316,46 +373,42 @@ export default function ChatComponent({
             setTimeout(() => { setMensajeCopiado(null); }, 2000);
         }
     }, []);
-
     const getMessageAlignment = useCallback((role: string): string => (role === 'user' ? 'items-end' : (role === 'assistant' || role === 'agent' ? 'items-start' : 'items-center justify-center')), []);
     const getMessageBgColor = useCallback((role: string): string => (role === 'user' ? 'bg-blue-700/80 hover:bg-blue-700 text-blue-50' : (role === 'assistant' ? 'bg-zinc-700/70 hover:bg-zinc-700 text-zinc-100' : (role === 'agent' ? 'bg-purple-700/80 hover:bg-purple-700 text-purple-50' : (role === 'system' ? 'bg-zinc-600/50 text-zinc-300 text-center' : 'bg-zinc-800 text-zinc-100')))), []);
 
-
     // RENDERIZADO DEL ÁREA DE CHAT
     let chatAreaContent;
-    if (!conversationDetails && !initialError && isLoadingPermissions) {
+    if (!conversationDetails && !initialError && isLoadingPermissions && messages.length === 0) {
         chatAreaContent = (<div className="flex-1 flex flex-col items-center justify-center text-zinc-500"> <Loader2 size={32} className="animate-spin" /> <p className="mt-2">Cargando conversación...</p> </div>);
-    } else if (!conversationDetails && (error || initialError)) {
-        chatAreaContent = (<div className="flex-1 flex flex-col items-center justify-center text-red-400"> <MessageSquareWarning size={32} className="mb-2" /> <p className="font-medium">Error:</p> <p className="text-sm">{error || initialError}</p> </div>);
-    } else if (messages.length === 0 && !isLoadingPermissions) { // Solo mostrar "no hay mensajes" si no se está cargando nada más
+    } else if (!conversationDetails && displayError) {
+        chatAreaContent = (<div className="flex-1 flex flex-col items-center justify-center text-red-400"> <MessageSquareWarning size={32} className="mb-2" /> <p className="font-medium">Error:</p> <p className="text-sm">{displayError}</p> </div>);
+    } else if (messages.length === 0 && !isLoadingPermissions) {
         chatAreaContent = (<div className="flex-1 flex flex-col items-center justify-center text-zinc-500"> <MessageSquareWarning size={32} className="mb-2" /> <p>No hay mensajes.</p> </div>);
     } else if (messages.length > 0) {
-        chatAreaContent = messages.map((msg) => {
-            if (msg.role === 'assistant' && msg.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE) {
-                const payloadString = (msg.uiComponentPayload === undefined || msg.uiComponentPayload === null)
-                    ? String(msg.uiComponentPayload) // Convierte undefined a "undefined" y null a "null"
-                    : JSON.stringify(msg.uiComponentPayload, null, 2);
-                const displayPayload = payloadString.length > 300 ? payloadString.substring(0, 300) + "..." : payloadString;
-                console.log(`[ChatComponent Map] Msg ID ${msg.id}. uiComponentPayload:`, displayPayload);
-            }
-            return (
-                <ChatMessageBubble
-                    key={msg.id || `msg-${msg.createdAt?.toString()}-${Math.random()}`}
-                    msg={msg}
-                    conversationDetails={conversationDetails} // Pasar el real del CRM
-                    currentAgentInfo={currentAgentInfo}
-                    isAdmin={isAdmin}
-                    isOwner={isOwner}
-                    getMessageAlignment={getMessageAlignment}
-                    getMessageBgColor={getMessageBgColor}
-                    getMessageSenderIcon={getMessageSenderIcon}
-                    openLightboxWithSlides={openLightboxWithSlides} // Pasar la función
-                />
-            );
-        });
-    } else { // Aún cargando mensajes o permisos, pero hay 'conversationDetails'
-        chatAreaContent = (<div className="flex-1 flex flex-col items-center justify-center text-zinc-500"> <Loader2 size={32} className="animate-spin" /> <p className="mt-2">Cargando mensajes...</p> </div>);
+        chatAreaContent = messages.map((msg) => (
+            <ChatMessageBubble
+                key={msg.id || `msg-${msg.createdAt?.getTime()}-${Math.random()}`}
+                msg={msg}
+                conversationDetails={conversationDetails}
+                currentAgentInfo={currentAgentInfo}
+                isAdmin={isUserAdmin}
+                isOwner={isUserOwner}
+                getMessageAlignment={getMessageAlignment}
+                getMessageBgColor={getMessageBgColor}
+                getMessageSenderIcon={getMessageSenderIcon}
+                openLightboxWithSlides={openLightboxWithSlides}
+            />
+        ));
+    } else {
+        chatAreaContent = (<div className="flex-1 flex flex-col items-center justify-center text-zinc-500"> <Loader2 size={32} className="animate-spin" /> <p className="mt-2">Cargando...</p> </div>);
     }
+
+    // Cálculo final del permiso de envío
+    const hasRolePermission = isUserAdmin || isUserOwner || isUserCrmAgent;
+    // Un agente/admin/owner SÍ puede enviar mensajes si el estado es 'hitl_activo' o 'en_espera_agente'.
+    // Solo no puede enviar si está 'cerrada'.
+    const canSendByConversationStatus = conversationDetails?.status !== 'cerrada';
+    const finalCanSendPermission = hasRolePermission && canSendByConversationStatus;
 
     return (
         <div className="flex flex-col h-full bg-zinc-800" style={{ maxHeight: 'calc(100vh - 110px)' }}>
@@ -375,24 +428,23 @@ export default function ChatComponent({
                 handleSendMessage={handleSendMessage}
                 isSending={isSending}
                 isLoadingPermissions={isLoadingPermissions}
-                canSendPermission={!!(currentAgentInfo?.id || isOwner || isAdmin)}
+                canSendPermission={finalCanSendPermission}
                 currentConversationId={currentConversationId}
-                error={error} // Pasar el error general del chat
+                error={displayError}
             />
-            {lightboxOpen && (
-                <Lightbox
-                    open={true} // Si ya está condicionado por lightboxOpen, esto es redundante
-                    close={() => {
-                        console.log("[ChatComponent V5] Lightbox close() prop llamada.");
-                        setLightboxOpen(false);
-                    }}
-                    slides={lightboxSlides}
-                    index={lightboxIndex}
-                    plugins={[Thumbnails]}
-                    thumbnails={{}}
-                    styles={{ container: { backgroundColor: "rgba(0, 0, 0, .9)" } }}
-                />
-            )}
+            {lightboxOpen && (<Lightbox
+                open={true}
+                close={() => {
+                    // console.log("[ChatComponent UltraFinal V2] Lightbox close() prop.");
+                    setLightboxOpen(false);
+                }}
+                slides={lightboxSlides}
+                index={lightboxIndex}
+                plugins={[Thumbnails]}
+                thumbnails={{}}
+                styles={{ container: { backgroundColor: "rgba(0, 0, 0, .9)" } }}
+            />)}
         </div>
     );
 }
+

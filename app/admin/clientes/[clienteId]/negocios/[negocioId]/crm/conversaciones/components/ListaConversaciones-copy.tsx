@@ -1,44 +1,28 @@
 // app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/conversaciones/components/ListaConversaciones.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, memo, JSX } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Search, Loader2, Inbox, RefreshCw, MessageSquare, Filter, ChevronDown, Bot, Globe } from 'lucide-react';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import Image from 'next/image';
 
+// Asegúrate que la ruta a las acciones y schemas sea la correcta
 import { listarConversacionesAction } from '@/app/admin/_lib/actions/conversacion/conversacion.actions';
 import type { ConversacionPreviewItemData, ListarConversacionesParams } from '@/app/admin/_lib/actions/conversacion/conversacion.schemas';
+
 import { obtenerPipelinesCrmAction } from '@/app/admin/_lib/actions/pipelineCrm/pipelineCrm.actions';
-import { useDebounce } from '@/app/admin/_lib/hooks/useDebounce';
+import { useDebounce } from '@/app/admin/_lib/hooks/useDebounce'; // Asumo que esta ruta es correcta
 
 interface PipelineSimple { id: string; nombre: string; }
 interface ListaConversacionesProps { negocioId: string; clienteId: string; }
 
 // --- Iconos de Canal ---
-const WhatsAppIcon = memo(() => (<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-green-500 flex-shrink-0"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" /></svg>));
-WhatsAppIcon.displayName = "WhatsAppIcon";
-const WebchatIcon = memo(() => <MessageSquare size={16} className="text-blue-400 flex-shrink-0" />);
-WebchatIcon.displayName = "WebchatIcon";
-const CrmIcon = memo(() => <Bot size={16} className="text-purple-400 flex-shrink-0" />);
-CrmIcon.displayName = "CrmIcon";
-const OtherChannelIcon = memo(() => <Globe size={16} className="text-gray-400 flex-shrink-0" />);
-OtherChannelIcon.displayName = "OtherChannelIcon";
+const WhatsAppIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-green-500 flex-shrink-0"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" /></svg>);
+const WebchatIcon = () => <MessageSquare size={16} className="text-blue-400 flex-shrink-0" />;
+const OtherChannelIcon = () => <Globe size={16} className="text-gray-400 flex-shrink-0" />;
 // --- Fin Iconos de Canal ---
-
-const stripHtml = (html: string | null | undefined): string => {
-    if (!html) return '';
-    if (typeof document !== 'undefined') {
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        let textContent = doc.body.textContent || "";
-        if (textContent.length > 70) { // Un poco más corto para la preview
-            textContent = textContent.substring(0, 67) + "...";
-        }
-        return textContent;
-    }
-    return html.replace(/<[^>]+>/g, '').substring(0, 70) + (html.length > 70 ? "..." : "");
-};
 
 let supabaseLista: SupabaseClient | null = null;
 if (typeof window !== 'undefined') {
@@ -63,20 +47,39 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
     const [isLoadingPipelines, setIsLoadingPipelines] = useState(true);
 
     const params = useParams();
+    // const pathname = usePathname(); // No es estrictamente necesario si activeConversationId funciona bien
     const activeConversationId = params?.conversacionId as string || '';
 
     const fetchConversations = useCallback(async () => {
         if (!negocioId) {
-            setError("ID de negocio no proporcionado."); setIsLoading(false); setConversations([]); return;
+            setError("ID de negocio no proporcionado para listar conversaciones.");
+            setIsLoading(false);
+            setConversations([]);
+            return;
         }
-        if (conversations.length === 0 && !error) setIsLoading(true);
+
+        // Mostrar spinner solo si es la carga inicial y no hay error previo
+        // o si estamos recargando explícitamente una lista vacía.
+        if (conversations.length === 0 && !error) {
+            setIsLoading(true);
+        }
+
         const paramsForAction: ListarConversacionesParams = {
-            negocioId, searchTerm: debouncedSearchTerm || null, filtroStatus,
+            negocioId,
+            searchTerm: debouncedSearchTerm || null, // Enviar null si está vacío
+            filtroStatus,
             filtroPipelineId: filtroPipelineId === 'all' ? null : filtroPipelineId,
         };
+
         const result = await listarConversacionesAction(paramsForAction);
-        if (result.success && result.data) { setConversations(result.data); setError(null); }
-        else { setError(result.error || 'No se pudieron cargar las conversaciones.'); setConversations([]); }
+
+        if (result.success && result.data) {
+            setConversations(result.data);
+            setError(null);
+        } else {
+            setError(result.error || 'No se pudieron cargar las conversaciones.');
+            setConversations([]);
+        }
         setIsLoading(false);
     }, [negocioId, debouncedSearchTerm, filtroStatus, filtroPipelineId, error, conversations.length]);
 
@@ -146,8 +149,10 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
         };
     }, [negocioId, fetchConversations]); // Se incluye fetchConversations para que el efecto se re-ejecute si cambia
 
+    const handleRefresh = () => {
+        fetchConversations();
+    };
 
-    const handleRefresh = () => fetchConversations();
     const basePath = `/admin/clientes/${clienteId}/negocios/${negocioId}/crm/conversaciones`;
 
     const getStatusColor = (status: string | null | undefined): string => {
@@ -158,55 +163,24 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
         if (s === 'archivada') return 'bg-gray-400';
         return 'bg-zinc-500';
     };
-    // En ListaConversaciones.tsx
-    const getChannelDisplayIcons = (
-        // Este ahora sería string[] (ej. ["whatsapp", "webchat_test"])
-        canalesInvolucrados?: string[] | null,
-        canalOrigenFallback?: ConversacionPreviewItemData['canalOrigen'],
-        canalIconoDbFallback?: string | null
-    ): JSX.Element[] => {
-        const icons: JSX.Element[] = [];
-        const processedIconTypes = new Set<string>(); // Para no repetir el MISMO TIPO de icono (ej. dos de WhatsApp)
-        const maxIconsToShow = 2; // O 3, como prefieras
 
-        const addIcon = (canalKey: string | null | undefined) => {
-            if (!canalKey || icons.length >= maxIconsToShow) return;
-
-            const key = canalKey.toLowerCase();
-            let iconComponent: JSX.Element | null = null;
-            let iconTypeKey: string = 'other'; // Para el Set
-
-            if (key.includes('whatsapp')) { iconComponent = <WhatsAppIcon key="whatsapp" />; iconTypeKey = 'whatsapp'; }
-            else if (key.includes('webchat') || key.includes('web_chat')) { iconComponent = <WebchatIcon key="webchat" />; iconTypeKey = 'webchat'; }
-            else if (key.includes('crm')) { iconComponent = <CrmIcon key="crm" />; iconTypeKey = 'crm'; }
-            // ... otros ...
-            else { iconComponent = <OtherChannelIcon key={key} />; iconTypeKey = key; }
-
-            if (iconComponent && !processedIconTypes.has(iconTypeKey)) {
-                icons.push(iconComponent);
-                processedIconTypes.add(iconTypeKey);
-            }
-        };
-
-        if (canalesInvolucrados && canalesInvolucrados.length > 0) {
-            // Si canalesInvolucrados es ["whatsapp", "webchat", "whatsapp"],
-            // y quieres mostrar el inicial abajo y el nuevo arriba (visualmente de izquierda a derecha),
-            // podrías querer mostrar solo los únicos en orden de aparición, o los N más recientes.
-            // La lógica de 'canalesUnicosOrdenados' del backend ya te daría ["whatsapp", "webchat"].
-            // Si el backend te da el array en el orden en que quieres que se muestren (ej. más antiguo a más nuevo),
-            // simplemente itera.
-            canalesInvolucrados.forEach(canalNombre => addIcon(canalNombre));
-        } else { // Fallback si no hay `canalesInvolucrados`
-            if (canalIconoDbFallback) addIcon(canalIconoDbFallback);
-            else if (canalOrigenFallback) addIcon(canalOrigenFallback);
+    const getChannelDisplayIcon = (canalOrigen: ConversacionPreviewItemData['canalOrigen'], canalIconoDb?: string | null) => {
+        if (canalIconoDb) {
+            const iconKey = canalIconoDb.toLowerCase();
+            if (iconKey.includes('bot') || iconKey.includes('asistente') || iconKey.includes('ia'))
+                return <Bot size={16} className="text-sky-400 flex-shrink-0" />;
+            if (iconKey.includes('whatsapp')) return <WhatsAppIcon />;
+            if (iconKey.includes('web') || iconKey.includes('chat')) return <WebchatIcon />;
+            // Añade más mapeos de string a icono aquí si es necesario
+            return <Globe size={16} className="text-gray-400 flex-shrink-0" />;
         }
-
-        if (icons.length === 0) icons.push(<OtherChannelIcon key="default-other" />);
-        return icons; // El map en el JSX se encarga del apilamiento visual
+        if (canalOrigen === 'whatsapp') return <WhatsAppIcon />;
+        if (canalOrigen === 'webchat') return <WebchatIcon />;
+        return <OtherChannelIcon />;
     };
 
     return (
-        <div className="p-3 flex flex-col h-full max-h-[calc(100vh-var(--admin-header-height,70px)-var(--admin-page-padding,40px))] overflow-hidden">
+        <div className="p-3 flex flex-col h-full max-h-[calc(100vh-var(--admin-header-height,70px)-var(--admin-page-padding,40px))] overflow-hidden"> {/* Ajusta Xpx */}
             <div className="mb-3 flex-shrink-0">
                 <div className="flex justify-between items-center mb-1 px-1">
                     <h3 className="text-lg font-semibold text-zinc-100">Conversaciones</h3>
@@ -278,56 +252,32 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
                     <ul className="space-y-1">
                         {conversations.map((conv) => {
                             const isActive = activeConversationId === conv.id;
-                            const cleanPreview = stripHtml(conv.lastMessagePreview);
-                            const channelIcons = getChannelDisplayIcons(
-                                conv.canalesInvolucrados, // Este viene del backend ahora
-                                conv.canalOrigen,
-                                conv.canalIcono
-                            );
-
                             return (
                                 <li key={conv.id}>
                                     <Link href={`${basePath}/${conv.id}`} className={`block p-2.5 rounded-md transition-colors ${isActive ? 'bg-zinc-700 shadow-md' : 'hover:bg-zinc-700/60'}`}>
                                         <div className="flex items-center gap-3">
-                                            {/* --- Bloque de Avatar y Status (NO DUPLICADO) --- */}
                                             <div className="relative flex-shrink-0">
                                                 {conv.avatarUrl ? (
                                                     <Image src={conv.avatarUrl} alt={conv.leadName || 'Avatar'} width={36} height={36} className="w-9 h-9 rounded-full object-cover border border-zinc-600" />
                                                 ) : (
                                                     <div className="w-9 h-9 rounded-full bg-zinc-600 flex items-center justify-center text-zinc-300 text-sm font-medium">
-                                                        {(conv.leadName || '??').substring(0, 2).toUpperCase()}
+                                                        {conv.leadName?.substring(0, 2).toUpperCase() || '??'}
                                                     </div>
                                                 )}
-                                                <span className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-zinc-800 ${getStatusColor(conv.status)}`} title={`Estado: ${conv.status || 'Desconocido'}`} />
+                                                <span className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-zinc-800 ${getStatusColor(conv.status)}`} title={`Estado: ${conv.status}`} />
                                             </div>
-
                                             <div className="flex-grow overflow-hidden">
-                                                <div className="flex justify-between items-start">
-                                                    <h4 className={`text-sm font-medium truncate ${isActive ? 'text-white' : 'text-zinc-200'}`}>{conv.leadName || 'Conversación sin nombre'}</h4>
+                                                <div className="flex justify-between items-start"> {/* items-start para alinear tiempo a la derecha si el texto es largo */}
+                                                    <h4 className={`text-sm font-medium truncate ${isActive ? 'text-white' : 'text-zinc-200'}`}>{conv.leadName}</h4>
                                                     <span className={`text-xs flex-shrink-0 ml-2 ${isActive ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                                                        {conv.lastMessageTimestamp ? new Date(conv.lastMessageTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                                        {new Date(conv.lastMessageTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                                    {/* Contenedor para los iconos de canal apilados */}
-                                                    <div className="flex items-center flex-shrink-0" title={`Canal(es): ${conv.canalOrigen || 'Desconocido'}`}>
-                                                        {channelIcons.map((icon, index) => (
-                                                            <span
-                                                                key={index}
-                                                                className="rounded-full bg-zinc-800 p-0.5"
-                                                                style={{
-                                                                    // Para que el más "nuevo" (último en el array) esté encima
-                                                                    marginLeft: index > 0 ? '-0.6rem' : '0', // Ajusta el solapamiento
-                                                                    zIndex: index
-                                                                }}
-                                                            >
-                                                                {icon}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                    <p className={`truncate ${isActive ? 'text-zinc-300' : 'text-zinc-400'}`}>
-                                                        {cleanPreview}
-                                                    </p>
+                                                    <span className="flex-shrink-0" title={`Canal: ${conv.canalOrigen || 'Desconocido'}`}>
+                                                        {getChannelDisplayIcon(conv.canalOrigen, conv.canalIcono)}
+                                                    </span>
+                                                    <p className={`truncate ${isActive ? 'text-zinc-300' : 'text-zinc-400'}`}>{conv.lastMessagePreview}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -341,4 +291,3 @@ export default function ListaConversaciones({ negocioId, clienteId }: ListaConve
         </div>
     );
 }
-

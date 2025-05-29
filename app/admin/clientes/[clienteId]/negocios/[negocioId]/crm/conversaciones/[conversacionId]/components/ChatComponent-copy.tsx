@@ -288,26 +288,18 @@ export default function ChatComponent({
         }
     };
 
-    // HELPERS DE UI
+    // HELPERS DE UI (pasados a ChatMessageBubble)
     const getMessageSenderIcon = useCallback((role: ChatMessageItemCrmData['role'], agente?: AgenteBasicoCrmData | null): JSX.Element => {
-        const localUser = user;
-        const localCurrentAgentInfo = currentAgentInfo;
+        const localUser = user; const localCurrentAgentInfo = currentAgentInfo;
         let agentDisplayName: string | null = null;
-        if (role === 'agent') {
-            if (agente?.id && localCurrentAgentInfo?.id && agente.id === localCurrentAgentInfo.id) agentDisplayName = localCurrentAgentInfo.nombre || localUser?.username || "Tú (Agente)";
-            else if (agente) agentDisplayName = agente.nombre || `Agente (${agente.id.substring(0, 4)}...)`;
-            else if (isOwner || isAdmin) agentDisplayName = localUser?.username || (isAdmin ? "Admin" : "Propietario");
-            else agentDisplayName = "Soporte/Agente";
-        }
-        const displayName = role === 'user' ? (conversationDetails?.leadNombre || 'Cliente') :
-            (role === 'assistant' ? (conversationDetails?.asistenteNombre || 'Asistente IA') : agentDisplayName);
+        if (role === 'agent') { if (agente?.id && localCurrentAgentInfo?.id && agente.id === localCurrentAgentInfo.id) agentDisplayName = localCurrentAgentInfo.nombre || localUser?.username || "Tú (Agente)"; else if (agente) agentDisplayName = agente.nombre || `Agente (${agente.id.substring(0, 4)}...)`; else if (isOwner || isAdmin) agentDisplayName = localUser?.username || (isAdmin ? "Admin" : "Propietario"); else agentDisplayName = "Soporte/Agente"; }
+        const displayName = role === 'user' ? (conversationDetails?.leadNombre || 'Cliente') : (role === 'assistant' ? (conversationDetails?.asistenteNombre || 'Asistente IA') : agentDisplayName);
         if (role === 'user') return <span title={displayName || undefined}><User size={18} className="text-blue-300" /></span>;
         if (role === 'assistant') return <span title={displayName || undefined}><Bot size={18} className="text-zinc-400" /></span>;
         if (role === 'agent' && (isOwner || isAdmin) && (!agente?.id || (agente?.userId === localUser?.id && localUser?.id))) return <span title={displayName || undefined}><ShieldCheck size={18} className="text-emerald-400" /></span>;
         if (role === 'agent') return <span title={displayName || undefined}><User size={18} className="text-purple-300" /></span>;
         return <MessageSquareWarning size={18} className="text-amber-400" />;
-    }, [user, currentAgentInfo, conversationDetails, isAdmin, isOwner]);
-
+    }, [user, currentAgentInfo, isAdmin, isOwner, conversationDetails?.leadNombre, conversationDetails?.asistenteNombre]);
 
     const copiarIdConversacion = useCallback((id: string | undefined) => {
         if (id) {
