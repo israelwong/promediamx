@@ -1,8 +1,8 @@
 // ruta: 'app/admin/_lib/actions/webchat_test/chatTest.actions.ts'
 'use server';
 
-import prisma from '@/app/admin/_lib/prismaClient';
 import { z } from 'zod';
+import prisma from '@/app/admin/_lib/prismaClient';
 import type { ActionResult } from '@/app/admin/_lib/types';
 import {
     IniciarConversacionWebchatInputSchema,
@@ -208,7 +208,7 @@ export async function iniciarConversacionWebchatAction(
             let iaMsgData: Prisma.InteraccionCreateInput;
 
             if (respuestaIA.llamadaFuncion) {
-                console.log('[ChatTest Actions Iniciar] IA solicitó FunctionCall:', respuestaIA.llamadaFuncion.nombreFuncion);
+                // console.log('[ChatTest Actions Iniciar] IA solicitó FunctionCall:', respuestaIA.llamadaFuncion.nombreFuncion);
                 iaMsgData = {
                     conversacion: { connect: { id: conversationIdVar } },
                     role: 'assistant', parteTipo: InteraccionParteTipo.FUNCTION_CALL,
@@ -377,7 +377,7 @@ export async function enviarMensajeWebchatAction(
 
     try {
         if (estadoActual === 'en_espera_agente' || estadoActual === 'hitl_activo') {
-            console.log(`[ChatTest Actions Enviar] Conversación ${conversationId} en espera de agente. No se llama a IA.`);
+            // console.log(`[ChatTest Actions Enviar] Conversación ${conversationId} en espera de agente. No se llama a IA.`);
             return {
                 success: true,
                 data: {
@@ -429,32 +429,9 @@ export async function enviarMensajeWebchatAction(
         }).filter(Boolean) as HistorialTurnoParaGemini[];
 
 
-        console.log(`[ChatTest Actions Enviar] Historial para IA (últimos 5) para conv ${conversationId}:`, JSON.stringify(historialParaIA.slice(-5), null, 2));
+        // console.log(`[ChatTest Actions Enviar] Historial para IA (últimos 5) para conv ${conversationId}:`, JSON.stringify(historialParaIA.slice(-5), null, 2));
 
         const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, prisma);
-        // const historialParaIAAdaptado = historialParaIA.map(item => {
-        //     // Map roles from Gemini to expected roles
-        //     let mappedRole: "user" | "assistant" | "agent" | "system";
-        //     switch (item.role) {
-        //         case "user":
-        //             mappedRole = "user";
-        //             break;
-        //         case "model":
-        //             mappedRole = "assistant";
-        //             break;
-        //         case "function":
-        //             mappedRole = "agent";
-        //             break;
-        //         default:
-        //             mappedRole = "system";
-        //     }
-        //     // Extract mensaje from parts (prefer text, otherwise null)
-        //     const textPart = item.parts.find(p => typeof p.text === "string");
-        //     return {
-        //         role: mappedRole,
-        //         mensaje: textPart?.text ?? null
-        //     };
-        // });
 
         const resultadoIA = await generarRespuestaAsistente({
             historialConversacion: historialParaIA,
@@ -473,7 +450,7 @@ export async function enviarMensajeWebchatAction(
             let iaMsgData: Prisma.InteraccionCreateInput;
 
             if (respuestaIA.llamadaFuncion) {
-                console.log('[ChatTest Actions Enviar] IA solicitó FunctionCall:', respuestaIA.llamadaFuncion.nombreFuncion);
+                // console.log('[ChatTest Actions Enviar] IA solicitó FunctionCall:', respuestaIA.llamadaFuncion.nombreFuncion);
                 iaMsgData = {
                     conversacion: { connect: { id: conversationId } },
                     role: 'assistant', parteTipo: InteraccionParteTipo.FUNCTION_CALL,

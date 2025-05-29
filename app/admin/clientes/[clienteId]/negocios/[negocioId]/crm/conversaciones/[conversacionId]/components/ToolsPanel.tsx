@@ -58,6 +58,8 @@ export default function ToolsPanel({
     onActionComplete,
     conversationDetails: initialConversationDetailsProp,
 }: ToolsPanelProps) {
+
+
     const [leadDetails, setLeadDetails] = useState<LeadDetailsForPanelData | null>(null);
     const [conversationDetails, setConversationDetails] = useState<ConversationDetailsForPanelData | null>(initialConversationDetailsProp);
     const [etiquetasDisponibles, setEtiquetasDisponibles] = useState<EtiquetaCrmItemData[]>([]);
@@ -230,6 +232,9 @@ export default function ToolsPanel({
     const currentAssignedAgentId = conversationDetails?.agenteCrmActual?.id || "";
     const isPaused = conversationDetails?.status === 'en_espera_agente' || conversationDetails?.status === 'hitl_activo';
     const isArchived = conversationDetails?.status === 'archivada';
+
+
+    // console.log(conversationDetails)
 
     return (
         <div className="space-y-5 h-full flex flex-col">

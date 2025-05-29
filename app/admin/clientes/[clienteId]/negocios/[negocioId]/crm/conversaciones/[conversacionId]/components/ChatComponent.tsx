@@ -47,7 +47,6 @@ interface InteraccionRealtimePayload {
 }
 
 interface ChatComponentProps {
-    conversationDetails: ConversationDetailsForPanelData | null;
     initialConversationDetails: ConversationDetailsForPanelData | null;
     initialMessages: ChatMessageItemCrmData[];
     initialError?: string | null;
@@ -68,7 +67,6 @@ if (typeof window !== 'undefined') {
 const ADMIN_ROLE_NAME = 'Administrador';
 
 export default function ChatComponent({
-    conversationDetails,
     initialConversationDetails,
     initialMessages,
     initialError,
@@ -78,7 +76,7 @@ export default function ChatComponent({
     console.log(`[ChatComponent CRM V5] Props iniciales. ConvID: ${initialConversationDetails?.id}, Msgs: ${initialMessages?.length}`);
 
     const [messages, setMessages] = useState<ChatMessageItemCrmData[]>(initialMessages || []);
-    // const [conversationDetails, setConversationDetails] = useState<ConversationDetailsForPanelData | null>(initialConversationDetails);
+    const [conversationDetails, setConversationDetails] = useState<ConversationDetailsForPanelData | null>(initialConversationDetails);
     const [error, setError] = useState<string | null>(initialError || null);
 
     const [newMessage, setNewMessage] = useState('');
@@ -103,18 +101,6 @@ export default function ChatComponent({
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null);
 
-    // El estado 'messages' y 'error' (para mensajes) se manejan aquí
-    // const [messages, setMessages] = useState<ChatMessageItemCrmData[]>(initialMessages || []);
-    const [errorMessages, setErrorMessages] = useState<string | null>(initialError || null);
-
-
-    // EFECTO: Actualizar mensajes si la prop initialMessages cambia
-    useEffect(() => {
-        setMessages(initialMessages || []);
-        setErrorMessages(initialError || null);
-    }, [initialMessages, initialError]);
-
-
     //! EFECTO: Validar token de usuario
     useEffect(() => {
         async function validarToken() {
@@ -136,7 +122,7 @@ export default function ChatComponent({
     // EFECTO: Actualizar estado con props cambiantes
     useEffect(() => {
         const prevConvId = conversationDetails?.id;
-        // setConversationDetails(initialConversationDetails);
+        setConversationDetails(initialConversationDetails);
         setMessages(initialMessages || []);
         setError(initialError || null);
         if (initialConversationDetails?.id !== prevConvId) {
@@ -159,6 +145,11 @@ export default function ChatComponent({
         }
     }, []);
 
+    // EFECTO PARA MONITOREAR LIGHTBOXOPEN (PARA DEBUG)
+    useEffect(() => {
+        console.log('[ChatComponent V5 - Lightbox STATE] lightboxOpen AHORA ES:', lightboxOpen);
+        // if (lightboxOpen) { debugger; } // Descomenta para usar el debugger del navegador
+    }, [lightboxOpen]);
 
     // EFECTO: Lightbox para contenido HTML (webchat)
     // Este listener es para el contenido que se renderiza con dangerouslySetInnerHTML
@@ -276,6 +267,7 @@ export default function ChatComponent({
             ).subscribe(/* ... tu lógica de subscribe ... */);
         return () => { if (supabase && channel) supabase.removeChannel(channel).catch(console.error); };
     }, [currentConversationId]);
+    // HANDLER: Enviar mensaje
 
     // HELPERS DE UI
     const handleSendMessage = async (e: FormEvent) => {
@@ -374,9 +366,7 @@ export default function ChatComponent({
                 isLoadingPermissions={isLoadingPermissions}
                 canSendPermission={!!(currentAgentInfo?.id || isOwner || isAdmin)}
                 currentConversationId={currentConversationId}
-                // error={error} // Pasar el error general del chat
-                error={errorMessages}
-
+                error={error} // Pasar el error general del chat
             />
             {lightboxOpen && (
                 <Lightbox
