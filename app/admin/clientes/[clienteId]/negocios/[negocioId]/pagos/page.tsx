@@ -56,42 +56,43 @@ export default async function PagosPage({ params }: { params: Promise<PageParams
     }
 
     return (
-        <div className="space-y-8"> {/* Aumentado el espacio general */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch"> {/* 2 columnas en desktop, mismo alto */}
             {/* <HeaderPage
-                    title="Pagos y Transacciones"
-                    description="Configura tus métodos de cobro y visualiza el historial de transacciones de tu negocio."
-                /> */}
-
-            {errorConfiguracion && (
-                <div className="p-4 text-sm text-red-700 bg-red-100 border border-red-400 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:border-red-700" role="alert">
-                    <p className="font-bold">Error al cargar configuración:</p>
-                    <p>{errorConfiguracion}</p>
-                </div>
-            )}
-
-            <PagosConfiguracion
-                negocioId={negocioId}
-                configuracionInicial={configuracionPago}
-            // esNuevaConfiguracion ya está dentro de configuracionPago
-            />
-
-            {errorTransacciones && (
-                <div className="p-4 text-sm text-red-700 bg-red-100 border border-red-400 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:border-red-700" role="alert">
-                    <p className="font-bold">Error al cargar transacciones:</p>
-                    <p>{errorTransacciones}</p>
-                </div>
-            )}
-
-            {/* Separador visual */}
-            <hr className="my-8 border-zinc-200 dark:border-zinc-700" />
+            title="Pagos y Transacciones"
+            description="Configura tus métodos de cobro y visualiza el historial de transacciones de tu negocio."
+            /> */}
 
 
-            <PagosHistorial
-                negocioId={negocioId}
-                initialTransactions={initialTransactions}
-                totalCount={totalTransactions}
-            // Podríamos pasar pageSize y page actual si quisiéramos que el server component maneje toda la paginación
-            />
+            <div>
+                <PagosHistorial
+                    negocioId={negocioId}
+                    initialTransactions={initialTransactions}
+                    totalCount={totalTransactions}
+                // Podríamos pasar pageSize y page actual si quisiéramos que el server component maneje toda la paginación
+                />
+            </div>
+
+            <div>
+                {errorConfiguracion && (
+                    <div className="p-4 text-sm text-red-700 bg-red-100 border border-red-400 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:border-red-700" role="alert">
+                        <p className="font-bold">Error al cargar configuración:</p>
+                        <p>{errorConfiguracion}</p>
+                    </div>
+                )}
+                <PagosConfiguracion
+                    negocioId={negocioId}
+                    configuracionInicial={configuracionPago}
+                // esNuevaConfiguracion ya está dentro de configuracionPago
+                />
+
+                {errorTransacciones && (
+                    <div className="p-4 text-sm text-red-700 bg-red-100 border border-red-400 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:border-red-700" role="alert">
+                        <p className="font-bold">Error al cargar transacciones:</p>
+                        <p>{errorTransacciones}</p>
+                    </div>
+                )}
+            </div>
+
         </div>
     );
 }

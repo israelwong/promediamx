@@ -1,104 +1,60 @@
 //ruta : app/admin/clientes/[clienteId]/negocios/[negocioId]/pagos/components/PagosConfiguracion.tsx
 'use client';
 
-import React, { useState, useTransition, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'; // Importar usePathname
+import React, { useState, useTransition, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { type NegocioConfiguracionPago } from '@/app/admin/_lib/actions/negocioPagos/negocioConfiguracionPago.schemas';
 import { iniciarConexionStripeAction } from '@/app/admin/_lib/actions/negocioPagos/negocioConfiguracionPago.actions';
 
-import { Button } from '@/app/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
-import { Switch } from '@/app/components/ui/switch';
-import { Label } from '@/app/components/ui/label';
+import { Button } from '@/app/components/ui/button'; // Correcta importación
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'; // Asumiendo que tienes Card
+import { Switch } from '@/app/components/ui/switch'; // Asumiendo que tienes Switch
+import { Label } from '@/app/components/ui/label';   // Asumiendo que tienes Label
 import { Loader2, ExternalLink, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 
 interface PagosConfiguracionProps {
     configuracionInicial: (NegocioConfiguracionPago & { _esNuevaConfiguracion?: boolean }) | null;
     negocioId: string;
+    // esNuevaConfiguracion ya está en configuracionInicial._esNuevaConfiguracion
 }
 
 export default function PagosConfiguracion({ configuracionInicial, negocioId }: PagosConfiguracionProps) {
     const router = useRouter();
-    const pathname = usePathname(); // Para construir la URL al limpiar parámetros
     const searchParams = useSearchParams();
-    const [isPending, startTransition] = useTransition(); // Para el botón Conectar/Continuar
-
-    // Estados para mensajes de feedback
+    const [isPending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [feedbackTimeoutId, setFeedbackTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
+    // Estado local para la configuración, inicializado con los props
+    // Esto permite que la UI sea interactiva antes de guardar
     const [aceptaPagosOnline, setAceptaPagosOnline] = useState(configuracionInicial?.aceptaPagosOnline || false);
     const [aceptaMSI, setAceptaMSI] = useState(configuracionInicial?.aceptaMesesSinIntereses || false);
-
-    // Función para limpiar mensajes y timeouts
-    const clearFeedback = useCallback(() => {
-        if (feedbackTimeoutId) {
-            clearTimeout(feedbackTimeoutId);
-        }
-        setSuccessMessage(null);
-        setError(null);
-        setFeedbackTimeoutId(null);
-    }, [feedbackTimeoutId]);
-
+    // mesesPermitidosMSI necesitaría un input más complejo (ej. MultiSelect o chips)
 
     useEffect(() => {
-        const stripeReturn = searchParams?.get('stripe_return');
-        const stripeRefresh = searchParams?.get('stripe_refresh');
-        // Usamos un flag en la URL para saber si ya procesamos estos parámetros
-        const paramsAlreadyProcessed = searchParams?.get('params_stripe_processed');
+        // Verificar si venimos de un retorno de Stripe Onboarding
+        if (searchParams && searchParams.get('stripe_return') === 'true') {
+            setSuccessMessage("¡Proceso de Stripe completado! Actualizando estado...");
+            // Forzar una recarga de los datos del servidor para esta ruta
+            window.history.replaceState(null, '', window.location.pathname);
 
-        let needsUrlUpdate = false;
-        let messageToShow: { type: 'success' | 'error'; text: string } | null = null;
-
-        if (paramsAlreadyProcessed !== 'true') { // Solo procesar si no están marcados como procesados
-            if (stripeReturn === 'true') {
-                messageToShow = { type: 'success', text: "¡Proceso de Stripe completado! Refrescando datos..." };
-                router.refresh(); // Importante: refrescar los datos del servidor
-                needsUrlUpdate = true;
-            } else if (stripeRefresh === 'true') {
-                messageToShow = { type: 'error', text: "El enlace de configuración de Stripe expiró o fue inválido. Por favor, intenta conectar de nuevo." };
-                needsUrlUpdate = true;
-            }
+            router.refresh();
+            // Opcional: limpiar los query params de la URL
+            // window.history.replaceState(null, '', window.location.pathname);
+            // toast.success("Configuración de Stripe actualizada.");
         }
-
-        if (messageToShow) {
-            clearFeedback(); // Limpiar cualquier mensaje anterior y su timeout
-            if (messageToShow.type === 'success') {
-                setSuccessMessage(messageToShow.text);
-                setError(null);
-            } else {
-                setError(messageToShow.text);
-                setSuccessMessage(null);
-            }
-
-            // Auto-ocultar el mensaje después de 5 segundos
-            const newTimeout = setTimeout(() => {
-                clearFeedback();
-            }, 5000);
-            setFeedbackTimeoutId(newTimeout);
+        if (searchParams && searchParams.get('stripe_refresh') === 'true') {
+            // El usuario podría haber sido redirigido aquí si el link de onboarding expiró.
+            setError("El enlace de configuración de Stripe expiró o fue inválido. Por favor, intenta conectar de nuevo.");
+            // router.refresh();
+            // Opcional: limpiar los query params
+            // window.history.replaceState(null, '', window.location.pathname);
         }
-
-        if (needsUrlUpdate) {
-            // Limpiar los parámetros originales de Stripe de la URL y marcar como procesados
-            const newUrlParams = new URLSearchParams(Array.from((searchParams ?? new URLSearchParams()).entries()));
-            newUrlParams.delete('stripe_return');
-            newUrlParams.delete('stripe_refresh');
-            newUrlParams.set('params_stripe_processed', 'true'); // Marcar como procesados
-            router.replace(`${pathname}?${newUrlParams.toString()}`, { scroll: false });
-        }
-
-        // Limpieza del timeout si el componente se desmonta o las dependencias cambian
-        return () => {
-            if (feedbackTimeoutId) clearTimeout(feedbackTimeoutId);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps 
-    }, [searchParams, pathname, router, clearFeedback]); // clearFeedback es una dependencia ahora
+    }, [searchParams, router]);
 
 
     const handleConectarStripe = () => {
-        clearFeedback(); // Limpiar mensajes antes de una nueva acción
         setError(null);
         setSuccessMessage(null);
         startTransition(async () => {
@@ -107,12 +63,12 @@ export default function PagosConfiguracion({ configuracionInicial, negocioId }: 
                 window.location.href = result.data.onboardingUrl;
             } else {
                 setError(result.error || 'Ocurrió un error al conectar con Stripe.');
+                // toast.error(result.error || 'Ocurrió un error al conectar con Stripe.');
             }
         });
     };
 
     if (!configuracionInicial) {
-        // ... (código de error si no hay configuracionInicial, sin cambios)
         return (
             <Card className="border-destructive">
                 <CardHeader><CardTitle className="text-destructive">Error</CardTitle></CardHeader>
@@ -143,20 +99,20 @@ export default function PagosConfiguracion({ configuracionInicial, negocioId }: 
             </CardHeader>
             <CardContent className="space-y-8">
                 {successMessage && (
-                    <div className="flex items-center gap-2 p-3 text-sm rounded-md bg-green-500/10 text-green-700 dark:text-green-300 border border-green-700/30">
+                    <div className="flex items-center gap-2 p-3 text-sm rounded-md bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700">
                         <CheckCircle size={18} /> {successMessage}
                     </div>
                 )}
                 {error && (
-                    <div className="flex items-center gap-2 p-3 text-sm rounded-md bg-red-500/10 text-red-700 dark:text-red-300 border border-red-700/30">
+                    <div className="flex items-center gap-2 p-3 text-sm rounded-md bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700">
                         <AlertTriangle size={18} /> {error}
                     </div>
                 )}
 
                 {/* Sección de Conexión con Stripe */}
-                <div className="p-4 space-y-3 border rounded-md bg-zinc-800/30 border-zinc-700">
+                <div className="p-4 space-y-3 border rounded-md bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700">
                     <div className="flex items-center justify-between">
-                        <Label htmlFor="stripe-connect-status" className="text-base font-semibold text-zinc-100">
+                        <Label htmlFor="stripe-connect-status" className="text-base font-semibold">
                             Conexión con Stripe
                         </Label>
                         {!stripeConectado && !stripePendiente && (
@@ -174,29 +130,29 @@ export default function PagosConfiguracion({ configuracionInicial, negocioId }: 
                     </div>
 
                     {!configuracionInicial.stripeAccountId && (
-                        <p className="flex items-center gap-2 text-sm text-amber-500"> {/* Cambiado a amber para tema dark */}
+                        <p className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
                             <Info size={16} /> Stripe no ha sido configurado.
                         </p>
                     )}
                     {stripePendiente && (
-                        <p className="flex items-center gap-2 text-sm text-amber-500">
+                        <p className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
                             <AlertTriangle size={16} /> Configuración de Stripe iniciada, pero pendiente de completar.
                         </p>
                     )}
                     {stripeConectado && (
-                        <div className="flex items-center gap-2 text-sm text-green-400"> {/* Cambiado a green-400 para tema dark */}
+                        <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
                             <CheckCircle size={16} /> Stripe Conectado Exitosamente.
                             {configuracionInicial.stripeAccountId && (
-                                <span className="text-xs text-zinc-400">(ID: {configuracionInicial.stripeAccountId})</span>
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400">(ID: {configuracionInicial.stripeAccountId})</span>
                             )}
                         </div>
                     )}
                     {configuracionInicial.stripeAccountId && (!stripeCargosActivos || !configuracionInicial.stripePayoutsEnabled) && (
-                        <p className="mt-2 text-xs text-amber-500">
+                        <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
                             <AlertTriangle size={14} className="inline mr-1" />
                             Tu cuenta de Stripe está conectada pero podría no estar completamente activa para procesar cobros o recibir pagos.
                             Esto puede deberse a verificaciones pendientes por parte de Stripe.
-                            <Button variant="link" size="sm" onClick={handleConectarStripe} disabled={isPending} className="p-0 ml-1 h-auto text-xs text-blue-400 hover:text-blue-300">
+                            <Button variant="link" size="sm" onClick={handleConectarStripe} disabled={isPending} className="p-0 ml-1 h-auto text-xs">
                                 {isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
                                 Revisar/Completar en Stripe <ExternalLink size={12} className="ml-1" />
                             </Button>
@@ -206,58 +162,60 @@ export default function PagosConfiguracion({ configuracionInicial, negocioId }: 
 
                 {/* Sección de Configuración General de Pagos (solo si Stripe está OK) */}
                 {stripeConectado && stripeCargosActivos && (
-                    <div className="pt-6 space-y-6 border-t border-zinc-700">
+                    <div className="pt-6 space-y-6 border-t border-zinc-200 dark:border-zinc-700">
                         <div>
-                            <Label htmlFor="aceptaPagosOnlineSwitch" className="text-base font-semibold text-zinc-100">Habilitar Pagos Online</Label>
+                            <Label htmlFor="aceptaPagosOnlineSwitch" className="text-base font-semibold">Habilitar Pagos Online</Label>
                             <div className="flex items-center mt-2 space-x-2">
                                 <Switch
                                     id="aceptaPagosOnlineSwitch"
                                     checked={aceptaPagosOnline}
                                     onCheckedChange={setAceptaPagosOnline}
-                                    disabled={isPending} // Considerar un estado de carga diferente para guardar esta config
+                                    disabled={isPending}
                                 />
-                                <Label htmlFor="aceptaPagosOnlineSwitch" className="text-sm text-zinc-400">
+                                <Label htmlFor="aceptaPagosOnlineSwitch" className="text-sm text-zinc-600 dark:text-zinc-400">
                                     {aceptaPagosOnline ? "Los pagos online están ACTIVADOS para este negocio." : "Los pagos online están DESACTIVADOS."}
                                 </Label>
                             </div>
-                            <p className="mt-1 text-xs text-zinc-500">
+                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                                 Permite que tu asistente genere links de pago y procese transacciones.
                             </p>
                         </div>
 
                         <div>
-                            <Label htmlFor="aceptaMSISwitch" className="text-base font-semibold text-zinc-100">Ofrecer Meses sin Intereses (MSI)</Label>
+                            <Label htmlFor="aceptaMSISwitch" className="text-base font-semibold">Ofrecer Meses sin Intereses (MSI)</Label>
                             <div className="flex items-center mt-2 space-x-2">
                                 <Switch
                                     id="aceptaMSISwitch"
                                     checked={aceptaMSI}
                                     onCheckedChange={setAceptaMSI}
-                                    disabled={isPending} // Considerar un estado de carga diferente
+                                    disabled={isPending}
                                 />
-                                <Label htmlFor="aceptaMSISwitch" className="text-sm text-zinc-400">
+                                <Label htmlFor="aceptaMSISwitch" className="text-sm text-zinc-600 dark:text-zinc-400">
                                     {aceptaMSI ? "MSI están ACTIVADOS (si Stripe y la tarjeta del cliente lo permiten)." : "MSI están DESACTIVADOS."}
                                 </Label>
                             </div>
                             {aceptaMSI && (
                                 <div className="mt-2">
-                                    <Label htmlFor="mesesPermitidosMSI" className="text-sm text-zinc-300">Plazos de MSI Preferidos (opcional)</Label>
-                                    <p className="text-xs text-zinc-500">
+                                    <Label htmlFor="mesesPermitidosMSI" className="text-sm">Plazos de MSI Preferidos (opcional)</Label>
+                                    {/* Aquí iría un MultiSelect o similar para los mesesPermitidosMSI */}
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                                         Ej: 3, 6, 9, 12. Si se deja vacío, Stripe ofrecerá todos los planes disponibles. (Input pendiente de implementar)
                                     </p>
-                                    <p className="text-xs text-zinc-400">
+                                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
                                         Planes actuales: {configuracionInicial.mesesPermitidosMSI.join(', ') || 'Ninguno específico'}
                                     </p>
                                 </div>
                             )}
-                            <p className="mt-1 text-xs text-zinc-500">
+                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                                 Permite a tus clientes pagar en cuotas. La disponibilidad final depende de Stripe y el banco del cliente.
                             </p>
                         </div>
-                        {/* Botón de Guardar Configuración de Pagos Online y MSI (necesitará su propia Server Action) */}
-                        {/* <div className="flex justify-end pt-4 border-t border-zinc-700">
-                            <Button onClick={handleGuardarConfiguracionPagos} disabled={isSavingConfig}>
-                                {isSavingConfig && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Guardar Configuración de Pagos
+
+                        {/* Botón de Guardar Configuración (necesitará su propia Server Action) */}
+                        {/* <div className="flex justify-end">
+                            <Button onClick={handleGuardarConfiguracion} disabled={isPending}>
+                                {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Guardar Configuración
                             </Button>
                         </div> */}
                     </div>

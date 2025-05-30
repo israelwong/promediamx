@@ -101,11 +101,10 @@ model AsistenteVirtual{
   whatsappQualityRating     String?      // Calificación de calidad del número: "GREEN", "YELLOW", "RED", "UNKNOWN" (informativo)
   whatsappTokenLastSet      DateTime?    // Fecha y hora en que el token fue configurado/actualizado por última vez
   // whatsappLongLivedTokenExpiresAt DateTime? // Opcional: si el token de larga duración tiene una fecha de expiración conocida y manejable
-
-  nombreHITL String? //Nombre responsable del Human in the loop
-  whatsappHITL String? //telefono para consultas human in the loop
-  emailHITL String?//email String? asociado al asistente virtual
-  emailCalendario String? //email para agendar citas
+  // nombreHITL String? //Nombre responsable del Human in the loop
+  // whatsappHITL String? //telefono para consultas human in the loop
+  // emailHITL String?//email String? asociado al asistente virtual
+  // emailCalendario String? //email para agendar citas
   version   Float
   status    String   @default("activo")
   createdAt DateTime @default(now())

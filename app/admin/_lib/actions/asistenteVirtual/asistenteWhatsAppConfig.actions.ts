@@ -634,36 +634,38 @@ export async function procesarCallbackMetaOAuth(
 export async function desconectarWhatsAppAction(
     input: z.infer<typeof DesconectarWhatsAppInputSchema>
 ): Promise<ActionResult<null>> {
+    console.log("[WhatsApp Disconnect] Iniciando acción para desconectar. Input:", input);
     try {
         // const usuario = await obtenerUsuarioServidor(); // Implementar autenticación/autorización
         // if (!usuario) {
+        //   console.error("[WhatsApp Disconnect] Error: No autorizado.");
         //   return { success: false, error: "No autorizado." };
         // }
-
+        console.log("[WhatsApp Disconnect] Paso 1: Validando input...");
         const validation = DesconectarWhatsAppInputSchema.safeParse(input);
         if (!validation.success) {
+            console.error("[WhatsApp Disconnect] Error: Datos de entrada inválidos.", validation.error.flatten());
             return { success: false, error: "ID de asistente inválido." };
         }
         const { asistenteId } = validation.data;
+        console.log(`[WhatsApp Disconnect] Paso 2: Input validado. Asistente ID: ${asistenteId}`);
 
         // TODO: Validar permisos del usuario sobre el asistente.
-        const asistente = await prisma.asistenteVirtual.findFirst({
-            where: {
-                id: asistenteId
-                // negocio: { clienteId: usuario.clienteId } // Descomenta y define 'usuario' si es necesario
-            },
-            select: { negocioId: true } // Para revalidar path
-        });
-        if (!asistente) {
-            return { success: false, error: "Asistente no encontrado o no tienes permiso." };
-        }
+        // Ejemplo:
+        // const asistentePermiso = await prisma.asistenteVirtual.findFirst({
+        //   where: { 
+        //     id: asistenteId,
+        //     // negocio: { clienteId: usuario.clienteId } // Asumiendo estructura
+        //   },
+        //   select: { id: true } 
+        // });
+        // if (!asistentePermiso) {
+        //     console.error(`[WhatsApp Disconnect] Error: Asistente ${asistenteId} no encontrado o sin permiso.`);
+        //     return { success: false, error: "Asistente no encontrado o no tienes permiso." };
+        // }
+        // console.log(`[WhatsApp Disconnect] Paso 3: Permisos validados para asistente ${asistenteId}.`);
 
-        // Opcional: Intentar invalidar el token del lado de Meta.
-        // Esto requiere el token de acceso del usuario.
-        // DELETE https://graph.facebook.com/{user_id}/permissions?access_token={user_access_token}
-        // Esto es más complejo porque necesitarías el user_id de Meta asociado al token.
-        // Por simplicidad, a menudo solo se borra el token de la BD.
-
+        console.log(`[WhatsApp Disconnect] Paso 4: Intentando actualizar BD para asistente ${asistenteId}...`);
         await prisma.asistenteVirtual.update({
             where: { id: asistenteId },
             data: {
@@ -671,23 +673,28 @@ export async function desconectarWhatsAppAction(
                 phoneNumberId: null,
                 whatsappBusinessAccountId: null,
                 whatsappDisplayName: null,
-                whatsappConnectionStatus: 'NO_CONECTADO',
+                whatsappConnectionStatus: 'NO_CONECTADO', // Asegúrate que este valor sea manejado en la UI
                 whatsappTokenLastSet: null,
                 whatsappQualityRating: null,
-                whatsappBusiness: null, // Limpiar también el número
+                whatsappBusiness: null,
             },
         });
+        console.log(`[WhatsApp Disconnect] Paso 5: BD actualizada para asistente ${asistenteId}.`);
 
-        // const negocioId = asistente.negocioId; // Obtener de la consulta previa
-        // revalidatePath(`/admin/clientes/[clienteId]/negocios/${negocioId}/asistente/${asistenteId}`);
-        console.log(`[WhatsApp Disconnect] WhatsApp desconectado para Asistente ${asistenteId}`);
+        // La revalidación de path está comentada en procesarCallbackMetaOAuth.
+        // Si la necesitas aquí, y esta acción se llama desde un Client Component,
+        // podrías intentar revalidatePath, pero podría dar el mismo error si el contexto no es el adecuado.
+        // Por ahora, el cliente refrescará la ruta con router.refresh().
+        // const pathUserIsOn = `/admin/clientes/...`; // Necesitarías construir la ruta completa
+        // revalidatePath(pathUserIsOn);
+        // console.log(`[WhatsApp Disconnect] Path revalidado (simulado): ${pathUserIsOn}`);
+
+        console.log(`[WhatsApp Disconnect] WhatsApp desconectado exitosamente para Asistente ${asistenteId}`);
         return { success: true, data: null };
 
     } catch (error) {
-        console.error("Error en desconectarWhatsAppAction:", error);
         const errorMessage = error instanceof Error ? error.message : "Error desconocido.";
+        console.error("[WhatsApp Disconnect] Error general en desconectarWhatsAppAction:", errorMessage, error);
         return { success: false, error: `Ocurrió un error al desconectar WhatsApp: ${errorMessage}` };
     }
 }
-
-

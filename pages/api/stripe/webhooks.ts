@@ -92,6 +92,8 @@ export default async function handler(
             const session = event.data.object as Stripe.Checkout.Session;
             console.log(`[Webhook] 'checkout.session.completed' recibido para la sesión: ${session.id}`);
 
+
+
             if (session.payment_status === 'paid') {
                 // const negocioId = 'cm9z1igbu0001guuswr4pd58b' //!prueba
                 const negocioId = session.metadata?.promedia_negocio_id;
@@ -133,6 +135,16 @@ export default async function handler(
                     }
                     if (!referenciaProcesadorId) {
                         referenciaProcesadorId = session.id; // Fallback al ID de la sesión si no hay payment_intent ID
+                    }
+
+                    // Dentro del case 'checkout.session.completed', antes de prisma.negocioTransaccion.create:
+                    const existingTransaction = await prisma.negocioTransaccion.findUnique({
+                        where: { referenciaProcesador: referenciaProcesadorId },
+                    });
+
+                    if (existingTransaction) {
+                        console.log(`[Webhook] Transacción para referenciaProcesador ${referenciaProcesadorId} ya fue procesada. Omitiendo.`);
+                        return res.status(200).json({ received: true, message: "Evento ya procesado." });
                     }
 
                     await prisma.negocioTransaccion.create({

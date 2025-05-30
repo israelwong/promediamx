@@ -55,10 +55,10 @@ export const actualizarAsistenteFormSchema = z.object({
     whatsappBusiness: z.string().trim().nullish().transform(val => val || null),
     phoneNumberId: z.string().trim().nullish().transform(val => val || null),
     token: z.string().trim().nullish().transform(val => val || null), // No se muestra, pero se podría actualizar
-    nombreHITL: z.string().trim().nullish().transform(val => val || null),
-    whatsappHITL: z.string().trim().nullish().transform(val => val || null),
-    emailHITL: z.string().email({ message: "Email HITL inválido." }).nullish().transform(val => val || null),
-    emailCalendario: z.string().email({ message: "Email de calendario inválido." }).nullish().transform(val => val || null),
+    // nombreHITL: z.string().trim().nullish().transform(val => val || null),
+    // whatsappHITL: z.string().trim().nullish().transform(val => val || null),
+    // emailHITL: z.string().email({ message: "Email HITL inválido." }).nullish().transform(val => val || null),
+    // emailCalendario: z.string().email({ message: "Email de calendario inválido." }).nullish().transform(val => val || null),
     // urlImagen se maneja por un componente separado.
     // precioBase se omite.
     // origen, clienteId no suelen ser editables directamente en este formulario.
@@ -76,10 +76,10 @@ export const asistenteDetalleDataSchema = z.object({
     whatsappBusiness: z.string().nullable(),
     phoneNumberId: z.string().nullable(),
     token: z.string().nullable(), // Considerar no enviar el token completo al cliente
-    nombreHITL: z.string().nullable(),
-    whatsappHITL: z.string().nullable(),
-    emailHITL: z.string().nullable(),
-    emailCalendario: z.string().nullable(),
+    // nombreHITL: z.string().nullable(),
+    // whatsappHITL: z.string().nullable(),
+    // emailHITL: z.string().nullable(),
+    // emailCalendario: z.string().nullable(),
     // precioBase: z.number().nullable(), // Omitido
     version: z.number(),
     status: z.string(),
