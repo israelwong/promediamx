@@ -5,6 +5,9 @@ import { Metadata } from 'next'
 
 import AsistenteEditarForm from './components/AsistenteEditarForm';
 import AsistenteTareas from './components/AsistenteTareas'; // Este será rediseñado después para separar tareas
+import { AsistenteWhatsAppConfig } from './components/AsistenteWhatsAppConfig';
+
+import { obtenerAsistenteVirtualPorId } from '@/app/admin/_lib/asistenteVirtual.actions';
 
 export const metadata: Metadata = {
     title: 'Detalles del Asistente',
@@ -18,8 +21,10 @@ export default async function page({ params }: { params: Promise<{ clienteId: st
     const mainColumnClasses = "lg:col-span-1 flex flex-col gap-6";
     const sidebarColumnClasses = "lg:col-span-1 flex flex-col gap-6 overflow-y-auto max-h-screen"; // O una max-h calculada
 
+    const { asistenteId, clienteId, negocioId } = await params;
 
-    const { clienteId, negocioId, asistenteId } = await params;
+    const asistente = await obtenerAsistenteVirtualPorId(asistenteId);
+
     return (
         <div className={pageContainerClasses}>
             <div className={`${gridContainerClasses} h-full min-h-screen`}>
@@ -32,6 +37,24 @@ export default async function page({ params }: { params: Promise<{ clienteId: st
                             negocioIdOriginal={negocioId}
                         />
                         {/* Aquí podrías añadir AsistenteEstadisticas si decides que sea un componente más pequeño debajo del form */}
+                    </div>
+                </div>
+
+                <div>
+                    {/* Columna Lateral (Configuración de WhatsApp) */}
+                    <div className={`${sidebarColumnClasses} `}>
+                        <AsistenteWhatsAppConfig
+                            asistenteId={asistenteId}
+                            clienteId={clienteId}
+                            negocioId={negocioId}
+                            asistenteConfig={{
+                                whatsappBusiness: asistente?.whatsappBusiness ?? null,
+                                phoneNumberId: asistente?.phoneNumberId ?? null,
+                                whatsappDisplayName: asistente?.whatsappDisplayName ?? null,
+                                whatsappBusinessAccountId: asistente?.whatsappBusinessAccountId ?? null,
+                                whatsappConnectionStatus: asistente?.whatsappConnectionStatus ?? null,
+                            }}
+                        />
                     </div>
                 </div>
 

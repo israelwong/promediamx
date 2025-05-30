@@ -55,7 +55,7 @@ export async function obtenerAsistenteVirtualPorId(asistenteVirtualId: string): 
                             select: { // Seleccionar campos necesarios de Tarea
                                 id: true, // **ASEGURARSE DE INCLUIR ID**
                                 nombre: true,
-                                descripcion: true,
+                                descripcionMarketplace: true,
                                 precio: true // Incluir precio si lo usas
                                 // ... otros campos de Tarea ...
                             }
@@ -128,7 +128,7 @@ export async function crearAsistenteVirtual(
     data: CrearAsistenteInput
 ): Promise<AsistenteVirtual> { // Devuelve el asistente creado completo
 
-    const PRECIO_BASE_DEFAULT = 499;
+    // const PRECIO_BASE_DEFAULT = 499;
     const VERSION_DEFAULT = 1.0;
     const STATUS_DEFAULT = 'activo';
     const ORIGEN_DEFAULT = 'cliente'; // O el valor por defecto que prefieras
@@ -145,7 +145,7 @@ export async function crearAsistenteVirtual(
                     clienteId: data.clienteId,
                     descripcion: data.descripcion || null, // Usar null si no viene
                     urlImagen: data.urlImagen || null, // Usar null si no viene
-                    precioBase: PRECIO_BASE_DEFAULT,   // <-- Precio base fijo
+                    // precioBase: PRECIO_BASE_DEFAULT,   // <-- Precio base fijo
                     version: VERSION_DEFAULT,        // <-- Versión por defecto
                     status: STATUS_DEFAULT,          // <-- Status por defecto
                     origen: ORIGEN_DEFAULT,          // <-- Origen por defecto
@@ -293,7 +293,7 @@ export async function obtenerAsistentesPorNegocioId(negocioId: string) {
             whatsappHITL: true,
             emailHITL: true,
             emailCalendario: true,
-            precioBase: true,
+            // precioBase: true,
             version: true,
             status: true,
             createdAt: true,
@@ -342,7 +342,7 @@ export async function obtenerAsistentesPorNegocioId(negocioId: string) {
 
 // Tipo para la respuesta de la acción
 export interface CostosAsistente {
-    precioBase: number | null;
+    // precioBase: number | null;
     costoTareasAdicionales: number;
 }
 /**
@@ -358,16 +358,16 @@ export async function obtenerCostosAsistente(asistenteId: string): Promise<Costo
     }
 
     try {
-        // 1. Obtener el precio base del asistente
-        const asistente = await prisma.asistenteVirtual.findUnique({
-            where: { id: asistenteId },
-            select: { precioBase: true }
-        });
+        // // 1. Obtener el precio base del asistente
+        // const asistente = await prisma.asistenteVirtual.findUnique({
+        //     where: { id: asistenteId },
+        //     select: { precioBase: true }
+        // });
 
-        if (!asistente) {
-            console.error(`obtenerCostosAsistente: Asistente con ID ${asistenteId} no encontrado.`);
-            return null; // O lanzar error
-        }
+        // if (!asistente) {
+        //     console.error(`obtenerCostosAsistente: Asistente con ID ${asistenteId} no encontrado.`);
+        //     return null; // O lanzar error
+        // }
 
         // 2. Calcular la suma de los montos de suscripción de tareas adicionales activas
         const resultadoSuma = await prisma.asistenteTareaSuscripcion.aggregate({
@@ -393,7 +393,7 @@ export async function obtenerCostosAsistente(asistenteId: string): Promise<Costo
         const costoTareas = resultadoSuma._sum.montoSuscripcion ?? 0; // Usar 0 si la suma es null (ninguna tarea con costo)
 
         return {
-            precioBase: asistente.precioBase ?? 0, // Devolver 0 si precioBase es null
+            // precioBase: asistente.precioBase ?? 0, // Devolver 0 si precioBase es null
             costoTareasAdicionales: costoTareas
         };
 
@@ -459,7 +459,7 @@ export async function obtenerAsistentesParaLista(negocioId: string): Promise<Asi
                 id: true,
                 nombre: true,
                 urlImagen: true,
-                precioBase: true,
+                // precioBase: true,
                 status: true, // Incluir status
                 // Seleccionar suscripciones para calcular costo adicional
                 AsistenteTareaSuscripcion: {
@@ -495,7 +495,7 @@ export async function obtenerAsistentesParaLista(negocioId: string): Promise<Asi
                 id: asistente.id,
                 nombre: asistente.nombre,
                 urlImagen: asistente.urlImagen,
-                precioBase: asistente.precioBase,
+                // precioBase: asistente.precioBase,
                 costoTotalTareasAdicionales: costoTareas,
                 totalConversaciones: asistente._count?.Conversacion,
                 // totalTareasSuscritas: asistente._count?.AsistenteTareaSuscripcion, // Descomentar si cuentas suscripciones

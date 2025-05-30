@@ -89,9 +89,19 @@ model AsistenteVirtual{
   nombre    String
   descripcion String?
   origen String? // sistema, cliente
+
   whatsappBusiness String? //Telefono de WhatsApp Business
   phoneNumberId String? @unique //API de WhatsApp Business
   token String? //Identificador de acceso a la API de WhatsApp Business
+
+   // --- Nuevos campos sugeridos para WhatsApp ---
+  whatsappBusinessAccountId String?      // ID de la Cuenta de WhatsApp Business (WABA) (obtenido de Meta)
+  whatsappConnectionStatus  String?      // Estado de la conexión: "NO_CONECTADO", "CONECTADO", "ERROR_CONFIGURACION", "REQUIERE_REAUTENTICACION"
+  whatsappDisplayName       String?      // Nombre público aprobado por WhatsApp para este número
+  whatsappQualityRating     String?      // Calificación de calidad del número: "GREEN", "YELLOW", "RED", "UNKNOWN" (informativo)
+  whatsappTokenLastSet      DateTime?    // Fecha y hora en que el token fue configurado/actualizado por última vez
+  // whatsappLongLivedTokenExpiresAt DateTime? // Opcional: si el token de larga duración tiene una fecha de expiración conocida y manejable
+
   nombreHITL String? //Nombre responsable del Human in the loop
   whatsappHITL String? //telefono para consultas human in the loop
   emailHITL String?//email String? asociado al asistente virtual

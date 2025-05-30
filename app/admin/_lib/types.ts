@@ -357,7 +357,7 @@ export interface AsistenteEnLista {
     id: string;
     nombre: string;
     urlImagen: string | null;
-    precioBase: number | null;
+    // precioBase: number | null;
     costoTotalTareasAdicionales: number; // Calculado en el backend
     // Opcionales (si decides incluirlos y la consulta los devuelve)
     totalConversaciones?: number;
@@ -611,6 +611,10 @@ export interface AsistenteVirtual {
     Conversacion?: Conversacion[];
     FacturaItem?: FacturaItem[]; // Relación inversa opcional
     ItemInteraccion?: ItemInteraccion[]; // Opcional: Interacciones relacionadas con este asistente
+
+    whatsappDisplayName?: string | null; // Nombre de WhatsApp (opcional)
+    whatsappBusinessAccountId?: string | null; // ID de cuenta de WhatsApp Business (opcional)
+    whatsappConnectionStatus?: string | null; // Estado de conexión de WhatsApp (opcional)
 
 }
 
