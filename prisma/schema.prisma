@@ -100,11 +100,7 @@ model AsistenteVirtual{
   whatsappDisplayName       String?      // Nombre público aprobado por WhatsApp para este número
   whatsappQualityRating     String?      // Calificación de calidad del número: "GREEN", "YELLOW", "RED", "UNKNOWN" (informativo)
   whatsappTokenLastSet      DateTime?    // Fecha y hora en que el token fue configurado/actualizado por última vez
-  // whatsappLongLivedTokenExpiresAt DateTime? // Opcional: si el token de larga duración tiene una fecha de expiración conocida y manejable
-  // nombreHITL String? //Nombre responsable del Human in the loop
-  // whatsappHITL String? //telefono para consultas human in the loop
-  // emailHITL String?//email String? asociado al asistente virtual
-  // emailCalendario String? //email para agendar citas
+
   version   Float
   status    String   @default("activo")
   createdAt DateTime @default(now())
@@ -795,9 +791,10 @@ model Oferta {
   OfertaGaleria      OfertaGaleria[]
   videos        OfertaVideos[]
 
+//!precio, tipo_pago, recurrencia
 
-    detallesAdicionales      OfertaDetalle[]          // NUEVA: Detalles granulares de la oferta
-    PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // NUEVA: Preguntas sin respuesta relacionadas a esta oferta
+  detallesAdicionales      OfertaDetalle[]          // NUEVA: Detalles granulares de la oferta
+  PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // NUEVA: Preguntas sin respuesta relacionadas a esta oferta
 
 
   @@index([negocioId, status, fechaFin]) // Índice útil para buscar ofertas activas por negocio

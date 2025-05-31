@@ -8,6 +8,8 @@ import {
     type NegocioConfiguracionPago,
     IniciarConexionStripeInputSchema,
     IniciarConexionStripeOutputSchema,
+    ActualizarOpcionesPagoInputSchema,
+    type ActualizarOpcionesPagoInput
 } from './negocioConfiguracionPago.schemas';
 import { ActionResult } from '@/app/admin/_lib/types'; // Asumo que tienes un tipo ActionResult
 import { headers } from 'next/headers';
@@ -181,6 +183,82 @@ export async function iniciarConexionStripeAction(
             errorMessage = `Error de Stripe: ${(error as { message?: string }).message} (Parámetro: ${(error as { param?: string }).param})`;
         } else if (typeof error === 'object' && error !== null && 'message' in error) {
             errorMessage = (error as { message?: string }).message ?? errorMessage;
+        }
+        return { success: false, error: errorMessage };
+    }
+}
+
+// --- NUEVA ACCIÓN: actualizarOpcionesPagoAction ---
+export async function actualizarOpcionesPagoAction(
+    input: ActualizarOpcionesPagoInput // Usar el tipo inferido del schema
+): Promise<ActionResult<NegocioConfiguracionPago>> {
+    try {
+        // const usuario = await obtenerUsuarioServidor();
+        // if (!usuario || !usuario.clienteId) return { success: false, error: "No autorizado." };
+
+        const validation = ActualizarOpcionesPagoInputSchema.safeParse(input);
+        if (!validation.success) {
+            console.error("Error de validación en actualizarOpcionesPagoAction:", validation.error.flatten());
+            return { success: false, error: "Datos de entrada inválidos." };
+        }
+
+        const {
+            negocioId,
+            aceptaPagosOnline,
+            aceptaOxxoPay,
+            aceptaMesesSinIntereses,
+            mesesPermitidosMSI
+        } = validation.data;
+
+        // TODO: Validar que el usuario tiene permiso sobre este negocioId
+        // const negocioPermiso = await prisma.negocio.findFirst({
+        //     where: { id: negocioId, clienteId: usuario.clienteId },
+        //     select: { clienteId: true } // Solo para confirmar existencia y permiso
+        // });
+        // if (!negocioPermiso) {
+        //     return { success: false, error: "Negocio no encontrado o no tienes permiso." };
+        // }
+
+        const configuracionExistente = await prisma.negocioConfiguracionPago.findUnique({
+            where: { negocioId },
+        });
+
+        if (!configuracionExistente) {
+            return { success: false, error: "Configuración de pagos no encontrada para este negocio. Conecta Stripe primero." };
+        }
+
+        // Si se desactiva MSI, asegurarse de que mesesPermitidosMSI esté vacío
+        const finalMesesPermitidosMSI = aceptaMesesSinIntereses ? mesesPermitidosMSI : [];
+
+        const updatedConfig = await prisma.negocioConfiguracionPago.update({
+            where: { negocioId: negocioId },
+            data: {
+                aceptaPagosOnline,
+                aceptaOxxoPay,
+                aceptaMesesSinIntereses,
+                mesesPermitidosMSI: finalMesesPermitidosMSI,
+                // Aquí podrías añadir lógica para actualizar capacidades en Stripe si es necesario,
+                // por ejemplo, si 'oxxo_payments' no estaba solicitado antes.
+                // Pero por ahora, solo guardamos la preferencia en nuestra BD.
+            },
+        });
+
+        // Revalidar el path para que la página que muestra la configuración se actualice
+        // Necesitamos el clienteId para construir la ruta completa.
+        // Asumimos que lo obtuvimos de negocioPermiso o que el input lo incluye si es necesario.
+        // const clienteId = negocioPermiso.clienteId; 
+        // revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/pagos`);
+        // Por ahora, el frontend usará router.refresh() después de una respuesta exitosa.
+
+        const parsedConfig = NegocioConfiguracionPagoSchema.parse(updatedConfig); // Validar la salida
+
+        return { success: true, data: parsedConfig };
+
+    } catch (error) {
+        console.error('Error en actualizarOpcionesPagoAction:', error);
+        let errorMessage = 'No se pudo actualizar la configuración de opciones de pago.';
+        if (error instanceof Error) {
+            errorMessage = error.message;
         }
         return { success: false, error: errorMessage };
     }
