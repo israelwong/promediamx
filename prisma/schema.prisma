@@ -767,55 +767,78 @@ model NegocioPaqueteVideos{
 
 }
 
-
 //! OFERTA
+// Enum para el tipo de pago de la oferta
+enum TipoPagoOferta {
+  UNICO      // Para pagos únicos
+  RECURRENTE // Para pagos recurrentes/suscripciones
+}
+
+// Enum para el intervalo de recurrencia
+enum IntervaloRecurrenciaOferta {
+  SEMANAL
+  QUINCENAL
+  MENSUAL
+  BIMESTRAL   // Cada 2 meses
+  TRIMESTRAL  // Cada 3 meses
+  SEMESTRAL   // Cada 6 meses
+  ANUAL
+}
+
+enum ObjetivoOferta {
+  CITA  // Para agendar citas/reservas
+  VENTA // Para generar ventas directas
+}
+
+enum TipoAnticipoOferta {
+  PORCENTAJE // Porcentaje del total
+  MONTO_FIJO // Monto fijo a pagar como anticipo
+}
+
+
 model Oferta {
   id            String    @id @default(cuid())
   negocioId     String
   negocio       Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borran sus ofertas
   nombre        String    // Ej: "Descuento Primera Compra", "Promo Día Padre", "Cupón BIENVENIDO10"
-  variantesNombre String[] // modismos locales 
   descripcion   String?
-  tipoOferta    String    // Ej: 'DESCUENTO_PORCENTAJE', 'DESCUENTO_MONTO', 'CODIGO_PROMOCIONAL', 'ENVIO_GRATIS', 'COMPRA_X_LLEVA_Y', 'GENERAL'
-  valor         Float?    // Valor numérico asociado (ej: 10.0 para 10%, 50.0 para $50) - Nulo si no aplica (ej: GENERAL)
-  codigo        String?   @unique // Código promocional único si tipoOferta = 'CODIGO_PROMOCIONAL'
   fechaInicio   DateTime
   fechaFin      DateTime
+
+  precio                Float?                             // El monto de la oferta (para pago único o por ciclo recurrente)
+  tipoPago              TipoPagoOferta? @default(UNICO)   // Por defecto, un pago único
+  intervaloRecurrencia  IntervaloRecurrenciaOferta?     // Solo aplica si tipoPago es RECURRENTE
+  tipoAnticipo         String?                            // Tipo de anticipo requerido (ej: "PORCENTAJE", "MONTO_FIJO")
+  porcentajeAnticipo   Float?                             // Porcentaje de anticipo requerido (si aplica)
+  anticipo              Float?                             // Anticipo requerido (si aplica)
+
   status        String    @default("activo") // activo, inactivo, programada, finalizada
-  condiciones   String?   // Texto libre para describir condiciones adicionales (ej: "Compra mínima $500", "Solo nuevos clientes")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  linkPago      String? // El que acabas de añadir
 
   ItemCatalogoOferta ItemCatalogoOferta[]
   OfertaGaleria      OfertaGaleria[]
   videos        OfertaVideos[]
+  documentosOferta OfertaDocumento[] // Nueva relación
 
-//!precio, tipo_pago, recurrencia
+  objetivos ObjetivoOferta[]
 
   detallesAdicionales      OfertaDetalle[]          // NUEVA: Detalles granulares de la oferta
   PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // NUEVA: Preguntas sin respuesta relacionadas a esta oferta
-
-
   @@index([negocioId, status, fechaFin]) // Índice útil para buscar ofertas activas por negocio
-  @@index([tipoOferta])
-  @@index([codigo]) // Índice para buscar por código
 }
 
-// --- NUEVA Tabla Intermedia: Item <-> Oferta ---
 model ItemCatalogoOferta {
   id            String @id @default(cuid()) // Usar ID propio es buena práctica
   itemCatalogoId String
   itemCatalogo  ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Si se borra item, se borra vínculo
   ofertaId      String
   oferta        Oferta       @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Si se borra oferta, se borra vínculo
-
   @@unique([itemCatalogoId, ofertaId]) // Asegurar que un item solo se vincule una vez a la misma oferta
   @@index([itemCatalogoId])
   @@index([ofertaId])
 }
 
-// --- NUEVA Entidad: Galería de Oferta ---
 model OfertaGaleria {
   id          String   @id @default(cuid())
   ofertaId    String
@@ -826,7 +849,6 @@ model OfertaGaleria {
   orden       Int?     // Orden visual
   tamañoBytes Int?     // Opcional: Tamaño
   createdAt   DateTime @default(now())
-
   @@index([ofertaId]) // Índice para buscar imágenes por oferta
 }
 
@@ -835,106 +857,111 @@ model OfertaVideos {
   ofertaId    String
   oferta      Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Relación con Oferta
   videoUrl    String   // URL del video (YouTube, Vimeo, o un archivo directo si lo alojas tú)
+  tamañoBytes Int?     // Opcional: Tamaño
   tipoVideo   String?  // Podría ser 'YOUTUBE', 'VIMEO', 'DIRECTO_MP4' para ayudar al frontend a decidir cómo renderizarlo
   titulo      String?  // Un título o descripción corta para el video
   descripcion String?  // Descripción más larga si es necesaria
   orden       Int?     // Para ordenar los videos si hay varios
-  tamañoBytes Int?     // Opcional: Tamaño
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  @@index([ofertaId])
+}
+
+model OfertaDocumento {
+  id                String   @id @default(cuid())
+  ofertaId          String
+  oferta            Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+  
+  documentoUrl      String   // URL al archivo
+  documentoNombre   String?  // Nombre del archivo
+  documentoTipo     String?  // MIME type o extensión
+  documentoTamanoBytes Int?   // Tamaño
+  descripcion       String?  // Descripción breve del documento
+  orden             Int?     // Para ordenar la visualización de varios documentos
+
+  createdAt         DateTime @default(now())
 
   @@index([ofertaId])
 }
 
 
-// --- NUEVA ENTIDAD: OfertaDetalle ---
 model OfertaDetalle {
   id                     String    @id @default(cuid())
   ofertaId               String
   oferta                 Oferta    @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
-
-  // Título o pregunta clave que este detalle responde. Crucial para el matching.
-  // Ej: "¿Cómo canjeo el descuento?", "Beneficios principales", "Requisitos para aplicar"
   tituloDetalle          String    
   contenido              String    @db.Text // La respuesta detallada, argumentos, FAQs, etc. (puede ser Markdown)
-  
-  // Opcional: para categorizar internamente o para la IA
   tipoDetalle            String?   // Ej: "USO", "BENEFICIO", "FAQ_OFERTA", "CONDICION_ESPECIFICA" 
   palabrasClave          String[]  // Para ayudar en la búsqueda o matching
   orden                  Int?      // Para mostrar detalles en un orden específico si es necesario
-
-  // Multimedia específica para este detalle (limitada)
   galeriaDetalle         OfertaDetalleGaleria[]
   videoDetalle           OfertaDetalleVideo? // Asumiendo un solo video por detalle
-
-  // Estado de este detalle (útil para el flujo de preguntas pendientes)
-  // PENDIENTE_RESPUESTA_HUMANA, RESPONDIDO_POR_HUMANO, PUBLICADO, ARCHIVADO
   estadoContenido        String    @default("PUBLICADO") 
   preguntaOriginalUsuario String?  // Si este detalle se originó de una pregunta no respondida
-
   creadoPorHumano        Boolean   @default(true) // Para diferenciar si fue creado por admin o por el sistema (pregunta pendiente)
   notificacionEnviada    Boolean   @default(false) // Para controlar si ya se notificó al admin sobre este detalle pendiente
-
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
-
+  documentosDetalle OfertaDetalleDocumento[] // Nueva relación
   PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // Relación a preguntas sin respuesta asociadas a este detalle
 
   @@index([ofertaId, tipoDetalle])
   @@index([ofertaId, estadoContenido])
 }
 
-// --- NUEVA ENTIDAD: OfertaDetalleGaleria (similar a TareaGaleria) ---
 model OfertaDetalleGaleria {
   id                   String        @id @default(cuid())
   ofertaDetalleId      String
   ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
   imageUrl             String
+  tamañoBytes          Int?     // AÑADIR ESTE CAMPO
   altText              String?
   descripcion          String?
   orden                Int?
   createdAt            DateTime      @default(now())
-  // No tamañoBytes aquí, según tu indicación
 }
 
-// --- NUEVA ENTIDAD: OfertaDetalleVideo (similar, pero quizás @unique en ofertaDetalleId si es solo 1 video) ---
 model OfertaDetalleVideo {
   id                   String        @id @default(cuid())
   ofertaDetalleId      String        @unique // Si solo permites un video por OfertaDetalle
   ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
   videoUrl             String        // URL del video (YouTube, Vimeo, archivo directo)
+  tamañoBytes          Int?     // AÑADIR ESTE CAMPO (si aplica para videos directos)
   tipoVideo            String?       // 'YOUTUBE', 'VIMEO', 'MP4_DIRECTO'
-  tituloVideo          String?
-  descripcionVideo     String?
+  titulo          String?
+  descripcion     String?
   createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  orden                Int?          // Para ordenar los videos si hay varios
 }
 
-// --- (Opcional pero Recomendado) NUEVA ENTIDAD: PreguntaSinRespuestaOferta ---
-// Para manejar explícitamente las preguntas no respondidas y su ciclo de vida
+model OfertaDetalleDocumento {
+  id                   String        @id @default(cuid())
+  ofertaDetalleId      String
+  ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
+  documentoUrl         String
+  documentoNombre      String?
+  documentoTipo        String?
+  documentoTamanoBytes Int?
+  descripcion          String?       // Podría ser útil para que el asistente sepa de qué trata este doc específico
+  orden              Int?          // Si un detalle puede tener MÚLTIPLES documentos, sino no es necesario
+  createdAt            DateTime      @default(now())
+  @@index([ofertaDetalleId])
+}
+
 model PreguntaSinRespuestaOferta {
     id                  String @id @default(cuid())
     ofertaId            String
     oferta              Oferta @relation(fields: [ofertaId], references: [id], onDelete:Cascade)
     conversacionId      String // Para saber de qué conversación vino la pregunta
-    // conversacion        Conversacion @relation(fields: [conversacionId], references: [id]) // Si tienes un modelo Conversacion
     preguntaUsuario     String @db.Text // La pregunta exacta que no se pudo responder
-    
-    // Estado de esta pregunta pendiente
-    // PENDIENTE_REVISION, EN_PROCESO_RESPUESTA, RESPONDIDA_Y_NOTIFICADA, DESCARTADA
     estado              String @default("PENDIENTE_REVISION") 
-    
-    // Quién la va a responder o quién la está revisando
     asignadoAId         String? // Podría ser un Usuario admin o Agente
-    // asignadoA           Usuario? @relation(fields: [asignadoAId], references: [id])
-
-    // Referencia al OfertaDetalle que se creó para responderla (una vez que se crea)
     ofertaDetalleRespuestaId String? @unique
     ofertaDetalleRespuesta   OfertaDetalle? @relation(fields: [ofertaDetalleRespuestaId], references: [id], onDelete: SetNull)
-    
     fechaCreacion       DateTime @default(now())
     fechaRespuesta      DateTime? // Cuando el humano responde en el panel
     fechaNotificacionUsuario DateTime? // Cuando se le notifica al usuario original (si es posible)
-
     @@index([ofertaId, estado])
     @@index([asignadoAId])
 }

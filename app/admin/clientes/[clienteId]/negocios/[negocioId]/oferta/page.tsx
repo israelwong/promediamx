@@ -1,3 +1,4 @@
+//ruta del archivo: app/admin/clientes/[clienteId]/negocios/[negocioId]/oferta/page.tsx
 import React from 'react'
 import { Metadata } from 'next'
 import OfertasLista from './components/OfertasLista'
@@ -16,7 +17,7 @@ interface Props {
 export default async function page({ params }: { params: Promise<Props> }) {
     const { negocioId, clienteId } = await params
     return (
-        <div>
+        <div className="flex flex-col gap-4 h-full">
             <OfertasLista
                 negocioId={negocioId}
                 clienteId={clienteId}

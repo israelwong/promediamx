@@ -7,11 +7,10 @@ import Image from 'next/image';
 
 import { obtenerOfertasNegocio } from '@/app/admin/_lib/actions/oferta/oferta.actions';
 import { type OfertaParaListaType } from '@/app/admin/_lib/actions/oferta/oferta.schemas';
-// import { ActionResult } from '@/app/admin/_lib/types';
 
 import { Button } from '@/app/components/ui/button';
 
-import { Loader2, PlusIcon, CalendarDays, BadgeCheck, BadgeX, AlertTriangle, PencilIcon, Ticket, Percent, PackageSearch } from 'lucide-react';
+import { Loader2, PlusIcon, CalendarDays, BadgeCheck, BadgeX, AlertTriangle, PencilIcon, Ticket, PackageSearch } from 'lucide-react';
 
 interface Props {
     negocioId: string;
@@ -36,7 +35,6 @@ export default function OfertasLista({ negocioId, clienteId }: Props) {
     const contentContainerClasses = "flex-grow overflow-hidden flex items-start flex-col justify-between gap-1.5 relative w-full";
 
     const statusBadgeBaseClasses = "text-[0.7rem] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 leading-tight border";
-    const codeBadgeClasses = "text-[0.7rem] font-mono bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30";
     const editButtonClasses = "text-zinc-400 hover:text-blue-300 p-1.5 rounded-md hover:bg-zinc-700 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 flex-shrink-0 absolute top-2 right-2 sm:relative sm:top-auto sm:right-auto";
 
     const emptyStateContainerClasses = "bg-zinc-800 border-2 border-dashed border-zinc-700 rounded-xl p-8 py-12 text-center text-zinc-400 flex flex-col items-center";
@@ -127,7 +125,6 @@ export default function OfertasLista({ negocioId, clienteId }: Props) {
                     <ul className='space-y-3'>
                         {ofertas.map((oferta) => {
                             const statusInfo = getStatusInfo(oferta.status);
-                            const hasCode = !!oferta.codigo;
                             return (
                                 <li key={oferta.id} className="">
                                     <button // Convertido a button para mejor accesibilidad y focus
@@ -146,7 +143,7 @@ export default function OfertasLista({ negocioId, clienteId }: Props) {
                                                 />
                                             ) : (
                                                 <div className="flex items-center justify-center h-full text-zinc-400">
-                                                    {oferta.tipoOferta?.includes('DESCUENTO') ? <Percent size={30} /> : <Ticket size={30} />}
+                                                    <Ticket size={30} />
                                                 </div>
                                             )}
                                         </div>
@@ -156,11 +153,6 @@ export default function OfertasLista({ negocioId, clienteId }: Props) {
                                                 <span className={`${statusBadgeBaseClasses} ${statusInfo.colorClasses}`}>
                                                     <statusInfo.icon size={11} />{statusInfo.text}
                                                 </span>
-                                                {hasCode && (
-                                                    <span className={codeBadgeClasses} title={`Código: ${oferta.codigo}`}>
-                                                        #{oferta.codigo}
-                                                    </span>
-                                                )}
                                             </div>
                                             <h4 className="text-base font-semibold text-zinc-100 truncate group-hover:text-blue-300 transition-colors" title={oferta.nombre || ''}>
                                                 {oferta.nombre || <span className="italic text-zinc-500">Sin nombre</span>}

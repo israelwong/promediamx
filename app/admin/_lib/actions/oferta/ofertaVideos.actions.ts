@@ -190,3 +190,5 @@ export async function eliminarVideoDeOfertaAction(
         return { success: false, error: `Error al eliminar video: ${error instanceof Error ? error.message : 'Desconocido'}` };
     }
 }
+
+

@@ -1,435 +1,428 @@
-// Ruta: /app/admin/clientes/[clienteId]/negocios/[negocioId]/oferta/[ofertaId]/components/OfertaEditarForm.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm, Controller, SubmitHandler, DefaultValues } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
 import {
-    obtenerOfertaPorId,
-    editarOferta,
-    eliminarOferta, // Se puede añadir un botón de eliminar aquí si se desea
-    mejorarDescripcionOfertaIA,
-    generarDescripcionOfertaIA,
+    obtenerOfertaParaEdicionAction, // Usar esta nueva action
+    editarOfertaAction, // Usar esta nueva action (o el nombre que le diste)
+    eliminarOferta
 } from '@/app/admin/_lib/actions/oferta/oferta.actions';
 import {
-    type EditarOfertaDataInputType as EditarOfertaData, // Usar el tipo de Zod para el envío
-    // type OfertaParaEditarType,         // Usar el tipo de Zod para los datos cargados
-    type OfertaStatusType,             // Importar el tipo correcto
-    TipoOfertaEnumSchema,
-    OfertaStatusEnumSchema
+    EditarOfertaInputSchema,
+    type EditarOfertaDataInputType,
+    type OfertaParaEditarFormType, // Para el tipo de initialData
+    TipoPagoOfertaEnumSchema,
+    IntervaloRecurrenciaOfertaEnumSchema,
+    OfertaStatusEnumSchema,
+    ObjetivoOfertaZodEnum,
+    TipoAnticipoOfertaZodEnum,
+    type ObjetivoOfertaZodEnumType,
 } from '@/app/admin/_lib/actions/oferta/oferta.schemas';
 // import { ActionResult } from '@/app/admin/_lib/types';
 
-import { Loader2, Save, Trash2, Sparkles, Hash, Wand2, AlertCircle, CheckCircle, ArrowLeft, Ticket, CalendarRange, Percent, Link as LinkIconLucide, Info, FileText, Edit2, DollarSign } from 'lucide-react';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
+import { Textarea } from '@/app/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
+import { Checkbox } from '@/app/components/ui/checkbox';
+import { Switch } from '@/app/components/ui/switch';
+import { toast } from 'react-hot-toast';
+import { Loader2, Save, Info, DollarSign, CalendarDays, Target, Percent, HandCoins, AlertTriangle, Trash2 } from 'lucide-react';
+// No necesitamos Card aquí, ya que este form irá dentro de una pestaña del OfertaEditarManager que ya es un Card.
 
 interface Props {
-    clienteId: string;
-    negocioId: string;
     ofertaId: string;
+    negocioId: string;
+    clienteId: string;
+    // initialData se cargará aquí mismo
 }
 
-// Tipo para el estado del formulario, las fechas serán string para los inputs
-type FormState = Omit<EditarOfertaData, 'fechaInicio' | 'fechaFin'> & {
-    fechaInicio?: string;
-    fechaFin?: string;
+type FormValues = z.infer<typeof EditarOfertaInputSchema>;
+
+// Opciones para Selects (como en OfertaNuevaForm)
+const TIPO_PAGO_OPTIONS = Object.values(TipoPagoOfertaEnumSchema.Values).map(value => ({ value, label: value === 'UNICO' ? 'Pago Único' : 'Pago Recurrente' }));
+const INTERVALO_RECURRENCIA_OPTIONS = Object.values(IntervaloRecurrenciaOfertaEnumSchema.Values).map(value => ({ value, label: value.charAt(0) + value.slice(1).toLowerCase() }));
+const STATUS_OFERTA_OPTIONS = Object.values(OfertaStatusEnumSchema.Values).map(value => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() }));
+const OBJETIVO_OPTIONS: { id: ObjetivoOfertaZodEnumType; label: string }[] = [
+    { id: ObjetivoOfertaZodEnum.Values.CITA, label: 'Agendar Citas / Reservas' },
+    { id: ObjetivoOfertaZodEnum.Values.VENTA, label: 'Generar Ventas Directas' },
+];
+const TIPO_ANTICIPO_OPTIONS = [
+    { value: TipoAnticipoOfertaZodEnum.Values.PORCENTAJE, label: 'Porcentaje (%)' },
+    { value: TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO, label: 'Monto Fijo ($)' },
+];
+
+const dateToInputFormat = (date?: Date | string | null): string => {
+    if (!date) return '';
+    try {
+        if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+        const d = new Date(date);
+        const year = d.getUTCFullYear();
+        const month = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = d.getUTCDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    } catch { return ''; }
 };
 
-const TIPOS_OFERTA_OPTIONS = [
-    { value: 'DESCUENTO_PORCENTAJE', label: 'Descuento (%)', requiresValue: true, requiresCode: false },
-    { value: 'DESCUENTO_MONTO', label: 'Descuento Monetario ($)', requiresValue: true, requiresCode: false },
-    { value: 'CODIGO_PROMOCIONAL', label: 'Código Promocional', requiresValue: false, requiresCode: true },
-    { value: 'ENVIO_GRATIS', label: 'Envío Gratis', requiresValue: false, requiresCode: false },
-    { value: 'COMPRA_X_LLEVA_Y', label: 'Compra X lleva Y', requiresValue: false, requiresCode: false },
-    { value: 'GENERAL', label: 'Promoción General', requiresValue: false, requiresCode: false },
-];
 
-const STATUS_OFERTA_OPTIONS = [
-    { value: 'activo', label: 'Activa' },
-    { value: 'inactivo', label: 'Inactiva' },
-    { value: 'programada', label: 'Programada' },
-    { value: 'finalizada', label: 'Finalizada' },
-    { value: 'borrador', label: 'Borrador' },
-];
-
-export default function OfertaEditarForm({ clienteId, negocioId, ofertaId }: Props) {
+export default function OfertaEditarForm({ ofertaId, negocioId, clienteId }: Props) {
     const router = useRouter();
-    const [formData, setFormData] = useState<FormState>({
-        nombre: '',
-        tipoOferta: TipoOfertaEnumSchema.enum.GENERAL,
-        status: OfertaStatusEnumSchema.enum.inactivo,
+    const [initialData, setInitialData] = useState<OfertaParaEditarFormType | null>(null);
+    const [loadingData, setLoadingData] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [requiereAnticipo, setRequiereAnticipo] = useState(false);
+
+
+    const {
+        control,
+        register,
+        handleSubmit,
+        watch,
+        setValue,
+        reset,
+        formState: { errors, isSubmitting, isDirty }, // isDirty para saber si hay cambios
+    } = useForm<FormValues>({
+        resolver: zodResolver(EditarOfertaInputSchema),
+        defaultValues: { // Se poblarán desde initialData en useEffect
+            nombre: '',
+            descripcion: null,
+            // codigo: null, // Si se añade 'codigo' al schema
+            precio: null,
+            tipoPago: TipoPagoOfertaEnumSchema.Values.UNICO,
+            intervaloRecurrencia: null,
+            objetivos: [ObjetivoOfertaZodEnum.Values.VENTA],
+            tipoAnticipo: null,
+            porcentajeAnticipo: null, // Input para %
+            anticipo: null,           // Input para monto fijo
+            fechaInicio: new Date(),
+            fechaFin: new Date(),
+            status: OfertaStatusEnumSchema.Values.borrador,
+        },
     });
-    const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [isImprovingDesc, setIsImprovingDesc] = useState(false);
-    const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
-    const [descripcionOriginalIA, setDescripcionOriginalIA] = useState<string | null | undefined>(null);
-    const disableAiButtons = isImprovingDesc || isGeneratingDesc || isSubmitting;
 
-    // Clases de Tailwind actualizadas
-    const mainCardClasses = "bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl flex flex-col h-full";
-    const headerCardClasses = "p-4 md:p-5 border-b border-zinc-700 flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sticky top-0 bg-zinc-800 z-20 rounded-t-xl";
-    const titleCardClasses = "text-xl font-semibold text-zinc-100 flex items-center gap-2.5";
-    const formBodyClasses = "p-4 md:p-6 flex-grow overflow-y-auto space-y-6 custom-scrollbar";
+    const tipoPagoSeleccionado = watch('tipoPago');
+    const tipoAnticipoSeleccionado = watch('tipoAnticipo');
+    const fechaInicioSeleccionada = watch('fechaInicio');
 
-    const labelBaseClasses = "block text-xs font-medium text-zinc-300 mb-1.5";
-    // ESTILOS DE INPUT MEJORADOS: Borde más visible, sin shadow-sm
-    const inputBaseClasses = "block w-full bg-zinc-900 border border-zinc-600 text-zinc-200 rounded-md p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 placeholder:text-zinc-500 sm:text-sm transition-colors";
-    const textareaBaseClasses = `${inputBaseClasses} min-h-[100px]`;
-    const selectClasses = `${inputBaseClasses} appearance-none`;
+    const fetchOfertaData = useCallback(async () => {
+        setLoadingData(true); setLoadError(null);
+        const result = await obtenerOfertaParaEdicionAction(ofertaId, negocioId);
+        if (result.success && result.data) {
+            const dataFromDb = result.data;
+            setInitialData(dataFromDb);
+            // Mapear los datos de la DB al estado del formulario
+            // El 'anticipo' de la DB (monto calculado o fijo) debe mapearse a 'valorAnticipo' del form si es MONTO_FIJO
+            // o a 'porcentajeAnticipo' si es PORCENTAJE.
 
-    const buttonBaseClasses = "inline-flex items-center justify-center px-3.5 py-2 border border-transparent text-xs font-semibold rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-50 transition-colors duration-150 gap-1.5";
-    const primaryButtonClasses = `${buttonBaseClasses} text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500`;
-    const secondaryButtonClasses = `${buttonBaseClasses} text-zinc-200 bg-zinc-600 hover:bg-zinc-500 focus:ring-zinc-500`;
-    const dangerButtonClasses = `${buttonBaseClasses} text-red-400 hover:bg-red-700/20 focus:ring-red-500 border-transparent hover:border-red-600/40`;
+            reset({
+                nombre: dataFromDb.nombre,
+                descripcion: dataFromDb.descripcion,
+                // codigo: dataFromDb.codigo,
+                precio: dataFromDb.precio,
+                tipoPago: dataFromDb.tipoPago,
+                intervaloRecurrencia: dataFromDb.intervaloRecurrencia,
+                objetivos: dataFromDb.objetivos,
+                tipoAnticipo: dataFromDb.tipoAnticipo,
+                porcentajeAnticipo: dataFromDb.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE ? (dataFromDb.porcentajeAnticipo ?? null) : null,
+                anticipo: dataFromDb.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO ? (dataFromDb.anticipo ?? null) : null,
+                fechaInicio: new Date(dataFromDb.fechaInicio), // Asegurar que sean Date objects
+                fechaFin: new Date(dataFromDb.fechaFin),
+                status: dataFromDb.status,
+            });
+            setRequiereAnticipo(!!dataFromDb.tipoAnticipo); // Activar switch si hay tipoAnticipo
+        } else {
+            setLoadError(result.error || "No se pudieron cargar los datos de la oferta.");
+            toast.error(result.error || "Error cargando oferta.");
+        }
+        setLoadingData(false);
+    }, [ofertaId, negocioId, reset]);
 
-    // const switchButtonClasses = "relative inline-flex items-center h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800";
-    // const switchKnobClasses = "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out";
+    useEffect(() => {
+        fetchOfertaData();
+    }, [fetchOfertaData]);
 
-    const sectionContainerClasses = "bg-zinc-900 border border-zinc-700 rounded-lg p-4 md:p-5";
-    const sectionTitleClasses = "text-sm font-semibold text-zinc-200 flex items-center gap-2 mb-3";
+    // Efectos para limpiar campos condicionales (similar a OfertaNuevaForm)
+    useEffect(() => {
+        if (!requiereAnticipo || tipoPagoSeleccionado === TipoPagoOfertaEnumSchema.Values.RECURRENTE) {
+            setValue('tipoAnticipo', null, { shouldValidate: true, shouldDirty: true });
+            setValue('porcentajeAnticipo', null, { shouldValidate: true, shouldDirty: true });
+            setValue('anticipo', null, { shouldValidate: true, shouldDirty: true });
+        } else {
+            // Si se activa requiereAnticipo y no hay tipo, poner uno por defecto
+            if (!watch('tipoAnticipo')) {
+                setValue('tipoAnticipo', TipoAnticipoOfertaZodEnum.Values.PORCENTAJE, { shouldDirty: true });
+            }
+        }
+    }, [requiereAnticipo, tipoPagoSeleccionado, setValue, watch]);
 
-    const aiButtonBaseClasses = "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-zinc-800 disabled:opacity-50";
-    const improveAiButtonClasses = `${aiButtonBaseClasses} text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 border-purple-500/40 focus:ring-purple-500`;
-    const generateAiButtonClasses = `${aiButtonBaseClasses} text-teal-300 bg-teal-500/20 hover:bg-teal-500/30 border-teal-500/40 focus:ring-teal-500`;
+    useEffect(() => {
+        if (tipoPagoSeleccionado === TipoPagoOfertaEnumSchema.Values.UNICO) {
+            setValue('intervaloRecurrencia', null, { shouldValidate: true, shouldDirty: true });
+        } else if (tipoPagoSeleccionado === TipoPagoOfertaEnumSchema.Values.RECURRENTE) {
+            setRequiereAnticipo(false); // Los recurrentes no tendrán este tipo de anticipo en este form
+        }
+    }, [tipoPagoSeleccionado, setValue]);
 
-    const messageBoxBaseClasses = "p-3 rounded-md text-sm my-3 flex items-center gap-2";
-    const errorBoxClasses = `${messageBoxBaseClasses} bg-red-500/10 border border-red-500/30 text-red-400`;
-    const successBoxClasses = `${messageBoxBaseClasses} bg-green-500/10 border border-green-500/30 text-green-300`;
+    useEffect(() => {
+        // Si se cambia el tipo de anticipo, limpiar el valor del otro tipo
+        if (tipoAnticipoSeleccionado === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE) {
+            setValue('anticipo', null, { shouldDirty: true });
+        } else if (tipoAnticipoSeleccionado === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO) {
+            setValue('porcentajeAnticipo', null, { shouldDirty: true });
+        }
+    }, [tipoAnticipoSeleccionado, setValue]);
 
-    const formatDateForInput = (date: Date | string | undefined | null): string => {
-        if (!date) return '';
-        try { return new Date(date).toISOString().split('T')[0]; }
-        catch { return ''; }
-    };
 
-    const loadOferta = useCallback(async () => {
-        if (!ofertaId || !negocioId) { setError("IDs de contexto no válidos."); setLoading(false); return; }
-        setLoading(true); setError(null); setSuccessMessage(null);
+    const onSubmitHandler: SubmitHandler<FormValues> = async (data) => {
+        const loadingToast = toast.loading("Actualizando oferta...");
         try {
-            const result = await obtenerOfertaPorId(ofertaId, negocioId);
+            // Preparar el payload para la action de edición
+            // La 'data' ya está validada por Zod.
+            // La action 'editarOfertaAction' se encargará de calcular el 'anticipo' final para la DB.
+            const dataToSend: EditarOfertaDataInputType = {
+                ...data,
+                // Los campos de anticipo se envían tal cual, la action los procesa
+                // Asegurar que 'intervaloRecurrencia' sea null si no es RECURRENTE
+                intervaloRecurrencia: data.tipoPago === TipoPagoOfertaEnumSchema.Values.RECURRENTE ? data.intervaloRecurrencia : null,
+                // Asegurar que los campos de anticipo se limpien si no aplica
+                tipoAnticipo: (requiereAnticipo && data.tipoPago === TipoPagoOfertaEnumSchema.Values.UNICO) ? data.tipoAnticipo : null,
+                porcentajeAnticipo: (requiereAnticipo && data.tipoPago === TipoPagoOfertaEnumSchema.Values.UNICO && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE) ? data.porcentajeAnticipo : null,
+                anticipo: (requiereAnticipo && data.tipoPago === TipoPagoOfertaEnumSchema.Values.UNICO && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO) ? data.anticipo : null,
+            };
+
+            const result = await editarOfertaAction(ofertaId, clienteId, negocioId, dataToSend);
+
+            toast.dismiss(loadingToast);
             if (result.success && result.data) {
-                const ofertaData = result.data; // Tipo OfertaParaEditarType
-                setFormData({
-                    nombre: ofertaData.nombre,
-                    descripcion: ofertaData.descripcion,
-                    tipoOferta: ofertaData.tipoOferta,
-                    valor: ofertaData.valor,
-                    codigo: ofertaData.codigo,
-                    fechaInicio: formatDateForInput(ofertaData.fechaInicio),
-                    fechaFin: formatDateForInput(ofertaData.fechaFin),
-                    status: ofertaData.status,
-                    condiciones: ofertaData.condiciones,
-                    linkPago: ofertaData.linkPago,
-                });
-                setDescripcionOriginalIA(ofertaData.descripcion);
+                toast.success(`Oferta "${result.data.nombre}" actualizada.`);
+                setInitialData(result.data); // Actualizar los datos base del formulario
+                reset(result.data as DefaultValues<FormValues>); // Resetea el form con los nuevos datos, marcándolo como no 'dirty'
+                router.refresh(); // Revalida la data del servidor para la página
             } else {
-                setError(result.error || "Oferta no encontrada.");
+                const errorMsg = result.errorDetails
+                    ? Object.values(result.errorDetails).flat().join('; ')
+                    : result.error || "No se pudo actualizar la oferta.";
+                toast.error(errorMsg);
+                console.error("Error updating offer:", result);
             }
         } catch (err) {
-            console.error("Error al cargar oferta:", err);
-            setError(err instanceof Error ? err.message : "Error al cargar los datos.");
-        } finally {
-            setLoading(false);
-        }
-    }, [ofertaId, negocioId]);
-
-    useEffect(() => { loadOferta(); }, [loadOferta]);
-    useEffect(() => { let timer: NodeJS.Timeout; if (successMessage) { timer = setTimeout(() => setSuccessMessage(null), 3500); } return () => clearTimeout(timer); }, [successMessage]);
-
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        let finalValue: string | number | null = value;
-        if (name === 'valor') {
-            finalValue = value === '' ? null : parseFloat(value);
-            if (isNaN(finalValue as number)) finalValue = null; // Mantener null si no es número
-        } else if ((name === 'fechaInicio' || name === 'fechaFin') && value === '') {
-            finalValue = null; // Para que Zod lo tome como opcional si está vacío
-        }
-        setFormData(prevState => ({ ...prevState, [name]: finalValue }));
-        setError(null); setSuccessMessage(null);
-    };
-
-    const handleStatusChange = (newStatus: OfertaStatusType) => {
-        setFormData(prevState => ({ ...prevState, status: newStatus }));
-        setError(null); setSuccessMessage(null);
-    };
-
-    const handleSubmit = async (e?: FormEvent<HTMLFormElement>) => {
-        e?.preventDefault();
-        setIsSubmitting(true); setError(null); setSuccessMessage(null);
-
-        const dataToValidate: EditarOfertaData = {
-            nombre: formData.nombre,
-            descripcion: formData.descripcion,
-            tipoOferta: formData.tipoOferta,
-            valor: formData.valor !== null && formData.valor !== undefined && (typeof formData.valor !== 'string' || formData.valor !== '') ? Number(formData.valor) : null,
-            codigo: formData.codigo,
-            fechaInicio: formData.fechaInicio ? new Date(formData.fechaInicio) : new Date(), // Default a hoy si está vacío, Zod lo requiere
-            fechaFin: formData.fechaFin ? new Date(formData.fechaFin) : new Date(),       // Default a hoy si está vacío, Zod lo requiere
-            status: formData.status,
-            condiciones: formData.condiciones,
-            linkPago: formData.linkPago,
-        };
-        // Limpiar campos undefined/null que Zod podría no querer si son opcionales
-        Object.keys(dataToValidate).forEach(keyStr => {
-            const key = keyStr as keyof EditarOfertaData;
-            if (dataToValidate[key] === undefined) {
-                delete dataToValidate[key];
-            }
-            if (dataToValidate[key] === '' && (key === 'descripcion' || key === 'codigo' || key === 'condiciones' || key === 'linkPago')) {
-                dataToValidate[key] = null;
-            }
-        });
-
-
-        try {
-            const result = await editarOferta(ofertaId, clienteId, negocioId, dataToValidate);
-            if (result.success) {
-                setSuccessMessage("Oferta actualizada exitosamente.");
-                router.refresh();
-            } else {
-                let errorMsg = result.error || "No se pudo actualizar la oferta.";
-                if (result.errorDetails) {
-                    errorMsg = Object.entries(result.errorDetails)
-                        .map(([field, errors]) => `${field.charAt(0).toUpperCase() + field.slice(1)}: ${errors.join(', ')}`)
-                        .join('; ');
-                }
-                setError(errorMsg);
-            }
-        } catch (err) {
-            console.error("Error al actualizar oferta:", err);
-            setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
-        } finally {
-            setIsSubmitting(false);
+            toast.dismiss(loadingToast);
+            toast.error(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
+            console.error("Submit error:", err);
         }
     };
 
-    const handleMejorarDescConIA = async () => {
-        const descActual = formData.descripcion?.trim() || descripcionOriginalIA?.trim();
-        if (!descActual) { setError("Escribe una descripción primero."); return; }
-        setIsImprovingDesc(true); setError(null); setSuccessMessage(null);
-        try {
-            const result = await mejorarDescripcionOfertaIA(ofertaId, descActual);
-            if (result.success && result.data?.sugerencia) {
-                setFormData(prev => ({ ...prev, descripcion: result.data?.sugerencia }));
-                setSuccessMessage("Descripción mejorada con IA.");
-            } else { throw new Error(result.error || "No se pudo obtener la sugerencia."); }
-        } catch (err) { setError(err instanceof Error ? err.message : "Error al mejorar con IA."); }
-        finally { setIsImprovingDesc(false); }
-    };
+    if (loadingData) return <div className="flex items-center justify-center p-10 min-h-[300px]"><Loader2 className='animate-spin h-8 w-8 text-blue-400' /><p className="ml-3 text-zinc-300">Cargando datos...</p></div>;
+    if (loadError) return <div className="p-10 text-center text-red-400"><AlertTriangle className="mx-auto h-8 w-8 mb-2" />Error al cargar: {loadError}</div>;
+    if (!initialData) return <div className="p-10 text-center text-zinc-400">No se encontró la oferta.</div>;
 
-    const handleGenerarDescConIA = async () => {
-        setIsGeneratingDesc(true); setError(null); setSuccessMessage(null);
-        try {
-            const result = await generarDescripcionOfertaIA(ofertaId);
-            if (result.success && result.data?.sugerencia) {
-                setDescripcionOriginalIA(formData.descripcion);
-                setFormData(prev => ({ ...prev, descripcion: result.data?.sugerencia }));
-                setSuccessMessage("Descripción generada con IA.");
-            } else { throw new Error(result.error || "No se pudo generar la descripción."); }
-        } catch (err) { setError(err instanceof Error ? err.message : "Error al generar con IA."); }
-        finally { setIsGeneratingDesc(false); }
-    };
-
-    const revertirDescripcionIA = () => {
-        if (descripcionOriginalIA !== undefined) {
-            setFormData(prev => ({ ...prev, descripcion: descripcionOriginalIA }));
-            setSuccessMessage("Descripción revertida al original.");
-        }
-    };
-
-    const handleCancel = () => router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta`);
-    const handleDelete = async () => {
-        // La acción eliminarOferta ya fue refactorizada y espera clienteId y negocioId
-        if (!confirm(`¿Eliminar permanentemente la oferta "${formData.nombre || 'esta oferta'}"? Esta acción no se puede deshacer.`)) return;
-        setIsSubmitting(true); setError(null); setSuccessMessage(null);
+    const handleDeleteOferta = async () => {
+        if (!window.confirm("¿Estás seguro de que deseas eliminar esta oferta? Esta acción no se puede deshacer.")) return;
+        const loadingToast = toast.loading("Eliminando oferta...");
         try {
             const result = await eliminarOferta(ofertaId, clienteId, negocioId);
+            toast.dismiss(loadingToast);
             if (result.success) {
-                setSuccessMessage("Oferta eliminada. Redirigiendo...");
-                setTimeout(() => {
-                    router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta`);
-                }, 1500);
+                toast.success("Oferta eliminada correctamente.");
+                router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta`);
             } else {
-                throw new Error(result.error || "No se pudo eliminar la oferta.");
+                toast.error(result.error || "No se pudo eliminar la oferta.");
             }
         } catch (err) {
-            console.error("Error al eliminar oferta:", err);
-            setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
-            setIsSubmitting(false);
+            toast.dismiss(loadingToast);
+            toast.error(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
         }
     };
 
 
-    if (loading) return <div className={`${mainCardClasses} items-center justify-center p-10`}><Loader2 className='animate-spin h-8 w-8 text-blue-400' /><p className="mt-3 text-zinc-400">Cargando oferta...</p></div>;
-    if (error && !formData.nombre) return <div className={`${mainCardClasses} border-red-500/30 bg-red-500/5 items-center justify-center p-10`}><AlertCircle className="h-10 w-10 text-red-400 mb-3" /><p className="text-red-400 text-center mb-1 font-medium">Error al Cargar</p><p className="text-zinc-400 text-sm text-center mb-4">{error}</p><button onClick={handleCancel} className={secondaryButtonClasses + " w-auto"}><ArrowLeft size={16} /> Volver a Ofertas</button></div>;
-    if (!formData.nombre && !loading) return <div className={`${mainCardClasses} items-center justify-center p-10`}><Ticket size={40} className="text-zinc-500 mb-3" /><p className="text-zinc-400 text-center">Oferta no encontrada.</p><button onClick={handleCancel} className={`${secondaryButtonClasses} mt-4`}><ArrowLeft size={16} /> Volver a Ofertas</button></div>;
-
-    const selectedTypeInfo = TIPOS_OFERTA_OPTIONS.find(t => t.value === formData.tipoOferta);
-    const showValorField = selectedTypeInfo?.requiresValue ?? false;
-    const showCodigoField = selectedTypeInfo?.requiresCode ?? false;
-    const disableAllActions = isSubmitting || isImprovingDesc || isGeneratingDesc;
-
     return (
-        <div className={mainCardClasses}>
-            <div className={headerCardClasses}>
-                <div className="flex-grow">
-                    <h1 className={titleCardClasses}><Edit2 size={22} className="text-amber-400" />Editar Oferta</h1>
-                    <p className="text-xs text-zinc-400 mt-0.5">ID: <span className="font-mono">{ofertaId}</span></p>
+        // El Card exterior lo pondrá el OfertaEditarManager en su pestaña
+        <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-6">
+            {/* Secciones del formulario (Información General, Objetivos, Precio y Pago, Vigencia y Estado) */}
+            {/* Similar al OfertaNuevaForm, pero usando register y Controller con los datos cargados */}
+
+            {/* Sección Información General */}
+            <section className="space-y-4 p-4 bg-zinc-800/30 rounded-md border border-zinc-700/50">
+                <h3 className="text-md font-semibold text-zinc-200 flex items-center gap-2 border-b border-zinc-700 pb-2 mb-4">
+                    <Info size={18} className="text-blue-400" /> Información General
+                </h3>
+                <div>
+                    <Label htmlFor="nombre" className="text-sm">Nombre de la Oferta <span className="text-red-500">*</span></Label>
+                    <Input id="nombre" {...register("nombre")} disabled={isSubmitting} />
+                    {errors.nombre && <p className="text-xs text-red-400 mt-1">{errors.nombre.message}</p>}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
-                    <button type="button" onClick={handleCancel} className={secondaryButtonClasses} disabled={isSubmitting}><ArrowLeft size={16} /> Cerrar</button>
+                <div>
+                    <Label htmlFor="descripcion" className="text-sm">Descripción Breve (Opcional)</Label>
+                    <Textarea id="descripcion" {...register("descripcion")} rows={3} disabled={isSubmitting} />
+                    {errors.descripcion && <p className="text-xs text-red-400 mt-1">{errors.descripcion.message}</p>}
                 </div>
+                {/* Si decides añadir 'codigo' para edición:
+                <div>
+                    <Label htmlFor="codigo" className="text-sm">Código Promocional (Opcional)</Label>
+                    <Input id="codigo" {...register("codigo")} disabled={isSubmitting} className="font-mono uppercase"/>
+                    {errors.codigo && <p className="text-xs text-red-400 mt-1">{errors.codigo.message}</p>}
+                </div>
+                */}
+            </section>
+
+            {/* Sección Objetivos */}
+            <section className="space-y-3 p-4 bg-zinc-800/30 rounded-md border border-zinc-700/50">
+                <h3 className="text-md font-semibold text-zinc-200 flex items-center gap-2 border-b border-zinc-700 pb-2 mb-4">
+                    <Target size={18} className="text-pink-400" /> Objetivos de la Oferta <span className="text-red-500">*</span>
+                </h3>
+                <Controller
+                    name="objetivos" control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            {OBJETIVO_OPTIONS.map((option) => (
+                                <div key={option.id} className="flex items-center space-x-2">
+                                    <Checkbox id={`objetivo-${option.id}`} checked={Array.isArray(field.value) && field.value.includes(option.id)}
+                                        onCheckedChange={(checked) => {
+                                            const currentValues = Array.isArray(field.value) ? field.value : [];
+                                            const newValues = checked ? [...currentValues, option.id] : currentValues.filter(v => v !== option.id);
+                                            field.onChange(newValues);
+                                        }}
+                                        disabled={isSubmitting} />
+                                    <Label htmlFor={`objetivo-${option.id}`} className="font-normal text-sm text-zinc-200 cursor-pointer">{option.label}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    )} />
+                {errors.objetivos && <p className="text-xs text-red-400 mt-1">{typeof errors.objetivos.message === 'string' ? errors.objetivos.message : 'Error en objetivos'}</p>}
+            </section>
+
+            {/* Sección Precio y Pago */}
+            <section className="space-y-4 p-4 bg-zinc-800/30 rounded-md border border-zinc-700/50">
+                <h3 className="text-md font-semibold text-zinc-200 flex items-center gap-2 border-b border-zinc-700 pb-2 mb-4">
+                    <DollarSign size={18} className="text-green-400" /> Precio y Pago
+                </h3>
+                <div>
+                    <Label htmlFor="tipoPago" className="text-sm">Tipo de Pago <span className="text-red-500">*</span></Label>
+                    <Controller name="tipoPago" control={control} render={({ field }) => (
+                        <Select onValueChange={(value) => { field.onChange(value); if (value === 'RECURRENTE') setRequiereAnticipo(false); }} value={field.value} disabled={isSubmitting}>
+                            <SelectTrigger><SelectValue placeholder="Selecciona tipo..." /></SelectTrigger>
+                            <SelectContent>{TIPO_PAGO_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                    )} />
+                    {errors.tipoPago && <p className="text-xs text-red-400 mt-1">{errors.tipoPago.message}</p>}
+                </div>
+                <div>
+                    <Label htmlFor="precio" className="text-sm">{tipoPagoSeleccionado === 'RECURRENTE' ? 'Precio por Intervalo' : 'Precio Total'} (Opcional)</Label>
+                    <Input type="number" id="precio" {...register("precio", { setValueAs: v => v === "" || v === null || v === undefined ? null : parseFloat(v) })} placeholder="0.00" step="0.01" min="0" disabled={isSubmitting} />
+                    {errors.precio && <p className="text-xs text-red-400 mt-1">{errors.precio.message}</p>}
+                </div>
+                {tipoPagoSeleccionado === 'RECURRENTE' && (
+                    <div>
+                        <Label htmlFor="intervaloRecurrencia" className="text-sm">Intervalo de Recurrencia <span className="text-red-500">*</span></Label>
+                        <Controller name="intervaloRecurrencia" control={control} render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value ?? undefined} disabled={isSubmitting}>
+                                <SelectTrigger><SelectValue placeholder="Selecciona intervalo..." /></SelectTrigger>
+                                <SelectContent>{INTERVALO_RECURRENCIA_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )} />
+                        {errors.intervaloRecurrencia && <p className="text-xs text-red-400 mt-1">{errors.intervaloRecurrencia.message}</p>}
+                    </div>
+                )}
+                {tipoPagoSeleccionado === 'UNICO' && (
+                    <div className="space-y-4 mt-4 pt-4 border-t border-zinc-700/50">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="requiereAnticipoSwitchEditar" checked={requiereAnticipo} onCheckedChange={setRequiereAnticipo} disabled={isSubmitting} />
+                            <Label htmlFor="requiereAnticipoSwitchEditar" className="text-sm text-zinc-200">¿Requiere Anticipo?</Label>
+                        </div>
+                        {requiereAnticipo && (
+                            <>
+                                <div>
+                                    <Label htmlFor="tipoAnticipo" className="text-sm">Tipo de Anticipo <span className="text-red-500">*</span></Label>
+                                    <Controller name="tipoAnticipo" control={control} render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value ?? undefined} disabled={isSubmitting}>
+                                            <SelectTrigger><SelectValue placeholder="Selecciona tipo..." /></SelectTrigger>
+                                            <SelectContent>{TIPO_ANTICIPO_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                    )} />
+                                    {errors.tipoAnticipo && <p className="text-xs text-red-400 mt-1">{errors.tipoAnticipo.message}</p>}
+                                </div>
+                                {/* El campo 'anticipo' en Zod/DB guardará el monto. 'porcentajeAnticipo' en Zod/DB guardará el %.
+                                    El form usa 'anticipo' para el input de monto fijo, y 'porcentajeAnticipo' para el input de porcentaje.
+                                */}
+                                {tipoAnticipoSeleccionado === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO && (
+                                    <div>
+                                        <Label htmlFor="anticipoMontoFijo" className="text-sm">Monto Fijo de Anticipo ($) <span className="text-red-500">*</span></Label>
+                                        <div className="relative">
+                                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><HandCoins size={14} className="text-zinc-400" /></div>
+                                            <Input type="number" id="anticipoMontoFijo" {...register("anticipo", { setValueAs: v => v === "" || v === null || v === undefined ? null : parseFloat(v) })} placeholder="Ej: 50.00" step="0.01" min="0" disabled={isSubmitting} className="pl-9" />
+                                        </div>
+                                        {errors.anticipo && <p className="text-xs text-red-400 mt-1">{errors.anticipo.message}</p>}
+                                    </div>
+                                )}
+                                {tipoAnticipoSeleccionado === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE && (
+                                    <div>
+                                        <Label htmlFor="porcentajeAnticipo" className="text-sm">Porcentaje de Anticipo (%) <span className="text-red-500">*</span></Label>
+                                        <div className="relative">
+                                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Percent size={14} className="text-zinc-400" /></div>
+                                            <Input type="number" id="porcentajeAnticipo" {...register("porcentajeAnticipo", { setValueAs: v => v === "" || v === null || v === undefined ? null : parseFloat(v) })} placeholder="Ej: 20 (para 20%)" step="1" min="1" max="99" disabled={isSubmitting} className="pl-9" />
+                                        </div>
+                                        {errors.porcentajeAnticipo && <p className="text-xs text-red-400 mt-1">{errors.porcentajeAnticipo.message}</p>}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+            </section>
+
+            {/* Vigencia y Estado */}
+            <section className="space-y-4 p-4 bg-zinc-800/30 rounded-md border border-zinc-700/50">
+                <h3 className="text-md font-semibold text-zinc-200 flex items-center gap-2 border-b border-zinc-700 pb-2 mb-4">
+                    <CalendarDays size={18} className="text-purple-400" /> Vigencia y Estado
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="fechaInicio" className="text-sm">Fecha Inicio <span className="text-red-500">*</span></Label>
+                        <Controller name="fechaInicio" control={control}
+                            render={({ field }) => (<Input type="date" id="fechaInicio" value={dateToInputFormat(field.value)}
+                                onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00Z") : null)}
+                                required disabled={isSubmitting} />)} />
+                        {errors.fechaInicio && <p className="text-xs text-red-400 mt-1">{errors.fechaInicio.message}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="fechaFin" className="text-sm">Fecha Fin <span className="text-red-500">*</span></Label>
+                        <Controller name="fechaFin" control={control}
+                            render={({ field }) => (<Input type="date" id="fechaFin" value={dateToInputFormat(field.value)}
+                                onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00Z") : null)}
+                                required disabled={isSubmitting} min={dateToInputFormat(fechaInicioSeleccionada)} />)} />
+                        {errors.fechaFin && <p className="text-xs text-red-400 mt-1">{errors.fechaFin.message}</p>}
+                    </div>
+                </div>
+                <div>
+                    <Label htmlFor="status" className="text-sm">Estado de la Oferta <span className="text-red-500">*</span></Label>
+                    <Controller name="status" control={control} render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                            <SelectTrigger><SelectValue placeholder="Selecciona estado..." /></SelectTrigger>
+                            <SelectContent>{STATUS_OFERTA_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                    )} />
+                    {errors.status && <p className="text-xs text-red-400 mt-1">{errors.status.message}</p>}
+                </div>
+            </section>
+
+            <div className="flex justify-end items-center gap-3 pt-6 mt-6 border-t border-zinc-700">
+                {/* El botón de eliminar podría estar en la CardFooter del OfertaEditarManager si prefieres */}
+                <Button type="button" variant="destructive" onClick={handleDeleteOferta} disabled={isSubmitting}>
+                    <Trash2 size={16} className="mr-1.5" /> Eliminar Oferta
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => router.back()} disabled={isSubmitting}>
+                    Cerrar Ventana
+                </Button>
+                <Button type="submit" disabled={isSubmitting || !isDirty} className="min-w-[150px]">
+                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" size={18} />}
+                    Guardar Cambios
+                </Button>
             </div>
-
-            <form onSubmit={handleSubmit} className={formBodyClasses} noValidate>
-                {error && !successMessage && <div className={errorBoxClasses}><AlertCircle size={18} /><span>{error}</span></div>}
-                {successMessage && <div className={successBoxClasses}><CheckCircle size={18} /><span>{successMessage}</span></div>}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                    {/* Columna Izquierda */}
-                    <div className="space-y-5">
-                        <div className={sectionContainerClasses}>
-                            <h3 className={sectionTitleClasses}><Info size={16} /> Detalles Principales</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="nombre" className={labelBaseClasses}>Nombre Oferta <span className="text-red-500">*</span></label>
-                                    <input type="text" id="nombre" name="nombre" value={formData.nombre || ''} onChange={handleChange} required className={inputBaseClasses} disabled={isSubmitting} />
-                                </div>
-                                <div>
-                                    <label htmlFor="descripcion" className={labelBaseClasses}>Descripción</label>
-                                    <textarea id="descripcion" name="descripcion" value={formData.descripcion || ''} onChange={handleChange} className={`${textareaBaseClasses} !min-h-[100px]`} disabled={disableAiButtons} rows={3} />
-                                    <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                        <button type="button" onClick={handleMejorarDescConIA} className={improveAiButtonClasses} disabled={disableAiButtons || !formData.descripcion?.trim()} title={!formData.descripcion?.trim() ? "Escribe descripción para mejorar" : "Mejorar con IA"}>
-                                            {isImprovingDesc ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} Mejorar
-                                        </button>
-                                        <button type="button" onClick={handleGenerarDescConIA} className={generateAiButtonClasses} disabled={disableAiButtons} title="Generar descripción con IA (usa imagen de portada si existe)">
-                                            {isGeneratingDesc ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />} Generar
-                                        </button>
-                                        {descripcionOriginalIA !== formData.descripcion && formData.descripcion && (
-                                            <button type="button" onClick={revertirDescripcionIA} className={`${aiButtonBaseClasses} text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-500/30 focus:ring-yellow-500 text-xs !px-2 !py-1`} disabled={disableAiButtons}>
-                                                Revertir
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className={sectionContainerClasses}>
-                            <h3 className={sectionTitleClasses}><Ticket size={16} /> Tipo y Valor</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="tipoOferta" className={labelBaseClasses}>Tipo de Oferta <span className="text-red-500">*</span></label>
-                                    <select id="tipoOferta" name="tipoOferta" value={formData.tipoOferta || ''} onChange={handleChange} required className={selectClasses} disabled={isSubmitting}>
-                                        <option value="" disabled>Selecciona un tipo...</option>
-                                        {TIPOS_OFERTA_OPTIONS.map(tipo => (<option key={tipo.value} value={tipo.value}>{tipo.label}</option>))}
-                                    </select>
-                                </div>
-                                {showValorField && (
-                                    <div>
-                                        <label htmlFor="valor" className={labelBaseClasses}>Valor ({formData.tipoOferta === 'DESCUENTO_PORCENTAJE' ? '%' : '$'}) <span className="text-red-500">*</span></label>
-                                        <div className="relative">
-                                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                                {formData.tipoOferta === 'DESCUENTO_PORCENTAJE' ? <Percent className="h-4 w-4 text-zinc-400" /> : <DollarSign className="h-4 w-4 text-zinc-400" />}
-                                            </div>
-                                            <input type="number" id="valor" name="valor" value={formData.valor ?? ''} onChange={handleChange} required className={`${inputBaseClasses} pl-9`} disabled={isSubmitting} step={formData.tipoOferta === 'DESCUENTO_PORCENTAJE' ? "0.1" : "0.01"} min="0" />
-                                        </div>
-                                    </div>
-                                )}
-                                {showCodigoField && (
-                                    <div>
-                                        <label htmlFor="codigo" className={labelBaseClasses}>Código Promocional <span className="text-red-500">*</span></label>
-                                        <div className="relative">
-                                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><Hash size={14} className="text-zinc-400" /></div>
-                                            <input type="text" id="codigo" name="codigo" value={formData.codigo || ''} onChange={handleChange} required className={`${inputBaseClasses} pl-9 font-mono uppercase`} disabled={isSubmitting} maxLength={50} placeholder="EJ: VERANO20" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Columna Derecha */}
-                    <div className="space-y-5">
-                        <div className={sectionContainerClasses}>
-                            <h3 className={sectionTitleClasses}><CalendarRange size={16} /> Vigencia y Estado</h3>
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label htmlFor="fechaInicio" className={labelBaseClasses}>Fecha Inicio <span className="text-red-500">*</span></label>
-                                        <input type="date" id="fechaInicio" name="fechaInicio" value={formData.fechaInicio || ''} onChange={handleChange} required className={inputBaseClasses} disabled={isSubmitting} />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="fechaFin" className={labelBaseClasses}>Fecha Fin <span className="text-red-500">*</span></label>
-                                        <input type="date" id="fechaFin" name="fechaFin" value={formData.fechaFin || ''} onChange={handleChange} required className={inputBaseClasses} disabled={isSubmitting} min={formData.fechaInicio || ''} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label htmlFor="status" className={labelBaseClasses + " mb-2"}>Estado de la Oferta</label>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-zinc-400">Inactiva</span>
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            aria-checked={formData.status === 'activo'}
-                                            tabIndex={0}
-                                            onClick={() => handleStatusChange(formData.status === 'activo' ? 'inactivo' : 'activo')}
-                                            disabled={isSubmitting}
-                                            className={`
-                                                relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                                                ${formData.status === 'activo' ? 'bg-green-500/80' : 'bg-zinc-600/60'}
-                                                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-800
-                                                disabled:opacity-50
-                                            `}
-                                        >
-                                            <span
-                                                className={`
-                                                    inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition
-                                                    ${formData.status === 'activo' ? 'translate-x-5' : 'translate-x-1'}
-                                                `}
-                                            />
-                                        </button>
-                                        <span className="text-xs text-green-400">Activa</span>
-                                    </div>
-                                    <select
-                                        id="status"
-                                        name="status"
-                                        value={formData.status || 'inactivo'}
-                                        onChange={(e) => handleStatusChange(e.target.value as OfertaStatusType)}
-                                        className="hidden"
-                                        disabled={isSubmitting}
-                                    >
-                                        {STATUS_OFERTA_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div className={sectionContainerClasses}>
-                            <h3 className={sectionTitleClasses}><FileText size={16} /> Condiciones y Enlaces</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="linkPago" className={labelBaseClasses}>Enlace de Pago Directo (Opcional)</label>
-                                    <div className="relative">
-                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><LinkIconLucide size={14} className="text-zinc-400" /></div>
-                                        <input type="url" id="linkPago" name="linkPago" value={formData.linkPago || ''} onChange={handleChange} className={`${inputBaseClasses} pl-9`} disabled={isSubmitting} maxLength={300} placeholder="https://ej.com/pago-oferta" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label htmlFor="condiciones" className={labelBaseClasses}>Condiciones Adicionales (Opcional)</label>
-                                    <textarea id="condiciones" name="condiciones" value={formData.condiciones || ''} onChange={handleChange} className={`${textareaBaseClasses} !min-h-[80px]`} disabled={isSubmitting} rows={3} maxLength={1000} placeholder="Ej: Compra mínima de $X, válido solo en sucursal..." />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 mt-6">
-                    <button type="button" onClick={handleDelete} className={dangerButtonClasses} disabled={isSubmitting}><Trash2 size={16} /> Eliminar Oferta</button>
-                    <button type="submit" className={primaryButtonClasses} disabled={isSubmitting || disableAllActions}>{isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save size={16} />} Guardar Cambios</button>
-                </div>
-            </form>
-        </div>
+        </form>
     );
 }

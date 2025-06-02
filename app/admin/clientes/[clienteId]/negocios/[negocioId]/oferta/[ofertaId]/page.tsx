@@ -1,12 +1,10 @@
-// Ruta del archivo: /Users/israelwong/Documents/Desarrollo/promedia-app/app/admin/clientes/[clienteId]/negocios/[negocioId]/oferta/[ofertaId]/page.tsx
+// Ruta del archivo: @app/admin/clientes/[clienteId]/negocios/[negocioId]/oferta/[ofertaId]/page.tsx
 
 import React from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation'; // Importar notFound
-import OfertaEditarForm from './components/OfertaEditarForm'; // Asume que existe
-// import OfertaGaleria from './components/OfertaGaleria';     // Asume que existe
-// import OfertaVideos from './components/OfertaVideos';
-import Multimedia from './components/Multimedia';
+import OfertaEditarManager from './components/OfertaEditarManager';
+import OfertaDetalleManager from './components/OfertaDetalleManager';
 
 // Metadata básica
 export const metadata: Metadata = {
@@ -33,38 +31,27 @@ export default async function EditarOfertaPage({ params }: { params: Promise<Pro
 
     return (
         // Contenedor principal con espaciado
-        <div className="space-y-6 lg:space-y-8">
-            {/* Grid principal para layout de columnas */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6"> {/* O por ejemplo md:grid-cols-5 para más control */}
 
-                {/* Columna Izquierda: Formulario de Edición (ocupa más espacio en lg) */}
-                <div className="lg:col-span-3 xl:col-span-3"> {/* Ajustado a 3/5 para dar más espacio al form */}
-                    <OfertaEditarForm
-                        clienteId={clienteId}
-                        negocioId={negocioId}
-                        ofertaId={ofertaId}
-                    />
-                </div>
-
-                {/* Columna Derecha: Galerías y Videos (ocupa menos espacio en lg) */}
-                <div className="lg:col-span-2 xl:col-span-2 space-y-6 lg:space-y-8"> {/* Contenedor para apilar galería y video */}
-                    <Multimedia
-                        ofertaId={ofertaId}
-                        negocioId={negocioId}
-                        clienteId={clienteId}
-                    />
-                    {/* <OfertaGaleria
-                        ofertaId={ofertaId}
-                    // negocioId={negocioId} // Pasar para la ruta de storage/actions
-                    // clienteId={clienteId} // Pasar para revalidación
-                    />
-                    <OfertaVideos
-                        ofertaId={ofertaId}
-                    // negocioId={negocioId} // Pasar para la ruta de storage/actions
-                    // clienteId={clienteId} // Pasar para revalidación
-                    /> */}
-                </div>
+            {/* Columna 1 (Más ancha, ej: md:col-span-2 de 3, o md:col-span-3 de 5) */}
+            <div className="md:col-span-1"> {/* Ejemplo de proporción */}
+                <OfertaEditarManager
+                    ofertaId={ofertaId}
+                    negocioId={negocioId}
+                    clienteId={clienteId}
+                />
             </div>
+
+            {/* Columna 2 (Más angosta, ej: md:col-span-1 de 3, o md:col-span-2 de 5) */}
+            <div className="md:col-span-2"> {/* Ejemplo de proporción */}
+                <OfertaDetalleManager
+                    ofertaId={ofertaId}
+                    negocioId={negocioId}
+                    clienteId={clienteId}
+                />
+            </div>
+
         </div>
+
     );
 }

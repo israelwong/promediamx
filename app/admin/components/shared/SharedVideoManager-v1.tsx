@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useDropzone, FileWithPath } from 'react-dropzone';
 import { Button } from '@/app/components/ui/button';
 import {
-    UploadCloud, Trash2, Loader2, AlertTriangle, CheckCircle, Save, FileVideo, Info
+    UploadCloud, Trash2, Loader2, AlertTriangle, CheckCircle, Save, FileVideo
 } from 'lucide-react';
 import { useForm, SubmitHandler, Controller, Path, DeepPartial, useWatch, DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -46,7 +46,7 @@ export const SharedUpsertVideoDataSchema = z.object({
 }, { message: "Se requiere una URL válida para el tipo de video seleccionado.", path: ["videoUrl"] });
 export type SharedUpsertVideoData = z.infer<typeof SharedUpsertVideoDataSchema>;
 
-// Extender Props para incluir la nueva action de prueba
+// --- Props del Componente Reutilizable ---
 export interface SharedVideoManagerProps<
     T_Item extends SharedVideoItemBase,
     T_UpsertData extends SharedUpsertVideoData
@@ -60,16 +60,12 @@ export interface SharedVideoManagerProps<
         fetchVideoAction: (ownerEntityId: string) => Promise<ActionResult<T_Item | null>>;
         saveVideoAction: (ownerEntityId: string, negocioId: string, clienteId: string, catalogoId: string | undefined, data: T_UpsertData, file?: File) => Promise<ActionResult<T_Item>>;
         deleteVideoAction: (videoId: string, negocioId: string, clienteId: string, ownerEntityId: string, catalogoId: string | undefined) => Promise<ActionResult<void>>;
-        // Nueva action de prueba opcional
-        testCompatibilityAction?: (videoId: string, negocioId: string) => Promise<ActionResult<{ esCompatible: boolean; mensaje: string; detallesApi?: unknown; mediaId?: string }>>;
     };
 
-    formSchema: z.ZodType<T_UpsertData>; // Esto es z.ZodType<T_UpsertData>
+    formSchema: z.ZodType<T_UpsertData>;
     maxFileSizeMB?: number;
     videoAspectRatio?: string;
     entityDisplayName?: string;
-    // Nueva prop para mensaje de ayuda sobre compatibilidad
-    compatibilityHelpText?: React.ReactNode;
 }
 
 export default function SharedVideoManager<
@@ -81,8 +77,7 @@ export default function SharedVideoManager<
     formSchema,
     maxFileSizeMB = 50,
     videoAspectRatio = "aspect-video",
-    entityDisplayName = "entidad",
-    compatibilityHelpText
+    entityDisplayName = "entidad"
 }: SharedVideoManagerProps<T_Item, T_UpsertData>) {
 
     const [currentVideo, setCurrentVideo] = useState<T_Item | null>(null);
@@ -238,15 +233,6 @@ export default function SharedVideoManager<
     return (
         <div className={cardContainerClasses}>
             <h3 className="text-base font-semibold text-zinc-100 mb-0">Video Principal de {entityDisplayName.charAt(0).toUpperCase() + entityDisplayName.slice(1)}</h3>
-
-            {compatibilityHelpText && (
-                <div className="p-3 text-xs bg-blue-900/20 border border-blue-700/30 rounded-md text-blue-200 flex gap-2.5 items-start">
-                    <Info size={28} className="flex-shrink-0 text-blue-400 mt-0.5" />
-                    <div>{compatibilityHelpText}</div>
-                </div>
-            )}
-
-
             {currentVideo && (
                 <div className="mb-4">
                     <h4 className="text-sm font-medium text-zinc-200 mb-2">Video Actual:</h4>

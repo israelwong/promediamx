@@ -10,7 +10,9 @@ import SharedVideoManager, {
 import {
     obtenerVideoDeOfertaAction,
     guardarVideoOfertaAction,
-    eliminarVideoDeOfertaAction
+    eliminarVideoDeOfertaAction,
+    // testearCompatibilidadVideoOfertaWhatsAppAction, // Importar la nueva action
+
 } from '@/app/admin/_lib/actions/oferta/ofertaVideos.actions'; // Verifica esta ruta
 
 // Tipos específicos del video de Oferta y su schema de upsert
@@ -42,7 +44,17 @@ export default function OfertaVideos({ ofertaId, negocioId, clienteId }: OfertaV
         deleteVideoAction: (videoId: string, currentNegocioId: string, currentClienteId: string, ownerEntityId: string) =>
             // La action eliminarVideoDeOfertaAction necesita el ofertaId (ownerEntityId) como último argumento.
             eliminarVideoDeOfertaAction(videoId, currentNegocioId, currentClienteId, ownerEntityId),
+
     };
+
+    const compatibilityHelpNode = (
+        <>
+            WhatsApp recomienda videos en formato MP4 con códec H.264 (video) y AAC (audio), y un tamaño menor a 16MB.
+            Sube tu video y luego usa el botón &quot;Verificar Compatibilidad&quot; para una prueba preliminar con la API de WhatsApp.
+            Si encuentras problemas, puedes usar un conversor externo como {' '}
+            <a href="https://video-converter.com/es/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Video converter</a> o similar.
+        </>
+    );
 
     return (
         <SharedVideoManager<OfertaVideoItemType, UpsertOfertaVideoData>
@@ -55,6 +67,8 @@ export default function OfertaVideos({ ofertaId, negocioId, clienteId }: OfertaV
             entityDisplayName="oferta" // Nombre para mensajes y UI
             maxFileSizeMB={25} // Puedes ajustar este límite si es diferente para videos de ofertas
             videoAspectRatio="aspect-video" // O el aspect ratio que prefieras
+            compatibilityHelpText={compatibilityHelpNode} // Pasar el texto de ayuda
+
         />
     );
 }
