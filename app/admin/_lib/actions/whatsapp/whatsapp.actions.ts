@@ -21,7 +21,7 @@ import {
     generarRespuestaAsistente,
     obtenerTareasCapacidadParaAsistente
 } from '@/app/admin/_lib/ia/ia.actions';
-import { dispatchTareaEjecutadaAction } from '@/app/admin/_lib/ia/funcionesEjecucion.actions';
+import { dispatchTareaEjecutadaAction } from '@/app/admin/_lib/dispatcher/funcionesEjecucion.actions';
 
 const WHATSAPP_CHANNEL_NAME = "WhatsApp";
 
@@ -41,6 +41,7 @@ export async function procesarMensajeWhatsAppEntranteAction(
     let conversationId: string | undefined;
     let leadId: string | undefined;
     let asistenteId: string | undefined;
+
     let asistenteNombre: string | undefined;
     let negocioNombre: string | undefined;
     let asistenteDescripcion: string | null | undefined;
@@ -181,34 +182,104 @@ export async function procesarMensajeWhatsAppEntranteAction(
             }
         });
 
-        const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
-            const parts: HistorialTurnoParaGemini['parts'] = [];
-            let roleForGemini: HistorialTurnoParaGemini['role'] | null = null;
+        // const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
+        //     const parts: HistorialTurnoParaGemini['parts'] = [];
+        //     let roleForGemini: HistorialTurnoParaGemini['role'] | null = null;
+
+        //     if (dbTurn.role === 'user') {
+        //         roleForGemini = 'user';
+        //         if (dbTurn.mensajeTexto) parts.push({ text: dbTurn.mensajeTexto });
+        //     } else if (dbTurn.role === 'assistant') {
+        //         roleForGemini = 'model';
+        //         if (dbTurn.parteTipo === 'FUNCTION_CALL' && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
+        //             parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
+        //         } else if (dbTurn.mensajeTexto) {
+        //             parts.push({ text: dbTurn.mensajeTexto });
+        //         }
+        //     } else if (dbTurn.role === 'function') {
+        //         roleForGemini = 'function';
+        //         if (dbTurn.parteTipo === 'FUNCTION_RESPONSE' && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
+        //             parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
+        //         } else if (dbTurn.mensajeTexto) {
+        //             parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunctionExecuted", response: { content: dbTurn.mensajeTexto } } });
+        //         }
+        //     } 
+
+        //     if (roleForGemini && parts.length > 0) {
+        //         return { role: roleForGemini, parts };
+        //     }
+        //     return null;
+        // }).filter(Boolean) as HistorialTurnoParaGemini[];
+
+        const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.flatMap(dbTurn => {
+            const turnosParaGemini: HistorialTurnoParaGemini[] = [];
 
             if (dbTurn.role === 'user') {
-                roleForGemini = 'user';
-                if (dbTurn.mensajeTexto) parts.push({ text: dbTurn.mensajeTexto });
+                if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
+                    turnosParaGemini.push({
+                        role: 'user',
+                        parts: [{ text: dbTurn.mensajeTexto }]
+                    });
+                }
             } else if (dbTurn.role === 'assistant') {
-                roleForGemini = 'model';
-                if (dbTurn.parteTipo === 'FUNCTION_CALL' && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
-                    parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
-                } else if (dbTurn.mensajeTexto) {
-                    parts.push({ text: dbTurn.mensajeTexto });
-                }
-            } else if (dbTurn.role === 'function') {
-                roleForGemini = 'function';
-                if (dbTurn.parteTipo === 'FUNCTION_RESPONSE' && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
-                    parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
-                } else if (dbTurn.mensajeTexto) {
-                    parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunctionExecuted", response: { content: dbTurn.mensajeTexto } } });
-                }
-            }
+                if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_CALL && dbTurn.functionCallNombre) {
+                    // El asistente decidió llamar a una función
+                    const functionCallPart = {
+                        functionCall: {
+                            name: dbTurn.functionCallNombre,
+                            args: dbTurn.functionCallArgs as Record<string, unknown> || {}
+                        }
+                    };
+                    // Si el mensajeTexto también existe para este turno de FUNCTION_CALL (ej. "Ok, buscando eso...")
+                    // y se lo mostraste al usuario, podrías añadirlo como otra part o un turno previo.
+                    // Por ahora, asumimos que el prompt de Gemini pide no mezclar texto con functionCall.
+                    // Si Gemini devuelve texto Y functionCall en el mismo candidate.content.parts,
+                    // la forma en que guardas esto en una sola Interaccion y la reconstruyes aquí es clave.
+                    // Si guardaste un mensajeTexto para la FUNCTION_CALL:
+                    if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
+                        turnosParaGemini.push({ role: 'model', parts: [{ text: dbTurn.mensajeTexto }] });
+                    }
+                    // Luego la function call en sí misma
+                    turnosParaGemini.push({ role: 'model', parts: [functionCallPart] });
 
-            if (roleForGemini && parts.length > 0) {
-                return { role: roleForGemini, parts };
+
+                } else if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && dbTurn.functionResponseNombre) {
+                    // Esta es una Interaccion que representa el resultado de una función que TU backend ejecutó.
+                    // Gemini espera esto como un turno de 'role: "function"'.
+                    turnosParaGemini.push({
+                        role: 'function',
+                        parts: [{
+                            functionResponse: {
+                                name: dbTurn.functionResponseNombre,
+                                response: dbTurn.functionResponseData as Record<string, unknown> ||
+                                { /* Fallback si functionResponseData es nulo */
+                                    confirmacion: `Acción ${dbTurn.functionResponseNombre} procesada.`,
+                                    content: dbTurn.mensajeTexto || "Resultado procesado."
+                                }
+                            }
+                        }]
+                    });
+
+                    // Después del 'functionResponse', lo que el asistente (model) le dijo al usuario como texto.
+                    // Este es el dbTurn.mensajeTexto de esta misma Interaccion.
+                    if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
+                        turnosParaGemini.push({
+                            role: 'model',
+                            parts: [{ text: dbTurn.mensajeTexto }]
+                        });
+                    }
+                } else if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
+                    // Respuesta de texto simple del asistente (no es llamada a función ni respuesta de función)
+                    turnosParaGemini.push({
+                        role: 'model',
+                        parts: [{ text: dbTurn.mensajeTexto }]
+                    });
+                }
             }
-            return null;
-        }).filter(Boolean) as HistorialTurnoParaGemini[];
+            // No esperamos 'role: function' directamente de la DB con la lógica actual de guardado.
+
+            return turnosParaGemini; // flatMap se encargará de aplanar el array de arrays
+        });
 
         console.log(`[WhatsApp Actions] Historial para IA (conv ${conversationId}, últimos 5):`, JSON.stringify(historialParaIA.slice(-5), null, 2));
 

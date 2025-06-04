@@ -82,67 +82,37 @@ export const RespuestaAsistenteConHerramientasSchema = z.object({
 export type RespuestaAsistenteConHerramientas = z.infer<typeof RespuestaAsistenteConHerramientasSchema>;
 
 
-// Parte de Texto
-const TextPartSchema = z.object({
-    text: z.string(),
-    // Asegurar que no haya otras propiedades de Part aquí
-    functionCall: z.undefined().optional(),
-    functionResponse: z.undefined().optional(),
-});
-
-// Parte de Llamada a Función
-const FunctionCallPartSchema = z.object({
-    functionCall: z.object({
-        name: z.string(),
-        args: z.record(z.string(), z.any()), // Gemini espera Record<string, any>
-    }),
-    // Asegurar que no haya otras propiedades de Part aquí
-    text: z.undefined().optional(),
-    functionResponse: z.undefined().optional(),
-});
-
-// Parte de Respuesta de Función
-const FunctionResponsePartSchema = z.object({
-    functionResponse: z.object({
-        name: z.string(), // Nombre de la función original
-        response: z.record(z.string(), z.any()), // El objeto de respuesta
-    }),
-    // Asegurar que no haya otras propiedades de Part aquí
-    text: z.undefined().optional(),
-    functionCall: z.undefined().optional(),
-});
-
-// Schema para una 'Part' individual, usando una unión discriminada implícita por la estructura
-// Esto se acerca más a cómo el SDK de Google define `Part`.
-const PartSchema = z.union([
-    TextPartSchema,
-    FunctionCallPartSchema,
-    FunctionResponsePartSchema,
-    // Nota: No estamos incluyendo otros tipos de Part del SDK de Google como
-    // InlineDataPart, FileDataPart, ExecutableCodePart, CodeExecutionResultPart,
-    // porque tu lógica actual solo genera text, functionCall, o functionResponse.
-    // Si el SDK REQUIERE que el tipo Part pueda ser CUALQUIERA de sus miembros
-    // incluso si no los usas, la compatibilidad directa puede ser más compleja.
-    // Sin embargo, la queja de TypeScript suele ser por no poder discriminar
-    // claramente qué tipo de Part es tu objeto.
-]);
-
-// Schema para un turno completo en el historial para Gemini
+// Asegúrate que HistorialTurnoParaGeminiSchema esté definido así o similar:
 export const HistorialTurnoParaGeminiSchema = z.object({
     role: z.enum(['user', 'model', 'function']),
-    parts: z.array(PartSchema).min(1, "El array 'parts' no puede estar vacío."),
+    parts: z.array(
+        z.object({ // Cada objeto en 'parts' puede ser uno de estos
+            text: z.string().optional(),
+            functionCall: z.object({
+                name: z.string(),
+                args: z.record(z.string(), z.any()),
+            }).optional(),
+            functionResponse: z.object({
+                name: z.string(),
+                response: z.record(z.string(), z.any()),
+            }).optional(),
+        }).refine(part => { // Asegurar que solo una propiedad de 'part' esté presente
+            const keys = Object.keys(part) as Array<keyof typeof part>;
+            const presentKeys = keys.filter(key => part[key] !== undefined);
+            return presentKeys.length === 1;
+        }, { message: "Cada parte debe tener exactamente una propiedad: text, functionCall, o functionResponse." })
+    ).min(1, "Parts array no puede estar vacío."), // parts no puede ser un array vacío
 });
-export type HistorialTurnoParaGemini = z.infer<typeof HistorialTurnoParaGeminiSchema>; // Este tipo debería ser compatible con Content de Gemini
+export type HistorialTurnoParaGemini = z.infer<typeof HistorialTurnoParaGeminiSchema>; // Este es el tipo Content de Gemini
 
-// Input para generarRespuestaAsistente (se mantiene, pero ahora HistorialTurnoParaGemini es más preciso)
 export const GenerarRespuestaAsistenteConHerramientasInputSchema = z.object({
-    historialConversacion: z.array(HistorialTurnoParaGeminiSchema), // Usar el schema de turno actualizado
+    historialConversacion: z.array(HistorialTurnoParaGeminiSchema),
     mensajeUsuarioActual: z.string(),
     contextoAsistente: z.object({
         nombreAsistente: z.string(),
         nombreNegocio: z.string(),
         descripcionAsistente: z.string().nullable().optional(),
     }),
-    tareasDisponibles: z.array(TareaCapacidadIASchema), // Asumiendo que TareaCapacidadIASchema está definido
+    tareasDisponibles: z.array(TareaCapacidadIASchema),
 });
 export type GenerarRespuestaAsistenteConHerramientasInput = z.infer<typeof GenerarRespuestaAsistenteConHerramientasInputSchema>;

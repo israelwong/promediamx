@@ -15,20 +15,19 @@ import type { AgenteBasicoCrmData } from '@/app/admin/_lib/actions/agenteCrm/age
 // Importar los tipos ACTUALIZADOS para UiComponentPayload
 import type {
     UiComponentPayload, // El tipo unión genérico
-    OfferDisplayPayloadData,
-    ActionPromptPayloadData,
-    StripePaymentLinkPayloadData, // Tipo de datos para el componente Stripe
-    UiComponentPayloadOfferDisplay,
-    UiComponentPayloadActionPrompt,
-    UiComponentPayloadStripePaymentLink // Tipo completo del payload para Stripe
-} from '@/app/admin/_lib/ui-payloads.types'; // AJUSTA LA RUTA si es diferente
+    OfferDisplayPayloadData, // Específico para OfferDisplay
+    ActionPromptPayloadData, // Específico para ActionPrompt
+    UiComponentPayloadOfferDisplay, // Tipo completo para OfferDisplay
+    UiComponentPayloadActionPrompt, // Tipo completo para ActionPrompt
+    StripePaymentLinkPayloadData,
+} from '@/app/admin/_lib/ui-payloads.types'; // AJUSTA LA RUTA
 
 // Subcomponentes
 import ClientTime from './ClientTime';
 import MediaItemDisplay from './MediaItemDisplay';
 import OfferDisplayComponent from '@/app/components/chat/rich_elements/OfferDisplayComponent';
-import ActionPromptComponent from '@/app/components/chat/rich_elements/ActionPromptComponent';
-import StripePaymentLinkComponent from '@/app/components/chat/rich_elements/StripePaymentLinkComponent';
+import ActionPromptComponent from '@/app/components/chat/rich_elements/ActionPromptComponent'; // NUEVO IMPORTE
+import StripePaymentLinkComponent from '@/app/components/chat/rich_elements/StripePaymentLinkComponent'; // NUEVO IMPORTE
 
 export interface ChatMessageBubbleProps {
     msg: ChatMessageItemCrmData;
@@ -46,9 +45,10 @@ export interface ChatMessageBubbleProps {
         slides: { src: string; alt?: string; type?: "image" }[],
         index: number
     ) => void;
+    // NUEVA PROP para manejar la acción de los botones
     onUiActionTrigger: (
-        action: UiComponentPayloadActionPrompt['data']['actions'][0],
-        messageContext: ChatMessageItemCrmData
+        action: UiComponentPayloadActionPrompt['data']['actions'][0], // El tipo de un botón de acción
+        messageContext: ChatMessageItemCrmData // Pasar el contexto del mensaje original
     ) => void;
 }
 
@@ -62,29 +62,31 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     getMessageBgColor,
     getMessageSenderIcon,
     openLightboxWithSlides,
-    onUiActionTrigger,
+    onUiActionTrigger, // NUEVA PROP
 }) => {
-    // console.log(`[Bubble] Msg ID ${msg.id}, uiPayload:`, msg.uiComponentPayload);
+    // console.log(`[Bubble] Msg ID ${msg.id}, Canal: ${msg.canalInteraccion}, uiPayload:`, msg.uiComponentPayload);
 
-    let uiPayloadToRender: UiComponentPayload | null = null;
+    let uiPayloadToRender: UiComponentPayload | null = null; // Usar el tipo unión genérico
     let fallbackContent: string | null | undefined = msg.mensajeTexto;
     let fallbackMedia: MediaItem[] = [];
 
     if (msg.role === 'assistant' && msg.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE) {
         if (msg.uiComponentPayload && typeof msg.uiComponentPayload === 'object' && 'componentType' in msg.uiComponentPayload) {
+            // Intentamos parsear como UiComponentPayload genérico
+            // TypeScript debería poder inferir el tipo correcto basado en componentType
             const parsedUiPayload = msg.uiComponentPayload as UiComponentPayload;
 
             if (parsedUiPayload.componentType === 'OfferDisplay' && parsedUiPayload.data) {
                 uiPayloadToRender = parsedUiPayload as UiComponentPayloadOfferDisplay;
+                // console.log(`[Bubble] Msg ID ${msg.id}: Renderizando OfferDisplay.`);
             } else if (parsedUiPayload.componentType === 'ActionPrompt' && parsedUiPayload.data) {
                 uiPayloadToRender = parsedUiPayload as UiComponentPayloadActionPrompt;
-            } else if (parsedUiPayload.componentType === 'StripePaymentLink' && parsedUiPayload.data) {
-                // *** ESTE BLOQUE else if ES EL AJUSTE PRINCIPAL ***
-                uiPayloadToRender = parsedUiPayload as UiComponentPayloadStripePaymentLink;
+                // console.log(`[Bubble] Msg ID ${msg.id}: Renderizando ActionPrompt.`);
             } else {
-                console.warn(`[Bubble] Msg ID ${msg.id}: uiComponentPayload con tipo desconocido o data faltante: ${parsedUiPayload.componentType}`);
+                // console.warn(`[Bubble] Msg ID ${msg.id}: uiComponentPayload con tipo desconocido: ${parsedUiPayload.componentType}`);
             }
 
+            // Si hay uiComponentPayload, el 'content' de functionResponseData es un fallback.
             if (uiPayloadToRender && msg.functionResponseData) {
                 const parsedFallbackResponse = FunctionResponseMediaDataSchema.safeParse(msg.functionResponseData);
                 if (parsedFallbackResponse.success) {
@@ -93,6 +95,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
             }
         }
 
+        // Si no se pudo renderizar un uiComponentPayload pero hay functionResponseData, usarlo para fallback.
         if (!uiPayloadToRender && msg.functionResponseData) {
             const parsedResponse = FunctionResponseMediaDataSchema.safeParse(msg.functionResponseData);
             if (parsedResponse.success) {
@@ -108,34 +111,31 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
 
     const renderMessageBody = () => {
         if (uiPayloadToRender) {
-            switch (uiPayloadToRender.componentType) {
-                case 'OfferDisplay':
-                    return <OfferDisplayComponent
-                        data={uiPayloadToRender.data as OfferDisplayPayloadData}
-                        openLightboxWithSlides={openLightboxWithSlides}
-                    />;
-                case 'ActionPrompt':
-                    return <ActionPromptComponent
-                        data={uiPayloadToRender.data as ActionPromptPayloadData}
-                        onActionTrigger={(action) => onUiActionTrigger(action, msg)}
-                    />;
-                case 'StripePaymentLink':
-                    return <StripePaymentLinkComponent
-                        data={uiPayloadToRender.data as StripePaymentLinkPayloadData}
-                    />;
-                default:
-                    console.warn(`[Bubble] No hay un caso de renderizado para componentType: ${(uiPayloadToRender as UiComponentPayload).componentType}`);
-                    if (fallbackContent) return <p className="text-sm whitespace-pre-wrap">{fallbackContent}</p>;
-                    return <p className="text-orange-400 text-xs italic">[Componente UI &apos;{(uiPayloadToRender as UiComponentPayload).componentType}&apos; no implementado en renderMessageBody]</p>;
+            if (uiPayloadToRender.componentType === 'OfferDisplay') {
+                return <OfferDisplayComponent
+                    data={uiPayloadToRender.data as OfferDisplayPayloadData} // Cast seguro por la comprobación anterior
+                    openLightboxWithSlides={openLightboxWithSlides}
+                />;
+            } else if (uiPayloadToRender.componentType === 'ActionPrompt') {
+                return <ActionPromptComponent
+                    data={uiPayloadToRender.data as ActionPromptPayloadData} // Cast seguro
+                    onActionTrigger={(action) => onUiActionTrigger(action, msg)} // Pasar el contexto del mensaje original
+                />;
+            } else if (uiPayloadToRender.componentType === 'StripePaymentLink') {
+                return <StripePaymentLinkComponent
+                    data={uiPayloadToRender.data as StripePaymentLinkPayloadData}
+                />;
             }
+            // Podrías tener un fallback aquí si el componentType es conocido pero no hay componente
+            // return <p className="text-orange-400 text-xs italic">[Componente UI '{uiPayloadToRender.componentType}' no implementado]</p>;
         }
-
+        // Si no hay uiComponentPayload, usar la lógica de fallback (content y media)
         const shouldRenderHtml =
             (msg.role === 'assistant' && msg.parteTipo === InteraccionParteTipo.FUNCTION_CALL) ||
             (msg.role === 'assistant' &&
                 msg.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE &&
                 conversationDetails?.canalOrigen === 'webchat' &&
-                fallbackMedia.length === 0);
+                fallbackMedia.length === 0); // Si es webchat y NO hay media separada, el content es HTML
 
         const textContentElement = fallbackContent ? (
             shouldRenderHtml ? (
@@ -147,8 +147,9 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                 <p className="text-sm whitespace-pre-wrap chat-message-content">{fallbackContent}</p>
             )
         ) : (
+            // No mostrar "[Mensaje sin texto principal]" si es una FUNCTION_RESPONSE y SÍ tiene fallbackMedia
             (msg.role !== 'assistant' || msg.parteTipo !== InteraccionParteTipo.FUNCTION_RESPONSE || fallbackMedia.length === 0) &&
-            !uiPayloadToRender &&
+            !uiPayloadToRender && // Solo si no estamos renderizando un uiPayload que podría ser autosuficiente
             <p className="text-sm italic text-zinc-400">[Mensaje sin contenido de texto]</p>
         );
 
@@ -170,13 +171,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         if (!textContentElement && !mediaElement && !uiPayloadToRender && msg.parteTipo !== InteraccionParteTipo.FUNCTION_CALL) {
             return <p className="text-sm italic text-zinc-400">[Mensaje sin contenido visible]</p>;
         }
-
-        return (
-            <>
-                {textContentElement}
-                {mediaElement}
-            </>
-        );
+        return <>{textContentElement}{mediaElement}</>;
     };
 
     return (
@@ -195,9 +190,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                         {(msg.role === 'assistant' && conversationDetails?.asistenteNombre) && (
                             <div className="flex items-center gap-1.5 mb-1 text-xs font-medium"> <span className='text-zinc-300'>{conversationDetails.asistenteNombre}</span> </div>
                         )}
-
                         {renderMessageBody()}
-
                         {msg.role === 'user' && msg.mediaUrl && msg.mediaType && (
                             <div className="mt-2">
                                 <MediaItemDisplay

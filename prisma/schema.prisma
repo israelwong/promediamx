@@ -198,8 +198,6 @@ model TareaFuncion {
                            // Este nombre se usará para la FunctionDeclaration de Gemini.
                            // Será único porque la función es única para la tarea.
   descripcion   String?    //! definición para gemini tool
-  orden         Int?       //! quitar no se necesita
-
   // --- Relación UNO-A-UNO Inversa con Tarea ---
   // Esto establece que una TareaFuncion pertenece exclusivamente a una Tarea.
   tareaId       String?     @unique // Campo de clave foránea que apunta a Tarea. El @unique aquí es CRUCIAL para la relación 1:1.
@@ -327,7 +325,7 @@ model ParametroRequerido{ //! descontinuar
   id        String   @id @default(cuid())
   orden     Int?
   tipoDato String // texto, numero, fecha, booleano
-  nombreVisible String?    //!no me surve 
+  nombreVisible String?    //!no me sirve 
   nombreInterno String?    @unique // usar _ para separar palabras (ej: "nombre_cliente", "fecha_cita")
   descripcion String? // Descripción del parámetro de lo que va a recibir
   createdAt DateTime @default(now())
@@ -1133,7 +1131,6 @@ model CRMCampoPersonalizado{
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-   // --- NUEVO: Relación inversa con las tareas que usan este campo ---
   tareasQueLoRequieren TareaCampoPersonalizado[]
   @@unique([crmId, nombre]) // Nombre visible único por CRM
   @@index([crmId]) // Índice añadido
@@ -1254,7 +1251,7 @@ model Agente{
   password  String   // ¡Asegúrate de hashear esto!
   rol       String?  // Ej: 'admin_crm', 'agente_ventas'
   status    String   @default("activo")
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now())  
   updatedAt DateTime @updatedAt
   conversacionesAsignadas Conversacion[] @relation("ConversacionesAsignadas")
   interaccionesRealizadas Interaccion[] @relation("InteraccionesPorAgente")
@@ -1452,8 +1449,6 @@ model Interaccion {
 
   canalInteraccion        String?   // Ej: "whatsapp", "webchat_test", "crm", "webchat_publico", "api_directa"
 
-
-  mensaje        String?   @db.Text //!quitar
   // Metadatos de análisis (opcional)
   intencion      String?
   entidad        String?

@@ -16,21 +16,21 @@ import {
     tareaBaseInfoSchema,
     tareaParaMarketplaceSchema,
     TareaParaMarketplaceData,
-    TareaConDetalles,
     CrearTareaBasicaInputSchema,
     TareaCreadaOutputSchema,
-    OrdenarTareasInputSchema,
-    CategoriaTareaSimpleSchema, // Importar el schema si se usa para validar salida de obtenerCategorias
-    ActualizarTareaInputSchema, // Nuevo
+    CategoriaTareaSimpleSchema,
+    ActualizarTareaInputSchema,
     type CrearTareaBasicaInput,
     type TareaCreadaOutput,
     type CategoriaTareaSimple,
-    TareaParaEditarSchema,      // Nuevo
+    TareaParaEditarSchema,
     type TareaParaEditar,
-    type ActualizarTareaInput
+    type ActualizarTareaInput,
+    ActualizarOrdenTareasPorGrupoInputSchema,
+    type ActualizarOrdenTareasPorGrupoInput,
+    type TareaConDetalles,
 } from './tarea.schemas';
 
-// --- Función para convertir a camelCase (simple) ---
 function toCamelCase(str: string): string {
     // Elimina acentos y caracteres especiales, deja solo letras/números/espacios
     const sinAcentos = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -247,25 +247,31 @@ export async function obtenerCategoriasParaFiltro(): Promise<ActionResult<z.infe
 // --- NUEVA ACCIÓN: Actualizar Tarea ---
 export async function actualizarTarea(
     id: string,
-    input: ActualizarTareaInput
+    input: ActualizarTareaInput // Tipo inferido del schema Zod actualizado
 ): Promise<ActionResult<TareaPrisma>> {
+    console.log(`Actualizar Tarea - ID: ${id}, Input:`, input);
     if (!id) {
         return { success: false, error: "Se requiere el ID de la tarea para actualizar." };
     }
+
+    // La validación Zod ya debería haber ocurrido en el componente antes de llamar a esta acción,
+    // pero una validación aquí también es una buena práctica defensiva.
     const validationResult = ActualizarTareaInputSchema.safeParse(input);
     if (!validationResult.success) {
+        console.error('Error de validación en action actualizarTarea:', validationResult.error.flatten().fieldErrors);
         return {
             success: false,
             error: "Datos de entrada inválidos.",
             validationErrors: validationResult.error.flatten().fieldErrors,
         };
     }
+    // Usar los datos validados y parseados por Zod
     const data = validationResult.data;
 
     try {
         const tareaActual = await prisma.tarea.findUnique({
             where: { id },
-            select: { nombre: true, tareaFuncion: { select: { id: true, nombre: true } } } // Obtener nombre actual y función
+            select: { nombre: true, tareaFuncion: { select: { id: true, nombre: true } } }
         });
 
         if (!tareaActual) {
@@ -273,55 +279,78 @@ export async function actualizarTarea(
         }
 
         const tareaActualizada = await prisma.$transaction(async (tx) => {
-            // 1. Actualizar campos directos de Tarea
+            const dataToUpdate: Prisma.TareaUpdateInput = {
+                nombre: data.nombre,
+                descripcionMarketplace: data.descripcionMarketplace,
+                instruccion: data.instruccion,
+                precio: data.precio,
+                rol: data.rol,
+                personalidad: data.personalidad,
+                version: data.version, // Zod asegura que es number | null | undefined. Prisma maneja null/undefined.
+                status: data.status,
+                CategoriaTarea: data.categoriaTareaId
+                    ? { connect: { id: data.categoriaTareaId } }
+                    : undefined,
+                iconoUrl: data.iconoUrl,
+            };
+
             const updatedTarea = await tx.tarea.update({
                 where: { id },
-                data: {
-                    nombre: data.nombre,
-                    descripcionMarketplace: data.descripcionMarketplace,
-                    // descripcionTool: data.descripcionTool,
-                    instruccion: data.instruccion,
-                    precio: data.precio,
-                    rol: data.rol,
-                    personalidad: data.personalidad,
-                    version: data.version,
-                    status: data.status,
-                    categoriaTareaId: data.categoriaTareaId,
-                    iconoUrl: data.iconoUrl,
-                },
+                data: dataToUpdate,
             });
 
-            // 2. Actualizar TareaFuncion.nombre si Tarea.nombre cambió
             if (data.nombre !== tareaActual.nombre && tareaActual.tareaFuncion?.id) {
                 const nuevoNombreFuncion = toCamelCase(data.nombre);
-                if (nuevoNombreFuncion !== tareaActual.tareaFuncion.nombre) {
-                    await tx.tareaFuncion.update({
-                        where: { id: tareaActual.tareaFuncion.id },
-                        data: { nombre: nuevoNombreFuncion },
-                    });
+                if (nuevoNombreFuncion && nuevoNombreFuncion !== tareaActual.tareaFuncion.nombre) {
+                    try {
+                        await tx.tareaFuncion.update({
+                            where: { id: tareaActual.tareaFuncion.id },
+                            data: { nombre: nuevoNombreFuncion },
+                        });
+                    } catch (fnError: unknown) {
+                        // Si el nuevo nombre de función ya existe para otra tarea, podría fallar
+                        // P2002: Unique constraint failed
+                        if (
+                            typeof fnError === 'object' &&
+                            fnError !== null &&
+                            'code' in fnError &&
+                            (fnError as { code?: string }).code === 'P2002'
+                        ) {
+                            console.warn(`Conflicto al intentar renombrar TareaFuncion para tarea ${id}: el nombre ${nuevoNombreFuncion} ya existe. Se mantiene el nombre de función anterior.`);
+                            // No relanzar el error para que la tarea principal se actualice.
+                            // Opcional: añadir un warning al resultado de la acción.
+                        } else {
+                            throw fnError; // Relanzar otros errores
+                        }
+                    }
+                } else if (!nuevoNombreFuncion && tareaActual.tareaFuncion.nombre) {
+                    console.warn(`El nuevo nombre de tarea '${data.nombre}' resultó en un nombre de función vacío. No se actualizó TareaFuncion.`);
                 }
             }
 
-            // 3. Actualizar relaciones M-N para TareaCanal
-            await tx.tareaCanal.deleteMany({ where: { tareaId: id } });
-            if (data.canalIds && data.canalIds.length > 0) {
-                await tx.tareaCanal.createMany({
-                    data: data.canalIds.map(canalId => ({
-                        tareaId: id,
-                        canalConversacionalId: canalId,
-                    })),
-                });
-            }
+            // Si canalIds se elimina del schema y del formulario, este bloque se elimina.
+            // if (data.canalIds !== undefined) { // Solo modificar si se provee (puede ser array vacío)
+            //     await tx.tareaCanal.deleteMany({ where: { tareaId: id } });
+            //     if (data.canalIds.length > 0) {
+            //         await tx.tareaCanal.createMany({
+            //             data: data.canalIds.map(canalId => ({
+            //                 tareaId: id,
+            //                 canalConversacionalId: canalId,
+            //             })),
+            //         });
+            //     }
+            // }
 
-            // 4. Actualizar relaciones M-N para TareaEtiqueta
-            await tx.tareaEtiqueta.deleteMany({ where: { tareaId: id } });
-            if (data.etiquetaIds && data.etiquetaIds.length > 0) {
-                await tx.tareaEtiqueta.createMany({
-                    data: data.etiquetaIds.map(etiquetaId => ({
-                        tareaId: id,
-                        etiquetaTareaId: etiquetaId,
-                    })),
-                });
+            if (data.etiquetaIds !== undefined) { // Solo modificar si se provee
+                await tx.tareaEtiqueta.deleteMany({ where: { tareaId: id } });
+                if (data.etiquetaIds.length > 0) {
+                    await tx.tareaEtiqueta.createMany({
+                        data: data.etiquetaIds.map(etiquetaId => ({
+                            tareaId: id,
+                            etiquetaTareaId: etiquetaId,
+                        })),
+                    });
+                }
             }
             return updatedTarea;
         });
@@ -332,6 +361,7 @@ export async function actualizarTarea(
     } catch (error: unknown) {
         console.error(`Error al actualizar tarea ${id}:`, error);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            // Asumiendo que 'nombre' es el único otro campo que podría tener un constraint unique a nivel de Tarea.
             if (error.meta?.target && (error.meta.target as string[]).includes('nombre')) {
                 return { success: false, error: `El nombre de tarea '${data.nombre}' ya existe.` };
             }
@@ -346,12 +376,6 @@ export async function eliminarTarea(id: string): Promise<ActionResult<null>> {
         return { success: false, error: "Se requiere el ID de la tarea para eliminar." };
     }
     try {
-        // La relación TareaFuncion -> Tarea tiene onDelete: Cascade,
-        // por lo que al borrar la Tarea, su TareaFuncion asociada se borrará.
-        // Las relaciones M-N (TareaCanal, TareaEtiqueta) también deberían tener onDelete: Cascade en el modelo Tarea.
-        // O borrarlas explícitamente aquí si no.
-        // Por ahora, asumimos que el schema maneja las cascadas para TareaFuncion, TareaCanal, TareaEtiqueta.
-
         // Validar si hay AsistenteTareaSuscripcion (esto no se borra en cascada usualmente)
         const suscripciones = await prisma.asistenteTareaSuscripcion.count({
             where: { tareaId: id, status: 'activo' } // Contar solo suscripciones activas
@@ -363,14 +387,6 @@ export async function eliminarTarea(id: string): Promise<ActionResult<null>> {
         // Si no hay suscripciones activas, proceder a eliminar
         // (Las suscripciones inactivas o canceladas podrían quedarse o borrarse según la lógica de negocio)
         await prisma.$transaction(async (tx) => {
-            // Opcional: Borrar explícitamente relaciones M-N si no hay onDelete: Cascade en el modelo Tarea
-            // await tx.tareaCanal.deleteMany({ where: { tareaId: id } });
-            // await tx.tareaEtiqueta.deleteMany({ where: { tareaId: id } });
-            // await tx.tareaGaleria.deleteMany({ where: { tareaId: id } }); 
-            // await tx.tareaEjecutada.deleteMany({ where: { tareaId: id } });
-            // await tx.asistenteTareaSuscripcion.deleteMany({ where: { tareaId: id } }); // Borrar todas las suscripciones
-            // La TareaFuncion se borra en cascada si la relación es onDelete: Cascade
-
             await tx.tarea.delete({ where: { id } });
         });
 
@@ -405,52 +421,77 @@ export async function obtenerCategoriasParaDropdown(): Promise<ActionResult<Cate
         return { success: false, error: 'No se pudieron obtener las categorías.' };
     }
 }
-// (Las otras acciones como obtenerTareasConDetalles y actualizarOrdenTareas se mantienen como antes)
-export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConDetalles[]>> { /* ... como antes ... */
-    try {
-        const tareas = await prisma.tarea.findMany({
-            select: {
-                id: true, nombre: true, iconoUrl: true, precio: true, status: true, orden: true, categoriaTareaId: true,
-                CategoriaTarea: { select: { id: true, nombre: true, color: true } },
-                tareaFuncion: { select: { id: true, nombre: true } },
-                etiquetas: { select: { etiquetaTarea: { select: { id: true, nombre: true } } } },
-                _count: { select: { TareaEjecutada: true, TareaGaleria: true } },
-            },
-            orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
-        });
-        return { success: true, data: tareas as unknown as TareaConDetalles[] };
-    } catch (error: unknown) {
-        console.error('Error en obtenerTareasConDetalles:', error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            return { success: false, error: `Error de base de datos: ${error.message}` };
-        }
-        return { success: false, error: 'Error desconocido al obtener las tareas.' };
-    }
-}
 
-export async function actualizarOrdenTareas(input: unknown): Promise<ActionResult<null>> { /* ... como antes ... */
-    const validationResult = OrdenarTareasInputSchema.safeParse(input);
+export async function actualizarOrdenTareas(
+    input: ActualizarOrdenTareasPorGrupoInput
+): Promise<ActionResult<null>> {
+    const validationResult = ActualizarOrdenTareasPorGrupoInputSchema.safeParse(input);
+
     if (!validationResult.success) {
-        return { success: false, error: 'Datos de entrada inválidos.', validationErrors: validationResult.error.flatten().fieldErrors as Record<string, string[]> };
+        console.error('Error de validación en actualizarOrdenTareas:', validationResult.error.flatten().fieldErrors);
+        return {
+            success: false,
+            error: 'Datos de entrada inválidos para actualizar el orden.',
+            validationErrors: validationResult.error.flatten().fieldErrors as Record<string, string[]>,
+        };
     }
-    const ordenData = validationResult.data;
+
+    const { categoriaTareaId, tareasOrdenadas } = validationResult.data;
+
+    console.log(`Actualizando orden para categoriaId: ${categoriaTareaId === null ? 'Sin Categoría' : categoriaTareaId}`);
+    console.log('Tareas ordenadas:', tareasOrdenadas.map(t => ({ id: t.id, orden: t.orden })));
+
     try {
+        // Asegurar que todas las tareas que se están ordenando realmente pertenecen
+        // al grupo especificado (categoría o sin categoría).
+        // Esta verificación es una capa adicional de seguridad.
+        const idsTareasEnviadas = tareasOrdenadas.map(t => t.id);
+        const tareasDesdeDb = await prisma.tarea.findMany({
+            where: {
+                id: { in: idsTareasEnviadas },
+                categoriaTareaId: categoriaTareaId, // Esto asegura que todas las tareas recuperadas pertenecen al grupo correcto
+            },
+            select: { id: true }
+        });
+
+        if (tareasDesdeDb.length !== idsTareasEnviadas.length) {
+            console.error('Error de consistencia: No todas las tareas enviadas pertenecen al grupo especificado o algunas no existen.');
+            return { success: false, error: 'Error de consistencia: Algunas tareas no pertenecen al grupo especificado.' };
+        }
+
+        // Si la validación de pertenencia es exitosa (o si decides omitirla confiando en el frontend),
+        // proceder con la actualización en una transacción.
         await prisma.$transaction(
-            ordenData.map((item) =>
-                prisma.tarea.update({ where: { id: item.id }, data: { orden: item.orden } })
+            tareasOrdenadas.map((item) =>
+                prisma.tarea.update({
+                    where: {
+                        id: item.id,
+                        // No es estrictamente necesario volver a verificar categoriaTareaId aquí
+                        // si ya lo hicimos arriba, pero no hace daño.
+                        // categoriaTareaId: categoriaTareaId
+                    },
+                    data: { orden: item.orden }
+                })
             )
         );
+
         revalidatePath('/admin/tareas');
+        // Considera revalidar también la página de edición de la categoría si tienes una
+        if (categoriaTareaId) {
+            revalidatePath(`/admin/tareas/categorias/${categoriaTareaId}`); // Asumiendo una ruta así
+        }
+        console.log(`Orden actualizado exitosamente para el grupo: ${categoriaTareaId === null ? 'Sin Categoría' : categoriaTareaId}`);
         return { success: true, data: null };
+
     } catch (error: unknown) {
-        console.error('Error en actualizarOrdenTareas:', error);
+        console.error(`Error en actualizarOrdenTareas para el grupo ${categoriaTareaId}:`, error);
         if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            // Errores específicos de Prisma
             return { success: false, error: `Error de base de datos al actualizar orden: ${error.message}` };
         }
         return { success: false, error: 'Error desconocido al actualizar el orden de las tareas.' };
     }
 }
-
 
 // --- NUEVA ACCIÓN: Obtener Tarea por ID para Edición ---
 export async function obtenerTareaPorId(id: string): Promise<ActionResult<TareaParaEditar | null>> {
@@ -485,24 +526,21 @@ export async function obtenerTareaPorId(id: string): Promise<ActionResult<TareaP
             }
         }
 
-
         const tarea = await prisma.tarea.findUnique({
             where: { id },
-            select: { // Asegurarse de seleccionar todos los campos que TareaParaEditarSchema espera
+            select: {
                 id: true,
                 nombre: true,
                 descripcionMarketplace: true,
-                // descripcionTool: true,
                 instruccion: true,
                 precio: true,
                 rol: true,
                 personalidad: true,
-                version: true, // <-- CAMPO AÑADIDO AQUÍ
+                version: true,
                 status: true,
                 categoriaTareaId: true,
                 iconoUrl: true,
-                updatedAt: true, // TareaParaEditarSchema lo incluye
-                // Relaciones
+                updatedAt: true,
                 CategoriaTarea: { select: { id: true, nombre: true, color: true } },
                 tareaFuncion: { select: { id: true, nombre: true } },
                 etiquetas: {
@@ -518,7 +556,7 @@ export async function obtenerTareaPorId(id: string): Promise<ActionResult<TareaP
                     },
                 },
                 _count: {
-                    select: { AsistenteTareaSuscripcion: true },
+                    select: { AsistenteTareaSuscripcion: { where: { status: 'activo' } } }, // Contar solo activas
                 },
             },
         });
@@ -539,5 +577,84 @@ export async function obtenerTareaPorId(id: string): Promise<ActionResult<TareaP
     } catch (error: unknown) {
         console.error(`Error al obtener tarea ${id}:`, error);
         return { success: false, error: `No se pudo cargar la tarea. ${(error instanceof Error ? error.message : '')}`, data: null };
+    }
+}
+
+
+export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConDetalles[]>> {
+    try {
+        const tareas = await prisma.tarea.findMany({
+            select: {
+                id: true,
+                nombre: true,
+                iconoUrl: true,
+                precio: true,
+                status: true,
+                version: true, // Asegúrate que este campo exista en tu modelo Tarea y tenga el tipo correcto
+                orden: true,
+                categoriaTareaId: true,
+                CategoriaTarea: { // Anidar la selección de CategoriaTarea
+                    select: {
+                        id: true,
+                        nombre: true,
+                        color: true,
+                        // orden: true, // Descomentar si añades 'orden' a CategoriaTarea
+                    }
+                },
+                tareaFuncion: { // Anidar la selección de tareaFuncion
+                    select: {
+                        id: true,
+                        nombre: true // Nombre camelCase
+                    }
+                },
+                etiquetas: {
+                    select: {
+                        etiquetaTarea: { // Anidar para obtener los detalles de la etiqueta
+                            select: {
+                                id: true,
+                                nombre: true
+                            }
+                        }
+                    }
+                },
+                _count: {
+                    select: {
+                        TareaEjecutada: true,
+                        TareaGaleria: true
+                    }
+                },
+            },
+            orderBy: [
+                // 1. Tareas sin categoría (categoriaTareaId IS NULL) van primero.
+                //    Dentro de este grupo, se ordenan por su propio 'orden' y luego 'nombre'.
+                { categoriaTareaId: { sort: 'asc', nulls: 'first' } },
+
+                // 2. Luego, las tareas con categoría.
+                //    Estas se ordenan por el 'orden' de su categoría (si existe y lo añades).
+                //    Si no hay CategoriaTarea.orden, se ordenarán por CategoriaTarea.nombre.
+                // { CategoriaTarea: { orden: 'asc' } }, // DESCOMENTAR SI AÑADES 'orden' a CategoriaTarea
+                { CategoriaTarea: { nombre: 'asc' } }, // Ordena alfabéticamente por nombre de categoría
+
+                // 3. Dentro de cada categoría (o el grupo sin categoría), ordenar por Tarea.orden.
+                { orden: 'asc' },
+
+                // 4. Como último criterio de desempate, por nombre de la tarea.
+                { nombre: 'asc' }
+            ],
+        });
+
+        // El tipo TareaConDetalles debe coincidir con la estructura de datos devuelta por esta query.
+        // Prisma inferirá el tipo, pero para asegurar que coincide con tu definición explícita:
+        return { success: true, data: tareas as TareaConDetalles[] };
+        // Usamos 'as any as TareaConDetalles[]' temporalmente. Idealmente, el tipo inferido por Prisma
+        // y tu tipo TareaConDetalles deberían ser idénticos si el 'select' es correcto.
+        // Si hay errores de tipo, revisa la definición de TareaConDetalles contra el 'select'.
+
+    } catch (error: unknown) {
+        console.error('Error en obtenerTareasConDetalles:', error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            return { success: false, error: `Error de base de datos: ${error.message}` };
+        }
+        return { success: false, error: 'Error desconocido al obtener las tareas.' };
     }
 }

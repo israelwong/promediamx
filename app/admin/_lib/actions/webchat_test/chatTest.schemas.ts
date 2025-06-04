@@ -2,6 +2,19 @@
 import { z } from 'zod';
 import { ChatMessageItemSchema } from '@/app/admin/_lib/schemas/sharedCommon.schemas'; // Reutilizar el esquema de mensajes
 
+import { Prisma } from '@prisma/client'; // Importa los tipos necesarios
+
+export type InteraccionParaHistorial = Prisma.InteraccionGetPayload<{
+    select: {
+        role: true;
+        parteTipo: true;
+        mensajeTexto: true;
+        functionCallNombre: true;
+        functionCallArgs: true;
+        functionResponseNombre: true; // Incluido
+        functionResponseData: true;
+    }
+}>;
 
 export const IniciarConversacionWebchatInputSchema = z.object({
     asistenteId: z.string().cuid("ID de Asistente inválido."),
@@ -41,23 +54,23 @@ export type EnviarMensajeWebchatOutput = z.infer<typeof EnviarMensajeWebchatOutp
 // Interfaz/Schema que `generarRespuestaAsistente` espera para su historial.
 // Este es el formato al que mapearemos los ChatMessageItem en `chatTest.actions.ts`.
 export const HistorialTurnoParaGeminiSchema = z.object({
-    role: z.enum(['user', 'model', 'function']), // Roles que Gemini espera para el historial
+    role: z.enum(['user', 'model', 'function']),
     parts: z.array(
-        z.object({
+        z.object({ // Cada objeto en 'parts' puede ser uno de estos
             text: z.string().optional(),
             functionCall: z.object({
                 name: z.string(),
-                args: z.record(z.string(), z.any()), // Gemini espera Record<string, any>
+                args: z.record(z.string(), z.any()),
             }).optional(),
             functionResponse: z.object({
-                name: z.string(), // Nombre de la función original
-                response: z.record(z.string(), z.any()), // El objeto de respuesta
+                name: z.string(),
+                response: z.record(z.string(), z.any()),
             }).optional(),
         })
-        // Asegurar que solo una de las propiedades de 'parts' (text, functionCall, functionResponse) esté presente.
-        // Zod puede manejar esto con .refine o .superRefine si es necesario, o un discriminatedUnion en 'parts'.
-        // Por ahora, la lógica de construcción se encargará de esto.
+        // ... comentario sobre .refine o discriminatedUnion
     ),
 });
 export type HistorialTurnoParaGemini = z.infer<typeof HistorialTurnoParaGeminiSchema>;
+
+
 

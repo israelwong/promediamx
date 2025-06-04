@@ -24,7 +24,7 @@ import {
 import { AgenteBasico } from '@/app/admin/_lib/agente.types';
 import { MensajeEntrantePayload } from '@/app/admin/_lib/webhook.types'; // Importar el nuevo tipo
 import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions'; // Importar la nueva acción de IA
-import { dispatchTareaEjecutadaAction } from './ia/funcionesEjecucion.actions'; // Ajusta la ruta si es necesario
+import { dispatchTareaEjecutadaAction } from './dispatcher/funcionesEjecucion.actions'; // Ajusta la ruta si es necesario
 
 import { obtenerTareasCapacidadParaAsistente } from '@/app/admin/_lib/ia/ia.actions';
 

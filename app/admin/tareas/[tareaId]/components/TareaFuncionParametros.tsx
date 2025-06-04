@@ -43,13 +43,6 @@ const TIPOS_DATO_PARAMETRO = [
     { value: 'integer', label: 'Entero (Integer)' },
     { value: 'boolean', label: 'Sí/No (Boolean)' },
     { value: 'array', label: 'Lista (Array)' }, // Para selecciones múltiples o listas de strings/numbers
-    // Puedes añadir más tipos si los necesitas mapear específicamente
-    // { value: 'texto_largo', label: 'Texto Largo' }, // Generalmente 'string'
-    // { value: 'fecha', label: 'Fecha (String)' }, // Usar 'string' y especificar formato en descripción
-    // { value: 'fecha_hora', label: 'Fecha y Hora (String)' },
-    // { value: 'email', label: 'Email (String)' },
-    // { value: 'telefono', label: 'Teléfono (String)' },
-    // { value: 'url', label: 'URL (String)' },
 ];
 
 const tipoDatoIconMap: { [key: string]: React.ReactElement } = {

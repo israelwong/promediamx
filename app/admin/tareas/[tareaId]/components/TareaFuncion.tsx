@@ -144,7 +144,7 @@ export default function TareaFuncion({ tareaFuncionId, nombreFuncionActual, onNo
                         value={descripcionEdit}
                         onChange={handleDescripcionChange}
                         className={`${textareaBaseClasses} ${validationErrorDescripcion ? 'border-red-500' : ''}`}
-                        rows={6}
+                        rows={10}
                         placeholder="Describe detalladamente cuándo y cómo la IA debe usar esta función específica..."
                         disabled={isSavingDescripcion}
                     />

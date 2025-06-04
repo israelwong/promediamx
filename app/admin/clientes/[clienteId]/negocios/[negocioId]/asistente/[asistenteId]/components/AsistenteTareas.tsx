@@ -131,7 +131,7 @@ export default function AsistenteTareas({
 
     const handleManageSubscription = (tareaId: string) => {
         // router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/asistente/${asistenteId}/tarea/${tareaId}`);
-        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/asistente/${asistenteId}/tarea/${tareaId}/editar`);
+        router.push(`/admin/marketplace/suscripcion/${tareaId}?asistenteId=${asistenteId}&clienteId=${clienteId}&negocioId=${negocioId}`);
     };
     const handleGoToMarketplace = () => {
         router.push(`/admin/marketplace/${asistenteId}`); // Pasar asistenteId al marketplace

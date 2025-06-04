@@ -1,75 +1,97 @@
-// Sugerencia de ubicación: @/app/admin/_lib/ui-payloads.types.ts
-// O dentro de @/app/admin/_lib/schemas/sharedCommon.schemas.ts
+// Ruta: app/admin/_lib/ui-payloads.types.ts
 
-// Importar el tipo de video compartido si aún no está globalmente accesible
-// import { type SharedTipoVideoType } from './sharedCommon.schemas'; // Ajusta la ruta
+// --- Definiciones Comunes para Payloads de UI ---
 
-// Estructura para una imagen dentro del payload de UI
 export interface UiPayloadImage {
     url: string;
     altText?: string | null;
     caption?: string | null;
-    isPrincipal?: boolean | null; // Para destacar una imagen
+    isPrincipal?: boolean | null; // Opcional para marcar la imagen principal
 }
 
-// Estructura para un video dentro del payload de UI
 export interface UiPayloadVideo {
-    tipoVideo: 'YOUTUBE' | 'VIMEO' | 'SUBIDO' | 'OTRO_URL'; // Debería usar tu SharedTipoVideoType
+    tipoVideo: 'YOUTUBE' | 'VIMEO' | 'SUBIDO' | 'OTRO_URL'; // Tipos de video que tu frontend puede manejar
     videoUrl: string;
     titulo?: string | null;
-    descripcion?: string | null; // Para un caption o descripción debajo del video
-    thumbnailUrl?: string | null; // Opcional, para mostrar una miniatura antes de cargar el video/iframe
+    descripcion?: string | null; // Para un caption o descripción
+    thumbnailUrl?: string | null; // Opcional, para miniaturas
 }
 
-// Estructura para un documento dentro del payload de UI
-export interface UiPayloadDocument {
+export interface UiPayloadDocument { // Si necesitas mostrar documentos de forma enriquecida
     url: string;
-    filename: string; // Nombre del archivo para la descarga
-    titulo?: string | null; // Título descriptivo del documento
+    filename: string;
+    titulo?: string | null;
     filetype?: string | null; // ej. 'PDF', 'DOCX'
     size?: string | null; // ej. '2.5MB'
 }
 
-// Estructura para un detalle adicional (FAQ, beneficio, etc.)
-export interface UiPayloadOfferDetailItem {
+export interface UiPayloadOfferDetailItem { // Para un item dentro de la lista de detalles de una oferta
     tituloDetalle: string;
-    contenido: string;
-    tipoDetalle?: string | null; // 'BENEFICIO', 'FAQ', 'CONDICION', etc.
+    contenido: string; // Puede ser HTML o Markdown, según cómo lo procese tu frontend
+    tipoDetalle?: string | null; // Ej: 'BENEFICIO', 'FAQ', 'CONDICION'
 }
 
-// Los datos específicos para el componente OfferDisplay
+// --- Payloads de Datos Específicos por Componente ---
+
+// 1. Para OfferDisplayComponent
 export interface OfferDisplayPayloadData {
-    id: string; // ID de la oferta
+    id: string;
     nombre: string;
     descripcionGeneral: string | null;
     precioFormateado: string | null;
     moneda: string | null;
-    condiciones: string | null;
-    linkPago?: string | null;
-
-    // Podríamos tener una imagen principal separada o marcar una dentro de la galería
+    objetivos?: string[]; // ej. ["VENTA", "CITA"]
     imagenPrincipal?: UiPayloadImage | null;
-    galeriaImagenes: UiPayloadImage[]; // Siempre un array, puede estar vacío
-
-    videos: UiPayloadVideo[]; // Siempre un array, puede estar vacío
-
-    // Para otros detalles como FAQs, beneficios (si no se manejan de otra forma)
-    listaDetalles: UiPayloadOfferDetailItem[]; // Siempre un array, puede estar vacío
-
-    // Podríamos incluso añadir Call to Actions (CTAs) si es necesario
-    // callToActions?: Array<{
-    //   label: string;
-    //   actionType: 'LINK' | 'FUNCTION_CALL' | 'ADD_TO_CART'; // Define los tipos de acción
-    //   payload: string | { functionName: string; args: Record<string, any> }; // URL, o nombre de función y args
-    //   style?: 'primary' | 'secondary' | 'outline';
-    // }>;
+    galeriaImagenes: UiPayloadImage[];
+    videos: UiPayloadVideo[];
+    detallesAdicionales: UiPayloadOfferDetailItem[]; // Antes llamado listaDetalles
 }
 
-// La estructura genérica para cualquier payload de UI que envíe el backend
-export interface UiComponentPayload<T_Data = Record<string, unknown>> {
-    componentType: string; // Ej: 'OfferDisplay', 'ProductList', 'PackageCarousel'
-    data: T_Data;
+export interface UiComponentPayloadOfferDisplay {
+    componentType: 'OfferDisplay';
+    data: OfferDisplayPayloadData;
 }
 
-// Un tipo específico para el payload de OfferDisplay
-export type OfferDisplayUiPayload = UiComponentPayload<OfferDisplayPayloadData>;
+// 2. Para ActionPromptComponent (botones de acción)
+export interface ActionButtonPayload {
+    label: string;
+    actionType: "CALL_FUNCTION" | "USER_INPUT_EXPECTED" | "OPEN_URL";
+    actionName?: string;
+    payload?: Record<string, unknown>; // Usar 'any' con precaución, o un tipo más específico si es posible
+    url?: string;
+    style?: 'primary' | 'secondary' | 'destructive' | 'outline';
+}
+
+export interface ActionPromptPayloadData {
+    message: string;
+    actions: ActionButtonPayload[];
+}
+
+export interface UiComponentPayloadActionPrompt {
+    componentType: 'ActionPrompt';
+    data: ActionPromptPayloadData;
+}
+
+// 3. Para StripePaymentLinkComponent
+export interface StripePaymentLinkPayloadData {
+    checkoutUrl: string;
+    buttonText: string;
+    message?: string;
+}
+
+export interface UiComponentPayloadStripePaymentLink {
+    componentType: 'StripePaymentLink';
+    data: StripePaymentLinkPayloadData;
+}
+
+// --- Tipo Genérico de Unión Discriminada para UiComponentPayload ---
+// Esto permite que ChatMessageBubble y otros consumidores manejen diferentes
+// tipos de componentes ricos de forma type-safe.
+export type UiComponentPayload<TData = unknown> = // TData es un genérico por si hay tipos no listados explícitamente
+    | UiComponentPayloadOfferDisplay
+    | UiComponentPayloadActionPrompt
+    | UiComponentPayloadStripePaymentLink
+    // | OtroTipoDeUiComponentPayload ... // Puedes añadir más tipos aquí en el futuro
+    // Fallback para tipos no explícitamente definidos en la unión, aunque es mejor ser explícito.
+    // Si solo vas a usar los de arriba, puedes omitir este fallback.
+    | { componentType: string; data: TData };
