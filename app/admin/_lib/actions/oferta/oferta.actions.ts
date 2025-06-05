@@ -5,27 +5,32 @@ import {
     EditarOfertaInputSchema,
     EditarOfertaDataInputType,
     OfertaParaEditarFormType,
-    // TipoPagoOfertaType,
-    // IntervaloRecurrenciaOfertaType,
-    // OfertaStatusType,
     OfertaCompletaParaManagerType,
     OfertaCompletaParaManagerSchema,
     CrearOfertaDataInputType,
     CrearOfertaInputSchema,
     CrearOfertaSimplificadoInputSchema, // Nuevo schema para creación simplificada
     type CrearOfertaSimplificadoDataInputType,
-    TipoAnticipoOfertaZodEnum, // Para verificar el tipo de anticipo
     UpdateOfertaDetalleInputSchema,
     type UpdateOfertaDetalleInputType,
     OfertaDetalleCompletoSchema,
     type OfertaDetalleCompletoType,
     OfertaCompletaParaEdicionSchema,
-    TipoPagoOfertaEnumSchema,
+
 } from './oferta.schemas';
+
 import { revalidatePath } from 'next/cache';
 import { ActionResult } from '@/app/admin/_lib/types';
 import { OfertaParaListaSchema, OfertaParaListaType } from './oferta.schemas';
 import { z } from 'zod';
+import {
+    Prisma,
+    TipoPagoOferta,
+    TipoPagoOferta as PrismaTipoPagoOferta,
+    TipoAnticipoOferta as PrismaTipoAnticipoOferta,
+    IntervaloRecurrenciaOferta as PrismaIntervaloRecurrenciaOferta,
+    ObjetivoOferta as PrismaObjetivoOferta
+} from '@prisma/client'; // Asegúrate de que este tipo esté disponible en tu Prisma Client
 
 // Helper para la ruta de revalidación
 const getPathToOfertaList = (clienteId: string, negocioId: string) =>
@@ -38,6 +43,11 @@ const getPathToOfertaEdicionPage = (clienteId: string, negocioId: string, oferta
     `/admin/clientes/${clienteId}/negocios/${negocioId}/oferta/${ofertaId}`;
 const getPathToOfertaDetalleEdicionPage = (clienteId: string, negocioId: string, ofertaId: string, ofertaDetalleId: string) =>
     `${getPathToOfertaEdicionPage(clienteId, negocioId, ofertaId)}/editar/${ofertaDetalleId}`;
+
+// Helper para redondear a 2 decimales
+function roundToTwoDecimals(num: number): number {
+    return Math.round((num + Number.EPSILON) * 100) / 100;
+}
 
 
 export async function obtenerOfertasNegocio(
@@ -72,7 +82,6 @@ export async function obtenerOfertasNegocio(
         return { success: false, error: "Error al obtener las ofertas del negocio." };
     }
 }
-
 
 export async function eliminarOferta(ofertaId: string, clienteId: string, negocioId: string): Promise<{ success: boolean; error?: string }> {
     try {
@@ -137,47 +146,6 @@ export async function eliminarDocumentoOfertaAction(
     return { success: true };
 }
 
-// export async function obtenerOfertaPorId(
-//     ofertaId: string,
-//     negocioIdVerificar: string
-// ): Promise<{ success: boolean; data?: OfertaParaEditarFormType; error?: string }> {
-//     try {
-//         const oferta = await prisma.oferta.findUnique({
-//             where: { id: ofertaId, negocioId: negocioIdVerificar },
-//             select: { // Seleccionar solo los campos necesarios para ESTE formulario
-//                 id: true,
-//                 nombre: true,
-//                 descripcion: true,
-//                 precio: true,
-//                 tipoPago: true,
-//                 intervaloRecurrencia: true,
-//                 fechaInicio: true,
-//                 fechaFin: true,
-//                 status: true,
-//             }
-//         });
-
-//         if (!oferta) {
-//             return { success: false, error: "Oferta no encontrada o no pertenece al negocio." };
-//         }
-//         // Asegurar que los enums tengan valores válidos o defaults
-//         return {
-//             success: true,
-//             data: {
-//                 ...oferta,
-//                 negocioId: negocioIdVerificar, // Asegurar que el negocioId esté presente
-//                 tipoPago: oferta.tipoPago as TipoPagoOfertaType, // Castear si es necesario o asegurar que el tipo de DB coincida
-//                 intervaloRecurrencia: oferta.intervaloRecurrencia as IntervaloRecurrenciaOfertaType | null,
-//                 status: oferta.status as OfertaStatusType,
-//                 objetivos: (oferta as { objetivos?: OfertaParaEditarFormType['objetivos'] }).objetivos ?? [], // Asegúrate de que la propiedad objetivos esté presente
-//             }
-//         };
-//     } catch (error) {
-//         console.error("Error en obtenerOfertaPorId:", error);
-//         return { success: false, error: "Error al obtener la oferta." };
-//     }
-// }
-
 export async function obtenerOfertaPorIdFull(
     ofertaId: string,
     negocioIdVerificar: string
@@ -216,66 +184,6 @@ export async function obtenerOfertaPorIdFull(
         return { success: false, error: "Error al obtener la información completa de la oferta." };
     }
 }
-
-// La acción editarOferta y las demás no cambian su firma por esta corrección.
-// export async function editarOferta(
-//     ofertaId: string,
-//     clienteId: string,
-//     negocioId: string,
-//     input: EditarOfertaDataInputType
-// ): Promise<{ success: boolean; data?: OfertaParaEditarFormType; error?: string; errorDetails?: Record<string, string[]> }> {
-//     const validationResult = EditarOfertaInputSchema.safeParse(input);
-//     if (!validationResult.success) {
-//         return {
-//             success: false,
-//             error: "Datos de entrada inválidos.",
-//             errorDetails: validationResult.error.flatten().fieldErrors as Record<string, string[]>,
-//         };
-//     }
-//     const data = validationResult.data;
-
-//     try {
-//         const ofertaExistente = await prisma.oferta.findFirst({
-//             where: { id: ofertaId, negocioId: negocioId }
-//         });
-//         if (!ofertaExistente) {
-//             return { success: false, error: "Oferta no encontrada o no tiene permiso para editarla." };
-//         }
-
-//         const ofertaActualizada = await prisma.oferta.update({
-//             where: { id: ofertaId },
-//             data: {
-//                 nombre: data.nombre,
-//                 descripcion: data.descripcion,
-//                 precio: data.precio,
-//                 tipoPago: data.tipoPago,
-//                 intervaloRecurrencia: data.tipoPago === 'RECURRENTE' ? data.intervaloRecurrencia : null,
-//                 fechaInicio: data.fechaInicio,
-//                 fechaFin: data.fechaFin,
-//                 status: data.status,
-//             },
-//         });
-
-//         revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta`);
-//         revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta/${ofertaId}`);
-//         return {
-//             success: true,
-//             data: {
-//                 ...ofertaActualizada,
-//                 tipoPago: (ofertaActualizada.tipoPago ?? "UNICO") as TipoPagoOfertaType,
-//                 intervaloRecurrencia: ofertaActualizada.intervaloRecurrencia as IntervaloRecurrenciaOfertaType | null,
-//                 status: ofertaActualizada.status as OfertaStatusType,
-//                 objetivos: ofertaActualizada.objetivos as OfertaParaEditarFormType['objetivos'],
-//                 negocioId: ofertaActualizada.negocioId,
-//             }
-//         };
-
-//     } catch (error) {
-//         console.error("Error en editarOferta:", error);
-//         return { success: false, error: "Error al actualizar la oferta." };
-//     }
-// }
-
 
 export async function crearOferta(
     negocioId: string,
@@ -341,51 +249,71 @@ export async function crearOferta(
     }
 }
 
-export async function crearOfertaAction( // Renombrar si prefieres, o sobrecargar con nuevo tipo
+export async function crearOfertaAction(
     negocioId: string,
     clienteId: string,
     input: CrearOfertaSimplificadoDataInputType
-): Promise<ActionResult<{ id: string; nombre: string }>> { // Devolvemos el ID y nombre
+): Promise<ActionResult<{ id: string; nombre: string }>> {
     if (!negocioId || !clienteId) {
         return { success: false, error: "IDs de negocio y cliente son requeridos." };
     }
 
     const validationResult = CrearOfertaSimplificadoInputSchema.safeParse(input);
     if (!validationResult.success) {
-        console.error("Error de validación al crear oferta (simplificado):", validationResult.error.flatten());
+        console.error("[crearOfertaAction] Error de validación Zod:", validationResult.error.flatten());
         return {
             success: false,
-            error: "Datos de entrada inválidos.",
+            error: "Datos de entrada inválidos para crear la oferta.",
             errorDetails: validationResult.error.flatten().fieldErrors as Record<string, string[]>,
         };
     }
     const data = validationResult.data;
 
-    // Calcular campos de anticipo para la DB
-    let dbAnticipo: number | null = null;
+    let dbTipoAnticipo: PrismaTipoAnticipoOferta | null = null;
     let dbPorcentajeAnticipo: number | null = null;
-    let dbTipoAnticipo: string | null = data.tipoAnticipo || null; // Será 'PORCENTAJE' o 'MONTO_FIJO' o null
+    let dbAnticipoMonto: number | null = null;
 
-    if (data.tipoPago === 'UNICO' && data.tipoAnticipo && data.valorAnticipo) {
-        if (data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE) {
-            dbPorcentajeAnticipo = data.valorAnticipo; // Guardamos el porcentaje
-            if (data.precio) { // Solo calculamos el monto si hay precio total
-                dbAnticipo = (data.precio * data.valorAnticipo) / 100;
+    // Lógica más estricta para anticipos:
+    // Solo se procesan anticipos si tipoPago es UNICO y se han proporcionado
+    // tanto el tipoAnticipo como un valorAnticipo válido.
+    if (
+        data.tipoPago === PrismaTipoPagoOferta.UNICO &&
+        data.tipoAnticipo && // Se seleccionó un tipo de anticipo
+        data.valorAnticipo != null && // Se ingresó un valor para el anticipo
+        data.valorAnticipo > 0 // El valor del anticipo es positivo
+    ) {
+        // data.tipoAnticipo es el valor del ZodEnum (ej. "PORCENTAJE" o "MONTO_FIJO")
+        // Lo casteamos al Enum de Prisma
+        const tipoAnticipoPrisma = data.tipoAnticipo as PrismaTipoAnticipoOferta;
+
+        if (tipoAnticipoPrisma === PrismaTipoAnticipoOferta.PORCENTAJE) {
+            if (data.precio != null && data.precio > 0 && data.valorAnticipo >= 1 && data.valorAnticipo <= 99) {
+                dbTipoAnticipo = PrismaTipoAnticipoOferta.PORCENTAJE;
+                dbPorcentajeAnticipo = data.valorAnticipo; // data.valorAnticipo es el porcentaje
+                dbAnticipoMonto = roundToTwoDecimals(data.precio * (data.valorAnticipo / 100));
+            } else {
+                // Si el porcentaje es inválido o no hay precio, no se guarda nada del anticipo.
+                console.warn("[crearOfertaAction] Anticipo por porcentaje inválido o sin precio. No se guardarán datos de anticipo.");
             }
-        } else if (data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO) {
-            dbAnticipo = data.valorAnticipo; // Guardamos el monto fijo
-            dbPorcentajeAnticipo = null; // Aseguramos que porcentaje sea null
+        } else if (tipoAnticipoPrisma === PrismaTipoAnticipoOferta.MONTO_FIJO) {
+            // Validar que el monto fijo no sea mayor o igual al precio total (si el precio existe)
+            if (data.precio != null && data.precio > 0 && data.valorAnticipo >= data.precio) {
+                console.warn("[crearOfertaAction] Anticipo fijo es mayor o igual al precio. No se guardarán datos de anticipo.");
+                // En este caso, podrías devolver un error de validación específico al usuario
+                // return { success: false, error: "El monto de anticipo fijo no puede ser mayor o igual al precio total."};
+            } else {
+                dbTipoAnticipo = PrismaTipoAnticipoOferta.MONTO_FIJO;
+                dbAnticipoMonto = data.valorAnticipo; // data.valorAnticipo es el monto fijo
+                dbPorcentajeAnticipo = null;
+            }
         }
-    } else { // Si no es UNICO con anticipo, o no se proporcionaron valores de anticipo
-        dbTipoAnticipo = null;
     }
+    // Si no se cumplen las condiciones anteriores, dbTipoAnticipo, dbPorcentajeAnticipo, y dbAnticipoMonto permanecerán null.
 
-
-    // Defaults para campos no presentes en el formulario simplificado
     const fechaInicioDefault = new Date();
     fechaInicioDefault.setUTCHours(0, 0, 0, 0);
     const fechaFinDefault = new Date(fechaInicioDefault);
-    fechaFinDefault.setFullYear(fechaInicioDefault.getFullYear() + 1); // Por ejemplo, 1 año de vigencia
+    fechaFinDefault.setFullYear(fechaInicioDefault.getFullYear() + 1);
 
     try {
         const nuevaOferta = await prisma.oferta.create({
@@ -393,35 +321,45 @@ export async function crearOfertaAction( // Renombrar si prefieres, o sobrecarga
                 negocioId: negocioId,
                 nombre: data.nombre,
                 descripcion: data.descripcion,
-                objetivos: data.objetivos,
+                objetivos: data.objetivos as PrismaObjetivoOferta[],
 
-                // Precios y pagos
-                tipoPago: data.tipoPago,
+                tipoPago: data.tipoPago as PrismaTipoPagoOferta,
                 precio: data.precio,
-                intervaloRecurrencia: data.tipoPago === 'RECURRENTE' ? data.intervaloRecurrencia : null,
+                intervaloRecurrencia: data.tipoPago === PrismaTipoPagoOferta.RECURRENTE
+                    ? data.intervaloRecurrencia as PrismaIntervaloRecurrenciaOferta
+                    : null,
 
-                // Campos de Anticipo para la DB
-                tipoAnticipo: dbTipoAnticipo,
-                porcentajeAnticipo: dbPorcentajeAnticipo,
-                anticipo: dbAnticipo,
+                tipoAnticipo: dbTipoAnticipo, // Será null si no se cumplieron las condiciones
+                porcentajeAnticipo: dbPorcentajeAnticipo, // Será null si no aplica
+                anticipo: dbAnticipoMonto, // Será null si no aplica
 
-                // Campos con Default asignado por la action
                 fechaInicio: fechaInicioDefault,
                 fechaFin: fechaFinDefault,
-                status: 'borrador', // O 'inactivo'
+                status: 'borrador',
             },
-            select: { // Devolver solo lo necesario
+            select: {
                 id: true,
                 nombre: true,
             }
         });
 
-        revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta`);
+        if (clienteId && negocioId) {
+            revalidatePath(getPathToOfertaList(clienteId, negocioId));
+        } else {
+            revalidatePath('/admin/ofertas');
+        }
+
+        console.log("[crearOfertaAction] Oferta creada exitosamente:", nuevaOferta);
         return { success: true, data: nuevaOferta };
 
     } catch (error: unknown) {
-        console.error("Error en crearOfertaAction (simplificado):", error);
-        // ... (tu manejo de errores de Prisma existente)
+        console.error("[crearOfertaAction] Error al crear la oferta:", error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === 'P2002') {
+                return { success: false, error: "Ya existe una oferta con un identificador similar." };
+            }
+            return { success: false, error: `Error de base de datos: ${error.message}` };
+        }
         return { success: false, error: "No se pudo crear la oferta en la base de datos." };
     }
 }
@@ -516,9 +454,6 @@ export async function updateOfertaDetalleAction(
 }
 
 
-
-
-
 // Acción para cargar TODOS los datos de una oferta para el formulario de edición
 export async function obtenerOfertaParaEdicionAction(
     ofertaId: string,
@@ -551,20 +486,24 @@ export async function obtenerOfertaParaEdicionAction(
     }
 }
 
-
-export async function editarOfertaAction( // Renombrar o asegurar que esta sea la que se usa
+export async function editarOfertaAction(
     ofertaId: string,
-    clienteId: string,
+    clienteId: string, // Usado para revalidatePath, si aplica
     negocioId: string,
-    input: EditarOfertaDataInputType
-): Promise<ActionResult<OfertaParaEditarFormType>> { // Devolver el objeto actualizado
+    input: EditarOfertaDataInputType // Este tipo ya es el inferido de EditarOfertaInputSchema
+): Promise<ActionResult<OfertaParaEditarFormType | null>> { // Devolver null en caso de error de búsqueda
+
+    // La validación Zod ya debería haber ocurrido en el componente que llama a esta acción
+    // o al inicio de la acción si 'input' no está pre-validado.
+    // Para robustez, re-validamos aquí.
     const validationResult = EditarOfertaInputSchema.safeParse(input);
     if (!validationResult.success) {
-        console.error("Error de validación Zod al editar oferta:", validationResult.error.flatten());
+        console.error("[editarOfertaAction] Error de validación Zod:", validationResult.error.flatten());
         return {
             success: false,
             error: "Datos de entrada inválidos.",
             errorDetails: validationResult.error.flatten().fieldErrors as Record<string, string[]>,
+            data: null,
         };
     }
     const data = validationResult.data;
@@ -574,46 +513,55 @@ export async function editarOfertaAction( // Renombrar o asegurar que esta sea l
             where: { id: ofertaId, negocioId: negocioId }
         });
         if (!ofertaExistente) {
-            return { success: false, error: "Oferta no encontrada o no tiene permiso para editarla." };
+            return { success: false, error: "Oferta no encontrada o no tiene permiso para editarla.", data: null };
         }
 
-        // Lógica para calcular y preparar campos de anticipo para la DB
-        let dbAnticipoFinal: number | null = null;
+        // --- Lógica Refactorizada para Campos de Anticipo ---
+        let dbTipoAnticipoFinal: PrismaTipoAnticipoOferta | null = null;
         let dbPorcentajeAnticipoFinal: number | null = null;
-        let dbTipoAnticipoFinal: string | null = data.tipoAnticipo || null;
+        let dbAnticipoMontoFinal: number | null = null; // Renombrado para claridad (este es el monto calculado o fijo)
 
-        if (data.tipoPago === TipoPagoOfertaEnumSchema.Values.UNICO && data.tipoAnticipo && data.precio != null) {
-            if (data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE && data.porcentajeAnticipo != null) {
-                dbPorcentajeAnticipoFinal = data.porcentajeAnticipo;
-                dbAnticipoFinal = (data.precio * data.porcentajeAnticipo) / 100;
-            } else if (data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO && data.anticipo != null) {
-                dbAnticipoFinal = data.anticipo; // 'anticipo' del schema Zod representa el monto fijo
-                dbPorcentajeAnticipoFinal = null;
-            } else { // Si hay tipo de anticipo pero no el valor correspondiente, o no hay precio
-                dbTipoAnticipoFinal = null; // Invalidar el tipo de anticipo si falta data
-                dbPorcentajeAnticipoFinal = null;
-                dbAnticipoFinal = null;
+        if (data.tipoPago === TipoPagoOferta.UNICO) { // Usar Enum de Prisma directamente si es posible
+            if (data.tipoAnticipo) { // Si se ha seleccionado un tipo de anticipo
+                dbTipoAnticipoFinal = data.tipoAnticipo as PrismaTipoAnticipoOferta; // Asumir que data.tipoAnticipo ya es del tipo Enum Prisma o compatible
+
+                if (data.tipoAnticipo === PrismaTipoAnticipoOferta.PORCENTAJE) {
+                    if (data.porcentajeAnticipo != null && data.precio != null) {
+                        dbPorcentajeAnticipoFinal = data.porcentajeAnticipo;
+                        dbAnticipoMontoFinal = roundToTwoDecimals(data.precio * (data.porcentajeAnticipo / 100));
+                    } else {
+                        // Si es tipo PORCENTAJE pero falta el porcentaje o el precio, invalidar anticipo
+                        dbTipoAnticipoFinal = null;
+                    }
+                } else if (data.tipoAnticipo === PrismaTipoAnticipoOferta.MONTO_FIJO) {
+                    if (data.anticipo != null) { // 'anticipo' en Zod es el monto fijo
+                        dbAnticipoMontoFinal = data.anticipo;
+                        dbPorcentajeAnticipoFinal = null; // Asegurar que el porcentaje sea null
+                    } else {
+                        // Si es tipo MONTO_FIJO pero falta el monto, invalidar anticipo
+                        dbTipoAnticipoFinal = null;
+                    }
+                }
             }
-        } else { // Si no es PAGO_UNICO o no hay tipoAnticipo, limpiar campos de anticipo
-            dbTipoAnticipoFinal = null;
-            dbPorcentajeAnticipoFinal = null;
-            dbAnticipoFinal = null;
+            // Si no se selecciona data.tipoAnticipo, todos los campos de anticipo permanecerán null (su valor inicial)
         }
+        // Si tipoPago no es UNICO, todos los campos de anticipo permanecen null
 
-        const ofertaActualizada = await prisma.oferta.update({
+        // --- Fin Lógica Refactorizada para Campos de Anticipo ---
+
+        await prisma.oferta.update({
             where: { id: ofertaId },
             data: {
                 nombre: data.nombre,
                 descripcion: data.descripcion,
-                // codigo: data.codigo, // Si decides incluirlo
                 precio: data.precio,
-                tipoPago: data.tipoPago,
-                intervaloRecurrencia: data.tipoPago === 'RECURRENTE' ? data.intervaloRecurrencia : null,
-                objetivos: data.objetivos,
+                tipoPago: data.tipoPago as TipoPagoOferta, // Cast si data.tipoPago es string y no enum
+                intervaloRecurrencia: data.tipoPago === TipoPagoOferta.RECURRENTE ? data.intervaloRecurrencia : null,
+                objetivos: data.objetivos as PrismaObjetivoOferta[], // Asegurar compatibilidad de tipo
 
                 tipoAnticipo: dbTipoAnticipoFinal,
                 porcentajeAnticipo: dbPorcentajeAnticipoFinal,
-                anticipo: dbAnticipoFinal,
+                anticipo: dbAnticipoMontoFinal, // Guardar el monto calculado o fijo aquí
 
                 fechaInicio: data.fechaInicio,
                 fechaFin: data.fechaFin,
@@ -621,17 +569,60 @@ export async function editarOfertaAction( // Renombrar o asegurar que esta sea l
             },
         });
 
-        // Parsear la data actualizada con el schema que espera el formulario para asegurar consistencia
-        const parsedData = OfertaCompletaParaEdicionSchema.parse(ofertaActualizada);
+        // Volver a obtener la oferta con todas las relaciones necesarias para OfertaCompletaParaEdicionSchema
+        const ofertaActualizadaConDetalles = await prisma.oferta.findUnique({
+            where: { id: ofertaId },
+            include: { // Asegúrate que este include coincida con lo que OfertaCompletaParaEdicionSchema espera
+                negocio: { select: { id: true, nombre: true } }, // Ejemplo, ajusta según necesites
+                // Aquí deberías incluir las relaciones que espera OfertaCompletaParaEdicionSchema
+                // como CategoriaTarea (si aplica a Oferta), tareaFuncion (si aplica), etc.
+                // Para el ejemplo, asumiré que el schema de edición no necesita tantas relaciones profundas.
+                // SI tu OfertaCompletaParaEdicionSchema espera relaciones como 'CategoriaTarea'
+                // o '_count', esas relaciones deben estar en este 'include' o el select.
+                // Basado en el schema Zod que me diste, el select para una oferta (no tarea) sería:
+                // No incluye CategoriaTarea, tareaFuncion, etiquetas, canalesSoportados, _count
+                // por lo que un select más simple podría ser suficiente si OfertaCompletaParaEdicionSchema
+                // realmente solo espera campos escalares y 'objetivos'.
+            }
+        });
 
-        revalidatePath(getPathToOfertaList(clienteId, negocioId));
-        revalidatePath(getPathToOfertaEditPage(clienteId, negocioId, ofertaId));
+        if (!ofertaActualizadaConDetalles) {
+            console.error("[editarOfertaAction] Error: No se pudo re-obtener la oferta actualizada.");
+            return { success: false, error: "Oferta actualizada, pero hubo un error al recargar sus datos.", data: null };
+        }
 
-        return { success: true, data: parsedData };
+        // Adaptar y parsear la oferta actualizada para que coincida con OfertaCompletaParaEdicionSchema
+        // Esto puede requerir un mapeo si los tipos de Prisma (ej. enums como strings) no coinciden directamente
+        // con lo que espera el schema Zod (ej. Zod enums).
+        // Por ahora, haremos un parse directo asumiendo compatibilidad o que el schema maneja la coerción.
+        const parsedData = OfertaCompletaParaEdicionSchema.safeParse(ofertaActualizadaConDetalles);
+
+        if (!parsedData.success) {
+            console.error("[editarOfertaAction] Error Zod al parsear oferta actualizada para retorno:", parsedData.error.flatten());
+            // Loguea parsedData.error para ver el detalle del fallo de Zod
+            return { success: false, error: "Oferta actualizada, pero los datos no pudieron ser validados para el formulario.", data: null, errorDetails: parsedData.error.flatten().fieldErrors as Record<string, string[]> };
+        }
+
+        // Revalidar rutas relevantes
+        if (clienteId && negocioId) { // Solo revalidar si tenemos los IDs
+            revalidatePath(getPathToOfertaList(clienteId, negocioId));
+            revalidatePath(getPathToOfertaEditPage(clienteId, negocioId, ofertaId));
+        } else {
+            revalidatePath('/admin/ofertas'); // Ruta genérica si no hay clienteId/negocioId
+            revalidatePath(`/admin/ofertas/editar/${ofertaId}`);
+        }
+
+        return { success: true, data: parsedData.data };
 
     } catch (error: unknown) {
-        console.error("Error en editarOfertaAction:", error);
-        // ... (manejo de errores de Prisma como lo tenías)
-        return { success: false, error: "Error al actualizar la oferta." };
+        console.error("[editarOfertaAction] Error al actualizar la oferta:", error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === 'P2025') {
+                return { success: false, error: "Error al actualizar: La oferta no fue encontrada.", data: null };
+            }
+            // Manejar otros errores de Prisma si es necesario
+        }
+        return { success: false, error: `Error desconocido al actualizar la oferta: ${error instanceof Error ? error.message : String(error)}`, data: null };
     }
 }
+

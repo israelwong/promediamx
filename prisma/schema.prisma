@@ -806,7 +806,7 @@ model Oferta {
   precio                Float?                             // El monto de la oferta (para pago único o por ciclo recurrente)
   tipoPago              TipoPagoOferta? @default(UNICO)   // Por defecto, un pago único
   intervaloRecurrencia  IntervaloRecurrenciaOferta?     // Solo aplica si tipoPago es RECURRENTE
-  tipoAnticipo         String?                            // Tipo de anticipo requerido (ej: "PORCENTAJE", "MONTO_FIJO")
+  tipoAnticipo         TipoAnticipoOferta?
   porcentajeAnticipo   Float?                             // Porcentaje de anticipo requerido (si aplica)
   anticipo              Float?                             // Anticipo requerido (si aplica)
 

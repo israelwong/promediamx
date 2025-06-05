@@ -263,11 +263,20 @@ export const CrearOfertaSimplificadoInputSchema = z.object({
     })
     .refine(data => {
         if (data.tipoPago === TipoPagoOfertaEnumSchema.Values.UNICO) {
-            if (data.tipoAnticipo && data.valorAnticipo === null) { // Si hay tipoAnticipo, valorAnticipo no puede ser null
-                return false;
+            const tieneTipo = !!data.tipoAnticipo;
+            const tienePorcentaje = data.valorAnticipo !== null && data.valorAnticipo !== undefined;
+            // 'valorAnticipo' aquí es el input de monto fijo en el CrearOfertaSimplificadoInputSchema
+            const tieneMontoFijo = data.valorAnticipo !== null && data.valorAnticipo !== undefined;
+
+            if (tieneTipo && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE && !tienePorcentaje) {
+                return false; // Si tipo es PORCENTAJE, valorAnticipo es requerido
             }
-            if (data.valorAnticipo !== null && !data.tipoAnticipo) { // Si hay valorAnticipo, tipoAnticipo es requerido
-                return false;
+            if (tieneTipo && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO && !tieneMontoFijo) {
+                return false; // Si tipo es MONTO_FIJO, valorAnticipo (monto fijo) es requerido
+            }
+            // ESTA ES LA CONDICIÓN QUE PROBABLEMENTE ESTÁ CAUSANDO EL ERROR:
+            if ((tienePorcentaje || tieneMontoFijo) && !tieneTipo) {
+                return false; // Si se provee un valor de anticipo (porcentaje o monto), el tipo es requerido
             }
         }
         return true;
@@ -440,7 +449,8 @@ export const EditarOfertaInputSchema = z.object({
         if (data.tipoPago === TipoPagoOfertaEnumSchema.Values.UNICO) {
             const tieneTipo = !!data.tipoAnticipo;
             const tienePorcentaje = data.porcentajeAnticipo !== null && data.porcentajeAnticipo !== undefined;
-            const tieneMontoFijo = data.anticipo !== null && data.anticipo !== undefined; // 'anticipo' aquí es el input de monto fijo
+            // 'anticipo' aquí es el input de monto fijo en el EditarOfertaInputSchema
+            const tieneMontoFijo = data.anticipo !== null && data.anticipo !== undefined;
 
             if (tieneTipo && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE && !tienePorcentaje) {
                 return false; // Si tipo es PORCENTAJE, porcentajeAnticipo es requerido
@@ -448,8 +458,9 @@ export const EditarOfertaInputSchema = z.object({
             if (tieneTipo && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO && !tieneMontoFijo) {
                 return false; // Si tipo es MONTO_FIJO, anticipo (monto fijo) es requerido
             }
+            // ESTA ES LA CONDICIÓN QUE PROBABLEMENTE ESTÁ CAUSANDO EL ERROR:
             if ((tienePorcentaje || tieneMontoFijo) && !tieneTipo) {
-                return false; // Si se provee un valor de anticipo, el tipo es requerido
+                return false; // Si se provee un valor de anticipo (porcentaje o monto), el tipo es requerido
             }
         }
         return true;
@@ -515,16 +526,18 @@ export const OfertaCompletaParaEdicionSchema = EditarOfertaInputObjectSchema.ext
         if (data.tipoPago === TipoPagoOfertaEnumSchema.Values.UNICO) {
             const tieneTipo = !!data.tipoAnticipo;
             const tienePorcentaje = data.porcentajeAnticipo !== null && data.porcentajeAnticipo !== undefined;
+            // 'anticipo' aquí es el input de monto fijo en el EditarOfertaInputSchema
             const tieneMontoFijo = data.anticipo !== null && data.anticipo !== undefined;
 
             if (tieneTipo && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.PORCENTAJE && !tienePorcentaje) {
-                return false;
+                return false; // Si tipo es PORCENTAJE, porcentajeAnticipo es requerido
             }
             if (tieneTipo && data.tipoAnticipo === TipoAnticipoOfertaZodEnum.Values.MONTO_FIJO && !tieneMontoFijo) {
-                return false;
+                return false; // Si tipo es MONTO_FIJO, anticipo (monto fijo) es requerido
             }
+            // ESTA ES LA CONDICIÓN QUE PROBABLEMENTE ESTÁ CAUSANDO EL ERROR:
             if ((tienePorcentaje || tieneMontoFijo) && !tieneTipo) {
-                return false;
+                return false; // Si se provee un valor de anticipo (porcentaje o monto), el tipo es requerido
             }
         }
         return true;
