@@ -793,6 +793,21 @@ enum TipoAnticipoOferta {
   MONTO_FIJO // Monto fijo a pagar como anticipo
 }
 
+enum ObjetivoCitaTipoEnum {
+  POR_HORA       // La cita se elige de los slots disponibles del negocio/servicio general
+  DIA_ESPECIFICO // La cita es para una fecha (y quizás hora) específica definida por la oferta (ej. un evento)
+}
+
+// Enum para el estado de una oferta
+enum EstadoOferta {
+  ACTIVO
+  INACTIVO
+  BORRADOR     // Utilizado al crear ofertas simplificadas
+  PROGRAMADA   // Para ofertas que inician en el futuro
+  FINALIZADA   // Para ofertas cuya fecha de fin ya pasó
+  BETA         // Para pruebas
+  PROXIMAMENTE // Para anunciar futuras ofertas
+}
 
 model Oferta {
   id            String    @id @default(cuid())
@@ -810,16 +825,39 @@ model Oferta {
   porcentajeAnticipo   Float?                             // Porcentaje de anticipo requerido (si aplica)
   anticipo              Float?                             // Anticipo requerido (si aplica)
 
-  status        String    @default("activo") // activo, inactivo, programada, finalizada
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
   ItemCatalogoOferta ItemCatalogoOferta[]
   OfertaGaleria      OfertaGaleria[]
   videos        OfertaVideos[]
   documentosOferta OfertaDocumento[] // Nueva relación
 
   objetivos ObjetivoOferta[]
+
+  // --- CAMPOS PARA OFERTAS CON OBJETIVO CITA ---
+  objetivoCitaTipo          ObjetivoCitaTipoEnum? // Nuevo Enum: ¿Es por hora o día específico?
+  objetivoCitaFecha         DateTime?             // Si es DIA_ESPECIFICO, esta es la fecha (y opcionalmente hora de inicio) del evento/cita.
+                                                  // Si es un evento de todo el día, la hora podría ser 00:00:00 UTC.
+                                                  // Si es un evento con hora de inicio, aquí se especifica.
+  objetivoCitaServicioId    String?               // FK Opcional a AgendaTipoCita.
+                                                  // Si la cita de la oferta SIEMPRE corresponde a un servicio específico
+                                                  // (ej. "Oferta: Taller de Fotografía"), aquí iría el ID de ese AgendaTipoCita.
+                                                  // Esto permitiría usar la duración y concurrencia de ese servicio.
+                                                  // Relación explícita (opcional pero recomendada si usas objetivoCitaServicioId):
+  objetivoCitaServicio    AgendaTipoCita?       @relation("OfertasParaServicioCitaEspecifico", fields: [objetivoCitaServicioId], references: [id], onDelete: SetNull, onUpdate:Cascade)
+
+  objetivoCitaUbicacion     String?               // Opcional: Si la cita de la oferta tiene una ubicación específica diferente a la del negocio.
+  objetivoCitaDuracionMinutos Int?                // Opcional: Si la cita de la oferta tiene una duración específica que sobrescribe la del AgendaTipoCita.
+  
+  // El campo 'objetivoCitaLimiteConcurrencia' que mencionamos antes podría manejarse a través del 'objetivoCitaServicioId'.
+  // Si el evento es masivo, se crea un AgendaTipoCita para ese evento con un 'limiteConcurrencia' alto.
+  // Si una oferta específica necesita su propio límite, entonces sí añadiríamos:
+  objetivoCitaLimiteConcurrencia Int?
+
+  // Asegúrate de que la relación a AgendaTipoCita (si la añades arriba) tenga su contraparte
+
+
+  status        EstadoOferta @default(BORRADOR)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   detallesAdicionales      OfertaDetalle[]          // NUEVA: Detalles granulares de la oferta
   PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // NUEVA: Preguntas sin respuesta relacionadas a esta oferta
@@ -1349,6 +1387,7 @@ model AgendaTipoCita{
   orden           Int?     // Para ordenar los tipos de cita en el frontend
   limiteConcurrencia Int @default(1) // Limite de citas concurrentes para este tipo de cita
   activo         Boolean @default(true) // Si está activo o no
+  ofertasConEsteServicioParaCita Oferta[] @relation("OfertasParaServicioCitaEspecifico")
   @@unique([negocioId, nombre])
   @@index([negocioId])
 }

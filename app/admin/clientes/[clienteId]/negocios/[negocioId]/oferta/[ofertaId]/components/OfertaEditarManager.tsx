@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { obtenerOfertaPorIdFull } from '@/app/admin/_lib/actions/oferta/oferta.actions';
-import { type OfertaCompletaParaManagerType } from '@/app/admin/_lib/actions/oferta/oferta.schemas';
+import {
+    obtenerOfertaParaEdicionAction
+} from '@/app/admin/_lib/actions/oferta/oferta.actions';
+import { OfertaCompletaParaManagerType } from '@/app/admin/_lib/actions/oferta/oferta.schemas';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs"; // Asumiendo que tienes este componente
 import { Card, CardContent } from '@/app/components/ui/card'; // Para la estructura general
@@ -32,7 +34,7 @@ export default function OfertaEditarManager({ ofertaId, negocioId, clienteId }: 
         setLoading(true);
         setError(null);
         try {
-            const result = await obtenerOfertaPorIdFull(ofertaId, negocioId);
+            const result = await obtenerOfertaParaEdicionAction(ofertaId, negocioId);
             if (result.success && result.data) {
                 setOfertaData(result.data as OfertaCompletaParaManagerType); // Casteamos al tipo esperado
             } else {
@@ -128,3 +130,6 @@ export default function OfertaEditarManager({ ofertaId, negocioId, clienteId }: 
         </Tabs>
     );
 }
+
+
+

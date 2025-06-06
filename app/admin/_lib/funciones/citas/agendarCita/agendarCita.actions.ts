@@ -1,12 +1,12 @@
-// Ruta: app/admin/_lib/funciones/agendarCita.actions.ts
+// Ruta actual desde app: admin/_lib/funciones/citas/agendarCita/agendarCita.actions
 'use server';
 
-import prisma from '../../prismaClient'; // Tu cliente Prisma
-import { ActionResult } from '../../types'; // Asumo que tienes este tipo genérico
+import prisma from '../../../prismaClient'; // Tu cliente Prisma
+import { ActionResult } from '../../../types'; // Asumo que tienes este tipo genérico
 import {
     AgendarCitaArgs, AgendarCitaData, ConfiguracionAgendaDelNegocio,
 
-} from '../citaCancenlar/agendarCita.schemas';
+} from './agendarCita.schemas';
 
 import {
     AgendaTipoCita as AgendaTipoCitaPrisma, // Alias para el tipo de Prisma
@@ -38,7 +38,6 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Prisma } from '@prisma/client';
-
 
 // Función auxiliar para extraer y parsear la hora del texto (asumo que ya la tienes)
 function extraerYParsearHora(texto: string): { hours: number; minutes: number } | null {

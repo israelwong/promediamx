@@ -8,6 +8,7 @@ const buttonVariants = {
     variant: {
         default: "bg-sky-600 text-sky-50 hover:bg-sky-700/90",
         destructive: "bg-red-600 text-red-50 hover:bg-red-700/90",
+        destructiveOutline: "border border-red-600 text-red-50 hover:bg-red-700/90",
         outline: "border border-zinc-700 bg-transparent hover:bg-zinc-800 hover:text-zinc-100",
         secondary: "bg-zinc-700 text-zinc-100 hover:bg-zinc-600/80",
         ghost: "hover:bg-zinc-700 hover:text-zinc-100",

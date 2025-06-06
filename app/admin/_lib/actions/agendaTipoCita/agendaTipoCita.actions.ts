@@ -11,8 +11,11 @@ import {
     ActualizarOrdenTiposCitaInput,
     actualizarOrdenTiposCitaSchema,
     // ordenAgendaTipoCitaItemSchema // No se usa directamente como tipo de parámetro
+    AgendaTipoCitaParaSelectSchema,
+    AgendaTipoCitaParaSelect
 } from './agendaTipoCita.schemas';
 import type { AgendaTipoCita as AgendaTipoCitaPrisma } from '@prisma/client';
+import { z } from 'zod';
 
 // Helper para parsear datos de Prisma al schema Zod (si hay diferencias o para asegurar el contrato)
 function parseToAgendaTipoCitaData(data: AgendaTipoCitaPrisma): AgendaTipoCitaData {
@@ -248,5 +251,51 @@ export async function actualizarOrdenTiposCitaAction(
         console.error("Error en actualizarOrdenTiposCitaAction:", error);
         // Prisma puede lanzar un error si algún ID no se encuentra o no pertenece al negocioId
         return { success: false, error: "Error al actualizar el orden de los tipos de cita." };
+    }
+}
+
+export async function obtenerTiposDeCitaParaSelectAction(
+    negocioId: string
+): Promise<ActionResult<AgendaTipoCitaParaSelect[]>> {
+    if (!negocioId) {
+        return { success: false, error: "Se requiere el ID del negocio para obtener los tipos de cita." };
+    }
+
+    try {
+        const tiposDeCitaDb = await prisma.agendaTipoCita.findMany({
+            where: {
+                negocioId: negocioId,
+                activo: true, // Solo obtener los tipos de cita que están activos
+            },
+            select: {
+                id: true,
+                nombre: true,
+                duracionMinutos: true,
+                // esVirtual: true, // Opcional: si quieres mostrar esta info en el select
+                // esPresencial: true, // Opcional
+            },
+            orderBy: [
+                { orden: 'asc' }, // Ordenar por el campo 'orden' si existe
+                { nombre: 'asc' }, // Luego por nombre
+            ]
+        });
+
+        // Validar la salida con Zod (cada item del array)
+        // Esto asegura que los datos que enviamos al frontend cumplen con el schema.
+        const validationResult = z.array(AgendaTipoCitaParaSelectSchema).safeParse(tiposDeCitaDb);
+
+        if (!validationResult.success) {
+            console.error("[obtenerTiposDeCitaParaSelectAction] Error Zod al parsear tipos de cita:", validationResult.error.flatten());
+            return { success: false, error: "Error al procesar los datos de los tipos de cita." };
+        }
+
+        return { success: true, data: validationResult.data };
+
+    } catch (error: unknown) {
+        console.error("[obtenerTiposDeCitaParaSelectAction] Error:", error);
+        return {
+            success: false,
+            error: `No se pudieron cargar los tipos de cita/servicios: ${error instanceof Error ? error.message : "Error desconocido."}`
+        };
     }
 }

@@ -1,3 +1,4 @@
+// Ruta actual desde app: admin/_lib/funciones/citas/agendarCita/agendarCita.schemas
 import { z } from 'zod';
 
 // Esquema Zod para los argumentos que la función 'agendarCita' espera de Gemini

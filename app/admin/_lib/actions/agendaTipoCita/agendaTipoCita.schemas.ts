@@ -52,9 +52,14 @@ export const actualizarOrdenTiposCitaSchema = z.object({
 export type ActualizarOrdenTiposCitaInput = z.infer<typeof actualizarOrdenTiposCitaSchema>;
 
 
+// Esquema para cada opción en el select de tipos de cita/servicios
+export const AgendaTipoCitaParaSelectSchema = z.object({
+    id: z.string().cuid(),
+    nombre: z.string(),
+    duracionMinutos: z.number().int().positive().nullable().optional(), // Opcional, pero útil para mostrar en el select
+    // Puedes añadir más campos si los necesitas en el select, ej: esVirtual, esPresencial
+});
 
+export type AgendaTipoCitaParaSelect = z.infer<typeof AgendaTipoCitaParaSelectSchema>;
 
-
-
-
-
+// No se necesitan schemas de input para esta acción ya que solo recibe negocioId como string.
