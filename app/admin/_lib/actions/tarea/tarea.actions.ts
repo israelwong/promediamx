@@ -244,18 +244,15 @@ export async function obtenerCategoriasParaFiltro(): Promise<ActionResult<z.infe
     }
 }
 
-// --- NUEVA ACCIÓN: Actualizar Tarea ---
 export async function actualizarTarea(
     id: string,
-    input: ActualizarTareaInput // Tipo inferido del schema Zod actualizado
+    input: ActualizarTareaInput
 ): Promise<ActionResult<TareaPrisma>> {
     console.log(`Actualizar Tarea - ID: ${id}, Input:`, input);
     if (!id) {
         return { success: false, error: "Se requiere el ID de la tarea para actualizar." };
     }
 
-    // La validación Zod ya debería haber ocurrido en el componente antes de llamar a esta acción,
-    // pero una validación aquí también es una buena práctica defensiva.
     const validationResult = ActualizarTareaInputSchema.safeParse(input);
     if (!validationResult.success) {
         console.error('Error de validación en action actualizarTarea:', validationResult.error.flatten().fieldErrors);
@@ -265,7 +262,6 @@ export async function actualizarTarea(
             validationErrors: validationResult.error.flatten().fieldErrors,
         };
     }
-    // Usar los datos validados y parseados por Zod
     const data = validationResult.data;
 
     try {
@@ -279,6 +275,7 @@ export async function actualizarTarea(
         }
 
         const tareaActualizada = await prisma.$transaction(async (tx) => {
+            // 1. Actualiza el modelo principal 'Tarea'
             const dataToUpdate: Prisma.TareaUpdateInput = {
                 nombre: data.nombre,
                 descripcionMarketplace: data.descripcionMarketplace,
@@ -286,11 +283,11 @@ export async function actualizarTarea(
                 precio: data.precio,
                 rol: data.rol,
                 personalidad: data.personalidad,
-                version: data.version, // Zod asegura que es number | null | undefined. Prisma maneja null/undefined.
+                version: data.version,
                 status: data.status,
                 CategoriaTarea: data.categoriaTareaId
                     ? { connect: { id: data.categoriaTareaId } }
-                    : undefined,
+                    : { disconnect: true }, // Desconectar si se envía nulo/undefined
                 iconoUrl: data.iconoUrl,
             };
 
@@ -299,49 +296,50 @@ export async function actualizarTarea(
                 data: dataToUpdate,
             });
 
-            if (data.nombre !== tareaActual.nombre && tareaActual.tareaFuncion?.id) {
-                const nuevoNombreFuncion = toCamelCase(data.nombre);
-                if (nuevoNombreFuncion && nuevoNombreFuncion !== tareaActual.tareaFuncion.nombre) {
+            // 2. --- INICIO DE LA LÓGICA CORREGIDA PARA TareaFuncion ---
+            if (tareaActual.tareaFuncion?.id) {
+                const dataToUpdateFuncion: Prisma.TareaFuncionUpdateInput = {};
+                let debeActualizarFuncion = false;
+
+                // Actualizar descripción de la función
+                if (data.funcionDescripcion !== undefined) {
+                    dataToUpdateFuncion.descripcion = data.funcionDescripcion;
+                    debeActualizarFuncion = true;
+                }
+
+                // Actualizar nombre de la función si el nombre de la tarea cambió
+                if (data.nombre !== tareaActual.nombre) {
+                    const nuevoNombreFuncion = toCamelCase(data.nombre);
+                    if (nuevoNombreFuncion && nuevoNombreFuncion !== tareaActual.tareaFuncion.nombre) {
+                        dataToUpdateFuncion.nombre = nuevoNombreFuncion;
+                        debeActualizarFuncion = true;
+                    }
+                }
+
+                // Si hay algo que actualizar en TareaFuncion, ejecutar la consulta
+                if (debeActualizarFuncion) {
                     try {
                         await tx.tareaFuncion.update({
                             where: { id: tareaActual.tareaFuncion.id },
-                            data: { nombre: nuevoNombreFuncion },
+                            data: dataToUpdateFuncion,
                         });
                     } catch (fnError: unknown) {
-                        // Si el nuevo nombre de función ya existe para otra tarea, podría fallar
-                        // P2002: Unique constraint failed
                         if (
-                            typeof fnError === 'object' &&
-                            fnError !== null &&
-                            'code' in fnError &&
-                            (fnError as { code?: string }).code === 'P2002'
+                            fnError instanceof Prisma.PrismaClientKnownRequestError &&
+                            fnError.code === 'P2002'
                         ) {
-                            console.warn(`Conflicto al intentar renombrar TareaFuncion para tarea ${id}: el nombre ${nuevoNombreFuncion} ya existe. Se mantiene el nombre de función anterior.`);
-                            // No relanzar el error para que la tarea principal se actualice.
-                            // Opcional: añadir un warning al resultado de la acción.
+                            console.warn(`Conflicto al renombrar TareaFuncion para tarea ${id}. Se mantiene el nombre anterior.`);
                         } else {
-                            throw fnError; // Relanzar otros errores
+                            throw fnError;
                         }
                     }
-                } else if (!nuevoNombreFuncion && tareaActual.tareaFuncion.nombre) {
-                    console.warn(`El nuevo nombre de tarea '${data.nombre}' resultó en un nombre de función vacío. No se actualizó TareaFuncion.`);
                 }
             }
+            // --- FIN DE LA LÓGICA CORREGIDA ---
 
-            // Si canalIds se elimina del schema y del formulario, este bloque se elimina.
-            // if (data.canalIds !== undefined) { // Solo modificar si se provee (puede ser array vacío)
-            //     await tx.tareaCanal.deleteMany({ where: { tareaId: id } });
-            //     if (data.canalIds.length > 0) {
-            //         await tx.tareaCanal.createMany({
-            //             data: data.canalIds.map(canalId => ({
-            //                 tareaId: id,
-            //                 canalConversacionalId: canalId,
-            //             })),
-            //         });
-            //     }
-            // }
 
-            if (data.etiquetaIds !== undefined) { // Solo modificar si se provee
+            // 3. Actualiza las etiquetas asociadas
+            if (data.etiquetaIds !== undefined) {
                 await tx.tareaEtiqueta.deleteMany({ where: { tareaId: id } });
                 if (data.etiquetaIds.length > 0) {
                     await tx.tareaEtiqueta.createMany({
@@ -361,7 +359,6 @@ export async function actualizarTarea(
     } catch (error: unknown) {
         console.error(`Error al actualizar tarea ${id}:`, error);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            // Asumiendo que 'nombre' es el único otro campo que podría tener un constraint unique a nivel de Tarea.
             if (error.meta?.target && (error.meta.target as string[]).includes('nombre')) {
                 return { success: false, error: `El nombre de tarea '${data.nombre}' ya existe.` };
             }
@@ -369,6 +366,7 @@ export async function actualizarTarea(
         return { success: false, error: `No se pudo actualizar la tarea. ${(error instanceof Error ? error.message : '')}` };
     }
 }
+
 
 // --- NUEVA ACCIÓN: Eliminar Tarea ---
 export async function eliminarTarea(id: string): Promise<ActionResult<null>> {
@@ -438,8 +436,8 @@ export async function actualizarOrdenTareas(
 
     const { categoriaTareaId, tareasOrdenadas } = validationResult.data;
 
-    console.log(`Actualizando orden para categoriaId: ${categoriaTareaId === null ? 'Sin Categoría' : categoriaTareaId}`);
-    console.log('Tareas ordenadas:', tareasOrdenadas.map(t => ({ id: t.id, orden: t.orden })));
+    // console.log(`Actualizando orden para categoriaId: ${categoriaTareaId === null ? 'Sin Categoría' : categoriaTareaId}`);
+    // console.log('Tareas ordenadas:', tareasOrdenadas.map(t => ({ id: t.id, orden: t.orden })));
 
     try {
         // Asegurar que todas las tareas que se están ordenando realmente pertenecen

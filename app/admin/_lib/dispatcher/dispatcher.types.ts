@@ -17,6 +17,7 @@ export interface FunctionResponsePayload {
 
 // Contexto extendido que se pasará a cada función ejecutora
 export interface FullExecutionFunctionContext extends SimpleFuncionContext {
+    conversacionId: string; // ID de la conversación actual
     tareaEjecutadaId: string;
     // Aquí podrías añadir otros datos comunes que el dispatcher ya tiene y podrían ser útiles,
     // como 'asistenteDb' o 'negocioDb' completos si muchas funciones los necesitan.

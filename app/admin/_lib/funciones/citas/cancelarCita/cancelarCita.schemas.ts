@@ -15,6 +15,7 @@ export const CancelarCitaArgsFromAISchema = z.object({
     confirmacion_usuario_cancelar: z.boolean().nullable().optional(),
     motivo_cancelacion: z.string().min(1, "El motivo no puede estar vacío si se proporciona.").max(500, "Motivo demasiado largo.").nullable().optional(),
 });
+export type CancelarCitaArgsFromAI = z.infer<typeof CancelarCitaArgsFromAISchema>;
 
 // Esquema Zod completo para los argumentos que la acción ejecutarCancelarCitaAction espera
 // (incluyendo los que añade el dispatcher)
@@ -46,3 +47,4 @@ export const CancelarCitaDataSchema = z.object({
     listaCitasParaElegir: z.array(CitaDetalleParaCancelarSchema).nullable().optional(),
 });
 export type CancelarCitaData = z.infer<typeof CancelarCitaDataSchema>;
+

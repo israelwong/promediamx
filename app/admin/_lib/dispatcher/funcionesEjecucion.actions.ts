@@ -94,6 +94,7 @@ export async function dispatchTareaEjecutadaAction(
         }
 
         fullExecContext = {
+            conversacionId: conversacionId as string,
             canalNombre: typeof canalNombre === 'string' && canalNombre.trim() !== '' ? canalNombre : "webchat",
             negocioId: asistenteDb.negocio.id,
             asistenteId: asistenteVirtualId as string,

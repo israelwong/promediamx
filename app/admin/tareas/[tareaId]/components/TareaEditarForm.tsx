@@ -167,15 +167,15 @@ export default function TareaEditarForm({ tareaId, initialData, currentNombre, o
 
         const dataToValidate: ActualizarTareaInput = {
             nombre: currentNombre.trim() || '',
-            descripcionMarketplace: formData.descripcionMarketplace || undefined,
-            instruccion: formData.instruccion || undefined,
+            descripcionMarketplace: formData.descripcionMarketplace || null,
+            instruccion: formData.instruccion || null,
             precio: formData.precio === undefined || formData.precio === null ? undefined : Number(formData.precio),
-            rol: formData.rol || undefined,
-            personalidad: formData.personalidad || undefined,
+            rol: formData.rol || null,
+            personalidad: formData.personalidad || null,
             version: formData.version === undefined || formData.version === null ? undefined : Number(formData.version),
             status: formData.status === 'activo' ? 'activo' : 'inactivo', // Asegurar que sea uno de los valores del enum
             categoriaTareaId: formData.categoriaTareaId || undefined,
-            iconoUrl: formData.iconoUrl || undefined,
+            iconoUrl: formData.iconoUrl || null,
             // canalIds: [], // Obligatorio aunque no se use, por el esquema
             etiquetaIds: formData.etiquetaIds || [],
         };
@@ -196,18 +196,7 @@ export default function TareaEditarForm({ tareaId, initialData, currentNombre, o
             const result = await actualizarTarea(tareaId, validationResult.data);
             if (result.success && result.data) {
                 toast.success("Tarea actualizada correctamente.", { id: 'actualizar-tarea' });
-                // Refrescar `initialData` en el layout padre para que otros componentes se actualicen
-                // Esto podría hacerse llamando a una función prop `onUpdateSuccess`
-                // o el layout podría re-fetchear si `tareaId` cambia (que no es el caso aquí).
-                // Por ahora, actualizaremos el estado local si es necesario para reflejar cambios.
-                // Es mejor que TareaEditLayout vuelva a fetchear para consistencia total.
-                // Opcionalmente, se puede hacer un router.refresh() o llamar a una prop de refresco.
-                // router.refresh(); // Puede ser una opción para recargar datos del servidor
-
-                // Sincronizar el estado local y el nombre en el layout
                 resetFormState(result.data as unknown as TareaParaEditar); // Cast si el tipo de retorno de actualizarTarea es TareaPrisma
-                // Es mejor que actualizarTarea devuelva TareaParaEditar
-
             } else {
                 setSubmitError(result.error || "Error desconocido al actualizar.");
                 if (result.validationErrors) {
@@ -403,13 +392,6 @@ export default function TareaEditarForm({ tareaId, initialData, currentNombre, o
                             {validationErrors.status && <p className="text-xs text-red-400 mt-1">{validationErrors.status.join(', ')}</p>}
                         </div>
                     </div>
-
-
-
-
-                    {/* SECCIÓN CANALES ELIMINADA POR DEFECTO, según tu comentario. */}
-                    {/* Si necesitas re-agregarla, su estructura sería similar a la de Etiquetas. */}
-
                 </div>
             </div>
 

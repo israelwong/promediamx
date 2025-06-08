@@ -1,16 +1,28 @@
 // app/admin/_lib/actions/email/email.actions.ts
 'use server';
 
-import { ConfirmacionPagoEmail } from '@/app/emails/ConfirmacionPagoEmail'; // Ajusta la ruta a tu plantilla
+import React from 'react';
 import { render } from '@react-email/render';
 import { resend } from '@/app/lib/mailClient'; // Tu cliente Resend inicializado
 import type { ActionResult } from '@/app/admin/_lib/types';
 import {
     EnviarConfirmacionPagoInputSchema,
-    type EnviarConfirmacionPagoInput
-} from './email.schemas';
-// import prisma from '@/app/admin/_lib/prismaClient'; // Para obtener datos del negocio si es necesario
+    type EnviarConfirmacionPagoInput,
 
+    EnviarConfirmacionCitaInputSchema,
+    type EnviarConfirmacionCitaInput,
+
+    EnviarCancelacionCitaInputSchema,
+    type EnviarCancelacionCitaInput
+} from './email.schemas';
+
+// Plantillas componentes de email
+import { ConfirmacionPagoEmail } from '@/app/emails/ConfirmacionPagoEmail';
+import { ConfirmacionCitaEmail } from '@/app/emails/ConfirmacionCitaEmail';
+import { CancelacionCitaEmail } from '@/app/emails/CancelacionCitaEmail';
+
+
+//! Acción para enviar correo de confirmación de pago
 export async function enviarCorreoConfirmacionPagoAction(
     input: EnviarConfirmacionPagoInput
 ): Promise<ActionResult<string | null>> { // Devuelve el ID del mensaje de Resend o null
@@ -88,5 +100,67 @@ export async function enviarCorreoConfirmacionPagoAction(
             errorMessage = error.message;
         }
         return { success: false, error: errorMessage };
+    }
+}
+
+export async function enviarEmailConfirmacionCitaAction(
+    input: EnviarConfirmacionCitaInput
+): Promise<ActionResult<string | null>> {
+
+    const validationResult = EnviarConfirmacionCitaInputSchema.safeParse(input);
+    if (!validationResult.success) {
+        console.error("Error de validación en enviarEmailConfirmacionCitaAction:", validationResult.error.flatten());
+        return { success: false, error: "Datos de entrada inválidos para enviar correo de cita.", errorDetails: validationResult.error.flatten().fieldErrors };
+    }
+
+    const props = validationResult.data;
+
+    try {
+        const emailHtml = await render(React.createElement(ConfirmacionCitaEmail, props));
+
+        const { data, error } = await resend.emails.send({
+            from: `${props.nombreNegocio} vía ProMedia <citas@promedia.mx>`, // Dominio/subdominio verificado
+            to: [props.emailDestinatario],
+            subject: `Tu cita para "${props.nombreServicio}" ha sido confirmada`,
+            replyTo: props.emailRespuestaNegocio,
+            html: emailHtml,
+        });
+
+        if (error) {
+            console.error("Error al enviar correo de cita desde Resend:", error);
+            return { success: false, error: error.message || "Error del servicio de email." };
+        }
+
+        console.log(`Correo de confirmación de cita enviado a ${props.emailDestinatario}. ID: ${data?.id}`);
+        return { success: true, data: data?.id || null };
+
+    } catch (error: unknown) {
+        console.error("Error catastrófico en enviarEmailConfirmacionCitaAction:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo enviar el correo de confirmación de cita." };
+    }
+}
+
+
+export async function enviarEmailCancelacionCitaAction(
+    input: EnviarCancelacionCitaInput
+): Promise<ActionResult<string | null>> {
+    const validationResult = EnviarCancelacionCitaInputSchema.safeParse(input);
+    if (!validationResult.success) {
+        return { success: false, error: "Datos inválidos para correo de cancelación." };
+    }
+    const props = validationResult.data;
+    try {
+        const emailHtml = await render(React.createElement(CancelacionCitaEmail, props));
+        const { data, error } = await resend.emails.send({
+            from: `${props.nombreNegocio} <cancelaciones@promedia.mx>`,
+            to: [props.emailDestinatario],
+            subject: `Confirmación de cancelación de tu cita en ${props.nombreNegocio}`,
+            replyTo: props.emailRespuestaNegocio,
+            html: emailHtml,
+        });
+        if (error) return { success: false, error: error.message };
+        return { success: true, data: data?.id || null };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "Error al enviar correo." };
     }
 }

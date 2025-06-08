@@ -27,4 +27,37 @@ export const EnviarConfirmacionPagoInputSchema = z.object({
 });
 export type EnviarConfirmacionPagoInput = z.infer<typeof EnviarConfirmacionPagoInputSchema>;
 
-// Podrías añadir más schemas aquí para otros tipos de correos (bienvenida, etc.)
+
+// Datos que la acción necesita para enviar una confirmación de CITA
+export const EnviarConfirmacionCitaInputSchema = z.object({
+    // Datos del Destinatario (quien agendó)
+    emailDestinatario: z.string().email("Email del destinatario inválido."),
+    nombreDestinatario: z.string().nullable().optional(),
+
+    // Datos del Negocio
+    nombreNegocio: z.string().min(1, "El nombre del negocio es requerido."),
+    logoNegocioUrl: z.string().url("URL de logo inválida").nullable().optional(),
+    emailRespuestaNegocio: z.string().email("Email de respuesta del negocio inválido."),
+
+    // Datos de la Cita
+    nombreServicio: z.string().min(1, "El nombre del servicio es requerido."),
+    fechaHoraCita: z.date({ errorMap: () => ({ message: "Se requiere un objeto Date válido para la fecha de la cita." }) }),
+    modalidadCita: z.enum(['presencial', 'virtual']),
+
+    // Opcionales según modalidad
+    direccionNegocio: z.string().nullable().optional(), // Para citas presenciales
+    meetingUrl: z.string().url("URL de reunión inválida.").nullable().optional(), // Para citas virtuales
+});
+export type EnviarConfirmacionCitaInput = z.infer<typeof EnviarConfirmacionCitaInputSchema>;
+
+// Datos para enviar un correo de cancelación de cita
+export const EnviarCancelacionCitaInputSchema = z.object({
+    emailDestinatario: z.string().email(),
+    nombreDestinatario: z.string().nullable().optional(),
+    nombreNegocio: z.string(),
+    nombreServicio: z.string(),
+    fechaHoraCitaOriginal: z.string(), // Pasaremos la fecha ya formateada
+    emailRespuestaNegocio: z.string().email("Email de respuesta del negocio inválido."),
+
+});
+export type EnviarCancelacionCitaInput = z.infer<typeof EnviarCancelacionCitaInputSchema>;

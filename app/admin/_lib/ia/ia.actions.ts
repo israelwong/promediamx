@@ -143,29 +143,26 @@ export async function generarRespuestaAsistente(
         const genAI = new GoogleGenerativeAI(apiKey);
 
         // TU systemInstructionText BASE (sin cambios)
-        const systemInstructionTextBase = `Eres ${input.contextoAsistente.nombreAsistente}, un asistente virtual amigable y eficiente para ${input.contextoAsistente.nombreNegocio}. ${input.contextoAsistente.descripcionAsistente ? `${input.contextoAsistente.descripcionAsistente}. ` : ''}Tu objetivo es ayudar al usuario.
-Evalúa la consulta del usuario contra las herramientas (funciones) disponibles:
-* **SI** la consulta coincide claramente con la descripción de una herramienta específica Y has verificado que tienes (o has obtenido del usuario preguntando ANTES) **todos** los parámetros requeridos por esa herramienta:
-    * **DEBES** usar la herramienta. Tu respuesta **COMPLETA Y ÚNICA** debe ser el objeto \`functionCall\` estructurado.
-    * **FORMATO ESPERADO DEL OBJETO \`functionCall\` (EJEMPLO):** \`{"functionCall": {"name": "nombreDeLaFuncionCorrecta", "args": {"parametro1": "valor1", "parametro2": "valor2"}}}\`
-    
-* **REGLAS ESTRICTAS PARA \`functionCall\`:**
-        * **NO** incluyas ningún texto explicativo, confirmación, o conversación antes o después de este objeto.
-        * **NO** escribas el objeto \`functionCall\` como un string JSON dentro de la parte 'text' de la respuesta.
-        * **NO** uses bloques de código Markdown.
-        * Simplemente devuelve el objeto \`functionCall\` puro como lo define la API.
+        const systemInstructionTextBase = `
+Eres ${input.contextoAsistente.nombreAsistente}, un asistente virtual para ${input.contextoAsistente.nombreNegocio}. Tu comportamiento se rige por la siguiente jerarquía de prioridades. Evalúa cada consulta del usuario estrictamente en este orden:
 
-* **SI has hecho una pregunta de confirmación al usuario para una acción de una herramienta (ej. '¿Confirmas que deseas X?') y el usuario responde afirmatirmativamente:**
-    * DEBES volver a llamar a la MISMA herramienta que estabas procesando.
-    * Asegúrate de incluir el parámetro de confirmación apropiado (ej. 'confirmacion_usuario_reagendar: true').
-    * También DEBES incluir los identificadores clave que se estaban procesando (ej. 'cita_id_original').
-* **Cuando una herramienta requiere múltiples datos del usuario en varios turnos (ej. primero identificar cita, luego nueva fecha):**
-    * Llama a la herramienta con la información que tengas. El backend te dirá qué falta.
-    * En el siguiente turno, cuando el usuario proporcione la información faltante, vuelve a llamar a la MISMA herramienta, incluyendo tanto la información nueva como la información clave previamente establecida (ej. \`cita_id_original\` Y \`nueva_fecha_hora_deseada\`).
+**PRIORIDAD 1: OBEDECER INSTRUCCIONES DEL BACKEND.**
+- Si el resultado de una función previa (el 'functionResponse') contiene un objeto 'aiContextData' con un campo 'messageToAI', esa es una instrucción directa y obligatoria. DEBES seguirla inmediatamente.
 
-* **EN CUALQUIER OTRO CASO** (si la consulta es general, no coincide con una herramienta, no estás seguro de cuál usar, o no pudiste obtener los parámetros necesarios después de preguntar):
-    * **DEBES** responder con un **mensaje de texto** útil y conversacional. No intentes llamar a una función. Si no puedes ayudar, explica la situación e indica que notificarás a un agente humano.
-Mantén siempre un tono amigable y eficiente.
+**PRIORIDAD 2: ENTREGAR EL RESULTADO DE UNA FUNCIÓN.**
+- Si una herramienta acaba de ejecutarse en el turno anterior y generó un mensaje para el usuario (contenido en el 'functionResponse'), tu única y exclusiva tarea en este turno es **entregar ese mensaje al usuario sin alterarlo**. NO intentes llamar a otra función ni añadir texto propio. Simplemente, transmite el resultado.
+
+**PRIORIDAD 3: USAR UNA HERRAMIENTA (FUNCTION CALL).**
+- SOLO SI las prioridades 1 y 2 no aplican, evalúa la consulta del usuario para usar una herramienta.
+- REGLA DE AGREGACIÓN: Cuando recolectes datos para una misma tarea en varios turnos (ej. 'agendarCita'), DEBES volver a llamar a la función incluyendo TODA la información de turnos anteriores MÁS la nueva información que acabas de recibir.
+- REGLA DE CONFIRMACIÓN: Para confirmar una acción (ej. 'confirmarCita'), DEBES usar la herramienta únicamente si la función anterior te proporcionó un 'nextActionArgs' en su 'aiContextData'.
+- REGLAS DE FORMATO: Tu respuesta DEBE ser únicamente el objeto 'functionCall' puro, sin texto adicional, explicaciones o Markdown.
+
+**PRIORIDAD 4: CONVERSACIÓN GENERAL.**
+- Si, y solo si, ninguna de las prioridades anteriores aplica (no hay instrucciones del backend, no hay resultados de función que entregar y no se puede usar una herramienta), responde de manera conversacional. Si no puedes ayudar, explícalo y sugiere contactar a un agente humano.
+
+**REGLA DE FINALIZACIÓN (APLICA A TODO):**
+- Una vez que una tarea final (como 'confirmarCita') se completa y entregas el mensaje de éxito, la tarea se considera TERMINADA. Si el usuario responde 'gracias' u 'ok', simplemente responde amablemente ('De nada', 'A tu servicio') y espera una nueva solicitud. NO vuelvas a llamar a la misma función.
 `;
         let systemInstructionFinal = systemInstructionTextBase;
         const chatHistory: HistorialTurnoParaGemini[] = input.historialConversacion; // Directamente
@@ -256,9 +253,10 @@ Mantén siempre un tono amigable y eficiente.
             // Sin embargo, tu prompt pide NO incluir texto explicativo.
             // Si Gemini sigue las reglas estrictas, response.text() podría ser vacío o nulo.
             respuestaTextual = response.text()?.trim() || null;
-            if (!respuestaTextual && llamadaFuncion) { // Si no hay texto pero sí llamada, crear uno genérico
-                respuestaTextual = `Entendido, voy a procesar la acción: ${llamadaFuncion.nombreFuncion}.`;
-            }
+            //! comentada para no enviar mensajes intermedios al usuario
+            // if (!respuestaTextual && llamadaFuncion) { // Si no hay texto pero sí llamada, crear uno genérico
+            //     respuestaTextual = `Entendido, voy a procesar la acción: ${llamadaFuncion.nombreFuncion}.`;
+            // }
         } else {
             // console.log("[IA Action V2] No se encontró functionCall ESTRUCTURADO. Verificando texto y workaround...");
             respuestaTextual = response.text()?.trim() || null;
@@ -272,7 +270,8 @@ Mantén siempre un tono amigable y eficiente.
                         if (parsedJson.functionCall && typeof parsedJson.functionCall.name === 'string' && typeof parsedJson.functionCall.args === 'object' && parsedJson.functionCall.args !== null) {
                             console.warn("[IA Action V2] Workaround: Función recuperada desde JSON en texto.");
                             llamadaFuncion = { nombreFuncion: parsedJson.functionCall.name, argumentos: parsedJson.functionCall.args as Record<string, unknown> };
-                            respuestaTextual = `Entendido. Procesando tu solicitud para: ${llamadaFuncion.nombreFuncion}.`; // Sobrescribir el texto original
+                            //! comentada para no enviar mensajes intermedios al usuario
+                            //! respuestaTextual = `Entendido. Procesando tu solicitud para: ${llamadaFuncion.nombreFuncion}.`; // Sobrescribir el texto original
                         } else { console.warn("[IA Action V2] Workaround: JSON parseado no tiene estructura esperada."); }
                     } catch (parseError) { console.warn("[IA Action V2] Workaround: Error al parsear JSON en texto.", parseError); }
                 }

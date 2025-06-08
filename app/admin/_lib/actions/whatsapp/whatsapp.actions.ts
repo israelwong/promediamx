@@ -25,15 +25,15 @@ import { dispatchTareaEjecutadaAction } from '@/app/admin/_lib/dispatcher/funcio
 
 const WHATSAPP_CHANNEL_NAME = "WhatsApp";
 
-// --- procesarMensajeWhatsAppEntranteAction (Mantenida como en la versión anterior del Canvas) ---
+// VERSIÓN FINAL CORREGIDA
 export async function procesarMensajeWhatsAppEntranteAction(
     input: ProcesarMensajeWhatsAppInput
 ): Promise<ActionResult<ProcesarMensajeWhatsAppOutput | null>> {
 
-    console.log("[WhatsApp Actions] Procesando mensaje entrante:", input);
+    // --- 1. CONFIGURACIÓN INICIAL Y VALIDACIÓN ---
     const validation = ProcesarMensajeWhatsAppInputSchema.safeParse(input);
     if (!validation.success) {
-        console.error("[WhatsApp Actions] Input inválido:", validation.error.flatten());
+        console.error("[WhatsApp Actions V5] Input inválido:", validation.error.flatten());
         return { success: false, error: "Datos de entrada inválidos.", errorDetails: validation.error.flatten().fieldErrors };
     }
     const { negocioPhoneNumberId, usuarioWaId, nombrePerfilUsuario, mensajeUsuario } = validation.data;
@@ -41,7 +41,6 @@ export async function procesarMensajeWhatsAppEntranteAction(
     let conversationId: string | undefined;
     let leadId: string | undefined;
     let asistenteId: string | undefined;
-
     let asistenteNombre: string | undefined;
     let negocioNombre: string | undefined;
     let asistenteDescripcion: string | null | undefined;
@@ -50,104 +49,60 @@ export async function procesarMensajeWhatsAppEntranteAction(
 
     try {
         const initialSetupResult = await prisma.$transaction(async (tx) => {
-            const asistente = await tx.asistenteVirtual.findFirst({
-                where: { phoneNumberId: negocioPhoneNumberId, status: 'activo' },
-                include: { negocio: { include: { CRM: true } } }
-            });
+            const asistente = await tx.asistenteVirtual.findFirst({ where: { phoneNumberId: negocioPhoneNumberId, status: 'activo' }, include: { negocio: { include: { CRM: true } } } });
+            if (!asistente || !asistente.negocio || !asistente.negocio.CRM) throw new Error(`Asistente, Negocio o CRM no encontrado para PNID: ${negocioPhoneNumberId}`);
 
-            if (!asistente || !asistente.negocio || !asistente.negocio.CRM) {
-                throw new Error(`Asistente, Negocio o CRM no encontrado o no activo para PNID: ${negocioPhoneNumberId}`);
-            }
-
-            const crmId = asistente.negocio.CRM.id;
             asistenteId = asistente.id;
             asistenteNombre = asistente.nombre;
             negocioNombre = asistente.negocio.nombre;
             asistenteDescripcion = asistente.descripcion;
 
+            const crmId = asistente.negocio.CRM.id;
             let canalWhatsApp = await tx.canalCRM.findFirst({ where: { crmId: crmId, nombre: WHATSAPP_CHANNEL_NAME } });
-            if (!canalWhatsApp) {
-                canalWhatsApp = await tx.canalCRM.create({ data: { crmId: crmId, nombre: WHATSAPP_CHANNEL_NAME, status: 'activo' } });
-            }
+            if (!canalWhatsApp) canalWhatsApp = await tx.canalCRM.create({ data: { crmId: crmId, nombre: WHATSAPP_CHANNEL_NAME, status: 'activo' } });
 
-            let currentLead = await tx.lead.findFirst({
-                where: { crmId: crmId, telefono: usuarioWaId }
-            });
-
+            let currentLead = await tx.lead.findFirst({ where: { crmId: crmId, telefono: usuarioWaId } });
             if (!currentLead) {
                 const primerPipeline = await tx.pipelineCRM.findFirst({ where: { crmId: crmId, status: 'activo' }, orderBy: { orden: 'asc' } });
                 if (!primerPipeline) throw new Error(`Pipeline inicial no configurado para CRM ID: ${crmId}`);
-                currentLead = await tx.lead.create({
-                    data: {
-                        crmId: crmId,
-                        nombre: nombrePerfilUsuario || `Usuario WhatsApp ${usuarioWaId.slice(-4)}`,
-                        canalId: canalWhatsApp.id,
-                        status: 'nuevo',
-                        pipelineId: primerPipeline.id,
-                        telefono: usuarioWaId,
-                        jsonParams: { whatsappUserId: usuarioWaId, whatsappProfileName: nombrePerfilUsuario }
-                    },
-                });
+                currentLead = await tx.lead.create({ data: { crmId: crmId, nombre: nombrePerfilUsuario || `Usuario WhatsApp ${usuarioWaId.slice(-4)}`, canalId: canalWhatsApp.id, status: 'nuevo', pipelineId: primerPipeline.id, telefono: usuarioWaId, jsonParams: { whatsappUserId: usuarioWaId, whatsappProfileName: nombrePerfilUsuario } } });
             }
             leadId = currentLead.id;
 
-            let currentConversacion = await tx.conversacion.findFirst({
-                where: { leadId: currentLead.id, asistenteVirtualId: asistente.id },
-                orderBy: { createdAt: 'desc' }
-            });
-
+            let currentConversacion = await tx.conversacion.findFirst({ where: { whatsappId: usuarioWaId }, orderBy: { createdAt: 'desc' } });
             if (!currentConversacion || ['cerrada', 'archivada'].includes(currentConversacion.status)) {
-                currentConversacion = await tx.conversacion.create({
-                    data: {
-                        leadId: currentLead.id,
-                        asistenteVirtualId: asistente.id,
-                        status: 'abierta',
-                        phoneNumberId: negocioPhoneNumberId,
-                        whatsappId: usuarioWaId,
-                    }
-                });
-            } else if (currentConversacion.status !== 'abierta' && currentConversacion.status !== 'en_espera_agente' && currentConversacion.status !== 'hitl_activo') {
-                currentConversacion = await tx.conversacion.update({
-                    where: { id: currentConversacion.id },
-                    data: { status: 'abierta', updatedAt: new Date() }
-                });
+                currentConversacion = await tx.conversacion.create({ data: { leadId: currentLead.id, asistenteVirtualId: asistente.id, status: 'abierta', phoneNumberId: negocioPhoneNumberId, whatsappId: usuarioWaId } });
+            } else if (!['abierta', 'en_espera_agente', 'hitl_activo'].includes(currentConversacion.status)) {
+                currentConversacion = await tx.conversacion.update({ where: { id: currentConversacion.id }, data: { status: 'abierta', updatedAt: new Date() } });
             }
             conversationId = currentConversacion.id;
             estadoActualConversacion = currentConversacion.status;
 
-            const interaccionUsuarioData: Prisma.InteraccionCreateInput = {
-                conversacion: { connect: { id: conversationId } },
-                role: 'user',
-                mensajeTexto: mensajeUsuario,
-                parteTipo: InteraccionParteTipo.TEXT,
-                canalInteraccion: "whatsapp", // <-- AÑADIR
-            };
-            const interaccionUsuario = await tx.interaccion.create({
-                data: interaccionUsuarioData,
-                select: {
-                    id: true, conversacionId: true, role: true, mensajeTexto: true,
-                    parteTipo: true, functionCallNombre: true, functionCallArgs: true,
-                    functionResponseData: true, functionResponseNombre: true,
-                    mediaUrl: true, mediaType: true, createdAt: true,
-                    agenteCrm: { select: { id: true, nombre: true } },
-                }
+            const interaccionUsuario = await tx.interaccion.create({ data: { conversacion: { connect: { id: conversationId } }, role: 'user', mensajeTexto: mensajeUsuario, parteTipo: InteraccionParteTipo.TEXT, canalInteraccion: "whatsapp" }, select: { id: true, conversacionId: true, role: true, mensajeTexto: true, parteTipo: true, functionCallNombre: true, functionCallArgs: true, functionResponseData: true, functionResponseNombre: true, mediaUrl: true, mediaType: true, createdAt: true, agenteCrm: { select: { id: true, nombre: true } } } });
+            // Forzar los campos requeridos a ser string
+            if (!interaccionUsuario.id || !interaccionUsuario.conversacionId) throw new Error("La interacción de usuario guardada no tiene id o conversacionId.");
+            const parsedUserMsg = ChatMessageItemSchema.safeParse({
+                ...interaccionUsuario,
+                id: String(interaccionUsuario.id),
+                conversacionId: String(interaccionUsuario.conversacionId)
             });
-
-            const parsedUserMsg = ChatMessageItemSchema.safeParse(interaccionUsuario);
-            if (!parsedUserMsg.success) {
-                console.error("[WhatsApp Actions] Error Zod parseando mensaje de usuario guardado:", parsedUserMsg.error.flatten());
-                throw new Error("Error al parsear mensaje de usuario guardado.");
-            }
+            if (!parsedUserMsg.success) throw new Error("Error al parsear mensaje de usuario guardado.");
             return { userInteraction: parsedUserMsg.data };
         });
-
         mensajeUsuarioGuardado = initialSetupResult.userInteraction;
-
     } catch (error: unknown) {
-        console.error('[WhatsApp Actions] Error en la configuración inicial de DB:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Error al iniciar/continuar la conversación en la base de datos.' };
+        console.error('[WhatsApp Actions V5] Error en la configuración inicial de DB:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Error al iniciar la conversación en la base de datos.' };
     }
 
+    // --- INICIO: Guarda de tipo para satisfacer a TypeScript ---
+    // Esta comprobación asegura que las variables no son 'undefined' en el resto de la función.
+    if (!conversationId || !leadId || !asistenteId || !mensajeUsuarioGuardado) {
+        return { success: false, error: "No se pudieron inicializar las variables de contexto de la conversación." };
+    }
+    // --- FIN: Guarda de tipo ---
+
+    // --- 2. VERIFICACIÓN DE ESTADO ---
     if (estadoActualConversacion === 'en_espera_agente' || estadoActualConversacion === 'hitl_activo') {
         console.log(`[WhatsApp Actions] Conversación ${conversationId} en espera. No se llama a IA.`);
         return {
@@ -163,227 +118,53 @@ export async function procesarMensajeWhatsAppEntranteAction(
         };
     }
 
-    let mensajeAsistenteGuardado: ChatMessageItem | undefined;
-    let tareaEjecutadaCreadaId: string | null = null;
 
+    // --- 3. PROCESAMIENTO PRINCIPAL REFACTORIZADO ---
     try {
-        if (!conversationId || !asistenteId || !asistenteNombre || !negocioNombre) {
-            throw new Error("Faltan variables críticas (conversationId, asistenteId, etc.) antes de llamar a la IA.");
-        }
+        if (!asistenteNombre || !negocioNombre) throw new Error("Faltan nombres de asistente/negocio antes de llamar a la IA.");
 
-        const historialInteraccionesDb = await prisma.interaccion.findMany({
-            where: { conversacionId: conversationId },
-            orderBy: { createdAt: 'asc' },
-            take: 20,
-            select: {
-                role: true, parteTipo: true, mensajeTexto: true,
-                functionCallNombre: true, functionCallArgs: true,
-                functionResponseNombre: true, functionResponseData: true,
-            }
-        });
-
-        // const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.map(dbTurn => {
-        //     const parts: HistorialTurnoParaGemini['parts'] = [];
-        //     let roleForGemini: HistorialTurnoParaGemini['role'] | null = null;
-
-        //     if (dbTurn.role === 'user') {
-        //         roleForGemini = 'user';
-        //         if (dbTurn.mensajeTexto) parts.push({ text: dbTurn.mensajeTexto });
-        //     } else if (dbTurn.role === 'assistant') {
-        //         roleForGemini = 'model';
-        //         if (dbTurn.parteTipo === 'FUNCTION_CALL' && dbTurn.functionCallNombre && dbTurn.functionCallArgs) {
-        //             parts.push({ functionCall: { name: dbTurn.functionCallNombre, args: dbTurn.functionCallArgs as Record<string, unknown> || {} } });
-        //         } else if (dbTurn.mensajeTexto) {
-        //             parts.push({ text: dbTurn.mensajeTexto });
-        //         }
-        //     } else if (dbTurn.role === 'function') {
-        //         roleForGemini = 'function';
-        //         if (dbTurn.parteTipo === 'FUNCTION_RESPONSE' && dbTurn.functionCallNombre && dbTurn.functionResponseData) {
-        //             parts.push({ functionResponse: { name: dbTurn.functionCallNombre, response: dbTurn.functionResponseData as Record<string, unknown> || {} } });
-        //         } else if (dbTurn.mensajeTexto) {
-        //             parts.push({ functionResponse: { name: dbTurn.functionCallNombre || "unknownFunctionExecuted", response: { content: dbTurn.mensajeTexto } } });
-        //         }
-        //     } 
-
-        //     if (roleForGemini && parts.length > 0) {
-        //         return { role: roleForGemini, parts };
-        //     }
-        //     return null;
-        // }).filter(Boolean) as HistorialTurnoParaGemini[];
-
+        const historialInteraccionesDb = await prisma.interaccion.findMany({ where: { conversacionId: conversationId }, orderBy: { createdAt: 'asc' }, take: 20, select: { role: true, parteTipo: true, mensajeTexto: true, functionCallNombre: true, functionCallArgs: true, functionResponseNombre: true, functionResponseData: true } });
         const historialParaIA: HistorialTurnoParaGemini[] = historialInteraccionesDb.flatMap(dbTurn => {
-            const turnosParaGemini: HistorialTurnoParaGemini[] = [];
-
-            if (dbTurn.role === 'user') {
-                if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
-                    turnosParaGemini.push({
-                        role: 'user',
-                        parts: [{ text: dbTurn.mensajeTexto }]
-                    });
-                }
+            const turnos: HistorialTurnoParaGemini[] = [];
+            if (dbTurn.role === 'user' && dbTurn.mensajeTexto) {
+                turnos.push({ role: 'user', parts: [{ text: dbTurn.mensajeTexto }] });
             } else if (dbTurn.role === 'assistant') {
-                if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_CALL && dbTurn.functionCallNombre) {
-                    // El asistente decidió llamar a una función
-                    const functionCallPart = {
-                        functionCall: {
-                            name: dbTurn.functionCallNombre,
-                            args: dbTurn.functionCallArgs as Record<string, unknown> || {}
-                        }
-                    };
-                    // Si el mensajeTexto también existe para este turno de FUNCTION_CALL (ej. "Ok, buscando eso...")
-                    // y se lo mostraste al usuario, podrías añadirlo como otra part o un turno previo.
-                    // Por ahora, asumimos que el prompt de Gemini pide no mezclar texto con functionCall.
-                    // Si Gemini devuelve texto Y functionCall en el mismo candidate.content.parts,
-                    // la forma en que guardas esto en una sola Interaccion y la reconstruyes aquí es clave.
-                    // Si guardaste un mensajeTexto para la FUNCTION_CALL:
-                    if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
-                        turnosParaGemini.push({ role: 'model', parts: [{ text: dbTurn.mensajeTexto }] });
-                    }
-                    // Luego la function call en sí misma
-                    turnosParaGemini.push({ role: 'model', parts: [functionCallPart] });
-
-
-                } else if (dbTurn.parteTipo === InteraccionParteTipo.FUNCTION_RESPONSE && dbTurn.functionResponseNombre) {
-                    // Esta es una Interaccion que representa el resultado de una función que TU backend ejecutó.
-                    // Gemini espera esto como un turno de 'role: "function"'.
-                    turnosParaGemini.push({
-                        role: 'function',
-                        parts: [{
-                            functionResponse: {
-                                name: dbTurn.functionResponseNombre,
-                                response: dbTurn.functionResponseData as Record<string, unknown> ||
-                                { /* Fallback si functionResponseData es nulo */
-                                    confirmacion: `Acción ${dbTurn.functionResponseNombre} procesada.`,
-                                    content: dbTurn.mensajeTexto || "Resultado procesado."
-                                }
-                            }
-                        }]
-                    });
-
-                    // Después del 'functionResponse', lo que el asistente (model) le dijo al usuario como texto.
-                    // Este es el dbTurn.mensajeTexto de esta misma Interaccion.
-                    if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
-                        turnosParaGemini.push({
-                            role: 'model',
-                            parts: [{ text: dbTurn.mensajeTexto }]
-                        });
-                    }
-                } else if (dbTurn.mensajeTexto && dbTurn.mensajeTexto.trim() !== '') {
-                    // Respuesta de texto simple del asistente (no es llamada a función ni respuesta de función)
-                    turnosParaGemini.push({
-                        role: 'model',
-                        parts: [{ text: dbTurn.mensajeTexto }]
-                    });
+                if (dbTurn.parteTipo === 'FUNCTION_CALL' && dbTurn.functionCallNombre) turnos.push({ role: 'model', parts: [{ functionCall: { name: dbTurn.functionCallNombre, args: (dbTurn.functionCallArgs as object) || {} } }] });
+                else if (dbTurn.parteTipo === 'FUNCTION_RESPONSE' && dbTurn.functionResponseNombre) {
+                    turnos.push({ role: 'function', parts: [{ functionResponse: { name: dbTurn.functionResponseNombre, response: (dbTurn.functionResponseData as object) || {} } }] });
+                    if (dbTurn.mensajeTexto) turnos.push({ role: 'model', parts: [{ text: dbTurn.mensajeTexto }] });
                 }
+                else if (dbTurn.mensajeTexto) turnos.push({ role: 'model', parts: [{ text: dbTurn.mensajeTexto }] });
             }
-            // No esperamos 'role: function' directamente de la DB con la lógica actual de guardado.
-
-            return turnosParaGemini; // flatMap se encargará de aplanar el array de arrays
+            return turnos;
         });
-
-        console.log(`[WhatsApp Actions] Historial para IA (conv ${conversationId}, últimos 5):`, JSON.stringify(historialParaIA.slice(-5), null, 2));
 
         const tareasDisponibles = await obtenerTareasCapacidadParaAsistente(asistenteId, prisma);
-        const resultadoIA = await generarRespuestaAsistente({
-            historialConversacion: historialParaIA,
-            mensajeUsuarioActual: mensajeUsuario,
-            contextoAsistente: {
-                nombreAsistente: asistenteNombre,
-                nombreNegocio: negocioNombre,
-                descripcionAsistente: asistenteDescripcion
-            },
-            tareasDisponibles: tareasDisponibles,
-        });
+        const resultadoIA = await generarRespuestaAsistente({ historialConversacion: historialParaIA, mensajeUsuarioActual: mensajeUsuario, contextoAsistente: { nombreAsistente: asistenteNombre, nombreNegocio: negocioNombre, descripcionAsistente: asistenteDescripcion }, tareasDisponibles });
 
-        if (resultadoIA.success && resultadoIA.data) {
-            const respuestaIA = resultadoIA.data;
-            let respuestaAsistenteTextoVar = respuestaIA.respuestaTextual;
-            let iaMsgData: Prisma.InteraccionCreateInput;
+        if (!resultadoIA.success || !resultadoIA.data) throw new Error(resultadoIA.error || "La IA no generó una respuesta válida.");
 
-            if (respuestaIA.llamadaFuncion) {
-                iaMsgData = {
-                    conversacion: { connect: { id: conversationId } },
-                    role: 'assistant', parteTipo: InteraccionParteTipo.FUNCTION_CALL,
-                    functionCallNombre: respuestaIA.llamadaFuncion.nombreFuncion,
-                    functionCallArgs: respuestaIA.llamadaFuncion.argumentos as Prisma.InputJsonValue,
-                    mensajeTexto: respuestaAsistenteTextoVar,
-                };
-                if (!respuestaAsistenteTextoVar && respuestaIA.llamadaFuncion.nombreFuncion) {
-                    respuestaAsistenteTextoVar = `Entendido. Procesando: ${respuestaIA.llamadaFuncion.nombreFuncion}.`;
-                    iaMsgData.mensajeTexto = respuestaAsistenteTextoVar;
-                }
-            } else if (respuestaAsistenteTextoVar) {
-                iaMsgData = {
-                    conversacion: { connect: { id: conversationId } },
-                    role: 'assistant', parteTipo: InteraccionParteTipo.TEXT,
-                    mensajeTexto: respuestaAsistenteTextoVar,
-                };
-            } else {
-                iaMsgData = { conversacion: { connect: { id: conversationId } }, role: 'assistant', parteTipo: InteraccionParteTipo.TEXT, mensajeTexto: '(Respuesta IA vacía)' };
-            }
-            const iaMsg = await prisma.interaccion.create({
-                data: iaMsgData, select: { /* ... select completo ... */
-                    id: true, conversacionId: true, role: true, mensajeTexto: true,
-                    parteTipo: true, functionCallNombre: true, functionCallArgs: true,
-                    functionResponseData: true, functionResponseNombre: true,
-                    mediaUrl: true, mediaType: true, createdAt: true,
-                    agenteCrm: { select: { id: true, nombre: true } },
-                }
-            });
-            const parsedAssistantMsg = ChatMessageItemSchema.safeParse(iaMsg);
-            if (parsedAssistantMsg.success) mensajeAsistenteGuardado = parsedAssistantMsg.data;
-            else console.error("[WhatsApp Actions] Error Zod parseando mensaje de asistente guardado:", parsedAssistantMsg.error.flatten());
+        const respuestaIA = resultadoIA.data;
+        let mensajeAsistenteGuardado: ChatMessageItem | undefined;
 
-            if (!respuestaIA.llamadaFuncion && respuestaAsistenteTextoVar) {
-                const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, select: { token: true } });
-                if (asistente?.token) {
-                    await enviarMensajeWhatsAppApiAction({
-                        destinatarioWaId: usuarioWaId,
-                        mensajeTexto: respuestaAsistenteTextoVar, // Solo enviar texto si no hay llamada a función
-                        negocioPhoneNumberIdEnvia: negocioPhoneNumberId,
-                        tokenAccesoAsistente: asistente.token,
-                        tipoMensaje: 'text' // Asegurar que el tipo sea 'text'
-                    });
-                } else { console.error(`[WhatsApp Actions] No se encontró token para asistente ${asistenteId}.`); }
-            }
-
-            if (respuestaIA.llamadaFuncion) {
-                const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === respuestaIA.llamadaFuncion?.nombreFuncion);
-                if (tareaCoincidente) {
-                    const te = await prisma.tareaEjecutada.create({
-                        data: {
-                            asistenteVirtualId: asistenteId,
-                            tareaId: tareaCoincidente.id,
-                            fechaEjecutada: new Date(),
-                            metadata: JSON.stringify({
-                                conversacionId: conversationId, leadId: leadId, asistenteVirtualId: asistenteId,
-                                funcionLlamada: respuestaIA.llamadaFuncion.nombreFuncion,
-                                argumentos: respuestaIA.llamadaFuncion.argumentos,
-                                canalNombre: WHATSAPP_CHANNEL_NAME,
-                                destinatarioWaId: usuarioWaId,
-                                negocioPhoneNumberIdEnvia: negocioPhoneNumberId,
-                            })
-                        }
-                    });
-                    tareaEjecutadaCreadaId = te.id;
-                }
-            }
-        } else {
-            await prisma.interaccion.create({ data: { conversacionId: conversationId, role: 'system', mensajeTexto: `Error IA: ${resultadoIA.error || 'Desconocido'}`, parteTipo: InteraccionParteTipo.TEXT } });
-            const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, select: { token: true } });
-            if (asistente?.token) {
-                await enviarMensajeWhatsAppApiAction({
-                    destinatarioWaId: usuarioWaId,
-                    mensajeTexto: "Lo siento, estoy teniendo algunos problemas técnicos. Un agente se pondrá en contacto contigo pronto.",
-                    negocioPhoneNumberIdEnvia: negocioPhoneNumberId,
-                    tokenAccesoAsistente: asistente.token,
-                    tipoMensaje: 'text'
-                });
-            }
+        if (respuestaIA.llamadaFuncion) {
+            // CORREGIDO: Usar 'conversationId' con 'C' mayúscula
+            const iaInteraction = await prisma.interaccion.create({ data: { conversacionId: conversationId, role: 'assistant', parteTipo: InteraccionParteTipo.FUNCTION_CALL, functionCallNombre: respuestaIA.llamadaFuncion.nombreFuncion, functionCallArgs: respuestaIA.llamadaFuncion.argumentos as Prisma.InputJsonValue } });
+            mensajeAsistenteGuardado = ChatMessageItemSchema.parse(iaInteraction);
+            const tareaCoincidente = tareasDisponibles.find(t => t.funcionHerramienta?.nombre === respuestaIA.llamadaFuncion?.nombreFuncion);
+            if (!tareaCoincidente) throw new Error(`La IA llamó a una función no disponible: ${respuestaIA.llamadaFuncion.nombreFuncion}`);
+            const tareaEjecutada = await prisma.tareaEjecutada.create({ data: { asistenteVirtualId: asistenteId, tareaId: tareaCoincidente.id, fechaEjecutada: new Date(), metadata: JSON.stringify({ conversacionId: conversationId, leadId: leadId, asistenteVirtualId: asistenteId, canalNombre: WHATSAPP_CHANNEL_NAME, funcionLlamada: respuestaIA.llamadaFuncion.nombreFuncion, argumentos: respuestaIA.llamadaFuncion.argumentos, destinatarioWaId: usuarioWaId, negocioPhoneNumberIdEnvia: negocioPhoneNumberId }) } });
+            await dispatchTareaEjecutadaAction(tareaEjecutada.id);
         }
-
-        if (tareaEjecutadaCreadaId) {
-            await dispatchTareaEjecutadaAction(tareaEjecutadaCreadaId);
+        else if (respuestaIA.respuestaTextual) {
+            // CORREGIDO: Usar 'conversationId' con 'C' mayúscula
+            const iaInteraction = await prisma.interaccion.create({ data: { conversacionId: conversationId, role: 'assistant', parteTipo: InteraccionParteTipo.TEXT, mensajeTexto: respuestaIA.respuestaTextual }, select: { id: true, conversacionId: true, role: true, mensajeTexto: true, parteTipo: true, functionCallNombre: true, functionCallArgs: true, functionResponseData: true, functionResponseNombre: true, mediaUrl: true, mediaType: true, createdAt: true, agenteCrm: { select: { id: true, nombre: true } } } });
+            mensajeAsistenteGuardado = ChatMessageItemSchema.parse(iaInteraction);
+            const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId! }, select: { token: true } });
+            if (!asistente?.token) throw new Error(`No se encontró token para el asistente ${asistenteId}.`);
+            await enviarMensajeWhatsAppApiAction({ destinatarioWaId: usuarioWaId, mensajeTexto: respuestaIA.respuestaTextual, negocioPhoneNumberIdEnvia: negocioPhoneNumberId, tokenAccesoAsistente: asistente.token, tipoMensaje: 'text' });
+        } else {
+            console.warn(`[WhatsApp Actions V5] La IA devolvió una respuesta vacía para conv: ${conversationId}`);
         }
 
         return {
@@ -400,13 +181,17 @@ export async function procesarMensajeWhatsAppEntranteAction(
                     : undefined
             }
         };
-
     } catch (error: unknown) {
-        console.error('[WhatsApp Actions] Error en el procesamiento principal post-TX:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Error interno al procesar mensaje de WhatsApp.' };
+        console.error('[WhatsApp Actions V5] Error en el procesamiento principal:', error);
+        try {
+            const asistente = await prisma.asistenteVirtual.findUnique({ where: { id: asistenteId }, select: { token: true } });
+            if (asistente?.token) await enviarMensajeWhatsAppApiAction({ destinatarioWaId: usuarioWaId, mensajeTexto: "Lo siento, estoy teniendo un problema técnico. Un agente se pondrá en contacto contigo pronto.", negocioPhoneNumberIdEnvia: negocioPhoneNumberId, tokenAccesoAsistente: asistente.token, tipoMensaje: 'text' });
+        } catch (fallbackError) {
+            console.error('[WhatsApp Actions V5] Error enviando mensaje de fallback:', fallbackError);
+        }
+        return { success: false, error: error instanceof Error ? error.message : 'Error interno al procesar mensaje.' };
     }
 }
-
 
 export async function enviarMensajeWhatsAppApiAction(
     input: EnviarMensajeWhatsAppApiInput // Usa el schema actualizado

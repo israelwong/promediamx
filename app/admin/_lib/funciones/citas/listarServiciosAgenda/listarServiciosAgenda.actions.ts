@@ -1,8 +1,8 @@
 // Ruta sugerida: app/admin/_lib/funciones/listarServiciosAgenda.actions.ts
 'use server';
 
-import prisma from '../../prismaClient'; // Tu cliente Prisma
-import { ActionResult } from '../../types'; // Asumo que tienes este tipo genérico
+import prisma from '../../../prismaClient'; // Tu cliente Prisma
+import { ActionResult } from '../../../types'; // Asumo que tienes este tipo genérico
 import {
     ListarServiciosAgendaArgs,
     ListarServiciosAgendaData,

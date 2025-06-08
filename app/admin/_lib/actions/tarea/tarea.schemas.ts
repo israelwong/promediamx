@@ -154,7 +154,7 @@ export type TareaParaEditar = z.infer<typeof TareaParaEditarSchema>;
 export const ActualizarTareaInputSchema = z.object({
     nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres.").max(100),
     descripcionMarketplace: z.string().max(1000).nullable().optional(),
-    instruccion: z.string().max(2000).nullable().optional(),
+    instruccion: z.string().nullable().optional(),
     precio: z.number().min(0, "El precio no puede ser negativo.").nullable().optional(),
     rol: z.string().max(50).nullable().optional(),
     personalidad: z.string().max(50).nullable().optional(),
@@ -164,10 +164,7 @@ export const ActualizarTareaInputSchema = z.object({
     }),
     categoriaTareaId: z.string().cuid("Categoría inválida.").nullable().optional(),
     iconoUrl: z.string().url("URL de icono inválida.").nullable().optional(),
-
-    // Si 'canalesSoportados' se elimina del formulario, también se elimina 'canalIds' de aquí.
-    // Si se mantiene, el default a array vacío está bien.
-    // canalIds: z.array(z.string().cuid()).optional().default([]),
+    funcionDescripcion: z.string().nullable().optional(),
     etiquetaIds: z.array(z.string().cuid()).optional().default([]),
 });
 export type ActualizarTareaInput = z.infer<typeof ActualizarTareaInputSchema>;
