@@ -58,6 +58,7 @@ export const EnviarCancelacionCitaInputSchema = z.object({
     nombreServicio: z.string(),
     fechaHoraCitaOriginal: z.string(), // Pasaremos la fecha ya formateada
     emailRespuestaNegocio: z.string().email("Email de respuesta del negocio inválido."),
+    fechaHoraCita: z.date({ errorMap: () => ({ message: "Se requiere un objeto Date válido para la fecha de la cita." }) }),
 
 });
 export type EnviarCancelacionCitaInput = z.infer<typeof EnviarCancelacionCitaInputSchema>;
