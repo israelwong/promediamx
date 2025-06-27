@@ -104,11 +104,7 @@ export const pipelineColumnKanbanSchema = z.object({
 export type PipelineColumnKanbanData = z.infer<typeof pipelineColumnKanbanSchema>;
 
 // Esquema para los datos completos del tablero Kanban
-export const kanbanBoardDataSchema = z.object({
-    crmId: z.string().cuid().nullable(),
-    columns: z.array(pipelineColumnKanbanSchema),
-});
-export type KanbanBoardData = z.infer<typeof kanbanBoardDataSchema>;
+
 
 // Esquema para los parámetros de entrada de obtenerDatosPipelineKanbanAction
 export const obtenerDatosPipelineKanbanParamsSchema = z.object({
@@ -118,15 +114,7 @@ export type ObtenerDatosPipelineKanbanParams = z.infer<typeof obtenerDatosPipeli
 
 
 // Esquema para los parámetros de entrada de la acción actualizarEtapaLeadEnPipelineAction
-export const actualizarEtapaLeadEnPipelineParamsSchema = z.object({
-    leadId: z.string().cuid(),
-    nuevoPipelineId: z.string().cuid(), // El ID de la nueva columna/etapa
-    // Opcional: podrías pasar el orden dentro de la nueva columna si quieres manejarlo en el servidor
-    // nuevoOrdenEnEtapa: z.number().int().optional(), 
-    // clienteId y negocioId para revalidación si es necesario
-    // clienteId: z.string().cuid(),
-    // negocioId: z.string().cuid(),
-});
+
 export type ActualizarEtapaLeadEnPipelineParams = z.infer<typeof actualizarEtapaLeadEnPipelineParamsSchema>;
 
 
@@ -136,3 +124,53 @@ export interface PipelineSimple {
     id: string;
     nombre: string;
 }
+
+
+const leadEtiquetaSchema = z.object({
+    etiqueta: z.object({
+        id: z.string(),
+        nombre: z.string(),
+        color: z.string().nullable(),
+    }),
+});
+
+// Este es el tipo para una tarjeta de Lead individual en el Kanban
+const leadInKanbanCardSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    pipelineId: z.string().nullable(),
+    valorEstimado: z.number().nullable(),
+    agente: z.object({
+        id: z.string(),
+        nombre: z.string().nullable(),
+    }).nullable(),
+    Etiquetas: z.array(leadEtiquetaSchema),
+});
+
+// NUEVO: Exportamos el tipo directamente desde aquí
+export type LeadInKanbanCard = z.infer<typeof leadInKanbanCardSchema>;
+
+
+const kanbanColumnSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    orden: z.number(),
+    leads: z.array(leadInKanbanCardSchema),
+});
+
+export const kanbanBoardDataSchema = z.object({
+    crmId: z.string().nullable(),
+    columns: z.array(kanbanColumnSchema),
+});
+
+export type KanbanBoardData = z.infer<typeof kanbanBoardDataSchema>;
+
+
+export const actualizarEtapaLeadEnPipelineParamsSchema = z.object({
+    leadId: z.string().cuid(),
+    nuevoPipelineId: z.string().cuid(),
+    // clienteId: z.string().cuid().optional(), // Opcional, para revalidación
+    // negocioId: z.string().cuid().optional(),
+});

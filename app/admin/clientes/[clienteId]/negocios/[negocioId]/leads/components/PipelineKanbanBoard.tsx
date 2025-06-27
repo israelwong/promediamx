@@ -24,6 +24,9 @@ export default function PipelineKanbanBoard({ initialBoardData }: { initialBoard
     const [boardData, setBoardData] = useState(initialBoardData);
     const [activeLead, setActiveLead] = useState<LeadInKanbanCard | null>(null);
 
+    // CORRECCIÓN CLAVE: Añadimos un estado para guardar manualmente la columna de origen.
+    const [originalColumnId, setOriginalColumnId] = useState<string | null>(null);
+
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -36,51 +39,52 @@ export default function PipelineKanbanBoard({ initialBoardData }: { initialBoard
         const lead = active.data.current?.lead as LeadInKanbanCard;
         if (lead) {
             setActiveLead(lead);
+            // CORRECCIÓN CLAVE: Al empezar a arrastrar, buscamos y guardamos el ID de la columna original.
+            // Esto nos da una fuente de verdad confiable.
+            const originColumn = boardData.columns.find(col => col.leads.some(l => l.id === active.id));
+            if (originColumn) {
+                setOriginalColumnId(originColumn.id);
+            }
         }
     }
 
     function handleDragEnd(event: DragEndEvent) {
         setActiveLead(null);
+        setOriginalColumnId(null); // Limpiamos el estado al terminar.
+
         const { active, over } = event;
 
         if (!over) return;
 
-        const originalColumnId = active.data.current?.sortable.containerId;
+        // CORRECCIÓN CLAVE: Usamos nuestro 'originalColumnId' del estado, no el de dnd-kit.
         const newColumnId = over.id as string;
         const leadId = active.id as string;
-
-        if (originalColumnId === newColumnId) {
-            return; // No se hizo ningún cambio de columna
-        }
-
         const leadToMove = active.data.current?.lead as LeadInKanbanCard;
 
-        // --- Actualización Optimista de la UI ---
+        if (!originalColumnId || !newColumnId || originalColumnId === newColumnId) {
+            return;
+        }
+
+        // La lógica de actualización optimista ahora funcionará porque tiene los IDs correctos.
         setBoardData(prevData => {
             const newColumns = prevData.columns.map(col => {
-                // Eliminar de la columna original
                 if (col.id === originalColumnId) {
                     return { ...col, leads: col.leads.filter(l => l.id !== leadId) };
                 }
-                // Añadir a la nueva columna
                 if (col.id === newColumnId) {
-                    // Actualizamos el pipelineId del lead que movemos para consistencia
-                    const updatedLeadToMove = { ...leadToMove, pipelineId: newColumnId };
-                    return { ...col, leads: [updatedLeadToMove, ...col.leads] };
+                    return { ...col, leads: [leadToMove, ...col.leads] };
                 }
                 return col;
             });
             return { ...prevData, columns: newColumns };
         });
 
-        // --- Llamada a la Server Action para persistir ---
         toast.promise(
             actualizarEtapaLeadEnPipelineAction({ leadId, nuevoPipelineId: newColumnId }),
             {
                 loading: 'Moviendo lead...',
                 success: '¡Etapa actualizada!',
                 error: (err) => {
-                    // En caso de error, revertimos al estado original
                     setBoardData(initialBoardData);
                     return `Error: ${err.message}`;
                 },

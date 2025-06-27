@@ -77,7 +77,6 @@ interface NegocioSidebarProps {
 export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarProps) {
     const pathname = usePathname();
 
-    // Estilos (sin cambios)
     const navContainerClasses = "flex h-full flex-col p-3 space-y-2 bg-zinc-800/50 rounded-lg border border-zinc-700 shadow-sm";
     const navLinkBaseClasses = "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900";
     const navLinkInactiveClasses = "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100";
@@ -88,17 +87,23 @@ export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarP
 
     const isActive = (hrefSuffix: string): boolean => {
         if (!pathname) return false;
-        // La lógica de 'isActive' es ahora más robusta para manejar sub-rutas como '/crm/conversaciones'
+
         const expectedPath = `${basePathForSidebar}${hrefSuffix}`;
-        // Para rutas anidadas, queremos una coincidencia de inicio. Para la raíz, una coincidencia exacta.
+
+        // CORRECCIÓN: Para la ruta raíz ('/'), necesitamos una coincidencia exacta.
+        // La lógica anterior de startsWith() hacía que siempre estuviera activo.
         if (hrefSuffix === '/') {
-            return pathname === expectedPath;
+            return pathname === basePathForSidebar;
         }
+
+        // Para las demás rutas, la lógica de startsWith() es correcta para que las
+        // sub-rutas (ej: /leads/123) también activen el enlace principal (/leads).
         return pathname.startsWith(expectedPath);
     };
 
+    // buildHref ahora maneja el caso raíz de forma más limpia
     const buildHref = (hrefSuffix: string): string => {
-        return `${basePathForSidebar}${hrefSuffix}`;
+        return hrefSuffix === '/' ? basePathForSidebar : `${basePathForSidebar}${hrefSuffix}`;
     };
 
     if (!clienteId || !negocioId) {
@@ -114,7 +119,7 @@ export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarP
                             href={buildHref('/')}
                             className={`${navLinkBaseClasses} ${isActive('/') ? navLinkActiveClasses : navLinkInactiveClasses}`}
                         >
-                            <LayoutDashboard className={`h-4 w-4 flex-shrink-0`} />
+                            <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
                             <span>Panel de Control</span>
                         </Link>
                     </li>
@@ -133,7 +138,7 @@ export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarP
                                                 className={`${navLinkBaseClasses} ${active ? navLinkActiveClasses : navLinkInactiveClasses}`}
                                                 aria-current={active ? 'page' : undefined}
                                             >
-                                                <link.icon className={`h-4 w-4 flex-shrink-0`} aria-hidden="true" />
+                                                <link.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                                                 <span>{link.label}</span>
                                             </Link>
                                         </li>

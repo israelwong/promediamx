@@ -70,19 +70,7 @@ export const opcionesSortLeadsSchema = z.object({
 });
 export type OpcionesSortLeadsData = z.infer<typeof opcionesSortLeadsSchema>;
 
-// Esquema para los parámetros de entrada de la acción listarLeadsAction
-// export const listarLeadsParamsSchema = z.object({
-//     negocioId: z.string().cuid(),
-//     filtros: filtrosLeadsSchema,
-//     sort: opcionesSortLeadsSchema,
-// });
-// export type ListarLeadsParams = z.infer<typeof listarLeadsParamsSchema>;
 
-// // Esquema para el resultado de la acción listarLeadsAction
-// export const listarLeadsResultSchema = z.object({
-//     crmId: z.string().cuid().nullable(),
-//     leads: z.array(leadListaItemSchema),
-// });
 export type ListarLeadsResultData = z.infer<typeof listarLeadsResultSchema>;
 
 
