@@ -8,7 +8,7 @@ import OfertaPreguntasPendientesListado from './OfertaPreguntasSinRespuestaLista
 // Actions para cargar los datos
 import { obtenerDetallesDeOfertaAction } from '@/app/admin/_lib/actions/oferta/ofertaDetalle.actions';
 import { type OfertaDetalleListItemType } from '@/app/admin/_lib/actions/oferta/ofertaDetalle.schemas';
-import { obtenerPreguntasSinRespuestaDeOfertaAction } from '@/app/admin/_lib/actions/oferta/preguntaSinRespuestaOferta.actions';
+import { obtenerPreguntasSinRespuestaAction } from '@/app/admin/_lib/actions/oferta/preguntaSinRespuestaOferta.actions';
 import { type PreguntaSinRespuestaOfertaListItemType } from '@/app/admin/_lib/actions/oferta/preguntaSinRespuestaOferta.schemas';
 
 // UI Components
@@ -34,7 +34,7 @@ export default function OfertaDetalleManager({ ofertaId, negocioId, clienteId }:
             // Cargar data para ambas secciones en paralelo
             const [detallesResult, preguntasResult] = await Promise.all([
                 obtenerDetallesDeOfertaAction(ofertaId),
-                obtenerPreguntasSinRespuestaDeOfertaAction(ofertaId)
+                obtenerPreguntasSinRespuestaAction(ofertaId)
             ]);
 
             let currentError = "";

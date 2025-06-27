@@ -1,13 +1,13 @@
-// Ruta actual: app/admin/clientes/layout.tsx
-import React from 'react'
+// Ruta: app/admin/clientes/layout.tsx
+import React from 'react';
+
 export default function LayoutClientes({ children }: Readonly<{ children: React.ReactNode }>) {
+    // CORRECCIÓN DEFINITIVA:
+    // Este layout debe usar h-full para tomar la altura de su padre (el <main> de AdminLayout),
+    // NO h-screen. Esto es crucial para que la cadena de alturas no se rompa.
     return (
-        <div className='h-screen'>
-            <div className="flex flex-grow">
-                <div className="flex-1 mx-auto p-5">
-                    {children}
-                </div>
-            </div>
+        <div className='h-full'>
+            {children}
         </div>
     );
 }

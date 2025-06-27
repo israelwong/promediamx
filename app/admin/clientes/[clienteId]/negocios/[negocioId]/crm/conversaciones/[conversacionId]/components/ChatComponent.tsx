@@ -321,6 +321,13 @@ export default function ChatComponent({
     const getMessageBgColor = useCallback((role: string): string => (role === 'user' ? 'bg-blue-700/80 hover:bg-blue-700 text-blue-50' : (role === 'assistant' ? 'bg-zinc-700/70 hover:bg-zinc-700 text-zinc-100' : (role === 'agent' ? 'bg-purple-700/80 hover:bg-purple-700 text-purple-50' : (role === 'system' ? 'bg-zinc-600/50 text-zinc-300 text-center' : 'bg-zinc-800 text-zinc-100')))), []);
 
 
+    // Handler para acciones UI desde ChatMessageBubble
+    const handleUiActionTrigger = useCallback((action: unknown) => {
+        // Aquí puedes manejar la acción según tu lógica de negocio
+        console.log("[ChatComponent] UI Action Triggered:", action);
+        // Por ejemplo, podrías hacer dispatch, abrir modales, etc.
+    }, []);
+
     // RENDERIZADO DEL ÁREA DE CHAT
     let chatAreaContent;
     if (!conversationDetails && !initialError && isLoadingPermissions) {
@@ -350,6 +357,7 @@ export default function ChatComponent({
                     getMessageBgColor={getMessageBgColor}
                     getMessageSenderIcon={getMessageSenderIcon}
                     openLightboxWithSlides={openLightboxWithSlides} // Pasar la función
+                    onUiActionTrigger={handleUiActionTrigger} // <-- Añadido para cumplir con la prop requerida
                 />
             );
         });

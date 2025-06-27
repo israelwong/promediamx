@@ -1,15 +1,21 @@
-// Ruta: app/admin/_lib/funciones/citas/confirmarCita/confirmarCita.schemas.ts
+// RUTA: app/admin/_lib/funciones/citas/confirmarCita/confirmarCita.schemas.ts
+'use server';
 import { z } from 'zod';
 
-// Esta función recibe TODOS los datos ya validados, listos para ejecutar.
-// Son los mismos que agendarCita, pero aquí son todos requeridos.
 export const ConfirmarCitaArgsSchema = z.object({
     servicio_nombre: z.string(),
-    fecha_hora_deseada: z.string().datetime({ message: "Se esperaba una fecha en formato ISO para la confirmación." }),
-    nombre_contacto: z.string(),
+
+    // --- CORRECCIÓN FINAL ---
+    // En lugar de validar el string, pre-procesamos el valor para convertirlo en
+    // un objeto Date y luego validamos que sea una fecha válida. Es más robusto.
+    fecha_hora_deseada: z.preprocess((arg) => {
+        if (typeof arg == "string" || arg instanceof Date) return new Date(arg);
+    }, z.date({ invalid_type_error: "La fecha proporcionada no es válida." })),
+
     email_contacto: z.string().email(),
-    telefono_contacto: z.string(),
+    nombre_contacto: z.string().nullable().optional(),
+    telefono_contacto: z.string().nullable().optional(),
     motivo_de_reunion: z.string().nullable().optional(),
-    ofertaId: z.string().cuid().nullable().optional(),
+    oferta_id: z.string().cuid().nullable().optional(),
 });
 export type ConfirmarCitaArgs = z.infer<typeof ConfirmarCitaArgsSchema>;

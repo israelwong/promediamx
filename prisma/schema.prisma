@@ -82,8 +82,9 @@ model AsistenteVirtual{
   id        String   @id @default(cuid())
   clienteId String?
 
-  negocioId String?
-  negocio   Negocio? @relation(fields: [negocioId], references: [id])
+  negocioId String? @unique
+  // negocio   Negocio? @relation(fields: [negocioId], references: [id])
+  negocio   Negocio?  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
 
   urlImagen String?
   nombre    String
@@ -133,7 +134,8 @@ model CanalConversacional {
 model AsistenteTareaSuscripcion{
   id        String   @id @default(cuid())
   asistenteVirtualId String
-  asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  // asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  asistenteVirtual     AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id], onDelete: Cascade) // <-- AÑADIR ESTO AQUÍ
   tareaId    String
   tarea      Tarea @relation(fields: [tareaId], references: [id])
   fechaSuscripcion DateTime @default(now())
@@ -348,7 +350,8 @@ model TareaFuncionParametroRequerido { //!Descontinuar
 model Factura {
   id                   String    @id @default(cuid())
   clienteId            String    // Cliente al que se factura
-  cliente              Cliente   @relation(fields: [clienteId], references: [id])
+  // cliente              Cliente   @relation(fields: [clienteId], references: [id])
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
   fechaEmision         DateTime  @default(now()) // Cuando se genera
   fechaVencimiento     DateTime  // Cuando se debe pagar (ej: día 1 del ciclo)
   periodoInicio        DateTime  // Inicio del ciclo cubierto (ej: 1 del mes)
@@ -390,35 +393,28 @@ model FacturaItem {
 model Negocio{
   id        String   @id @default(cuid())
   clienteId String?
-  cliente   Cliente? @relation(fields: [clienteId], references: [id])
-  logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
-  logoTamañoBytes Int? // Tamaño del logo en bytes
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: Cascade) // <-- Cambiar y añadir onDelete
+  
   nombre    String
   slug      String?    @unique // NUEVO: Para la URL amigable. Debe ser único.
+  logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
   slogan   String? //Lema, Tagline, Frase de Impacto.
-  descripcion String? //Resumen Ejecutivo, Misión, Visión, Filosofía, Valores, Antecedentes.
+  
   telefonoLlamadas String?
   telefonoWhatsapp String?
   email     String?
   direccion String?
   googleMaps String?
   paginaWeb String?
-  competencia String? //Competencia, Análisis FODA, Análisis PESTEL, Análisis de Mercado.
-  clienteIdeal String? //Rango de Edad, Rango de Ingresos, Distribución de Género, Distribución Geográfica, Nivel Educativo, Ocupación, Sector, Motivaciones Principales, Factores de Influencia, Personalidad, Intereses, Lenguaje, Tono de Comunicación Preferido, Canal de Comunicación Preferido.
-  terminologia String? //Terminología del Negocio, Glosario de Términos, Jerga del Sector.
+  
   status    String   @default("activo")
-
-  avisoPrivacidad String? //Aviso de Privacidad, Aviso de Cookies, Aviso de Seguridad.
-  politicas String? //Políticas de Privacidad, Términos y Condiciones, Políticas de Devolución, Políticas de Reembolso, Políticas de Cancelación.
-  garantias String? //Garantías, 
-
-  almacenamientoUsadoBytes BigInt? @default(0) // Contador total
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  AsistenteVirtual AsistenteVirtual[]
 
+  logoTamañoBytes Int? // Tamaño del logo en bytes
+  almacenamientoUsadoBytes BigInt? @default(0) // Contador total
+
+  AsistenteVirtual AsistenteVirtual[]
   CRM       CRM?   // Added opposite relation field
   itemsCatalogo ItemCatalogo[] // Relación a la galería
   Catalogo   Catalogo[]
@@ -508,9 +504,11 @@ model NegocioConocimientoItem {
   categoria                 String?   // Ej: "Pagos", "Envíos", "Producto X", "Política de Devolución"
   
   // Auditoría y seguimiento
-  fechaCreacion             DateTime  @default(now())
   fechaRespuesta            DateTime? // Última vez que se actualizó la respuesta
-  fechaUltimaActualizacion  DateTime  @updatedAt
+  // fechaCreacion             DateTime  @default(now())
+  // fechaUltimaActualizacion  DateTime  @updatedAt
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   creadoPorTipo             String?   // Origen: "SISTEMA" (pregunta no respondida), "AGENTE_NEGOCIO", "ADMIN_PLATAFORMA"
   creadoPorId               String?   // ID del usuario/agente/sistema (según creadoPorTipo)
@@ -589,7 +587,8 @@ enum EstadoTransaccion {
 model NegocioTransaccion { 
   id                        String    @id @default(cuid())
   negocioId                 String
-  negocio                   Negocio   @relation(fields: [negocioId], references: [id], onDelete:Restrict) // No borrar transacciones si se borra el negocio, o SetNull negocioId
+  // negocio                   Negocio   @relation(fields: [negocioId], references: [id], onDelete:Restrict) // No borrar transacciones si se borra el negocio, o SetNull negocioId
+  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Restrict) // <-- ¡Importante!
 
   fechaTransaccion          DateTime  @default(now())
   concepto                  String    // Descripción de lo que se pagó
@@ -694,7 +693,8 @@ model ImagenGaleriaNegocio {
 model NegocioPaquete {
   id            String    @id @default(cuid())
   negocioId     String
-  negocio       Negocio   @relation(fields: [negocioId], references: [id])
+  // negocio       Negocio   @relation(fields: [negocioId], references: [id])
+  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
   nombre        String    // Ej: "Paquete Boda Esencial", "Paquete XV Años Premium"
   descripcionCorta String? // Descripción corta para mostrar en listados
   descripcion   String?
@@ -837,12 +837,14 @@ model Oferta {
   objetivoCitaFecha         DateTime?             // Si es DIA_ESPECIFICO, esta es la fecha (y opcionalmente hora de inicio) del evento/cita.
                                                   // Si es un evento de todo el día, la hora podría ser 00:00:00 UTC.
                                                   // Si es un evento con hora de inicio, aquí se especifica.
-  objetivoCitaServicioId    String?               // FK Opcional a AgendaTipoCita.
-                                                  // Si la cita de la oferta SIEMPRE corresponde a un servicio específico
-                                                  // (ej. "Oferta: Taller de Fotografía"), aquí iría el ID de ese AgendaTipoCita.
-                                                  // Esto permitiría usar la duración y concurrencia de ese servicio.
-                                                  // Relación explícita (opcional pero recomendada si usas objetivoCitaServicioId):
-  objetivoCitaServicio    AgendaTipoCita?       @relation("OfertasParaServicioCitaEspecifico", fields: [objetivoCitaServicioId], references: [id], onDelete: SetNull, onUpdate:Cascade)
+
+  serviciosDeCita         OfertaServicioCita[]
+  // objetivoCitaServicioId    String?               // FK Opcional a AgendaTipoCita.
+  //                                                 // Si la cita de la oferta SIEMPRE corresponde a un servicio específico
+  //                                                 // (ej. "Oferta: Taller de Fotografía"), aquí iría el ID de ese AgendaTipoCita.
+  //                                                 // Esto permitiría usar la duración y concurrencia de ese servicio.
+  //                                                 // Relación explícita (opcional pero recomendada si usas objetivoCitaServicioId):
+  // objetivoCitaServicio    AgendaTipoCita?       @relation("OfertasParaServicioCitaEspecifico", fields: [objetivoCitaServicioId], references: [id], onDelete: SetNull, onUpdate:Cascade)
 
   objetivoCitaUbicacion     String?               // Opcional: Si la cita de la oferta tiene una ubicación específica diferente a la del negocio.
   objetivoCitaDuracionMinutos Int?                // Opcional: Si la cita de la oferta tiene una duración específica que sobrescribe la del AgendaTipoCita.
@@ -1369,6 +1371,8 @@ model AgendaConfiguracion {
   requiereNombreParaCita  Boolean  @default(true)  // Ya estaba en true
   bufferMinutos           Int?      // Minutos de buffer entre citas
   metodosPagoTexto       String?   // Texto para mostrar los métodos de pago disponibles
+
+  agendaRecordatorios agendaRecordatorio[] // Relación con recordatorios de agenda
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 }
@@ -1382,14 +1386,28 @@ model AgendaTipoCita{
   esVirtual       Boolean  @default(false)
   esPresencial    Boolean  @default(false)
   negocioId       String   // A qué negocio pertenece este tipo de cita
-  negocio         Negocio  @relation(fields: [negocioId], references: [id]) // Asumiendo un modelo Negocio
+  ofertasQueLoIncluyen    OfertaServicioCita[] // Un tipo de cita puede estar en muchas ofertas
+  // negocio         Negocio  @relation(fields: [negocioId], references: [id]) // Asumiendo un modelo Negocio
+  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
   agendas         Agenda[] // Relación inversa
   orden           Int?     // Para ordenar los tipos de cita en el frontend
   limiteConcurrencia Int @default(1) // Limite de citas concurrentes para este tipo de cita
   activo         Boolean @default(true) // Si está activo o no
-  ofertasConEsteServicioParaCita Oferta[] @relation("OfertasParaServicioCitaEspecifico")
+  // ofertasConEsteServicioParaCita Oferta[] @relation("OfertasParaServicioCitaEspecifico")
   @@unique([negocioId, nombre])
   @@index([negocioId])
+}
+
+// --- NUEVO MODELO: LA TABLA INTERMEDIA ---
+// Esta tabla conecta Ofertas y AgendaTipoCita
+model OfertaServicioCita {
+  ofertaId         String
+  oferta           Oferta         @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  agendaTipoCitaId String
+  agendaTipoCita   AgendaTipoCita @relation(fields: [agendaTipoCitaId], references: [id], onDelete: Cascade)
+
+  @@id([ofertaId, agendaTipoCitaId]) // Clave primaria compuesta
 }
 
 
@@ -1419,6 +1437,64 @@ model AgendaHistorial{
   @@index([agendaId])
 }
 
+model agendaRecordatorio {
+  id                    String   @id @default(cuid())
+  agendaConfiguracionId String
+  agendaConfiguracion   AgendaConfiguracion @relation(fields: [agendaConfiguracionId], references: [id])
+
+  // La lógica del recordatorio
+  minutosAntes          Int      // 2 horas = 120, 30 mins = 30, 1 día = 1440
+  mensaje               String   // El texto a enviar. "Hola {{nombre}}, tu cita para {{servicio}} es en {{tiempo_restante}}."
+  activo                Boolean  @default(true)
+
+  @@index([agendaConfiguracionId])
+}
+
+// NUEVO ENUM PARA GESTIONAR LOS ESTADOS DE LAS TAREAS
+enum EstadoTareaConversacional {
+  // --- Estados Genéricos ---
+  INICIADA                      // La tarea acaba de empezar.
+  RECOLECTANDO_DATOS            // Estado general mientras se piden parámetros.
+  PENDIENTE_CONFIRMACION_USUARIO // Se han recolectado todos los datos y se espera el "sí, confirma" del usuario.
+  EJECUTANDO_ACCION_FINAL       // El sistema está escribiendo en la base de datos (ej. creando la cita).
+  COMPLETADA                    // La tarea terminó exitosamente.
+  FALLIDA                       // La tarea falló por un error interno.
+  CANCELADA_POR_USUARIO         // El usuario decidió no continuar.
+  VALIDANDO_DISPONIBILIDAD // Estado específico para validar disponibilidad de citas.
+  RECOLECTANDO_NUEVA_FECHA // <-- NUEVO
+  RECOLECTANDO_NUEVA_HORA   // <-- NUEVO
+  PENDIENTE_CONFIRMACION_FECHA_AMBIGUA
+}
+
+
+//==================================================
+// GESTOR DE ESTADO DE TAREAS CONVERSACIONALES
+//==================================================
+// Este modelo guarda el estado de una tarea activa para una conversación,
+// permitiendo que el servidor gestione el contexto en lugar de la IA.
+model TareaEnProgreso {
+  id               String       @id @default(cuid())
+  conversacionId   String       @unique
+  conversacion     Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  
+  nombreTarea      String
+  
+  contexto         Json
+  
+  // --- CAMBIO CLAVE ---
+  // Reemplazamos el String por nuestro nuevo Enum.
+  // El estado por defecto ahora es INICIADA.
+  estado           EstadoTareaConversacional @default(INICIADA) // ANTES: status String
+  
+  // --- ADICIÓN ESTRATÉGICA (Opcional pero Recomendado) ---
+  // Un campo para guardar el último error o mensaje para el usuario.
+  mensajeError     String? @db.Text
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([conversacionId, estado]) // ANTES: @@index([conversacionId, status])
+}
 //!CONVERSACIONES
 model Conversacion {
   id                 String    @id @default(cuid())
@@ -1443,6 +1519,8 @@ model Conversacion {
   agenteCrmActualId  String?   // ID del Agente CRM actualmente asignado a esta conversación
   agenteCrmActual    Agente?   @relation("ConversacionesAsignadas", fields: [agenteCrmActualId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   // --- FIN DE NUEVOS CAMPOS ---
+
+  tareaEnProgreso     TareaEnProgreso? // Una conversación puede tener una tarea en progreso.
 
   Interaccion        Interaccion[]
   itemInteracciones  ItemInteraccion[] 
@@ -1510,7 +1588,8 @@ model Interaccion {
 model Notificacion {
   id          String    @id @default(cuid())
   clienteId   String    // A quién pertenece la notificación (el dueño de la cuenta)
-  cliente     Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // cliente     Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
   negocioId   String?   // Opcional: Si la notificación es específica de un negocio
   negocio     Negocio?  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   agenteId    String? // Opcional: Si es para un agente específico del CRM (más avanzado)

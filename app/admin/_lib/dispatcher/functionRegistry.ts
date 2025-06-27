@@ -11,15 +11,21 @@ import { ejecutarResponderPreguntaSobreOfertaAction } from '../funciones/ofertas
 import { ejecutarProcesarPagoConStripeAction } from '../funciones/pagos/procesarPagoConStripe/procesarPagoConStripe.actions';
 
 // --- Funciones de Citas ---
-import { ejecutarAgendarCitaActionV3 } from '../funciones/citas/agendarCita/agendarCita.actions';
+import { ejecutarListarServiciosDeCitasAction } from '../funciones/citas/listarServiciosDeCitas/listarServiciosDeCitas.actions';
+import { ejecutarAgendarCitaAction } from '../funciones/citas/agendarCita/agendarCita.actions';
 import { ejecutarConfirmarCitaAction } from '../funciones/citas/confirmarCita/confirmarCita.actions';
+import { ejecutarVerificarDisponibilidadHorarioAction } from '../funciones/citas/verificarDisponibilidadHorario/verificarDisponibilidadHorario.actions';
+
+import { ejecutarReagendarCitaAction } from '../funciones/citas/reagendarCita/reagendarCita.actions';
+import { ejecutarReagendamientoConfirmadoAction } from '../funciones/citas/confirmarReagendamiento/confirmarReagendamiento.actions';
+
 import { ejecutarCancelarCitaAction } from '../funciones/citas/cancelarCita/cancelarCita.actions';
 import { ejecutarConfirmarCancelacionCitaAction } from '../funciones/citas/confirmarCancelacionCita/confirmarCancelacionCita.actions';
-// import { ejecutarCancelarCitaAction } from '../funciones/citas/cancelarCita/cancelarCita.actions';
-// import { ejecutarListarHorariosDisponiblesAction } from '../funciones/citas/listarHorariosDisponiblesAgenda/listarHorariosDisponiblesAgenda.actions';
 
+
+
+// import { ejecutarListarHorariosDisponiblesAction } from '../funciones/citas/listarHorariosDisponiblesAgenda/listarHorariosDisponiblesAgenda.actions';
 // import { ejecutarListarServiciosAgendaAction } from '../funciones/citas/listarServiciosAgenda/listarServiciosAgenda.actions';
-// import { ejecutarReagendarCitaAction } from '../funciones/citas/reagendarCita/reagendarCita.actions';
 
 // --- Funciones de Informes ---
 // import { ejecutarBrindarInfoNegocioAction } from '../funciones/informes/brindarInformacionDelNegocio/brindarInformacionDelNegocio.actions';
@@ -37,14 +43,17 @@ export const functionRegistry: Record<string, FunctionExecutor> = {
     'procesarPagoConStripe': ejecutarProcesarPagoConStripeAction,
 
     // --- Citas ---
-    'agendarCita': ejecutarAgendarCitaActionV3,
+    'verificarDisponibilidadHorario': ejecutarVerificarDisponibilidadHorarioAction,
+    'listarServiciosDeCitas': ejecutarListarServiciosDeCitasAction,
+    'agendarCita': ejecutarAgendarCitaAction,
     'confirmarCita': ejecutarConfirmarCitaAction,
+
+    'reagendarCita': ejecutarReagendarCitaAction,
+    'confirmarReagendamiento': ejecutarReagendamientoConfirmadoAction,
     'cancelarCita': ejecutarCancelarCitaAction,
     'confirmarCancelacionCita': ejecutarConfirmarCancelacionCitaAction,
     // 'listarHorariosDisponiblesAgenda': ejecutarListarHorariosDisponiblesAction,
-    // 'cancelarCita': ejecutarCancelarCitaAction,
     // 'listarServiciosAgenda': ejecutarListarServiciosAgendaAction,
-    // 'reagendarCita': ejecutarReagendarCitaAction,
 
     // --- Informes ---
     // 'brindarInformacionDelNegocio': ejecutarBrindarInfoNegocioAction,

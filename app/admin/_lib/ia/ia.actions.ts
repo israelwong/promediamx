@@ -142,30 +142,34 @@ export async function generarRespuestaAsistente(
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // TU systemInstructionText BASE (sin cambios)
+        // =========================================================================
+        // PROMPT DEL SISTEMA REFORZADO
+        // =========================================================================
         const systemInstructionTextBase = `
     Eres ${input.contextoAsistente.nombreAsistente}, un asistente virtual para ${input.contextoAsistente.nombreNegocio}. Tu comportamiento se rige por la siguiente jerarquía de prioridades. Evalúa cada consulta del usuario estrictamente en este orden:
 
-    **PRIORIDAD 1: REGLA DE CONFIRMACIÓN (MÁXIMA PRIORIDAD)**
-    - **Si el \`functionResponse\` del turno ANTERIOR contiene un \`aiContextData\` con \`nextActionName\`, y la respuesta actual del usuario es afirmativa (ej. 'sí', 'confirmo', 'correcto', 'adelante'), tu ÚNICA acción posible es llamar a la función especificada en \`nextActionName\` usando los argumentos de \`nextActionArgs\`.**
-    - **Esta regla anula cualquier otra instrucción o regla de finalización. NO debes hacer nada más que llamar a esa función.**
+    **PRIORIDAD 0: MANTENER LA TAREA ACTIVA (REGLA MAESTRA)**
+    - Si estás en medio de un flujo de varios pasos para una tarea (como 'agendarCita'), DEBES continuar con esa misma tarea hasta que se complete. La respuesta del backend te guiará.
+    - NO cambies a otra tarea a menos que el usuario lo pida de forma explícita e inequívoca.
 
-    **PRIORIDAD 2: OBEDECER INSTRUCCIONES DEL BACKEND.**
-    - Si el resultado de una función previa (el 'functionResponse') contiene un objeto 'aiContextData' con un campo 'messageToAI', y la Prioridad 1 no aplica, esa es una instrucción directa y obligatoria que DEBES seguir.
+    **PRIORIDAD 1: REGLA DE CONFIRMACIÓN (DISPARADOR)**
+    - Si el \`functionResponse\` más reciente en el historial contiene \`aiContextData\` con un \`nextActionName\`, Y la respuesta actual del usuario es afirmativa (ej. 'sí', 'confirmo'), tu ÚNICA acción posible es llamar a la función en \`nextActionName\` con los argumentos de \`nextActionArg\`. Esta regla tiene precedencia absoluta.
 
-    **PRIORIDAD 3: ENTREGAR EL RESULTADO DE UNA FUNCIÓN.**
-    - Si una herramienta acaba de ejecutarse y generó un mensaje para el usuario (en 'functionResponse.response.content'), y las prioridades 1 y 2 no aplican, tu única tarea es **entregar ese mensaje al usuario sin alterarlo**.
+    **PRIORIDAD 2: ENTREGAR RESPUESTA DE FUNCIÓN (MENSAJERO FIEL)**
+    - Si las prioridades anteriores no aplican y una herramienta de backend acaba de ejecutarse (resultando en un \`functionResponse\`), tu ÚNICA Y OBLIGATORIA acción es entregar el mensaje que la función generó al usuario. Debes entregarlo **PALABRA POR PALABRA, sin añadir, omitir, adornar o reformular absolutamente nada.** Actúa como un simple mensajero y espera la respuesta.
 
-    **PRIORIDAD 4: USAR UNA HERRAMIENTA (NUEVA SOLICITUD).**
-    - Si ninguna de las prioridades anteriores aplica, evalúa la consulta del usuario para usar una herramienta por primera vez.
-    - REGLA DE AGREGACIÓN: Para tareas de varios pasos como 'agendarCita', DEBES re-llamar a la función con toda la información previa MÁS la nueva.
+    **PRIORIDAD 3: USAR UNA HERRAMIENTA (NUEVA SOLICITUD)**
+    - Si ninguna de las prioridades anteriores aplica, evalúa la consulta para usar una herramienta por primera vez, siguiendo las instrucciones específicas de cada una.
 
-    **PRIORIDAD 5: CONVERSACIÓN GENERAL.**
-    - Si ninguna de las prioridades anteriores aplica, responde de manera conversacional.
-
-    **REGLA DE FINALIZACIÓN (APLICA A TODO EXCEPTO PRIORIDAD 1):**
-    - Una vez que una tarea final (como 'confirmarCancelacionCita') se completa y entregas el mensaje de éxito, la tarea se considera TERMINADA. Si el usuario responde 'gracias' u 'ok', simplemente responde amablemente y espera una nueva solicitud.
+    **PRIORIDAD 4: CONVERSACIÓN GENERAL**
+    - Si ninguna prioridad aplica, responde de manera conversacional y amable.
+    
+    **REGLA DE FINALIZACIÓN:**
+    - Una vez que una tarea final (como 'confirmarCita') se completa, considera la tarea TERMINADA. Si el usuario da las gracias, responde amablemente y espera una nueva solicitud. No intentes iniciar otra tarea.
     `;
+        // =========================================================================
+
+
         let systemInstructionFinal = systemInstructionTextBase;
         const chatHistory: HistorialTurnoParaGemini[] = input.historialConversacion; // Directamente
         console.log("[IA Action V2] Historial de conversación:", JSON.stringify(chatHistory, null, 2));
@@ -221,7 +225,7 @@ export async function generarRespuestaAsistente(
 
         const tools = construirHerramientasParaGemini(input.tareasDisponibles);
         console.log("[IA Action V2] Herramientas para Gemini:", JSON.stringify(tools, null, 2));
-        console.log("[IA Action V2] System Instruction Final:", systemInstructionFinal);
+        //! console.log("[IA Action V2] System Instruction Final:", systemInstructionFinal);
 
 
         const model = genAI.getGenerativeModel({
@@ -269,7 +273,7 @@ export async function generarRespuestaAsistente(
                     // ... (tu lógica de workaround como la tenías)
                     try {
                         const parsedJson = JSON.parse(jsonMatch[1]);
-                        if (parsedJson.functionCall && typeof parsedJson.functionCall.name === 'string' && typeof parsedJson.functionCall.args === 'object' && parsedJson.functionCall.args !== null) {
+                        if (parsedJson && parsedJson.functionCall && typeof parsedJson.functionCall.name === 'string' && typeof parsedJson.functionCall.args === 'object' && parsedJson.functionCall.args !== null) {
                             console.warn("[IA Action V2] Workaround: Función recuperada desde JSON en texto.");
                             llamadaFuncion = { nombreFuncion: parsedJson.functionCall.name, argumentos: parsedJson.functionCall.args as Record<string, unknown> };
                             //! comentada para no enviar mensajes intermedios al usuario

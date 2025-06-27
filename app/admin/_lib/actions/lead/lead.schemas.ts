@@ -1,39 +1,6 @@
 // app/admin/_lib/actions/lead/lead.schemas.ts
 import { z } from 'zod';
 
-
-// Esquema para los datos de un pipeline simple (usado en filtros y LeadListaItem)
-// export const pipelineSimpleSchema = z.object({
-//     id: z.string().cuid(),
-//     nombre: z.string(),
-//     color: z.string().nullable().optional(), // Color del pipeline si existe
-// });
-// export type PipelineSimpleData = z.infer<typeof pipelineSimpleSchema>;
-
-// // Esquema para los datos de un agente simple (usado en filtros y LeadListaItem)
-// export const agenteSimpleSchema = z.object({
-//     id: z.string().cuid(),
-//     nombre: z.string().nullable(),
-// });
-// export type AgenteSimpleData = z.infer<typeof agenteSimpleSchema>;
-
-// // Esquema para los datos de una etiqueta simple (usado en filtros y LeadListaItem)
-// export const etiquetaSimpleSchema = z.object({
-//     id: z.string().cuid(),
-//     nombre: z.string(),
-//     color: z.string().nullable().optional(),
-// });
-// export type EtiquetaSimpleData = z.infer<typeof etiquetaSimpleSchema>;
-
-// // Esquema para los datos de un canal simple (usado en filtros)
-// export const canalSimpleSchema = z.object({
-//     id: z.string().cuid(),
-//     nombre: z.string(),
-// });
-// export type CanalSimpleData = z.infer<typeof canalSimpleSchema>;
-
-
-
 // Esquema para los datos de un pipeline simple (ya definido, lo reusamos)
 export const pipelineSimpleSchema = z.object({
     id: z.string().cuid(),
@@ -104,18 +71,18 @@ export const opcionesSortLeadsSchema = z.object({
 export type OpcionesSortLeadsData = z.infer<typeof opcionesSortLeadsSchema>;
 
 // Esquema para los parámetros de entrada de la acción listarLeadsAction
-export const listarLeadsParamsSchema = z.object({
-    negocioId: z.string().cuid(),
-    filtros: filtrosLeadsSchema,
-    sort: opcionesSortLeadsSchema,
-});
-export type ListarLeadsParams = z.infer<typeof listarLeadsParamsSchema>;
+// export const listarLeadsParamsSchema = z.object({
+//     negocioId: z.string().cuid(),
+//     filtros: filtrosLeadsSchema,
+//     sort: opcionesSortLeadsSchema,
+// });
+// export type ListarLeadsParams = z.infer<typeof listarLeadsParamsSchema>;
 
-// Esquema para el resultado de la acción listarLeadsAction
-export const listarLeadsResultSchema = z.object({
-    crmId: z.string().cuid().nullable(),
-    leads: z.array(leadListaItemSchema),
-});
+// // Esquema para el resultado de la acción listarLeadsAction
+// export const listarLeadsResultSchema = z.object({
+//     crmId: z.string().cuid().nullable(),
+//     leads: z.array(leadListaItemSchema),
+// });
 export type ListarLeadsResultData = z.infer<typeof listarLeadsResultSchema>;
 
 
@@ -162,14 +129,6 @@ export const actualizarEtiquetasLeadParamsSchema = z.object({
 export type ActualizarEtiquetasLeadParams = z.infer<typeof actualizarEtiquetasLeadParamsSchema>;
 
 
-
-
-
-
-
-
-
-// --- NUEVOS ESQUEMAS / ACTUALIZACIONES PARA EL FORMULARIO DE LEAD ---
 
 // Esquema para los detalles completos de un Lead para el formulario de edición
 export const leadDetalleSchema = z.object({
@@ -281,3 +240,45 @@ export const crearLeadParamsSchema = z.object({
     datos: nuevoLeadFormValidationSchema, // Los datos validados del formulario
 });
 export type CrearLeadParams = z.infer<typeof crearLeadParamsSchema>;
+
+
+
+
+
+// Esquema para la entrada de la acción de listar leads
+export const listarLeadsParamsSchema = z.object({
+    negocioId: z.string().cuid(),
+    page: z.number().int().positive().default(1),
+    pageSize: z.number().int().positive().default(10),
+    searchTerm: z.string().optional(),
+    // Podríamos añadir más filtros aquí en el futuro (por pipelineId, tagId, etc.)
+});
+
+// Esquema para un único lead en la lista
+export const leadListItemSchema = z.object({
+    id: z.string().cuid(),
+    nombre: z.string(),
+    email: z.string().email().nullable(),
+    telefono: z.string().nullable(),
+    createdAt: z.date(),
+    etapaPipeline: z.object({
+        id: z.string().cuid(),
+        nombre: z.string(),
+    }).nullable(),
+    agenteAsignado: z.object({
+        id: z.string().cuid(),
+        nombre: z.string().nullable(),
+    }).nullable(),
+});
+
+// Esquema para la respuesta completa de la acción
+export const listarLeadsResultSchema = z.object({
+    leads: z.array(leadListItemSchema),
+    totalCount: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+});
+
+export type ListarLeadsParams = z.infer<typeof listarLeadsParamsSchema>;
+export type LeadListItem = z.infer<typeof leadListItemSchema>;
+export type ListarLeadsResult = z.infer<typeof listarLeadsResultSchema>;

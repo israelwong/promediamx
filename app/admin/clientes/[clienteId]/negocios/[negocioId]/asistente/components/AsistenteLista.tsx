@@ -60,7 +60,7 @@ export default function AsistenteLista({ negocioId, clienteId }: Props) {
         <div className={containerClasses}>
             <div className={headerClasses}>
                 <h2 className={titleClasses}> {/* Cambiado a h2 para mejor semántica */}
-                    <Bot size={22} /> Mis Asistentes Virtuales
+                    <Bot size={22} /> Asistentes Virtuales
                 </h2>
                 <button onClick={handleCrearAsistente} className={buttonPrimaryClasses} title="Crear nuevo asistente">
                     <PlusIcon size={16} /> <span>Crear Asistente</span>
@@ -81,7 +81,7 @@ export default function AsistenteLista({ negocioId, clienteId }: Props) {
                         <h4 className="text-md font-semibold text-zinc-200 mb-1">No hay asistentes creados</h4>
                         <p className='text-zinc-400 text-sm'>Empieza creando tu primer asistente virtual para este negocio.</p>
                         <button onClick={handleCrearAsistente} className={`${buttonPrimaryClasses} mt-6`} title="Crear nuevo asistente">
-                            <PlusIcon size={16} /> <span>Crear Mi Primer Asistente</span>
+                            <PlusIcon size={16} /> <span>Crear Asistente</span>
                         </button>
                     </div>
                 ) : (

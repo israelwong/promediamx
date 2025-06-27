@@ -4,7 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
-import { PlusCircle, Edit, Trash2, ExternalLink } from 'lucide-react';
+import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { type OfertaDetalleListItemType } from '@/app/admin/_lib/actions/oferta/ofertaDetalle.schemas';
 
 interface OfertaDetalleListadoProps {
@@ -20,7 +20,7 @@ export default function OfertaDetalleListado({
     negocioId,
     clienteId,
     initialDetalles,
-    onDetalleUpdated,
+    // onDetalleUpdated,
 }: OfertaDetalleListadoProps) {
     const router = useRouter();
 

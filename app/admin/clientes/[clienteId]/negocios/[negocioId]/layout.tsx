@@ -1,34 +1,35 @@
-// Ruta actual del archivo: app/admin/clientes/[clienteId]/negocios/[negocioId]/layout.tsx
-import React from 'react'
-import NegocioHeader from './components/NegocioHeader';
-import NegocioSidebar from './components/NegocioSidebar'
+// Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/layout.tsx
+import React from 'react';
+import NegocioSidebar from './components/NegocioSidebar';
 
 interface Props {
     clienteId: string;
     negocioId: string;
 }
 
+// Usamos el patrón de Promise que funciona en tu proyecto
 export default async function LayoutNegocio({ children, params }: { children: React.ReactNode, params: Promise<Props> }) {
     const { negocioId, clienteId } = await params;
 
     return (
-        <div className='flex flex-col h-screen overflow-y-auto'> {/* overflow-hidden */}
-            <div className='flex-shrink-0 mb-5'>
-                <NegocioHeader clienteId={clienteId} negocioId={negocioId} />
-            </div>
+        // CORRECCIÓN DEFINITIVA:
+        // Este contenedor usa h-full para ocupar todo el espacio que le da el LayoutClientes.
+        // Es un contenedor flex que se dividirá horizontalmente.
+        <div className='flex h-full w-full gap-6 p-6'>
+            {/* 1. Sidebar */}
+            <aside className="w-[250px] flex-shrink-0">
+                <NegocioSidebar
+                    clienteId={clienteId}
+                    negocioId={negocioId}
+                />
+            </aside>
 
-            {/* CONTENEDOR 2: Cuerpo principal, flex horizontal, también con overflow-hidden */}
-            <div className="flex flex-grow gap-5">
-                <div className="w-[250px] flex-shrink-0  overflow-y-auto">
-                    <NegocioSidebar
-                        clienteId={clienteId}
-                        negocioId={negocioId}
-                    />
-                </div>
-                <main className="flex-grow overflow-y-auto bg-zinc-900 min-w-0">
-                    {children}
-                </main>
-            </div>
+            {/* 2. Contenido Principal */}
+            {/* flex-1 hace que ocupe el resto del ancho. */}
+            {/* min-w-0 es el "truco mágico" que le permite a un hijo con overflow (como el Kanban) encogerse y mostrar su propio scroll. */}
+            <main className="flex-1 min-w-0">
+                {children}
+            </main>
         </div>
     );
 }

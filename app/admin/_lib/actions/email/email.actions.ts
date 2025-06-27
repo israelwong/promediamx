@@ -20,6 +20,8 @@ import {
 import { ConfirmacionPagoEmail } from '@/app/emails/ConfirmacionPagoEmail';
 import { ConfirmacionCitaEmail } from '@/app/emails/ConfirmacionCitaEmail';
 import { CancelacionCitaEmail } from '@/app/emails/CancelacionCitaEmail';
+import { ReagendamientoCitaEmail } from '@/app/emails/ReagendamientoCitaEmail';
+
 
 
 //! Acción para enviar correo de confirmación de pago
@@ -162,5 +164,35 @@ export async function enviarEmailCancelacionCitaAction(
         return { success: true, data: data?.id || null };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Error al enviar correo." };
+    }
+}
+
+
+export async function enviarEmailReagendamientoAction(input: {
+    emailDestinatario: string;
+    nombreDestinatario: string | null;
+    nombreNegocio: string;
+    nombreServicio: string;
+    fechaHoraOriginal: Date;
+    fechaHoraNueva: Date;
+}) {
+    try {
+        const data = await resend.emails.send({
+            from: 'ProMedia <no-reply@promedia.mx>',
+            to: [input.emailDestinatario],
+            subject: `Tu cita de "${input.nombreServicio}" ha sido Reagendada`,
+            react: ReagendamientoCitaEmail({
+                nombreUsuario: input.nombreDestinatario,
+                nombreNegocio: input.nombreNegocio,
+                nombreServicio: input.nombreServicio,
+                fechaHoraAnterior: input.fechaHoraOriginal,
+                fechaHoraNueva: input.fechaHoraNueva,
+            }) as React.ReactElement,
+        });
+        console.log(`Correo de reagendamiento enviado a ${input.emailDestinatario}. ID: ${data.data?.id}`);
+        return { success: true, data: data.data?.id };
+    } catch (error) {
+        console.error("Error al enviar email de reagendamiento:", error);
+        return { success: false, error: 'Error al enviar email.' };
     }
 }

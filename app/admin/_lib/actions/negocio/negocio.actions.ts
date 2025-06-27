@@ -1,212 +1,277 @@
-// @/app/admin/_lib/actions/negocio/negocio.actions.ts
 'use server';
+
 import prisma from '@/app/admin/_lib/prismaClient';
 import { ActionResult } from '@/app/admin/_lib/types';
-import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import slugify from 'slugify';
+import { Prisma } from '@prisma/client';
 
 import {
-    ActualizarNegocioInputSchema,
-    ObtenerDetallesNegocioInputSchema,
-    type NegocioDetallesParaEditar, // Para el tipo de retorno de obtener
-    NegocioDetallesParaEditarSchema, // Para validar la salida de obtener
+    NegocioProfileSchema,
+    UpdateNegocioProfileInputSchema,
     VerificarSlugUnicoInputSchema,
-    type VerificarSlugUnicoOutput,
+    NegocioHeaderData,
+    UpdateNegocioNombreInput,
+    NegocioHeaderDataSchema,
+    updateNegocioNombreSchema,
 } from './negocio.schemas';
 
-import type { Negocio as PrismaNegocioType } from '@prisma/client'; // Para claridad
-import { z } from 'zod'; // Asegúrate de tener Zod instalado: npm install zod
+import type {
+    NegocioProfileType,
+    UpdateNegocioProfileInputType,
+} from './negocio.schemas';
 
-
-export async function generarSlugUnico(nombreNegocio: string, negocioIdActual?: string): Promise<string> {
+/**
+ * Genera un slug único a partir del nombre de un negocio, 
+ * verificando en la base de datos para evitar colisiones.
+ */
+async function generarSlugUnico(nombreNegocio: string, negocioIdActual?: string): Promise<string> {
     let baseSlug = slugify(nombreNegocio, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g });
-    if (!baseSlug) { // Si el nombre solo tenía caracteres especiales
-        baseSlug = `negocio-${Date.now().toString().slice(-5)}`;
-    }
+    if (!baseSlug) baseSlug = `negocio-${Date.now().toString().slice(-5)}`;
 
     let slugFinal = baseSlug;
     let contador = 1;
-
     while (true) {
         const negocioExistente = await prisma.negocio.findUnique({
             where: { slug: slugFinal },
             select: { id: true }
         });
 
-        // Si no existe, o si existe pero es el mismo negocio que estamos actualizando, el slug es válido.
         if (!negocioExistente || (negocioIdActual && negocioExistente.id === negocioIdActual)) {
             break;
         }
 
-        // Si el slug ya existe y pertenece a otro negocio, genera uno nuevo.
         slugFinal = `${baseSlug}-${contador}`;
         contador++;
     }
     return slugFinal;
 }
 
-// --- Acción: obtenerDetallesNegocioParaEditar (Actualizada para incluir slug) ---
-export async function obtenerDetallesNegocioParaEditar(
-    negocioId: string
-): Promise<PrismaNegocioType | null> { // Devuelve el tipo Prisma directamente o null
-    const validation = ObtenerDetallesNegocioInputSchema.safeParse({ negocioId });
-    if (!validation.success) {
-        console.error("Error de validación en obtenerDetallesNegocioParaEditar:", validation.error.flatten());
-        // Podrías lanzar un error o devolver null según tu manejo de errores preferido
-        return null;
-    }
 
+/**
+ * Obtiene los datos del perfil de un negocio para el formulario de edición.
+ * Si el negocio no tiene un slug, genera uno sugerido.
+ */
+export async function getNegocioProfileForEdit(negocioId: string): Promise<ActionResult<NegocioProfileType>> {
     try {
         const negocio = await prisma.negocio.findUnique({
             where: { id: negocioId },
-            // No es necesario un select complejo si NegocioDetallesParaEditarSchema
-            // se basa en NegocioFormDataSchema y este ya tiene los campos deseados.
-            // Prisma devolverá todos los campos escalares por defecto.
+            select: {
+                id: true, nombre: true, slug: true, logo: true, slogan: true,
+                telefonoLlamadas: true, telefonoWhatsapp: true, email: true,
+                direccion: true, googleMaps: true, paginaWeb: true, status: true,
+            }
         });
 
-        if (!negocio) return null;
+        if (!negocio) {
+            return { success: false, error: "Negocio no encontrado." };
+        }
 
-        // Validar la salida (opcional pero recomendado si quieres transformar o asegurar el tipo)
-        // const parsedNegocio = NegocioDetallesParaEditarSchema.safeParse(negocio);
-        // if (!parsedNegocio.success) {
-        //     console.error("Error Zod al parsear datos de negocio para editar:", parsedNegocio.error.flatten());
-        //     return null; // O manejar el error de otra forma
-        // }
-        // return parsedNegocio.data;
+        // Si el negocio no tiene slug, generar uno sugerido sobre la marcha
+        if (!negocio.slug) {
+            negocio.slug = await generarSlugUnico(negocio.nombre);
+        }
 
-        return negocio; // Devolver el objeto Prisma directamente
+        const validation = NegocioProfileSchema.safeParse(negocio);
+        if (!validation.success) {
+            console.error("Error Zod en getNegocioProfileForEdit:", validation.error.flatten());
+            return { success: false, error: "Los datos del perfil del negocio son inconsistentes." };
+        }
+        return { success: true, data: validation.data };
 
-    } catch (error) {
-        console.error(`Error al obtener detalles del negocio ${negocioId}:`, error);
-        return null;
+    } catch {
+        return { success: false, error: "Error al cargar el perfil del negocio." };
     }
 }
 
-
-
-// --- Acción: actualizarDetallesNegocio (Actualizada para manejar slug) ---
-export async function actualizarDetallesNegocio(
+/**
+ * Actualiza el perfil de un negocio, manejando inteligentemente la actualización del slug.
+ */
+export async function updateNegocioProfile(
     negocioId: string,
-    data: unknown // Recibe unknown para validar con Zod aquí
-): Promise<ActionResult<NegocioDetallesParaEditar>> {
-    const validationInput = ActualizarNegocioInputSchema.safeParse(data);
-    if (!validationInput.success) {
-        return { success: false, error: "Datos de entrada inválidos.", errorDetails: validationInput.error.flatten().fieldErrors };
+    input: UpdateNegocioProfileInputType
+): Promise<ActionResult<NegocioProfileType>> {
+
+    const validation = UpdateNegocioProfileInputSchema.safeParse(input);
+    if (!validation.success) {
+        return { success: false, error: "Datos de entrada inválidos.", validationErrors: validation.error.flatten().fieldErrors };
     }
 
-    const validatedData = validationInput.data;
+    const validatedData = validation.data;
 
     try {
         const negocioActual = await prisma.negocio.findUnique({
             where: { id: negocioId },
-            select: { nombre: true, slug: true } // Solo necesitamos el nombre y slug actual para la lógica del slug
+            select: { nombre: true, slug: true }
         });
 
         if (!negocioActual) {
             return { success: false, error: "Negocio no encontrado." };
         }
 
-        let slugParaGuardar = negocioActual.slug; // Por defecto, mantener el slug actual
-
-        // Si se proporciona un nuevo nombre, o si se proporciona un nuevo slug,
-        // o si el negocio no tiene slug y se proporciona un nombre, regenerar/validar slug.
-        if (validatedData.nombre && validatedData.nombre !== negocioActual.nombre) {
-            // El nombre cambió, generar nuevo slug basado en el nuevo nombre
-            console.log(`[actualizarDetallesNegocio] Nombre cambió de "${negocioActual.nombre}" a "${validatedData.nombre}". Regenerando slug.`);
-            slugParaGuardar = await generarSlugUnico(validatedData.nombre, negocioId);
-        } else if (validatedData.slug && validatedData.slug !== negocioActual.slug) {
-            // El usuario proveyó un slug diferente, verificar y usarlo si es único
-            console.log(`[actualizarDetallesNegocio] Slug proporcionado manualmente: "${validatedData.slug}". Verificando unicidad.`);
-            const slugVerificado = await generarSlugUnico(validatedData.slug, negocioId); // generarSlugUnico también verifica
-            if (slugVerificado !== validatedData.slug.toLowerCase()) {
-                // Esto podría pasar si el slug manual tenía caracteres no permitidos o ya existía y se le añadió sufijo.
-                // Podrías devolver un error específico o usar el sugerido.
-                console.warn(`[actualizarDetallesNegocio] Slug manual "${validatedData.slug}" fue modificado a "${slugVerificado}" para asegurar unicidad/formato.`);
-            }
-            slugParaGuardar = slugVerificado;
-        } else if (!negocioActual.slug && validatedData.nombre) {
-            // No hay slug actual, pero hay un nombre (podría ser el mismo o nuevo), generar slug
-            console.log(`[actualizarDetallesNegocio] Negocio sin slug, generando a partir del nombre: "${validatedData.nombre}".`);
-            slugParaGuardar = await generarSlugUnico(validatedData.nombre, negocioId);
-        }
-
         const dataToUpdate: Prisma.NegocioUpdateInput = { ...validatedData };
-        if (slugParaGuardar) { // Solo actualizar si tenemos un slug válido
-            dataToUpdate.slug = slugParaGuardar;
+
+        // Lógica de actualización del slug
+        const nombreCambiado = validatedData.nombre && validatedData.nombre !== negocioActual.nombre;
+        const slugManualCambiado = validatedData.slug && validatedData.slug !== negocioActual.slug;
+        const necesitaSlugNuevo = !negocioActual.slug && validatedData.nombre;
+
+        if (nombreCambiado || slugManualCambiado || necesitaSlugNuevo) {
+            console.log("Detectado cambio de nombre o slug, regenerando...");
+            dataToUpdate.slug = await generarSlugUnico(validatedData.slug || validatedData.nombre!, negocioId);
         }
 
-
-        const negocioActualizado = await prisma.negocio.update({
+        const updatedNegocio = await prisma.negocio.update({
             where: { id: negocioId },
             data: dataToUpdate,
         });
 
-        // Revalidar el path de la vitrina si el slug cambió
-        if (negocioActualizado.slug && negocioActual.slug !== negocioActualizado.slug) {
-            if (negocioActual.slug) revalidatePath(`/vd/${negocioActual.slug}`);
-            revalidatePath(`/vd/${negocioActualizado.slug}`);
-        }
-        // Revalidar también la página de edición
-        // Asumiendo que clienteId se puede obtener de alguna manera o no es crucial para revalidatePath aquí
-        // revalidatePath(`/admin/clientes/[clienteId]/negocios/${negocioId}/editar`);
+        revalidatePath(`/admin/clientes/`); // Revalidar una ruta general
+        revalidatePath(`/vd/${updatedNegocio.slug}`); // Revalidar vitrina digital
 
-
-        const parsedData = NegocioDetallesParaEditarSchema.safeParse(negocioActualizado);
-        if (!parsedData.success) {
-            console.error("Error Zod al parsear datos de negocio actualizado:", parsedData.error.flatten());
-            return { success: false, error: "Error al procesar datos del negocio actualizado." };
-        }
-        return { success: true, data: parsedData.data };
+        return await getNegocioProfileForEdit(negocioId);
 
     } catch (error) {
-        console.error(`Error al actualizar el negocio ${negocioId}:`, error);
+        console.error("Error al actualizar el perfil del negocio:", error);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            // El error P2002 usualmente es por campos únicos. Si el slug falló la verificación de generarSlugUnico,
-            // no debería llegar aquí, pero es una salvaguarda.
-            if ((error.meta?.target as string[])?.includes('slug')) {
-                return { success: false, error: "El 'slug' (URL amigable) generado ya está en uso. Intenta con un nombre de negocio ligeramente diferente o ajusta el slug manualmente." };
-            }
+            return { success: false, error: "El 'slug' (URL amigable) ya está en uso. Intenta con un nombre o slug diferente." };
         }
-        return { success: false, error: 'No se pudo actualizar el negocio.' };
+        return { success: false, error: "No se pudo actualizar el perfil." };
     }
 }
 
-// --- NUEVA Acción: verificarSlugUnicoAction ---
-export async function verificarSlugUnicoAction(
-    input: z.infer<typeof VerificarSlugUnicoInputSchema>
-): Promise<ActionResult<VerificarSlugUnicoOutput>> {
-    const validation = VerificarSlugUnicoInputSchema.safeParse(input);
-    if (!validation.success) {
-        return { success: false, error: "Datos de entrada inválidos.", errorDetails: validation.error.flatten().fieldErrors };
-    }
-    const { slug, negocioIdActual } = validation.data;
-
-    // Validar formato del slug con la regex del schema (opcional, Zod ya lo hace en el cliente si se usa useForm)
-    const slugFormatRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-    if (!slugFormatRegex.test(slug)) {
-        return { success: true, data: { esUnico: false, sugerencia: "Formato de slug inválido. Usa solo minúsculas, números y guiones." } };
-    }
-
-
+/**
+ * Verifica si un slug es único en la base de datos, excluyendo el negocio actual.
+ */
+export async function verifySlugUniqueness(input: z.infer<typeof VerificarSlugUnicoInputSchema>): Promise<ActionResult<{ isUnique: boolean, suggestion?: string }>> {
     try {
-        const negocioExistente = await prisma.negocio.findUnique({
+        const { slug, negocioIdActual } = input;
+
+        const existing = await prisma.negocio.findUnique({
             where: { slug: slug },
             select: { id: true }
         });
 
-        if (negocioExistente && negocioExistente.id !== negocioIdActual) {
-            // El slug existe y NO pertenece al negocio que se está editando
-            // Generar una sugerencia
-            const sugerenciaSlug = await generarSlugUnico(slug, negocioIdActual); // Le pasamos el slug actual para que intente con sufijos
-            return { success: true, data: { esUnico: false, sugerencia: sugerenciaSlug } };
+        if (existing && existing.id !== negocioIdActual) {
+            const suggestion = `${slug}-${Math.random().toString(36).substring(2, 6)}`;
+            return { success: true, data: { isUnique: false, suggestion } };
         }
 
-        // El slug no existe, o existe pero pertenece al negocio actual
-        return { success: true, data: { esUnico: true } };
+        return { success: true, data: { isUnique: true } };
+    } catch {
+        return { success: false, error: "Error al verificar el slug." };
+    }
+}
+
+
+
+
+/**
+ * Obtiene los datos necesarios para mostrar en la cabecera del negocio.
+ */
+export async function obtenerDatosHeaderNegocio(negocioId: string): Promise<ActionResult<NegocioHeaderData>> {
+    if (!negocioId) {
+        return { success: false, error: "ID de negocio no proporcionado." };
+    }
+    try {
+        const negocio = await prisma.negocio.findUnique({
+            where: { id: negocioId },
+            select: { id: true, nombre: true, status: true }
+        });
+
+        if (!negocio) {
+            return { success: false, error: "Negocio no encontrado." };
+        }
+
+        // Mapea el status del negocio al 'suscripcionStatus' que espera el header
+        const dataParaValidar = {
+            ...negocio,
+            suscripcionStatus: negocio.status === 'activo' ? 'activa' : 'inactiva',
+        };
+
+        const validation = NegocioHeaderDataSchema.safeParse(dataParaValidar);
+        if (!validation.success) {
+            console.error("Error Zod en obtenerDatosHeaderNegocio:", validation.error);
+            return { success: false, error: "Los datos del negocio tienen un formato inesperado." };
+        }
+
+        return { success: true, data: validation.data };
 
     } catch (error) {
-        console.error(`Error al verificar slug "${slug}":`, error);
-        return { success: false, error: "Error al verificar la disponibilidad del slug." };
+        console.error("Error al obtener datos de la cabecera del negocio:", error);
+        return { success: false, error: "Error al cargar los datos de la cabecera." };
+    }
+}
+
+/**
+ * Actualiza únicamente el nombre de un negocio.
+ */
+export async function actualizarNombreNegocio(negocioId: string, input: UpdateNegocioNombreInput): Promise<ActionResult<null>> {
+    const validation = updateNegocioNombreSchema.safeParse(input);
+    if (!validation.success) {
+        return { success: false, error: "Nombre inválido.", validationErrors: validation.error.flatten().fieldErrors };
+    }
+
+    try {
+        await prisma.negocio.update({
+            where: { id: negocioId },
+            data: { nombre: validation.data.nombre },
+        });
+
+        revalidatePath(`/admin/clientes`); // Revalidar una ruta general
+        return { success: true, data: null };
+    } catch (error) {
+        console.error("Error al actualizar el nombre:", error);
+        return { success: false, error: "No se pudo actualizar el nombre." };
+    }
+}
+
+/**
+ * ARCHIVAR (Soft Delete): Cambia el estado del negocio a 'inactivo'.
+ */
+export async function archiveNegocio(negocioId: string, clienteId: string): Promise<ActionResult<null>> {
+    if (!negocioId || !clienteId) {
+        return { success: false, error: "Se requieren los IDs de negocio y cliente." };
+    }
+    try {
+        await prisma.negocio.update({
+            where: { id: negocioId },
+            data: { status: 'inactivo' },
+        });
+        revalidatePath(`/admin/clientes/${clienteId}`);
+        return { success: true, data: null };
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return { success: false, error: "No se encontró el negocio para archivar." };
+        }
+        return { success: false, error: "Ocurrió un error al archivar el negocio." };
+    }
+}
+
+/**
+ * ELIMINAR DEFINITIVAMENTE: Borra un negocio y sus datos asociados en cascada.
+ */
+export async function deleteNegocioDefinitivamente(negocioId: string, clienteId: string): Promise<ActionResult<null>> {
+    if (!negocioId || !clienteId) {
+        return { success: false, error: "Se requieren los IDs de negocio y cliente." };
+    }
+    try {
+        await prisma.negocio.delete({
+            where: { id: negocioId },
+        });
+        revalidatePath(`/admin/clientes/${clienteId}`);
+        return { success: true, data: null };
+    } catch (error) {
+        console.error("Error al eliminar negocio:", error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === 'P2025') {
+                return { success: false, error: "No se encontró el negocio para eliminar." };
+            }
+            if (error.code === 'P2014') {
+                return { success: false, error: "No se puede eliminar el negocio porque tiene datos relacionados protegidos." };
+            }
+        }
+        return { success: false, error: "Ocurrió un error al eliminar el negocio." };
     }
 }

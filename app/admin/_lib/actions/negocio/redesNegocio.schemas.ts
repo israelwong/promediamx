@@ -1,48 +1,46 @@
-// @/app/admin/_lib/actions/negocio/redesNegocio.schemas.ts
 import { z } from 'zod';
 
-// Esquema base que refleja el modelo Prisma NegocioRedSocial
+// Esquema base que refleja los campos editables del modelo Prisma
 export const NegocioRedSocialSchema = z.object({
     id: z.string().cuid(),
-    negocioId: z.string().cuid(),
     nombreRed: z.string()
+        .trim()
         .min(1, "El nombre de la red es obligatorio.")
-        .max(50, "El nombre de la red no debe exceder los 50 caracteres."),
+        .max(50, "El nombre no debe exceder los 50 caracteres."),
     url: z.string()
+        .trim()
         .min(1, "La URL es obligatoria.")
         .url("La URL proporcionada no es válida."),
-    icono: z.string().max(50, "El nombre del icono no debe exceder los 50 caracteres.").nullish(),
-    orden: z.number().int().nullish(),
+    icono: z.string().trim().max(50).nullable().optional(),
+    orden: z.number().int().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
 });
-export type NegocioRedSocialType = z.infer<typeof NegocioRedSocialSchema>;
 
-// Esquema para los datos al crear una nueva red social
-// negocioId se pasará como argumento directo a la acción.
-export const CrearRedSocialNegocioDataSchema = z.object({
-    nombreRed: NegocioRedSocialSchema.shape.nombreRed,
-    url: NegocioRedSocialSchema.shape.url,
-    icono: NegocioRedSocialSchema.shape.icono.optional(), // Hacerlo opcional explícitamente aquí
+// Esquema para la entrada de la acción de CREAR una red social
+export const CrearRedSocialNegocioSchema = NegocioRedSocialSchema.pick({
+    nombreRed: true,
+    url: true,
+    icono: true,
 });
-export type CrearRedSocialNegocioData = z.infer<typeof CrearRedSocialNegocioDataSchema>;
 
-// Esquema para los datos al actualizar una red social existente
-// id se pasará como argumento directo a la acción.
-export const ActualizarRedSocialNegocioDataSchema = z.object({
-    nombreRed: NegocioRedSocialSchema.shape.nombreRed.optional(),
-    url: NegocioRedSocialSchema.shape.url.optional(),
-    icono: NegocioRedSocialSchema.shape.icono.optional(),
-    // 'orden' se maneja con una acción separada y no se actualiza aquí
-});
-export type ActualizarRedSocialNegocioData = z.infer<typeof ActualizarRedSocialNegocioDataSchema>;
+// Esquema para la entrada de la acción de ACTUALIZAR una red social
+export const ActualizarRedSocialNegocioSchema = NegocioRedSocialSchema.pick({
+    nombreRed: true,
+    url: true,
+    icono: true,
+}).partial();
 
-// Esquema para un item individual en la data de reordenamiento
+// Esquema para un item individual en la data de REORDENAMIENTO
 export const RedSocialOrdenDataItemSchema = z.object({
-    id: z.string().cuid({ message: "ID de red social inválido." }),
-    orden: z.number().int({ message: "El orden debe ser un número entero." }),
+    id: z.string().cuid(),
+    orden: z.number().int(),
 });
+export const ActualizarOrdenRedesSocialesSchema = z.array(RedSocialOrdenDataItemSchema);
 
-// Esquema para el array completo de datos de reordenamiento
-export const ActualizarOrdenRedesSocialesDataSchema = z.array(RedSocialOrdenDataItemSchema);
-export type ActualizarOrdenRedesSocialesData = z.infer<typeof ActualizarOrdenRedesSocialesDataSchema>;
+
+// --- Tipos Inferidos ---
+export type NegocioRedSocialType = z.infer<typeof NegocioRedSocialSchema>;
+export type CrearRedSocialNegocioType = z.infer<typeof CrearRedSocialNegocioSchema>;
+export type ActualizarRedSocialNegocioType = z.infer<typeof ActualizarRedSocialNegocioSchema>;
+export type ActualizarOrdenRedesSocialesType = z.infer<typeof ActualizarOrdenRedesSocialesSchema>;

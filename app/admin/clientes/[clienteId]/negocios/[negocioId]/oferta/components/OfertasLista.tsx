@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-import { obtenerOfertasNegocio } from '@/app/admin/_lib/actions/oferta/oferta.actions';
+import { obtenerOfertasNegocioAction } from '@/app/admin/_lib/actions/oferta/oferta.actions';
 import { type OfertaParaListaType } from '@/app/admin/_lib/actions/oferta/oferta.schemas';
 
 import { Button } from '@/app/components/ui/button';
@@ -48,7 +48,7 @@ export default function OfertasLista({ negocioId, clienteId }: Props) {
         }
         setLoading(true); setError(null);
         try {
-            const result = await obtenerOfertasNegocio(negocioId);
+            const result = await obtenerOfertasNegocioAction(negocioId);
             if (result.success && result.data) {
                 setOfertas(result.data);
             } else {

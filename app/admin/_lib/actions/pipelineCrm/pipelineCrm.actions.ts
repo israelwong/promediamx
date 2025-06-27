@@ -319,26 +319,58 @@ export async function actualizarEtapaLeadEnPipelineAction( // Nombre más espec�
     }
 }
 
+// export async function obtenerPipelinesCrmAction(negocioId: string): Promise<ActionResult<PipelineSimple[]>> {
+//     if (!negocioId) return { success: false, error: "ID de negocio requerido." };
+//     try {
+//         // Buscar el CRM asociado al negocio
+//         const crm = await prisma.cRM.findUnique({
+//             where: { negocioId: negocioId },
+//             select: { id: true }
+//         });
+
+//         // Si no hay CRM, devolver lista vacía
+//         if (!crm) return { success: true, data: [] };
+
+//         // Obtener pipelines activos de ese CRM
+//         const pipelines = await prisma.pipelineCRM.findMany({
+//             where: {
+//                 crmId: crm.id,
+//                 status: 'activo' // Solo mostrar pipelines activos en el filtro
+//             },
+//             select: { id: true, nombre: true },
+//             orderBy: { orden: 'asc' } // Ordenar por el campo 'orden'
+//         });
+
+//         return { success: true, data: pipelines };
+//     } catch (error) {
+//         console.error("Error obteniendo pipelines:", error);
+//         return { success: false, error: "Error al obtener etapas del pipeline." };
+//     }
+// }
+
+
+
 export async function obtenerPipelinesCrmAction(negocioId: string): Promise<ActionResult<PipelineSimple[]>> {
-    if (!negocioId) return { success: false, error: "ID de negocio requerido." };
+    if (!negocioId) {
+        return { success: false, error: "ID de negocio requerido." };
+    }
     try {
-        // Buscar el CRM asociado al negocio
         const crm = await prisma.cRM.findUnique({
             where: { negocioId: negocioId },
             select: { id: true }
         });
 
-        // Si no hay CRM, devolver lista vacía
-        if (!crm) return { success: true, data: [] };
+        if (!crm) {
+            return { success: true, data: [] };
+        }
 
-        // Obtener pipelines activos de ese CRM
         const pipelines = await prisma.pipelineCRM.findMany({
             where: {
                 crmId: crm.id,
-                status: 'activo' // Solo mostrar pipelines activos en el filtro
+                status: 'activo'
             },
             select: { id: true, nombre: true },
-            orderBy: { orden: 'asc' } // Ordenar por el campo 'orden'
+            orderBy: { orden: 'asc' }
         });
 
         return { success: true, data: pipelines };

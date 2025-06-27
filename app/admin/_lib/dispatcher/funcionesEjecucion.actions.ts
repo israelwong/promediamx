@@ -16,7 +16,7 @@ export async function dispatchTareaEjecutadaAction(
     tareaEjecutadaId: string
 ): Promise<ActionResult<null>> {
 
-    const timestampInicio = Date.now();
+    // const timestampInicio = Date.now();
     let metadataObj: Record<string, unknown> = {};
     let fullExecContext: FullExecutionFunctionContext;
 
@@ -107,7 +107,7 @@ export async function dispatchTareaEjecutadaAction(
         const executor = functionRegistry[funcionLlamada as string];
 
         if (executor) {
-            console.log(`[Dispatcher Refactor] Tarea ${tareaEjecutadaId} - Ejecutando función: "${funcionLlamada}"`);
+            // console.log(`[Dispatcher Refactor] Tarea ${tareaEjecutadaId} - Ejecutando función: "${funcionLlamada}"`);
             try {
                 // argsFromIA se pasa como Record<string, unknown>. La función específica debe validarlo con Zod.
                 resultadoEjecucionDeFuncion = await executor(argsFromIA as Record<string, unknown>, fullExecContext);
@@ -200,7 +200,7 @@ export async function dispatchTareaEjecutadaAction(
             console.error(`[Dispatcher Refactor] Error al actualizar TareaEjecutada ${tareaEjecutadaId} con metadata final:`, updateError);
         }
 
-        console.log(`[Dispatcher Refactor] Tarea ${tareaEjecutadaId} - FIN. Duración: ${Date.now() - timestampInicio}ms`);
+        // console.log(`[Dispatcher Refactor] Tarea ${tareaEjecutadaId} - FIN. Duración: ${Date.now() - timestampInicio}ms`);
         return { success: true, data: null };
 
     } catch (catastrophicError: unknown) {

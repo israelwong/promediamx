@@ -7,10 +7,10 @@ import {
     obtenerEtiquetasAsignadasLeadParamsSchema,
     actualizarEtiquetasLeadParamsSchema,
     listarLeadsParamsSchema,
-    ListarLeadsResultData,
+    // ListarLeadsResultData,
     obtenerDatosParaFiltrosLeadParamsSchema,
     DatosParaFiltrosLeadData,
-    LeadListaItemData,
+    // LeadListaItemData,
     LeadDetalleData,                 // Tipo de salida para detalles
     leadDetalleSchema,               // Schema Zod para validar la salida
     obtenerDatosFormularioLeadParamsSchema,
@@ -23,119 +23,74 @@ import {
 import { z } from 'zod';
 import { crearInteraccionSistemaAction } from '../conversacion/conversacion.actions'; // Necesitaremos esta acción refactorizada
 import { revalidatePath } from 'next/cache';
+import { type ListarLeadsResult } from './lead.schemas';
+
 
 
 
 export async function listarLeadsAction(
     params: z.infer<typeof listarLeadsParamsSchema>
-): Promise<ActionResult<ListarLeadsResultData>> {
+): Promise<ActionResult<ListarLeadsResult>> {
+
     const validation = listarLeadsParamsSchema.safeParse(params);
     if (!validation.success) {
-        return { success: false, error: "Parámetros inválidos.", errorDetails: validation.error.flatten().fieldErrors };
+        return { success: false, error: "Parámetros inválidos." };
     }
-    const { negocioId, filtros, sort } = validation.data;
+
+    const { negocioId, page, pageSize, searchTerm } = validation.data;
+    const skip = (page - 1) * pageSize;
 
     try {
-        const crm = await prisma.cRM.findUnique({
-            where: { negocioId },
-            select: { id: true }
-        });
-
-        if (!crm) {
-            // Si no hay CRM, no puede haber leads asociados directamente a este negocio vía CRM.
-            // Devuelve éxito pero con crmId null y leads vacíos.
-            return { success: true, data: { crmId: null, leads: [] } };
-        }
-        const crmId = crm.id;
-
-        const whereConditions: Prisma.LeadWhereInput[] = [{ crmId: crmId }]; // Condición base: pertenecer al CRM del negocio
-
-        if (filtros.searchTerm && filtros.searchTerm.trim() !== '') {
-            const term = filtros.searchTerm.trim();
-            whereConditions.push({
+        const whereClause: Prisma.LeadWhereInput = {
+            crm: { negocioId },
+            ...(searchTerm && {
                 OR: [
-                    { nombre: { contains: term, mode: 'insensitive' } },
-                    { email: { contains: term, mode: 'insensitive' } },
-                    { telefono: { contains: term, mode: 'insensitive' } },
+                    { nombre: { contains: searchTerm, mode: 'insensitive' } },
+                    { email: { contains: searchTerm, mode: 'insensitive' } },
+                    { telefono: { contains: searchTerm, mode: 'insensitive' } },
                 ],
-            });
-        }
+            }),
+        };
 
-        if (filtros.pipelineId && filtros.pipelineId !== 'all') {
-            whereConditions.push({ pipelineId: filtros.pipelineId });
-        }
-        if (filtros.canalId && filtros.canalId !== 'all') {
-            whereConditions.push({ canalId: filtros.canalId });
-        }
-        if (filtros.agenteId && filtros.agenteId !== 'all') {
-            whereConditions.push({ agenteId: filtros.agenteId });
-        }
-        if (filtros.etiquetaId && filtros.etiquetaId !== 'all') {
-            whereConditions.push({ Etiquetas: { some: { etiquetaId: filtros.etiquetaId } } });
-        }
-
-        const orderBy: Prisma.LeadOrderByWithRelationInput = {};
-        if (sort.campo) {
-            // Mapear campos de UI a campos de Prisma si son diferentes
-            // Por ahora asumimos que coinciden o son manejables directamente
-            orderBy[sort.campo as keyof Prisma.LeadOrderByWithRelationInput] = sort.direccion;
-        } else { // Orden por defecto
-            orderBy.updatedAt = 'desc';
-        }
-
-
-        const leadsPrisma = await prisma.lead.findMany({
-            where: { AND: whereConditions },
-            select: {
-                id: true,
-                nombre: true,
-                email: true,
-                telefono: true,
-                status: true,
-                createdAt: true,
-                updatedAt: true,
-                valorEstimado: true,
-                Pipeline: { select: { id: true, nombre: true, /* color si lo tienes */ } }, // Renombrado a Pipeline
-                agente: { select: { id: true, nombre: true } },
-                Etiquetas: { // Nombre de la relación en el modelo Lead
-                    select: { etiqueta: { select: { id: true, nombre: true, color: true } } },
-                    take: 3, // Limitar número de etiquetas en la preview
+        const [leads, totalCount] = await prisma.$transaction([
+            prisma.lead.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    nombre: true,
+                    email: true,
+                    telefono: true,
+                    createdAt: true,
+                    Pipeline: { select: { id: true, nombre: true } },
+                    agente: { select: { id: true, nombre: true } },
                 },
-                Conversacion: { // Para obtener la última conversación
-                    orderBy: { updatedAt: 'desc' },
-                    take: 1,
-                    select: { id: true, updatedAt: true, status: true }
-                }
-            },
-            orderBy: orderBy,
-            // Considerar paginación
-            take: 50,
-        });
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: pageSize,
+            }),
+            prisma.lead.count({ where: whereClause }),
+        ]);
 
-        const leadsData: LeadListaItemData[] = leadsPrisma.map(lead => ({
-            id: lead.id,
-            nombre: lead.nombre,
-            email: lead.email,
-            telefono: lead.telefono,
-            status: lead.status,
-            createdAt: lead.createdAt,
-            updatedAt: lead.updatedAt,
-            valorEstimado: lead.valorEstimado,
-            pipeline: lead.Pipeline ? { id: lead.Pipeline.id, nombre: lead.Pipeline.nombre } : null,
-            agente: lead.agente ? { id: lead.agente.id, nombre: lead.agente.nombre } : null,
-            etiquetas: lead.Etiquetas?.map(le => ({ etiqueta: { id: le.etiqueta.id, nombre: le.etiqueta.nombre, color: le.etiqueta.color } })),
-            ultimaConversacion: lead.Conversacion[0] ? {
-                id: lead.Conversacion[0].id,
-                updatedAt: lead.Conversacion[0].updatedAt,
-                status: lead.Conversacion[0].status
-            } : null,
-        }));
+        const result: ListarLeadsResult = {
+            leads: leads.map(lead => ({
+                id: lead.id,
+                nombre: lead.nombre,
+                email: lead.email,
+                telefono: lead.telefono,
+                createdAt: lead.createdAt,
+                etapaPipeline: lead.Pipeline,
+                agenteAsignado: lead.agente,
+            })),
+            totalCount,
+            page,
+            pageSize,
+        };
 
-        return { success: true, data: { crmId, leads: leadsData } };
+        return { success: true, data: result };
 
     } catch (error) {
-        console.error('Error en listarLeadsAction:', error);
-        return { success: false, error: 'No se pudieron cargar los leads.' };
+        console.error("Error en listarLeadsAction:", error);
+        return { success: false, error: "No se pudieron cargar los leads." };
     }
 }
 

@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { code, state, error: errorMeta, error_reason: errorReasonMeta, error_description: errorDescriptionMeta } = req.query;
 
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'; // Asegúrate que esta variable esté bien configurada
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'; // Asegúrate que esta variable esté bien configurada
 
     // Intentar decodificar el state para obtener IDs para una redirección más precisa
     let asistenteIdFromState: string | undefined;
@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Construir la ruta de error específica si tenemos todos los IDs del state
     if (clientIdFromState && negocioIdFromState && asistenteIdFromState) {
-        errorRedirectPath = `/admin/clientes/${clientIdFromState}/negocios/${negocioIdFromState}/asistente/${asistenteIdFromState}`;
+        errorRedirectPath = `/admin/clientes/${clientIdFromState}/negocios/${negocioIdFromState}/asistente/`;
     }
 
     if (errorMeta) {
@@ -72,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // result.data debería contener asistenteId y negocioId
         // Usamos clientIdFromState que obtuvimos al inicio del handler
         if (clientIdFromState && result.data.negocioId && result.data.asistenteId) {
-            finalRedirectPath = `/admin/clientes/${clientIdFromState}/negocios/${result.data.negocioId}/asistente/${result.data.asistenteId}`;
+            finalRedirectPath = `/admin/clientes/${clientIdFromState}/negocios/${result.data.negocioId}/asistente/`;
         } else {
             // Si por alguna razón no tenemos clientIdFromState aquí pero el result fue exitoso,
             // es una situación extraña. Podríamos intentar obtenerlo de result.data si lo devolviera procesarCallbackMetaOAuth.

@@ -1,56 +1,102 @@
-"use server";
+'use server';
 
-import prisma from '@/app/admin/_lib/prismaClient'; // Ajusta tu ruta
+import prisma from '@/app/admin/_lib/prismaClient';
 import { ActionResult } from '@/app/admin/_lib/types';
-import { PreguntaSinRespuestaOfertaListItemSchema, type PreguntaSinRespuestaOfertaListItemType } from './preguntaSinRespuestaOferta.schemas';
 // import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+import { PreguntaSinRespuestaOfertaListItemSchema, VincularPreguntaInputSchema, MarcarComoNotificadaInputSchema } from './preguntaSinRespuestaOferta.schemas';
+import type { PreguntaSinRespuestaOfertaListItemType } from './preguntaSinRespuestaOferta.schemas';
 
-// Helper para la ruta de revalidación
-// const getPathToOfertaEdicionPage = (clienteId: string, negocioId: string, ofertaId: string) =>
-//     `/admin/clientes/${clienteId}/negocios/${negocioId}/oferta/${ofertaId}`;
-
-export async function obtenerPreguntasSinRespuestaDeOfertaAction(
-    ofertaId: string
-): Promise<ActionResult<PreguntaSinRespuestaOfertaListItemType[]>> {
-    if (!ofertaId) return { success: false, error: "ID de oferta requerido." };
+/**
+ * Obtiene todas las preguntas sin respuesta para una oferta específica.
+ */
+export async function obtenerPreguntasSinRespuestaAction(ofertaId: string): Promise<ActionResult<PreguntaSinRespuestaOfertaListItemType[]>> {
     try {
-        const preguntasDb = await prisma.preguntaSinRespuestaOferta.findMany({
-            where: { ofertaId: ofertaId },
+        const preguntas = await prisma.preguntaSinRespuestaOferta.findMany({
+            where: { ofertaId },
             select: {
                 id: true,
                 ofertaId: true,
                 preguntaUsuario: true,
                 estado: true,
                 fechaCreacion: true,
-                ofertaDetalleRespuesta: { // Incluir el detalle vinculado si existe
+                ofertaDetalleRespuesta: {
                     select: {
                         id: true,
                         tituloDetalle: true,
                     }
                 }
             },
-            orderBy: { fechaCreacion: 'desc' },
-        });
-
-        // Validar cada item con el schema
-        const parseResults = preguntasDb.map(item => PreguntaSinRespuestaOfertaListItemSchema.safeParse(item));
-        const validItems: PreguntaSinRespuestaOfertaListItemType[] = [];
-        parseResults.forEach((res, index) => {
-            if (res.success) {
-                validItems.push(res.data);
-            } else {
-                console.warn(`Datos de PreguntaSinRespuestaOfertaListItem inválidos para ID ${preguntasDb[index]?.id}:`, res.error.flatten());
+            orderBy: {
+                fechaCreacion: 'desc'
             }
         });
-        return { success: true, data: validItems };
+
+        const validation = z.array(PreguntaSinRespuestaOfertaListItemSchema).safeParse(preguntas);
+        if (!validation.success) {
+            console.error("Error Zod en obtenerPreguntasSinRespuestaAction:", validation.error);
+            return { success: false, error: "Los datos de las preguntas son inconsistentes." };
+        }
+
+        return { success: true, data: validation.data };
+
     } catch (error) {
-        console.error("Error en obtenerPreguntasSinRespuestaDeOfertaAction:", error);
-        return { success: false, error: "No se pudieron obtener las preguntas sin respuesta." };
+        console.error("Error al obtener preguntas sin respuesta:", error);
+        return { success: false, error: "No se pudieron cargar las preguntas pendientes." };
     }
 }
 
-// Aquí irían las actions para:
-// - resolverPreguntaCreandoNuevoDetalleAction(...) -> llamaría a createOfertaDetalleAction y luego actualizaría PreguntaSinRespuestaOferta
-// - resolverPreguntaVinculandoDetalleExistenteAction(preguntaId, detalleExistenteId) -> actualizaría PreguntaSinRespuestaOferta
-// - descartarPreguntaAction(preguntaId) -> cambiaría estado
-// - notificarUsuarioRespuestaAction(preguntaId) -> enviaría WhatsApp
+
+/**
+ * Resuelve una pregunta vinculándola a un detalle de oferta existente.
+ */
+export async function resolverPreguntaVinculandoDetalleAction(input: z.infer<typeof VincularPreguntaInputSchema>): Promise<ActionResult<null>> {
+    const validation = VincularPreguntaInputSchema.safeParse(input);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos." };
+    }
+
+    try {
+        await prisma.preguntaSinRespuestaOferta.update({
+            where: { id: validation.data.preguntaSinRespuestaId },
+            data: {
+                estado: 'RESPONDIDA_LISTA_PARA_NOTIFICAR',
+                ofertaDetalleRespuestaId: validation.data.ofertaDetalleId,
+            }
+        });
+
+        // Idealmente, se revalida la ruta del manager que contiene este componente.
+        // revalidatePath(...) 
+
+        return { success: true, data: null };
+    } catch (error) {
+        console.error("Error al vincular pregunta:", error);
+        return { success: false, error: "No se pudo vincular la pregunta a la respuesta." };
+    }
+}
+
+
+/**
+ * Marca una pregunta como resuelta y notificada al usuario.
+ */
+export async function marcarPreguntaComoNotificadaAction(input: z.infer<typeof MarcarComoNotificadaInputSchema>): Promise<ActionResult<null>> {
+    const validation = MarcarComoNotificadaInputSchema.safeParse(input);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos." };
+    }
+
+    try {
+        await prisma.preguntaSinRespuestaOferta.update({
+            where: { id: validation.data.preguntaSinRespuestaId },
+            data: {
+                estado: 'RESUELTA_Y_NOTIFICADA', // O 'ARCHIVADA', según tu lógica de estados.
+                fechaNotificacionUsuario: new Date(),
+            }
+        });
+
+        return { success: true, data: null };
+    } catch (error) {
+        console.error("Error al marcar como notificada:", error);
+        return { success: false, error: "No se pudo actualizar el estado de la pregunta." };
+    }
+}

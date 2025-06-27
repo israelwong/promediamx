@@ -1,48 +1,104 @@
 import { z } from 'zod';
 
-// Esquema base para los campos editables de un Cliente
-// Excluimos campos sensibles o gestionados automáticamente como id, password, createdAt, updatedAt
-export const ClienteEditableFieldsSchema = z.object({
-    nombre: z.string().min(1, "El nombre es obligatorio.").max(100, "Máximo 100 caracteres."),
-    email: z.string().email("Email inválido.").max(100, "Máximo 100 caracteres."),
-    telefono: z.string().min(1, "El teléfono es obligatorio.").max(20, "Máximo 20 caracteres."),
-    rfc: z.string().max(13, "RFC no puede exceder 13 caracteres.").nullable().optional(),
-    curp: z.string().max(18, "CURP no puede exceder 18 caracteres.").nullable().optional(),
-    razonSocial: z.string().max(200, "Razón Social no puede exceder 200 caracteres.").nullable().optional(),
-    status: z.enum(['activo', 'inactivo', 'archivado']).default('activo'), // Definir los estados permitidos
-    stripeCustomerId: z.string().max(100).nullable().optional(),
+/**
+ * Esquema base para el modelo Cliente. Define todos los campos escalares
+ * y sus tipos básicos según el `schema.prisma`.
+ */
+export const baseClienteSchema = z.object({
+    id: z.string().cuid({ message: 'ID de CUID inválido.' }),
+    nombre: z.string().optional(),
+    email: z.string().email({ message: 'Por favor, introduce un correo electrónico válido.' }),
+    telefono: z.string().min(10, { message: 'El teléfono debe tener al menos 10 dígitos.' }),
+    password: z.string().min(8, { message: 'La contraseña debe tener al menos 8 caracteres.' }),
+    rfc: z.string().optional().nullable(),
+    curp: z.string().optional().nullable(),
+    razonSocial: z.string().optional().nullable(),
+    status: z.enum(['activo', 'inactivo', 'archivado']).default('activo'),
+    stripeCustomerId: z.string().optional().nullable(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
 });
 
-// Esquema para los datos que se envían al actualizar un cliente
-// No incluimos todos los campos de Cliente, solo los que el formulario edita.
-export const ActualizarClienteInputSchema = ClienteEditableFieldsSchema.partial().extend({
-    // Hacemos que ciertos campos sigan siendo requeridos en la actualización si esa es la lógica
-    nombre: z.string().min(1, "El nombre es obligatorio.").max(100).optional(), // Puede ser opcional si no siempre se actualiza
-    email: z.string().email("Email inválido.").max(100).optional(),
-    telefono: z.string().min(1, "El teléfono es obligatorio.").max(20).optional(),
-    status: z.enum(['activo', 'inactivo', 'archivado']).optional(), // Status es importante para la acción de archivar también
-}).refine(data => Object.keys(data).length > 0, {
-    message: "Se requiere al menos un campo para actualizar."
+/**
+ * Esquema para CREAR un nuevo Cliente (flujo de administrador).
+ * Valida solo los campos del formulario simplificado.
+ */
+export const createClienteAdminSchema = baseClienteSchema.pick({
+    nombre: true,
+    email: true,
+    telefono: true,
+}).required({ // Hacemos los campos requeridos explícitamente para este formulario
+    nombre: true,
+    email: true,
+    telefono: true,
 });
-export type ActualizarClienteInput = z.infer<typeof ActualizarClienteInputSchema>;
 
+/**
+ * Esquema para ACTUALIZAR un Cliente existente.
+ * Todos los campos son opcionales. La actualización de contraseña se omite intencionadamente.
+ */
+export const updateClienteSchema = baseClienteSchema.pick({
+    nombre: true,
+    email: true,
+    telefono: true,
+    rfc: true,
+    curp: true,
+    razonSocial: true,
+    status: true,
+    stripeCustomerId: true
+}).partial();
 
-// Esquema para los datos de un Cliente que se cargan para edición/visualización en el formulario
-// Incluye campos no editables como ID y fechas para mostrar.
-export const ClienteParaEditarSchema = ClienteEditableFieldsSchema.extend({
-    id: z.string().cuid(),
-    createdAt: z.date().optional(), // Opcional si no siempre lo necesitas en el form
-    updatedAt: z.date().optional(),
-    // Las relaciones complejas (negocio, contrato, etc.) se omiten aquí, se manejarían por separado.
-    // Puedes añadir _count si es necesario para alguna lógica en el form.
-    negocio: z.array(z.object({ // Ejemplo si quieres mostrar una lista simple de nombres de negocios
-        id: z.string().cuid(),
-        nombre: z.string(),
-        status: z.string().optional(),
+/**
+ * Esquema para validar solo el ID de un cliente. Útil para eliminar, archivar, etc.
+ */
+export const clienteIdSchema = baseClienteSchema.pick({ id: true });
+
+/**
+ * Esquema para los datos detallados de un cliente en la lista.
+ * Se usa para validar la salida de `getClientesConDetalles`.
+ */
+export const clienteConDetallesSchema = z.object({
+    id: z.string(),
+    nombre: z.string().nullable(),
+    email: z.string().email(),
+    status: z.string(),
+    createdAt: z.date(),
+    _count: z.object({
+        Negocio: z.number().optional(),
+    }).optional(),
+    Negocio: z.array(z.object({
+        AsistenteVirtual: z.array(z.object({
+            AsistenteTareaSuscripcion: z.array(z.object({
+                montoSuscripcion: z.number().nullable(),
+                status: z.string(),
+            })),
+        })).optional(),
     })).optional(),
 });
-export type ClienteParaEditar = z.infer<typeof ClienteParaEditarSchema>;
 
-// Esquema para el output de la acción de actualizar (puede ser el cliente completo o un subconjunto)
-export const ClienteActualizadoOutputSchema = ClienteParaEditarSchema; // O un schema más simple
-export type ClienteActualizadoOutput = z.infer<typeof ClienteActualizadoOutputSchema>;
+
+// --- TIPOS INFERIDOS DE ZOD ---
+
+export type CreateClienteAdminInput = z.infer<typeof createClienteAdminSchema>;
+export type UpdateClienteInput = z.infer<typeof updateClienteSchema>;
+export type ClienteConDetalles = z.infer<typeof clienteConDetallesSchema>;
+
+
+
+// Define la estructura de datos que la acción `getClienteById` debe devolver.
+export const clienteParaEditarSchema = baseClienteSchema.pick({
+    id: true,
+    nombre: true,
+    email: true,
+    telefono: true,
+    rfc: true,
+    curp: true,
+    razonSocial: true,
+    status: true,
+    stripeCustomerId: true,
+    createdAt: true,
+    updatedAt: true
+});
+
+
+export type ClienteParaEditar = z.infer<typeof clienteParaEditarSchema>;

@@ -1,45 +1,73 @@
-// app/admin/clientes/[clienteId]/negocios/[negocioId]/crm/components/NegocioSidebar.tsx
-// O la ruta donde realmente reside tu NegocioSidebar
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/_components/NegocioSidebar.tsx
 'use client';
 
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
+// --- Iconos para la nueva estructura (actualizados) ---
 import {
     LayoutDashboard,
-    CalendarDays,
-    Bot,
-    BookOpen,
-    Presentation,
+    MessageSquare,
+    Users, // Para Leads
+    Calendar,
     Tag,
-    Package,
     Briefcase,
-    DatabaseZap,
+    LibraryBig,
+    SlidersHorizontal,
+    Bot,
     CreditCard,
-    LibraryBig
+    UserCog, // Para Agentes
+    Columns, // Para Pipeline
+    Tags, // Para Etiquetas
 } from 'lucide-react';
 
+// --- Interfaces (sin cambios) ---
 interface NavLink {
     hrefSuffix: string;
     label: string;
     icon: React.ElementType;
 }
 
+interface NavSection {
+    title: string;
+    links: NavLink[];
+}
 
-const navLinks: NavLink[] = [
-    { hrefSuffix: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil de Negocio' },
-    { hrefSuffix: '/agenda', icon: CalendarDays, label: 'Configuración de Agenda' },
-    { hrefSuffix: '/catalogo', icon: BookOpen, label: 'Catálogo' },
-    { hrefSuffix: '/paquetes', icon: Package, label: 'Paquetes' },
-    { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
-    { hrefSuffix: '/asistente', icon: Bot, label: 'Asistentes virtuales' },
-    { hrefSuffix: '/crm', icon: DatabaseZap, label: 'CRM' },
-    { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' }, // Cambiado a Briefcase como ícono de "budget"
-    { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Conocimiento *' },
-    { hrefSuffix: '/landingpage', icon: Presentation, label: 'Vitrina digital *' },
+// --- ESTRUCTURA DE NAVEGACIÓN REFACTORIZADA ---
+// Aquí aplicamos la nueva arquitectura de información que acordamos.
+const navSections: NavSection[] = [
+    {
+        title: 'Gestión Diaria',
+        links: [
+            // CAMBIO: La ruta de Conversaciones ahora es más específica.
+            { hrefSuffix: '/crm/conversaciones', icon: MessageSquare, label: 'Conversaciones' },
+            // NUEVO: Añadido enlace a la nueva sección de Leads.
+            { hrefSuffix: '/leads', icon: Users, label: 'Leads' },
+            { hrefSuffix: '/citas', icon: Calendar, label: 'Citas Agendadas' },
+        ]
+    },
+    {
+        title: 'Campañas',
+        links: [
+            { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
+        ]
+    },
+    {
+        title: 'Configuración',
+        links: [
+            { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil del Negocio' },
+            { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
+            { hrefSuffix: '/agenda', icon: SlidersHorizontal, label: 'Config. de Agenda' },
+            { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente Virtual' },
+            { hrefSuffix: '/pagos', icon: CreditCard, label: 'Config. de Pagos' },
+            // NUEVO: Enlaces para la configuración específica del CRM.
+            { hrefSuffix: '/agentes', icon: UserCog, label: 'Agentes' },
+            { hrefSuffix: '/pipeline', icon: Columns, label: 'Ajustes de Pipeline' },
+            { hrefSuffix: '/etiquetas', icon: Tags, label: 'Etiquetas (Tags)' },
+        ]
+    },
 ];
-
 
 interface NegocioSidebarProps {
     negocioId: string;
@@ -49,62 +77,73 @@ interface NegocioSidebarProps {
 export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarProps) {
     const pathname = usePathname();
 
-    const navListClasses = "flex-grow p-3 space-y-1.5 bg-zinc-800/50 rounded-md border border-zinc-700 shadow-sm";
-    const navLinkBaseClasses = "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"; // Asumiendo que el offset es sobre un fondo oscuro
+    // Estilos (sin cambios)
+    const navContainerClasses = "flex h-full flex-col p-3 space-y-2 bg-zinc-800/50 rounded-lg border border-zinc-700 shadow-sm";
+    const navLinkBaseClasses = "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900";
     const navLinkInactiveClasses = "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100";
     const navLinkActiveClasses = "bg-blue-600 text-white shadow-sm";
+    const sectionTitleClasses = "px-3 pt-3 pb-1 text-xs font-semibold text-zinc-500 uppercase tracking-wider";
 
     const basePathForSidebar = `/admin/clientes/${clienteId}/negocios/${negocioId}`;
 
     const isActive = (hrefSuffix: string): boolean => {
         if (!pathname) return false;
-        let normalizedSuffix = hrefSuffix;
-        if (hrefSuffix === '') normalizedSuffix = '/';
-        else if (!hrefSuffix.startsWith('/')) normalizedSuffix = `/${hrefSuffix}`;
-
-        const expectedPath = `${basePathForSidebar}${normalizedSuffix === '/' ? '' : normalizedSuffix}`;
-
-        if (normalizedSuffix === '/') {
-            return pathname === basePathForSidebar || pathname === `${basePathForSidebar}/`;
+        // La lógica de 'isActive' es ahora más robusta para manejar sub-rutas como '/crm/conversaciones'
+        const expectedPath = `${basePathForSidebar}${hrefSuffix}`;
+        // Para rutas anidadas, queremos una coincidencia de inicio. Para la raíz, una coincidencia exacta.
+        if (hrefSuffix === '/') {
+            return pathname === expectedPath;
         }
-        return pathname.startsWith(`${expectedPath}/`) || pathname === expectedPath;
+        return pathname.startsWith(expectedPath);
     };
 
     const buildHref = (hrefSuffix: string): string => {
-        let normalizedSuffix = hrefSuffix;
-        if (hrefSuffix === '' || hrefSuffix === '/') normalizedSuffix = '';
-        else if (!hrefSuffix.startsWith('/')) normalizedSuffix = `/${hrefSuffix}`;
-        return `${basePathForSidebar}${normalizedSuffix}`;
+        return `${basePathForSidebar}${hrefSuffix}`;
     };
 
     if (!clienteId || !negocioId) {
-        return (
-            <nav className={navListClasses}>
-                <p className="text-zinc-500 text-xs p-3">Cargando navegación...</p>
-            </nav>
-        );
+        return <nav className={navContainerClasses}><p className="text-zinc-500 text-xs p-3">Cargando...</p></nav>;
     }
 
     return (
-        <nav className={navListClasses}>
-            <ul>
-                {navLinks.map((link) => {
-                    const active = isActive(link.hrefSuffix);
-                    const href = buildHref(link.hrefSuffix);
-                    return (
-                        <li key={link.label}>
-                            <Link
-                                href={href}
-                                className={`${navLinkBaseClasses} ${active ? navLinkActiveClasses : navLinkInactiveClasses}`}
-                                aria-current={active ? 'page' : undefined}
-                            >
-                                <link.icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`} aria-hidden="true" />
-                                <span>{link.label}</span>
-                            </Link>
+        <nav className={navContainerClasses}>
+            <div className="flex-grow">
+                <ul className="space-y-2">
+                    <li>
+                        <Link
+                            href={buildHref('/')}
+                            className={`${navLinkBaseClasses} ${isActive('/') ? navLinkActiveClasses : navLinkInactiveClasses}`}
+                        >
+                            <LayoutDashboard className={`h-4 w-4 flex-shrink-0`} />
+                            <span>Panel de Control</span>
+                        </Link>
+                    </li>
+
+                    {navSections.map((section) => (
+                        <li key={section.title}>
+                            <h4 className={sectionTitleClasses}>{section.title}</h4>
+                            <ul className="space-y-1 mt-1">
+                                {section.links.map((link) => {
+                                    const active = isActive(link.hrefSuffix);
+                                    const href = buildHref(link.hrefSuffix);
+                                    return (
+                                        <li key={link.label}>
+                                            <Link
+                                                href={href}
+                                                className={`${navLinkBaseClasses} ${active ? navLinkActiveClasses : navLinkInactiveClasses}`}
+                                                aria-current={active ? 'page' : undefined}
+                                            >
+                                                <link.icon className={`h-4 w-4 flex-shrink-0`} aria-hidden="true" />
+                                                <span>{link.label}</span>
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
                         </li>
-                    );
-                })}
-            </ul>
+                    ))}
+                </ul>
+            </div>
         </nav>
     );
 }
