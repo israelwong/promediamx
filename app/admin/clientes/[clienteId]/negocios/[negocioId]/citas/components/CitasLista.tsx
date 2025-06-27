@@ -2,11 +2,14 @@
 
 import React from 'react';
 import type { CitaType } from '@/app/admin/_lib/actions/citas/citas.schemas';
+// import { useCitaModalStore } from '@/app/admin/_lib/hooks/useCitaModalStore'; // Importamos nuestro store
 import { Badge } from '@/app/components/ui/badge';
 import { CheckCircle, Clock, XCircle, RefreshCcw, User, Phone, Tag } from 'lucide-react';
-
+import { useRouter } from 'next/navigation';
 interface Props {
     citas: CitaType[];
+    negocioId: string; // Añadimos el negocioId para futuras referencias
+    clienteId: string; // Opcional, si necesitas el ID del cliente
 }
 
 const statusMap: { [key: string]: { icon: React.ElementType; color: string; label: string } } = {
@@ -17,10 +20,24 @@ const statusMap: { [key: string]: { icon: React.ElementType; color: string; labe
     NO_ASISTIO: { icon: User, color: 'bg-zinc-500/20 text-zinc-300', label: 'No Asistió' },
 };
 
-export function CitasLista({ citas }: Props) {
-    if (citas.length === 0) {
-        return <p className="text-center text-zinc-400 py-8">No hay citas para mostrar.</p>
-    }
+export function CitasLista({ citas, negocioId, clienteId }: Props) {
+
+    const router = useRouter();
+    // Obtenemos la función para abrir el modal desde nuestro store
+    // const { onOpen } = useCitaModalStore();
+
+    // if (citas.length === 0) {
+    //     return <p className="text-center text-zinc-400 py-8">No hay citas para mostrar.</p>
+    // }
+
+    const handleRowClick = (cita: CitaType) => {
+        // Al hacer clic, abrimos el modal pasándole AMBOS IDs:
+        // el del lead y el de la cita específica.
+        if (cita.lead && 'id' in cita.lead && cita.lead.id) {
+            router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/leads/${cita.lead.id}`);
+            // onOpen(String(cita.lead.id), String(cita.id));
+        }
+    };
 
     return (
         <div className="overflow-x-auto">
@@ -37,7 +54,12 @@ export function CitasLista({ citas }: Props) {
                     {citas.map((cita) => {
                         const statusInfo = statusMap[cita.status] || statusMap['PENDIENTE'];
                         return (
-                            <tr key={cita.id} className="border-b border-zinc-700/50 hover:bg-zinc-800/80 transition-colors">
+                            // Añadimos el evento onClick a la fila y la hacemos interactiva
+                            <tr
+                                key={cita.id}
+                                onClick={() => handleRowClick(cita)}
+                                className="border-b border-zinc-700/50 hover:bg-zinc-800/80 transition-colors cursor-pointer"
+                            >
                                 <td className="p-3">
                                     <div className="font-medium text-zinc-100">{cita.lead.nombre}</div>
                                     <div className="text-xs text-zinc-400 flex items-center gap-1.5 mt-1"><Phone size={12} />{cita.lead.telefono || 'N/A'}</div>

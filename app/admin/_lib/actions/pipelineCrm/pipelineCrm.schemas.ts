@@ -167,10 +167,10 @@ export const kanbanBoardDataSchema = z.object({
 
 export type KanbanBoardData = z.infer<typeof kanbanBoardDataSchema>;
 
-
 export const actualizarEtapaLeadEnPipelineParamsSchema = z.object({
     leadId: z.string().cuid(),
     nuevoPipelineId: z.string().cuid(),
-    // clienteId: z.string().cuid().optional(), // Opcional, para revalidación
-    // negocioId: z.string().cuid().optional(),
+    // CORRECCIÓN: Añadimos los IDs para poder revalidar la ruta correcta
+    clienteId: z.string().cuid(),
+    negocioId: z.string().cuid(),
 });

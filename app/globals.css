@@ -111,3 +111,112 @@ body {
 }
 
 @import "react-big-calendar/lib/css/react-big-calendar.css";
+
+/* ======================================================================== */
+/* CUSTOM STYLES FOR REACT-BIG-CALENDAR (DARK THEME) - v3 (FINAL)          */
+/* ======================================================================== */
+
+/* --- Contenedor General --- */
+.rbc-calendar {
+  @apply !text-zinc-300;
+}
+
+/* --- Toolbar (Navegación Mes/Semana/Día) --- */
+.rbc-toolbar {
+  @apply mb-4 flex flex-wrap items-center justify-between gap-2;
+}
+.rbc-toolbar .rbc-toolbar-label {
+  @apply text-xl font-semibold text-zinc-100;
+}
+.rbc-toolbar .rbc-btn-group {
+  @apply inline-flex items-center rounded-md bg-zinc-900 border border-zinc-700 p-1 gap-1;
+}
+.rbc-toolbar .rbc-btn-group button {
+  @apply px-3 py-1.5 text-xs font-medium text-zinc-400 rounded-md transition-colors hover:bg-zinc-700/70 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+.rbc-toolbar .rbc-btn-group button.rbc-active {
+  @apply bg-blue-600 text-white shadow-sm hover:bg-blue-600;
+}
+
+/* --- Cabecera General (Días de la semana) --- */
+.rbc-header {
+  @apply !border-b-2 !border-zinc-700 p-2 text-center text-sm font-medium text-zinc-300;
+}
+.rbc-header + .rbc-header {
+  @apply !border-l !border-zinc-700;
+}
+
+/* --- Vista de Mes --- */
+.rbc-month-view {
+  @apply !border-zinc-700 rounded-lg overflow-hidden;
+}
+.rbc-month-row {
+  @apply !border-t !border-zinc-700;
+}
+.rbc-day-bg {
+  @apply !border-l !border-zinc-700;
+}
+.rbc-day-bg:first-child {
+  @apply !border-l-0;
+}
+.rbc-off-range-bg {
+  @apply !bg-zinc-800/40;
+}
+.rbc-date-cell {
+  @apply px-2 pt-1 text-right text-sm;
+}
+.rbc-off-range .rbc-date-cell {
+  @apply !text-zinc-600;
+}
+.rbc-row-content {
+  @apply !z-10;
+}
+
+/* --- Eventos (Citas) --- */
+.rbc-event,
+.rbc-agenda-table .rbc-event {
+  @apply !p-1.5 !rounded-md !bg-blue-800/80 !border !border-blue-600/70 text-zinc-100 text-xs;
+}
+.rbc-event:focus {
+  @apply !outline-none !ring-2 !ring-offset-2 !ring-offset-zinc-900 !ring-blue-500;
+}
+
+/* --- VISTAS SEMANA Y DÍA (CORRECCIÓN FINAL) --- */
+.rbc-time-view {
+  @apply !border !border-zinc-700 rounded-lg;
+}
+.rbc-time-header-content {
+  @apply !border-l-0; /* Quitamos borde izquierdo redundante */
+}
+.rbc-time-content {
+  @apply !border-t !border-zinc-700;
+}
+
+/* Columna de las horas (izquierda) */
+.rbc-time-gutter {
+  @apply !bg-zinc-800;
+}
+.rbc-time-gutter .rbc-timeslot-group {
+  @apply !border-b !border-zinc-700;
+}
+.rbc-time-gutter .rbc-time-slot {
+  @apply !border-t-0;
+}
+.rbc-time-gutter .rbc-time-slot .rbc-label {
+  @apply !text-xs text-zinc-400;
+}
+
+/* Contenido principal de las columnas de días */
+.rbc-time-content > * + * > * {
+  @apply !border-l !border-zinc-700;
+}
+
+/* Celda individual de tiempo (la caja donde va un evento) */
+.rbc-day-slot .rbc-time-slot {
+  @apply !border-t !border-zinc-800;
+}
+/* Día de hoy */
+.rbc-day-bg.rbc-today,
+.rbc-day-slot.rbc-today {
+  @apply !bg-blue-900/30;
+}

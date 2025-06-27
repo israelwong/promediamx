@@ -1,6 +1,9 @@
 // Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/layout.tsx
 import React from 'react';
 import NegocioSidebar from './components/NegocioSidebar';
+import CitaModal from './leads/components/CitaModal'; // Importamos el modal
+
+
 
 interface Props {
     clienteId: string;
@@ -12,10 +15,16 @@ export default async function LayoutNegocio({ children, params }: { children: Re
     const { negocioId, clienteId } = await params;
 
     return (
+
+
         // CORRECCIÓN DEFINITIVA:
         // Este contenedor usa h-full para ocupar todo el espacio que le da el LayoutClientes.
         // Es un contenedor flex que se dividirá horizontalmente.
         <div className='flex h-full w-full gap-6 p-6'>
+
+            {/* El CitaModal vive aquí, fuera del flujo principal, listo para ser activado. */}
+            <CitaModal negocioId={negocioId} clienteId={clienteId} />
+
             {/* 1. Sidebar */}
             <aside className="w-[250px] flex-shrink-0">
                 <NegocioSidebar

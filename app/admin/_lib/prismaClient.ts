@@ -1,16 +1,20 @@
+// Ruta: app/admin/_lib/prismaClient.ts
 import { PrismaClient } from '@prisma/client';
 
-// Uso de un objeto global extendido
-const globalForPrisma = global as typeof globalThis & {
-    prisma?: PrismaClient;
-};
+declare global {
+    var prisma: PrismaClient | undefined;
+}
 
-const prisma =
-    globalForPrisma.prisma ||
+// La lógica del Singleton se mantiene igual
+const prismaInstance =
+    global.prisma ||
     new PrismaClient({
-        // log: ['query', 'info', 'warn', 'error'],
+        log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     });
 
-if (process.env.NODE_ENV === 'development') globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') {
+    global.prisma = prismaInstance;
+}
 
-export default prisma;
+// CORRECCIÓN: Exportamos la instancia como la exportación por defecto del archivo.
+export default prismaInstance;

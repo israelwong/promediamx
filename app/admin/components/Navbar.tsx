@@ -84,8 +84,8 @@ function Navbar() {
     const baseLinks = [{ href: '/admin/dashboard', label: 'Dashboard' },];
     const adminLinks = [
         { href: '/admin/clientes', label: 'Clientes' },
-        { href: '/admin/marketplace', label: 'Marketplace' },
-        { href: '/admin/tareas', label: 'Tareas' },
+        // { href: '/admin/marketplace', label: 'Marketplace' },
+        // { href: '/admin/tareas', label: 'Tareas' },
         { href: '/admin/configurar', label: 'Configurar' },
     ];
 

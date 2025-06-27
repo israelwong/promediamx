@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 // --- NUEVAS IMPORTS ---
 import {
     actualizarLeadAction,
-    eliminarLeadAction
+    // eliminarLeadAction
 } from '@/app/admin/_lib/actions/lead/lead.actions';
 import type {
     ActualizarLeadFormData, // Para el estado del formulario
@@ -22,7 +22,7 @@ import { actualizarLeadFormValidationSchema } from '@/app/admin/_lib/actions/lea
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
-import { Loader2, Save, ArrowLeft, Trash } from 'lucide-react';
+import { Loader2, Save, ArrowLeft } from 'lucide-react';
 import { useForm, Controller, SubmitHandler } from 'react-hook-form'; // Importar para react-hook-form
 import { zodResolver } from '@hookform/resolvers/zod'; // Importar resolver
 
@@ -99,28 +99,7 @@ export default function LeadFormEditar({ leadInicial, datosSelects, negocioId, c
     };
 
     const handleCancel = () => {
-        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads`);
-    };
-
-    const handleDeleteLead = async () => {
-        if (confirm("¿Estás seguro de que deseas eliminar este lead? Esta acción no se puede deshacer.")) {
-            setSubmitError(null);
-            setIsSubmitting(true);
-            try {
-                const result = await eliminarLeadAction({ leadId: leadInicial.id }); // Nueva Action
-                if (result.success) {
-                    router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads`);
-                    router.refresh();
-                } else {
-                    throw new Error(result.error || "Error desconocido al eliminar el lead.");
-                }
-            } catch (err) {
-                console.error("Error deleting lead:", err);
-                setSubmitError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
-            } finally {
-                setIsSubmitting(false);
-            }
-        }
+        router.back(); // Volver a la página anterior
     };
 
     // Clases (sin cambios)
@@ -167,8 +146,8 @@ export default function LeadFormEditar({ leadInicial, datosSelects, negocioId, c
                         {errors.nombre && <p className="text-xs text-red-400 mt-1">{errors.nombre.message}</p>}
                     </div>
                     <div className="sm:col-span-3">
-                        <label htmlFor="email" className={labelClasses}>Email (No editable)</label>
-                        <Input id="email" name="email" type="email" defaultValue={leadInicial.email || ''} className={`${inputClasses} bg-zinc-800 cursor-not-allowed`} disabled readOnly />
+                        <label htmlFor="email" className={labelClasses}>Email</label>
+                        <Input id="email" name="email" type="email" defaultValue={leadInicial.email || ''} className={`${inputClasses} bg-zinc-800 cursor-not-allowed`} />
                     </div>
                     <div className="sm:col-span-3">
                         <label htmlFor="telefono" className={labelClasses}>Teléfono</label>
@@ -321,19 +300,9 @@ export default function LeadFormEditar({ leadInicial, datosSelects, negocioId, c
 
                 {/* Botones de Acción */}
                 <div className="pt-5 flex flex-col sm:flex-row justify-between gap-3 border-t border-zinc-700 mt-1">
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={handleDeleteLead}
-                        disabled={isSubmitting}
-                        className="text-red-500 hover:bg-red-900/50 hover:text-red-400 order-last sm:order-first"
-                    >
-                        <Trash className="mr-2 h-4 w-4" />
-                        Eliminar Lead
-                    </Button>
                     <div className="flex gap-3 justify-end">
                         <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting} className="bg-transparent hover:bg-zinc-700">
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Cancelar
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Cancelar / regresar
                         </Button>
                         <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700">
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}

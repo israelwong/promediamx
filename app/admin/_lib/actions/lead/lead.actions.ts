@@ -2,6 +2,7 @@
 import { Prisma } from '@prisma/client';
 import prisma from '@/app/admin/_lib/prismaClient';
 import type { ActionResult } from '@/app/admin/_lib/types';
+import { asignarEtiquetaLeadParamsSchema } from './lead.schemas';
 import {
     obtenerLeadDetallesParamsSchema,
     obtenerEtiquetasAsignadasLeadParamsSchema,
@@ -11,15 +12,30 @@ import {
     obtenerDatosParaFiltrosLeadParamsSchema,
     DatosParaFiltrosLeadData,
     // LeadListaItemData,
-    LeadDetalleData,                 // Tipo de salida para detalles
+    // LeadDetalleData,                 // Tipo de salida para detalles
     leadDetalleSchema,               // Schema Zod para validar la salida
     obtenerDatosFormularioLeadParamsSchema,
     DatosFormularioLeadData,
     actualizarLeadParamsSchema,
     eliminarLeadParamsSchema,
     crearLeadParamsSchema,
-
 } from './lead.schemas'; // Asumiendo que los schemas están aquí
+
+// Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
+type LeadDetalleData = {
+    id: string;
+    nombre: string;
+    email: string | null;
+    telefono: string | null;
+    status: string | null;
+    pipelineId: string | null;
+    agenteId: string | null;
+    canalId: string | null;
+    valorEstimado: number | null;
+    etiquetaIds: string[];
+    createdAt: Date;
+    updatedAt: Date;
+};
 import { z } from 'zod';
 import { crearInteraccionSistemaAction } from '../conversacion/conversacion.actions'; // Necesitaremos esta acción refactorizada
 import { revalidatePath } from 'next/cache';
@@ -146,28 +162,6 @@ export async function obtenerDatosFiltrosLeadAction(
 }
 
 
-// export async function obtenerLeadDetallesAction(
-//     params: z.infer<typeof obtenerLeadDetallesParamsSchema>
-// ): Promise<ActionResult<LeadDetailsForPanelData | null>> {
-//     const validation = obtenerLeadDetallesParamsSchema.safeParse(params);
-//     if (!validation.success) {
-//         return { success: false, error: "ID de Lead inválido.", errorDetails: validation.error.flatten().fieldErrors };
-//     }
-//     const { leadId } = validation.data;
-//     try {
-//         const lead = await prisma.lead.findUnique({
-//             where: { id: leadId },
-//             select: { id: true, nombre: true, email: true, telefono: true },
-//         });
-//         if (!lead) {
-//             return { success: false, error: 'Lead no encontrado.', data: null };
-//         }
-//         return { success: true, data: lead };
-//     } catch (error) {
-//         console.error('Error en obtenerLeadDetallesAction:', error);
-//         return { success: false, error: 'No se pudieron cargar los detalles del lead.', data: null };
-//     }
-// }
 
 export async function obtenerEtiquetasAsignadasLeadAction(
     params: z.infer<typeof obtenerEtiquetasAsignadasLeadParamsSchema>
@@ -221,18 +215,13 @@ export async function actualizarEtiquetasDelLeadAction( // Renombrada para clari
 }
 
 
-
-
-
-
-
-
-export async function obtenerLeadDetallesAction( // Nombre consistente
+// Reemplaza tu función existente con esta versión
+export async function obtenerLeadDetallesAction(
     params: z.infer<typeof obtenerLeadDetallesParamsSchema>
 ): Promise<ActionResult<LeadDetalleData | null>> {
     const validation = obtenerLeadDetallesParamsSchema.safeParse(params);
     if (!validation.success) {
-        return { success: false, error: "ID de Lead inválido.", errorDetails: validation.error.flatten().fieldErrors, data: null };
+        return { success: false, error: "ID de Lead inválido.", data: null };
     }
     const { leadId } = validation.data;
 
@@ -249,12 +238,7 @@ export async function obtenerLeadDetallesAction( // Nombre consistente
                 agenteId: true,
                 canalId: true,
                 valorEstimado: true,
-                jsonParams: true, // Para campos personalizados
-                Etiquetas: { // Obtener las etiquetas asignadas
-                    select: {
-                        etiquetaId: true,
-                    },
-                },
+                Etiquetas: { select: { etiquetaId: true } },
                 createdAt: true,
                 updatedAt: true,
             },
@@ -264,34 +248,34 @@ export async function obtenerLeadDetallesAction( // Nombre consistente
             return { success: false, error: 'Lead no encontrado.', data: null };
         }
 
-        // Mapear a LeadDetalleData
-        const leadData: LeadDetalleData = {
+        // Preparamos el objeto para la validación
+        const leadDataParaValidar = {
             id: lead.id,
             nombre: lead.nombre,
-            email: lead.email,
-            telefono: lead.telefono,
-            status: lead.status,
-            pipelineId: lead.pipelineId,
-            agenteId: lead.agenteId,
-            canalId: lead.canalId,
-            valorEstimado: lead.valorEstimado,
-            // jsonParams: lead.jsonParams ? JSON.parse(JSON.stringify(lead.jsonParams)) : null, // Asegurar que es un objeto JSON parseable si es necesario
+            email: lead.email ?? null,
+            telefono: lead.telefono ?? null,
+            status: lead.status ?? null,
+            pipelineId: lead.pipelineId ?? null,
+            agenteId: lead.agenteId ?? null,
+            canalId: lead.canalId ?? null,
+            valorEstimado: lead.valorEstimado ?? null,
             etiquetaIds: lead.Etiquetas.map(le => le.etiquetaId),
             createdAt: lead.createdAt,
-            updatedAt: lead.updatedAt,
+            // CORRECCIÓN CLAVE: Garantizamos que 'updatedAt' NUNCA sea null.
+            // Si es null, usamos la fecha de creación como valor de respaldo.
+            updatedAt: lead.updatedAt ?? lead.createdAt,
         };
 
-        // Validar con Zod antes de devolver es una buena práctica
-        const parseResult = leadDetalleSchema.safeParse(leadData);
-        if (!parseResult.success) {
-            console.error("Error de validación Zod en obtenerLeadDetallesAction:", parseResult.error.flatten());
-            // console.log("Datos que fallaron:", leadData);
-            return { success: false, error: "Formato de datos del lead inesperado.", data: null };
-        }
+        // Usamos .parse() que es más estricto. Si falla, irá al bloque catch.
+        const validatedData = leadDetalleSchema.parse(leadDataParaValidar);
 
-        return { success: true, data: parseResult.data };
+        return { success: true, data: validatedData };
 
     } catch (error) {
+        if (error instanceof z.ZodError) {
+            console.error("Error de validación Zod FINAL:", error.flatten());
+            return { success: false, error: "Los datos recibidos de la base de datos no coinciden con el formato esperado." };
+        }
         console.error(`Error en obtenerLeadDetallesAction para leadId ${leadId}:`, error);
         return { success: false, error: 'No se pudieron cargar los detalles del lead.', data: null };
     }
@@ -404,29 +388,23 @@ export async function actualizarLeadAction(
                 });
             }
 
-            // Aquí podrías añadir la lógica para crear una interacción de sistema si es necesario
-            // if (params.conversacionId && params.nombreAgenteQueActualiza) {
-            //   await crearInteraccionSistemaAction({
-            //       conversacionId: params.conversacionId,
-            //       mensaje: `Detalles del lead actualizados por ${params.nombreAgenteQueActualiza}.`
-            //   }, tx);
-            // }
-
             return updatedLead; // Devolver el lead con sus campos base
         });
 
         // Re-mapear para incluir etiquetaIds directamente como en LeadDetalleData
         const finalData: LeadDetalleData = {
             ...leadActualizado,
+            email: leadActualizado.email ?? null,
+            telefono: leadActualizado.telefono ?? null,
+            status: leadActualizado.status ?? null,
+            pipelineId: leadActualizado.pipelineId ?? null,
+            agenteId: leadActualizado.agenteId ?? null,
+            canalId: leadActualizado.canalId ?? null,
+            valorEstimado: leadActualizado.valorEstimado ?? null,
             etiquetaIds: etiquetaIds || [], // Usar las etiquetaIds que se intentaron guardar
-            // jsonParams si lo manejas, necesitas seleccionarlo y pasarlo.
+            createdAt: leadActualizado.createdAt,
+            updatedAt: leadActualizado.updatedAt,
         };
-
-        // Revalidar paths para que la UI se actualice (lista de leads, página del lead)
-        // Necesitarás clienteId y negocioId para esto, considera pasarlos a la action o derivarlos.
-        // Por ahora, revalidación genérica, pero deberías hacerla más específica.
-        // revalidatePath(`/admin/crm/leads`); // Ejemplo
-        // revalidatePath(`/admin/crm/leads/${leadId}`); // Ejemplo
 
         const parseResult = leadDetalleSchema.safeParse(finalData);
         if (!parseResult.success) {
@@ -599,3 +577,268 @@ export async function crearLeadAction(
         return { success: false, error: 'No se pudo crear el lead.', data: null };
     }
 }
+
+import { obtenerDetallesLeadParamsSchema } from './lead.schemas';
+
+// Define LeadDetails type if not imported from schemas
+type LeadDetails = {
+    id: string;
+    nombre: string;
+    email: string | null;
+    telefono: string | null;
+    pipeline: { id: string; nombre: string } | null;
+    etapaPipeline: { id: string; nombre: string } | null; // Renombrado para consistencia
+    etiquetas: { id: string; nombre: string; color: string | null }[]; // Añadido para que coincida con el objeto retornado
+    createdAt?: Date;
+    updatedAt?: Date;
+};
+
+
+export async function obtenerDetallesLeadAction(
+    params: z.infer<typeof obtenerDetallesLeadParamsSchema>
+): Promise<ActionResult<LeadDetails>> {
+    const validation = obtenerDetallesLeadParamsSchema.safeParse(params);
+    if (!validation.success) return { success: false, error: "ID de lead inválido." };
+
+    try {
+        const lead = await prisma.lead.findUnique({
+            where: { id: validation.data.leadId },
+            select: {
+                id: true,
+                nombre: true,
+                email: true,
+                telefono: true,
+                // CORRECCIÓN: Añadimos 'crmId' a la consulta para que coincida con el esquema.
+                Pipeline: { select: { id: true, nombre: true, crmId: true } },
+                Etiquetas: {
+                    select: {
+                        etiqueta: { select: { id: true, nombre: true, color: true } }
+                    }
+                }
+            }
+        });
+
+        if (!lead) return { success: false, error: "Lead no encontrado." };
+
+        const leadData: LeadDetails = {
+            id: lead.id,
+            nombre: lead.nombre,
+            email: lead.email,
+            telefono: lead.telefono,
+            pipeline: lead.Pipeline, // Agrega la propiedad pipeline
+            etapaPipeline: lead.Pipeline, // Puedes mantener esto si lo usas en otro lado, o eliminarlo si no es necesario
+            etiquetas: lead.Etiquetas.map(e => e.etiqueta)
+        };
+
+        return { success: true, data: leadData };
+
+    } catch (error) {
+        console.error("Error en obtenerDetallesLeadAction:", error);
+        return { success: false, error: "Error al obtener detalles del lead." };
+    }
+}
+
+import { marcarLeadComoGanadoParamsSchema } from './lead.schemas';
+
+export async function marcarLeadComoGanadoAction(
+    params: z.infer<typeof marcarLeadComoGanadoParamsSchema>
+): Promise<ActionResult<boolean>> {
+    const validation = marcarLeadComoGanadoParamsSchema.safeParse(params);
+    if (!validation.success) return { success: false, error: "Parámetros inválidos." };
+    const { leadId, negocioId } = validation.data;
+
+    try {
+        // 1. Encontrar la etapa "Ganado" de este negocio
+        const etapaGanado = await prisma.pipelineCRM.findFirst({
+            where: {
+                crm: { negocioId },
+                nombre: { equals: 'Ganado', mode: 'insensitive' }
+            },
+        });
+
+        if (!etapaGanado) return { success: false, error: "No se encontró la etapa 'Ganado'." };
+
+        // 2. Actualizar el lead a esta nueva etapa
+        await prisma.lead.update({
+            where: { id: leadId },
+            data: { pipelineId: etapaGanado.id },
+        });
+
+        // 3. Revalidar el path para que Next.js refresque los datos del pipeline
+        revalidatePath(`/admin/clientes/.*/negocios/${negocioId}/leads`);
+
+        return { success: true, data: true };
+    } catch {
+        return { success: false, error: "Error al actualizar el lead." };
+    }
+}
+
+import { actualizarEstadoCitaParamsSchema } from '../citas/citas.schemas'; // Asegúrate de que este schema esté definido correctamente
+
+export async function actualizarEstadoCitaAction(
+    params: z.infer<typeof actualizarEstadoCitaParamsSchema>
+): Promise<ActionResult<boolean>> {
+    const validation = actualizarEstadoCitaParamsSchema.safeParse(params);
+    if (!validation.success) return { success: false, error: "Parámetros inválidos." };
+
+    const { agendaId, nuevoEstado } = validation.data;
+
+    try {
+        await prisma.agenda.update({
+            where: { id: agendaId },
+            data: { status: nuevoEstado },
+        });
+
+        // Asumimos que las citas se ven en una ruta de 'citas', revalidamos
+        revalidatePath('/admin/clientes/.*/negocios/.*/citas');
+
+        return { success: true, data: true };
+    } catch {
+        return { success: false, error: "Error al actualizar el estado de la cita." };
+    }
+}
+
+
+export async function asignarEtiquetaLeadAction(
+    params: z.infer<typeof asignarEtiquetaLeadParamsSchema>
+): Promise<ActionResult<boolean>> {
+    const validation = asignarEtiquetaLeadParamsSchema.safeParse(params);
+    if (!validation.success) return { success: false, error: "Parámetros inválidos." };
+
+    const { leadId, nombreEtiqueta, crmId, colorEtiqueta } = validation.data;
+
+    try {
+        // Usamos 'upsert' para crear la etiqueta si no existe, o encontrarla si ya existe.
+        const etiqueta = await prisma.etiquetaCRM.upsert({
+            where: { crmId_nombre: { crmId, nombre: nombreEtiqueta } },
+            update: {}, // No actualizamos nada si ya existe
+            create: {
+                crmId,
+                nombre: nombreEtiqueta,
+                color: colorEtiqueta,
+            },
+        });
+
+        // Creamos la relación en la tabla intermedia, ignorando si ya existe.
+        await prisma.leadEtiqueta.create({
+            data: {
+                leadId,
+                etiquetaId: etiqueta.id,
+            },
+        });
+
+        // Revalidamos la ruta de leads para que se reflejen los cambios en la UI
+        // Esta es una revalidación más genérica que puede servir.
+        revalidatePath('/admin/clientes', 'layout');
+
+        return { success: true, data: true };
+    } catch (error) {
+        // Prisma tira un error P2002 si la relación ya existe, lo cual no es un error para nosotros.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            return { success: true, data: true };
+        }
+        console.error("Error en asignarEtiquetaLeadAction:", error);
+        return { success: false, error: "No se pudo asignar la etiqueta." };
+    }
+}
+
+
+import { etiquetarYReubicarLeadParamsSchema } from './lead.schemas';
+export async function etiquetarYReubicarLeadAction(
+    params: z.infer<typeof etiquetarYReubicarLeadParamsSchema>
+): Promise<ActionResult<boolean>> {
+    const validation = etiquetarYReubicarLeadParamsSchema.safeParse(params);
+    if (!validation.success) return { success: false, error: "Parámetros inválidos." };
+
+    const { leadId, negocioId, nombreEtiqueta, nombreEtapaDestino } = validation.data;
+
+    try {
+        // Usamos una transacción para asegurar que ambas operaciones (o ninguna) se completen.
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Encontrar el CRM ID
+            const lead = await tx.lead.findUnique({ where: { id: leadId }, select: { crmId: true } });
+            if (!lead?.crmId) throw new Error("CRM no encontrado para este lead.");
+
+            // 2. Crear/encontrar la etiqueta
+            const etiqueta = await tx.etiquetaCRM.upsert({
+                where: { crmId_nombre: { crmId: lead.crmId, nombre: nombreEtiqueta } },
+                update: {},
+                create: { crmId: lead.crmId, nombre: nombreEtiqueta },
+            });
+
+            // 3. Asignar la etiqueta al lead
+            await tx.leadEtiqueta.create({
+                data: { leadId, etiquetaId: etiqueta.id },
+            });
+
+            // 4. Encontrar la etapa de destino del pipeline
+            const etapaDestino = await tx.pipelineCRM.findFirst({
+                where: { crm: { negocioId }, nombre: { equals: nombreEtapaDestino, mode: 'insensitive' } },
+            });
+            if (!etapaDestino) throw new Error(`Etapa de pipeline '${nombreEtapaDestino}' no encontrada.`);
+
+            // 5. Mover el lead a la nueva etapa
+            await tx.lead.update({
+                where: { id: leadId },
+                data: { pipelineId: etapaDestino.id },
+            });
+
+            return true;
+        });
+
+        revalidatePath('/admin/clientes', 'layout');
+        return { success: true, data: result };
+
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            // Si la etiqueta ya estaba asignada, no es un error fatal.
+            return { success: true, data: true };
+        }
+        console.error("Error en etiquetarYReubicarLeadAction:", error);
+        return { success: false, error: (error as Error).message || "No se pudo completar la acción." };
+    }
+}
+
+import { cambiarEtapaLeadParamsSchema } from './lead.schemas';
+
+export async function cambiarEtapaLeadAction(
+    params: z.infer<typeof cambiarEtapaLeadParamsSchema>
+): Promise<ActionResult<boolean>> {
+    const validation = cambiarEtapaLeadParamsSchema.safeParse(params);
+    if (!validation.success) {
+        return { success: false, error: "Parámetros inválidos." };
+    }
+
+    const { leadId, negocioId, nombreEtapaDestino } = validation.data;
+
+    try {
+        // 1. Encontrar la etapa de destino del pipeline por su nombre para ese negocio
+        const etapaDestino = await prisma.pipelineCRM.findFirst({
+            where: {
+                crm: { negocioId },
+                nombre: { equals: nombreEtapaDestino, mode: 'insensitive' } // 'insensitive' para evitar errores de mayúsculas/minúsculas
+            },
+        });
+
+        // Si no se encuentra la etapa, es un error fatal para esta operación.
+        if (!etapaDestino) {
+            return { success: false, error: `La etapa de pipeline '${nombreEtapaDestino}' no fue encontrada.` };
+        }
+
+        // 2. Mover el lead a esta nueva etapa
+        await prisma.lead.update({
+            where: { id: leadId },
+            data: { pipelineId: etapaDestino.id },
+        });
+
+        // Revalidamos el caché para que la UI refleje el cambio
+        revalidatePath('/admin/clientes', 'layout');
+
+        return { success: true, data: true };
+
+    } catch (error) {
+        console.error(`Error en cambiarEtapaLeadAction:`, error);
+        return { success: false, error: "No se pudo actualizar la etapa del lead." };
+    }
+}
+

@@ -6,6 +6,9 @@ import { Card, CardContent } from "@/app/components/ui/card";
 import { GripVertical } from 'lucide-react';
 import { type LeadInKanbanCard } from '@/app/admin/_lib/actions/pipelineCrm/pipelineCrm.schemas';
 
+import { useCitaModalStore } from '@/app/admin/_lib/hooks/useCitaModalStore';
+
+
 interface LeadCardProps {
     lead: LeadInKanbanCard;
     isDragging?: boolean;
@@ -21,6 +24,8 @@ export default function LeadCard({ lead, isDragging = false }: LeadCardProps) {
         isDragging: isSortableDragging,
     } = useSortable({ id: lead.id, data: { lead } });
 
+    const { onOpen } = useCitaModalStore();
+
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
@@ -30,7 +35,9 @@ export default function LeadCard({ lead, isDragging = false }: LeadCardProps) {
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="bg-zinc-900 border-zinc-700/80 hover:border-zinc-600 transition-all cursor-grab active:cursor-grabbing">
+            <Card
+                onClick={() => onOpen(lead.id)} // Abrimos el modal al hacer clic
+                className="bg-zinc-900 border-zinc-700/80 hover:border-zinc-600 transition-all cursor-grab active:cursor-grabbing">
                 <CardContent className="p-3">
                     <div className="flex justify-between items-start">
                         <p className="text-sm font-medium text-zinc-200 break-words">{lead.nombre}</p>

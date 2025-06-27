@@ -120,20 +120,19 @@ export type ActualizarEtiquetasLeadParams = z.infer<typeof actualizarEtiquetasLe
 
 // Esquema para los detalles completos de un Lead para el formulario de edición
 export const leadDetalleSchema = z.object({
-    id: z.string().cuid(),
-    nombre: z.string().min(1, "El nombre es requerido."),
-    email: z.string().email("Email inválido.").nullable().optional().or(z.literal('')), // Permite string vacío
-    telefono: z.string().nullable().optional().or(z.literal('')),
-    status: z.string().nullable().optional(), // Considerar z.enum si los estados son fijos
-    pipelineId: z.string().cuid().nullable().optional(),
-    agenteId: z.string().cuid().nullable().optional(),
-    canalId: z.string().cuid().nullable().optional(),
-    valorEstimado: z.number().nullable().optional(),
-    // jsonParams: z.record(z.any()).nullable().optional(), // Para campos personalizados, si los usas
-    etiquetaIds: z.array(z.string().cuid()).default([]), // IDs de las etiquetas asignadas
-    // Campos de auditoría (opcionales en el form, pero útiles para mostrar)
-    createdAt: z.date().optional(),
-    updatedAt: z.date().nullable().optional(),
+    id: z.string(),
+    nombre: z.string(),
+    email: z.string().nullable(),
+    telefono: z.string().nullable(),
+    status: z.string().nullable(),
+    pipelineId: z.string().nullable(),
+    agenteId: z.string().nullable(),
+    canalId: z.string().nullable(),
+    valorEstimado: z.number().nullable(),
+    etiquetaIds: z.array(z.string()),
+    createdAt: z.date(),
+    // CORRECCIÓN DEFINITIVA: Hacemos que el esquema espere SIEMPRE una fecha. No permitimos null.
+    updatedAt: z.date(),
 });
 export type LeadDetalleData = z.infer<typeof leadDetalleSchema>;
 
@@ -270,3 +269,59 @@ export const listarLeadsResultSchema = z.object({
 export type ListarLeadsParams = z.infer<typeof listarLeadsParamsSchema>;
 export type LeadListItem = z.infer<typeof leadListItemSchema>;
 export type ListarLeadsResult = z.infer<typeof listarLeadsResultSchema>;
+
+export const obtenerDetallesLeadParamsSchema = z.object({
+    leadId: z.string().cuid(),
+});
+
+export const asignarEtiquetaLeadParamsSchema = z.object({
+    leadId: z.string().cuid(),
+    nombreEtiqueta: z.string().min(1),
+    // Opcional: para crear la etiqueta si no existe
+    crmId: z.string().cuid(),
+    colorEtiqueta: z.string().optional(),
+});
+
+export const etiquetarYReubicarLeadParamsSchema = z.object({
+    leadId: z.string().cuid(),
+    negocioId: z.string().cuid(),
+    nombreEtiqueta: z.string().min(1),
+    nombreEtapaDestino: z.string().min(1), // El nombre de la columna del pipeline a la que se moverá
+});
+
+
+
+// Esquema para una etiqueta individual
+const etiquetaSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    color: z.string().nullable(),
+});
+
+// Actualizamos el esquema principal de los detalles del lead
+export const leadDetailsSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    email: z.string().nullable(),
+    telefono: z.string().nullable(),
+    // CORRECCIÓN: Nos aseguramos que la definición aquí requiera el crmId.
+    etapaPipeline: z.object({
+        id: z.string(),
+        nombre: z.string(),
+        crmId: z.string(),
+    }).nullable(),
+    etiquetas: z.array(etiquetaSchema).optional(),
+});
+export type LeadDetails = z.infer<typeof leadDetailsSchema>;
+
+export const marcarLeadComoGanadoParamsSchema = z.object({
+    leadId: z.string().cuid(),
+    negocioId: z.string().cuid(),
+});
+
+
+export const cambiarEtapaLeadParamsSchema = z.object({
+    leadId: z.string().cuid(),
+    negocioId: z.string().cuid(),
+    nombreEtapaDestino: z.string().min(1),
+});

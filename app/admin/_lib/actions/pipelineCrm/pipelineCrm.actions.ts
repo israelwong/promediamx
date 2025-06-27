@@ -19,7 +19,7 @@ import {
     PipelineSimple
 } from './pipelineCrm.schemas';
 import { z } from 'zod';
-// import { revalidatePath } from 'next/cache';
+import { revalidatePath } from 'next/cache';
 
 
 
@@ -277,44 +277,34 @@ export async function obtenerDatosPipelineKanbanAction(
 
 
 // --- REFACTORIZACIÓN de actualizarEtapaLead ---
-export async function actualizarEtapaLeadEnPipelineAction( // Nombre más específico
+export async function actualizarEtapaLeadEnPipelineAction(
     params: z.infer<typeof actualizarEtapaLeadEnPipelineParamsSchema>
-): Promise<ActionResult<{ leadId: string; nuevoPipelineId: string } | null>> { // Devuelve los IDs para confirmación
+): Promise<ActionResult<{ leadId: string; nuevoPipelineId: string } | null>> {
     const validation = actualizarEtapaLeadEnPipelineParamsSchema.safeParse(params);
     if (!validation.success) {
-        return { success: false, error: "Datos inválidos para actualizar la etapa del lead.", errorDetails: validation.error.flatten().fieldErrors };
+        return { success: false, error: "Datos inválidos para actualizar." };
     }
-    const { leadId, nuevoPipelineId /*, clienteId, negocioId */ } = validation.data;
+    // CORRECCIÓN: Obtenemos los nuevos IDs
+    const { leadId, nuevoPipelineId, clienteId, negocioId } = validation.data;
 
     try {
         const updatedLead = await prisma.lead.update({
             where: { id: leadId },
             data: {
                 pipelineId: nuevoPipelineId,
-                updatedAt: new Date(), // Actualizar timestamp del lead
-                // Si tienes un campo 'ordenEnEtapa' en Lead, lo actualizarías aquí también.
-                // Para ello, necesitarías que la acción `actualizarEtapaLeadEnPipelineAction` reciba el nuevo array de leads de la columna
-                // y actualice el orden de todos los leads en esa columna. Por ahora, lo mantenemos simple.
+                updatedAt: new Date(),
             },
-            select: { id: true, pipelineId: true } // Confirmar los datos actualizados
+            select: { id: true, pipelineId: true }
         });
 
-        // Revalidar el path del pipeline y, si es posible, el path específico del lead
-        // if (negocioId && clienteId) {
-        //    revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/pipeline`);
-        //    revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/crm/leads/${leadId}`);
-        // } else {
-        //    // Revalidación más genérica si no se tienen los IDs de contexto
-        //    revalidatePath('/admin/crm/pipeline', 'layout'); // Revalida el layout y sus hijos
-        // }
-
+        // CORRECCIÓN: Invalidamos el caché de la página de leads
+        const path = `/admin/clientes/${clienteId}/negocios/${negocioId}/leads`;
+        revalidatePath(path);
+        console.log(`Ruta revalidada: ${path}`);
 
         return { success: true, data: { leadId: updatedLead.id, nuevoPipelineId: updatedLead.pipelineId! } };
     } catch (error) {
-        console.error(`Error al actualizar etapa para lead ${leadId} a ${nuevoPipelineId}:`, error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-            return { success: false, error: `El Lead o la Etapa de Pipeline no fueron encontrados.` };
-        }
+        console.error(`Error al actualizar etapa para lead ${leadId}:`, error);
         return { success: false, error: 'No se pudo actualizar la etapa del Lead.' };
     }
 }
@@ -379,3 +369,4 @@ export async function obtenerPipelinesCrmAction(negocioId: string): Promise<Acti
         return { success: false, error: "Error al obtener etapas del pipeline." };
     }
 }
+// La función revalidatePath ya está importada de 'next/cache' y puede usarse directamente.

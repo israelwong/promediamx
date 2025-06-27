@@ -3,7 +3,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import LeadFormEditar from './components/LeadEditForm'; // Sin cambios aquí
-import LeadGestionCitas from './components/LeadGestionCitas'; // Sin cambios aquí
+// import LeadGestionCitas from './components/LeadGestionCitas'; // Sin cambios aquí
 
 // --- NUEVAS IMPORTS ---
 import {
@@ -68,7 +68,7 @@ export default async function LeadDetailPage({ params: paramsPromise }: { params
     };
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-5 gap-6"> {/* Ajustado a xl:grid-cols-5 como sugerencia previa */}
+        <div className="grid grid-cols-1 gap-6"> {/* Ajustado a xl:grid-cols-5 como sugerencia previa */}
             {/* Columna Principal (Formulario de Edición) */}
             <div className="lg:col-span-2 xl:col-span-3 space-y-6"> {/* Ajustado col-span */}
                 <LeadFormEditar
@@ -81,11 +81,10 @@ export default async function LeadDetailPage({ params: paramsPromise }: { params
             </div>
 
             {/* Columna Secundaria (Gestión de Citas y otros) */}
-            <div className="lg:col-span-1 xl:col-span-2 space-y-4 bg-zinc-800/50 p-4 rounded-lg shadow-md border border-zinc-700">
+            {/* <div className="lg:col-span-1 xl:col-span-2 space-y-4 bg-zinc-800/50 p-4 rounded-lg shadow-md border border-zinc-700">
                 <h3 className="text-lg font-semibold text-zinc-200 border-b border-zinc-700 pb-2">Agenda y Seguimiento</h3>
                 <LeadGestionCitas leadId={leadId} negocioId={negocioId} />
-                {/* Aquí podrías añadir también la Bitácora del Lead en el futuro */}
-            </div>
+            </div> */}
         </div>
     );
 }
