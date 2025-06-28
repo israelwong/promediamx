@@ -88,3 +88,50 @@ export const EnviarMensajeWhatsAppApiInputSchema = z.object({
     }, { message: "Se requiere 'mediaUrl' para mensajes de tipo media.", path: ['mediaUrl'] });
 
 export type EnviarMensajeWhatsAppApiInput = z.infer<typeof EnviarMensajeWhatsAppApiInputSchema>;
+
+
+
+export type AsistenteContext = {
+    id: string;
+    nombre: string;
+    negocio: {
+        id: string;
+        nombre: string;
+        CRM: {
+            id: string;
+        } | null;
+    } | null;
+};
+
+export type FsmContext = {
+    conversacionId: string;
+    leadId: string;
+    asistente: AsistenteContext;
+    mensaje: WhatsAppMessageInput;
+    usuarioWaId: string;
+    negocioPhoneNumberId: string;
+};
+
+// Tipos específicos para los datos que guarda cada tarea en el contexto
+export type AgendarCitaContext = {
+    servicioId?: string;
+    servicioNombre?: string;
+    fechaHora?: string;
+    fechaParcial?: string; // Fecha parcial en formato ISO String
+};
+
+export type CancelarCitaContext = {
+    citasEncontradas?: { id: string; asunto: string; fecha: Date; tipoDeCitaId: string | null }[];
+    citaIdParaCancelar?: string;
+};
+
+export type ReagendarCitaContext = {
+    citasEncontradas?: { id: string; asunto: string; fecha: Date; tipoDeCitaId: string | null }[];
+    citaOriginalId?: string;
+    citaOriginalAsunto?: string;
+    citaOriginalFecha?: Date;
+    citaOriginalTipoDeCitaId?: string | null;
+    nuevaFechaHora?: string;
+    nuevaFechaParcial?: { año: number; mes: number; dia: number };
+    preguntaConfirmacionHecha?: boolean;
+};

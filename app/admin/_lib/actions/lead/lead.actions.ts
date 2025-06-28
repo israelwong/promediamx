@@ -8,12 +8,8 @@ import {
     obtenerEtiquetasAsignadasLeadParamsSchema,
     actualizarEtiquetasLeadParamsSchema,
     listarLeadsParamsSchema,
-    // ListarLeadsResultData,
     obtenerDatosParaFiltrosLeadParamsSchema,
     DatosParaFiltrosLeadData,
-    // LeadListaItemData,
-    // LeadDetalleData,                 // Tipo de salida para detalles
-    leadDetalleSchema,               // Schema Zod para validar la salida
     obtenerDatosFormularioLeadParamsSchema,
     DatosFormularioLeadData,
     actualizarLeadParamsSchema,
