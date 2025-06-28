@@ -8,7 +8,7 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import type { TareaEnProgreso } from '@prisma/client';
 import type { ActionResult } from '@/app/admin/_lib/types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
-import { ejecutarBuscarCitasAction } from '../helpers/actions.helpers';
+import { ejecutarBuscarCitasAction } from '../helpers/actions.helpers-x';
 import { enviarMensajeAsistente } from '../core/orchestrator';
 
 export async function manejarBuscarCitas(

@@ -1,6 +1,6 @@
 // /tasks/reagendarCita.handler.ts
-// Este handler contiene la compleja lógica para la tarea de reagendar una cita.
-// Es el más robusto, manejando identificación, extracción de datos parciales y completos, y validación.
+// VERSION FINAL, COMPLETA Y REFACTORIZADA (27 de junio de 2025)
+// Utiliza un helper de IA especializado para la extracción inicial y mantiene flujos robustos como fallback.
 
 'use server';
 
@@ -14,8 +14,8 @@ import type { ActionResult } from '../../../types';
 import type { FsmContext, ReagendarCitaContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
 
 // Helpers
-import { construirFechaDesdePalabrasClave, sonElMismoDia } from '../helpers/date.helpers';
-import { extraerPalabrasClaveDeFecha } from '../helpers/ia.helpers';
+import { construirFechaDesdePalabrasClave } from '../helpers/date.helpers';
+import { extraerFechasParaReagendamiento, extraerPalabrasClaveDeFecha } from '../helpers/ia.helpers';
 import { verificarDisponibilidad, findBestMatchingAppointment } from '../helpers/availability.helpers';
 import { ejecutarReagendamientoFinalCitaAction } from '../helpers/actions.helpers';
 
@@ -35,7 +35,7 @@ export async function manejarReagendarCita(
 
     const tareaContexto = (tarea.contexto as ReagendarCitaContext) || {};
 
-    console.log(`[FSM-REAGENDAR] Iniciando. Estado: ${tarea.estado}. Contexto:`, tareaContexto);
+    console.log(`[FSM-REAGENDAR-V2] Iniciando. Estado: ${tarea.estado}. Contexto:`, tareaContexto);
 
     switch (tarea.estado) {
 
@@ -51,66 +51,63 @@ export async function manejarReagendarCita(
                 return { success: true, data: null };
             }
 
-            // --- ¡LÓGICA DE CIRUGÍA LÁSER! ---
-            let textoCitaOriginal = textoUsuario;
-            const separadores = [' para el ', ' para la ', ' al ', ' a las '];
-            for (const sep of separadores) {
-                if (textoUsuario.toLowerCase().includes(sep)) {
-                    textoCitaOriginal = textoUsuario.split(new RegExp(sep, 'i'))[0];
-                    break;
+            // 1. Llamamos a nuestro nuevo helper de IA especializado.
+            const extraccion = await extraerFechasParaReagendamiento(textoUsuario);
+
+            // 2. Analizamos el resultado para decidir el camino a seguir.
+            if (extraccion?.original?.texto && extraccion.nueva) {
+                // CASO A: ¡Éxito! El usuario dio toda la info. Intentamos el "camino rápido".
+                console.log('[FSM-REAGENDAR-V2] Detectado intento de "camino rápido".', extraccion);
+
+                const citaIdentificada = findBestMatchingAppointment(extraccion.original.texto, citasActivas);
+                const { fecha: nuevaFecha, hora: nuevaHora } = construirFechaDesdePalabrasClave(extraccion.nueva, new Date());
+
+                if (citaIdentificada && nuevaFecha && nuevaHora) {
+                    // Si tenemos todo, saltamos directo a la validación.
+                    tareaContexto.citaOriginalId = citaIdentificada.id;
+                    tareaContexto.citaOriginalAsunto = citaIdentificada.asunto;
+                    tareaContexto.citaOriginalFecha = citaIdentificada.fecha;
+                    tareaContexto.citaOriginalTipoDeCitaId = citaIdentificada.tipoDeCitaId;
+
+                    nuevaFecha.setHours(nuevaHora.hora, nuevaHora.minuto, 0, 0);
+                    tareaContexto.nuevaFechaHora = nuevaFecha.toISOString();
+
+                    const tareaActualizada = await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.VALIDANDO_DISPONIBILIDAD } });
+                    return manejarReagendarCita(tareaActualizada, mensaje, contexto); // Re-llamada para entrar al estado de validación
                 }
             }
 
-            const citaIdentificada = findBestMatchingAppointment(textoCitaOriginal, citasActivas);
-
+            // CASO B: El usuario fue genérico o la IA no pudo extraer todo. Seguimos el camino seguro paso a paso.
+            // Primero, intentamos identificar la cita a mover.
+            const citaIdentificada = findBestMatchingAppointment(textoUsuario, citasActivas);
             if (citaIdentificada) {
+                // Si encontramos la cita, la guardamos y pedimos la nueva fecha.
                 tareaContexto.citaOriginalId = citaIdentificada.id;
                 tareaContexto.citaOriginalAsunto = citaIdentificada.asunto;
-                const fechaOriginal = new Date(citaIdentificada.fecha);
-                tareaContexto.citaOriginalFecha = fechaOriginal;
+                tareaContexto.citaOriginalFecha = citaIdentificada.fecha;
                 tareaContexto.citaOriginalTipoDeCitaId = citaIdentificada.tipoDeCitaId;
 
-                const palabrasClave = await extraerPalabrasClaveDeFecha(textoUsuario);
-                if (palabrasClave) {
+                await prisma.tareaEnProgreso.update({
+                    where: { id: tarea.id },
+                    data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.RECOLECTANDO_NUEVA_FECHA }
+                });
 
-                    const resultadoCalculo = construirFechaDesdePalabrasClave(palabrasClave, new Date(), fechaOriginal);
-                    let fechaCalculada = resultadoCalculo.fecha;
-                    const horaCalculada = resultadoCalculo.hora;
-
-
-                    if (fechaCalculada && sonElMismoDia(fechaCalculada, fechaOriginal) && !horaCalculada) {
-                        fechaCalculada = null;
-                    }
-
-                    if (fechaCalculada && horaCalculada) {
-                        console.log("[FSM-HÍBRIDO] Se calculó cita, fecha y hora. Saltando a VALIDAR.");
-                        fechaCalculada.setHours(horaCalculada.hora, horaCalculada.minuto, 0, 0);
-                        tareaContexto.nuevaFechaHora = fechaCalculada.toISOString();
-                        const tareaActualizada = await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.VALIDANDO_DISPONIBILIDAD } });
-                        return manejarReagendarCita(tareaActualizada, mensaje, contexto);
-                    } else if (fechaCalculada) {
-                        console.log("[FSM-HÍBRIDO] Se calculó cita y fecha. Saltando a PEDIR HORA.");
-                        tareaContexto.nuevaFechaParcial = { año: fechaCalculada.getFullYear(), mes: fechaCalculada.getMonth() + 1, dia: fechaCalculada.getDate() };
-                        await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.RECOLECTANDO_NUEVA_HORA } });
-                        await enviarMensajeAsistente(conversacionId, `Entendido, para el ${fechaCalculada.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}. ¿A qué hora te gustaría?`, usuarioWaId, negocioPhoneNumberId);
-                        return { success: true, data: null };
-                    }
-                }
-
-                const fechaLegibleOriginal = fechaOriginal.toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' });
-                await enviarMensajeAsistente(conversacionId, `Ok, vamos a reagendar tu cita del ${fechaLegibleOriginal}. ¿Para qué nueva fecha y hora te gustaría?`, usuarioWaId, negocioPhoneNumberId);
-                await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.RECOLECTANDO_NUEVA_FECHA } });
+                const fechaLegibleOriginal = new Date(citaIdentificada.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' });
+                await enviarMensajeAsistente(conversacionId, `Ok, vamos a reagendar tu cita para "${citaIdentificada.asunto}" del ${fechaLegibleOriginal}. ¿Para qué nueva fecha y hora te gustaría?`, usuarioWaId, negocioPhoneNumberId);
 
             } else {
+                // CASO C: No se pudo identificar una cita. Mostramos la lista para que el usuario elija.
                 let mensajeLista = "Encontré estas citas a tu nombre. Por favor, dime cuál quieres mover y para qué nueva fecha y hora te gustaría:\n";
                 citasActivas.forEach((cita, index) => {
                     const fechaLegible = new Date(cita.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' });
                     mensajeLista += `\n${index + 1}. ${cita.asunto} el ${fechaLegible}`;
                 });
+
                 tareaContexto.citasEncontradas = citasActivas.map(c => ({ ...c, fecha: new Date(c.fecha) }));
                 await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject } });
                 await enviarMensajeAsistente(conversacionId, mensajeLista, usuarioWaId, negocioPhoneNumberId);
             }
+
             return { success: true, data: null };
         }
 
@@ -120,31 +117,27 @@ export async function manejarReagendarCita(
             if (palabrasClave) {
                 const { fecha: fechaCalculada, hora: horaCalculada } = construirFechaDesdePalabrasClave(palabrasClave, new Date());
 
-                // Caso A: El usuario dio fecha y hora completas.
                 if (fechaCalculada && horaCalculada) {
                     fechaCalculada.setHours(horaCalculada.hora, horaCalculada.minuto, 0, 0);
                     tareaContexto.nuevaFechaHora = fechaCalculada.toISOString();
                     const tareaActualizada = await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.VALIDANDO_DISPONIBILIDAD } });
                     return manejarReagendarCita(tareaActualizada, mensaje, contexto);
-                }
-                // Caso B: El usuario solo dio una fecha válida.
-                else if (fechaCalculada) {
+                } else if (fechaCalculada) {
                     tareaContexto.nuevaFechaParcial = { año: fechaCalculada.getFullYear(), mes: fechaCalculada.getMonth() + 1, dia: fechaCalculada.getDate() };
                     await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.RECOLECTANDO_NUEVA_HORA } });
                     await enviarMensajeAsistente(conversacionId, `Entendido, para el ${fechaCalculada.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}. ¿A qué hora te gustaría?`, usuarioWaId, negocioPhoneNumberId);
-                    return { success: true, data: null };
+                } else {
+                    await enviarMensajeAsistente(conversacionId, "Disculpa, no entendí la fecha que mencionaste. ¿Podrías intentarlo de nuevo? Por ejemplo: 'para el próximo martes a las 3pm'.", usuarioWaId, negocioPhoneNumberId);
                 }
+            } else {
+                await enviarMensajeAsistente(conversacionId, "Disculpa, no entendí la fecha que mencionaste. ¿Podrías intentarlo de nuevo? Por ejemplo: 'para el próximo martes a las 3pm'.", usuarioWaId, negocioPhoneNumberId);
             }
-
-            // --- ESTA ES LA SOLUCIÓN ---
-            // Caso C (El "catch-all"): Si no se encontraron palabras clave, o si no pudimos construir una fecha válida con ellas.
-            // En cualquier caso de no entender, pedimos que lo intente de nuevo.
-            await enviarMensajeAsistente(conversacionId, "Disculpa, no entendí la fecha que mencionaste. ¿Podrías intentarlo de nuevo? Por ejemplo: 'para el próximo martes a las 3pm'.", usuarioWaId, negocioPhoneNumberId);
             return { success: true, data: null };
         }
 
         case EstadoTareaConversacional.RECOLECTANDO_NUEVA_HORA: {
             const palabrasClave = await extraerPalabrasClaveDeFecha(textoUsuario);
+
             if (palabrasClave && palabrasClave.hora_str && tareaContexto.nuevaFechaParcial) {
                 const { hora: horaCalculada } = construirFechaDesdePalabrasClave(palabrasClave, new Date());
                 if (horaCalculada) {
@@ -164,6 +157,7 @@ export async function manejarReagendarCita(
         }
 
         case EstadoTareaConversacional.VALIDANDO_DISPONIBILIDAD: {
+            // Este bloque no requiere cambios, su lógica es sólida.
             const estaDisponible = await verificarDisponibilidad({
                 negocioId: asistente.negocio!.id,
                 tipoDeCitaId: tareaContexto.citaOriginalTipoDeCitaId!,
@@ -187,6 +181,7 @@ export async function manejarReagendarCita(
         }
 
         case EstadoTareaConversacional.PENDIENTE_CONFIRMACION_USUARIO: {
+            // Este bloque no requiere cambios, su lógica es sólida.
             const respuestaUsuarioConfirmacion = textoUsuario.toLowerCase();
             const afirmaciones = ['si', 'sí', 'afirmativo', 'correcto', 'claro', 'adelante'];
             const negaciones = ['no', 'nel', 'cancelar', 'está mal'];
@@ -205,13 +200,10 @@ export async function manejarReagendarCita(
             return { success: true, data: null };
         }
 
-        // El caso PENDIENTE_CONFIRMACION_FECHA_AMBIGUA lo podemos eliminar si el calculador de fecha es robusto.
-        // Si se mantiene, su lógica no cambia.
-
         default: {
             console.warn(`[FSM ADVERTENCIA] Tarea 'reagendarCita' en estado no manejado: ${tarea.estado}`);
             await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
+            return { success: true, data: null };
         }
     }
-    return { success: true, data: null };
 }

@@ -2,21 +2,24 @@
 // Este archivo contiene funciones puras para la manipulación y cálculo de fechas.
 // No tiene dependencias externas más allá de las nativas de JavaScript/TypeScript.
 
+// /helpers/date.helpers.ts
+
 export function construirFechaDesdePalabrasClave(
     palabrasClave: { dia_semana?: string; dia_relativo?: string; dia_mes?: number; hora_str?: string },
-    fechaReferencia: Date
+    fechaReferencia: Date,
+    fechaCitaOriginal?: Date
 ): { fecha: Date | null, hora: { hora: number, minuto: number } | null, fechaEncontrada: boolean, horaEncontrada: boolean } {
 
-    const fechaCalculada: Date | null = new Date(fechaReferencia);
+    let fechaCalculada: Date | null = new Date(fechaReferencia);
     let fechaModificada = false;
 
+    // --- LÓGICA DE CÁLCULO DE DÍA (sin cambios) ---
     if (palabrasClave.dia_relativo?.toLowerCase() === 'mañana') {
         fechaCalculada.setDate(fechaCalculada.getDate() + 1);
         fechaModificada = true;
     } else if (palabrasClave.dia_relativo?.toLowerCase() === 'hoy') {
         fechaModificada = true;
     }
-
     if (palabrasClave.dia_semana) {
         const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
         const diaTarget = diasSemana.indexOf(palabrasClave.dia_semana.toLowerCase());
@@ -28,34 +31,44 @@ export function construirFechaDesdePalabrasClave(
             fechaModificada = true;
         }
     }
-
     if (palabrasClave.dia_mes) {
         fechaCalculada.setDate(palabrasClave.dia_mes);
         fechaModificada = true;
     }
 
+    // --- LÓGICA DE CÁLCULO DE HORA (CORREGIDA) ---
     let horaCalculada: { hora: number, minuto: number } | null = null;
     let horaEncontrada = false;
-    if (palabrasClave.hora_str) {
+
+    if (palabrasClave.hora_str?.toLowerCase().includes('misma hora') && fechaCitaOriginal) {
+        const originalDate = new Date(fechaCitaOriginal);
+        // Obtenemos la hora LOCAL de la cita original.
+        horaCalculada = { hora: originalDate.getHours(), minuto: originalDate.getMinutes() };
+        horaEncontrada = true;
+    }
+    else if (palabrasClave.hora_str) {
         const matchHora = palabrasClave.hora_str.match(/(\d{1,2}):?(\d{2})?/);
         if (matchHora) {
             let hora = parseInt(matchHora[1], 10);
             const minuto = matchHora[2] ? parseInt(matchHora[2], 10) : 0;
-
             if (palabrasClave.hora_str.toLowerCase().includes('pm') && hora < 12) { hora += 12; }
             if (palabrasClave.hora_str.toLowerCase().includes('am') && hora === 12) { hora = 0; }
-
             horaCalculada = { hora, minuto };
             horaEncontrada = true;
-
-            if (fechaCalculada) {
-                fechaCalculada.setHours(hora, minuto, 0, 0);
-            }
         }
     }
 
+    // Aplicamos la hora LOCAL a la fecha calculada.
+    if (horaEncontrada && fechaCalculada) {
+        fechaCalculada.setHours(horaCalculada!.hora, horaCalculada!.minuto, 0, 0);
+    }
+
+    if (!fechaModificada) {
+        fechaCalculada = null;
+    }
+
     return {
-        fecha: fechaModificada ? fechaCalculada : null,
+        fecha: fechaCalculada,
         hora: horaCalculada,
         fechaEncontrada: fechaModificada,
         horaEncontrada: horaEncontrada

@@ -1,12 +1,14 @@
 // /helpers/actions.helpers.ts
-// Este archivo contiene las acciones finales que ejecutan cambios en la base de datos (Crear, Actualizar, Borrar).
+// Contiene las acciones finales que ejecutan cambios en la BD o llaman a APIs externas.
+
+'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
-import { Agenda, StatusAgenda } from '@prisma/client';
-import type { ActionResult } from '@/app/admin/_lib/types';
-import type { AgendarCitaContext, FsmContext, ReagendarCitaContext } from '../whatsapp.schemas'; // Importamos los tipos desde su nuevo hogar
-import { EnviarMensajeWhatsAppApiInputSchema, type EnviarMensajeWhatsAppApiInput } from '../whatsapp.schemas';
-import { InteraccionParteTipo } from '@prisma/client';
+import type { Agenda } from '@prisma/client';
+import { StatusAgenda, InteraccionParteTipo } from '@prisma/client';
+import type { ActionResult } from '../../../types';
+import type { AgendarCitaContext, FsmContext, ReagendarCitaContext, EnviarMensajeWhatsAppApiInput } from '../whatsapp.schemas';
+import { EnviarMensajeWhatsAppApiInputSchema } from '../whatsapp.schemas';
 
 export async function ejecutarConfirmacionFinalCitaAction(
     tareaContexto: AgendarCitaContext,
@@ -109,10 +111,11 @@ export async function ejecutarBuscarCitasAction(
     const { leadId } = fsmContexto;
 
     try {
-        // La consulta ahora solo busca citas PENDIENTES, como definimos.
         const citasFuturas = await prisma.agenda.findMany({
             where: {
                 leadId: leadId,
+                // --- AJUSTE DE CONSISTENCIA ---
+                // La consulta ahora solo busca citas PENDIENTES, como definimos.
                 status: StatusAgenda.PENDIENTE,
                 fecha: { gte: new Date() }
             },
@@ -138,7 +141,7 @@ export async function ejecutarBuscarCitasAction(
     }
 }
 
-// Esta función ahora vive aquí
+
 export async function enviarMensajeInternoYWhatsAppAction(input: {
     conversacionId: string;
     contentFuncion: string;
@@ -148,7 +151,6 @@ export async function enviarMensajeInternoYWhatsAppAction(input: {
     destinatarioWaId: string;
     negocioPhoneNumberIdEnvia: string;
 }) {
-    // Lógica para guardar la interacción en la BD...
     await prisma.interaccion.create({
         data: {
             conversacionId: input.conversacionId,
@@ -159,7 +161,6 @@ export async function enviarMensajeInternoYWhatsAppAction(input: {
         }
     });
 
-    // Lógica para obtener el token del asistente...
     const asistente = await prisma.asistenteVirtual.findFirst({
         where: { phoneNumberId: input.negocioPhoneNumberIdEnvia }
     });
@@ -168,19 +169,16 @@ export async function enviarMensajeInternoYWhatsAppAction(input: {
         return;
     }
 
-    // Llamada a la API de WhatsApp
     await enviarMensajeWhatsAppApiAction({
         destinatarioWaId: input.destinatarioWaId,
         mensajeTexto: input.contentFuncion,
         negocioPhoneNumberIdEnvia: input.negocioPhoneNumberIdEnvia,
         tokenAccesoAsistente: asistente.token,
-        // --- ¡CORRECCIÓN AQUÍ! ---
-        // Añadimos la propiedad obligatoria que faltaba.
         tipoMensaje: 'text'
     });
 }
 
-// Esta función también vive aquí, ya que la anterior depende de ella.
+
 export async function enviarMensajeWhatsAppApiAction(
     input: EnviarMensajeWhatsAppApiInput
 ): Promise<ActionResult<string | null>> {
@@ -195,8 +193,6 @@ export async function enviarMensajeWhatsAppApiAction(
         negocioPhoneNumberIdEnvia,
         tokenAccesoAsistente,
         tipoMensaje = 'text',
-        // mediaUrl,
-        // caption,
     } = validation.data;
 
     const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v20.0';

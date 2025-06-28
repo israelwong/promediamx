@@ -1171,6 +1171,8 @@ model CRMCampoPersonalizado{
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  metadata  Json? // Para almacenar metadatos adicionales si es necesario
+
   tareasQueLoRequieren TareaCampoPersonalizado[]
   @@unique([crmId, nombre]) // Nombre visible único por CRM
   @@index([crmId]) // Índice añadido
@@ -1466,7 +1468,6 @@ enum EstadoTareaConversacional {
   PENDIENTE_CONFIRMACION_FECHA_AMBIGUA
 }
 
-
 //==================================================
 // GESTOR DE ESTADO DE TAREAS CONVERSACIONALES
 //==================================================
@@ -1495,6 +1496,7 @@ model TareaEnProgreso {
 
   @@index([conversacionId, estado]) // ANTES: @@index([conversacionId, status])
 }
+
 //!CONVERSACIONES
 model Conversacion {
   id                 String    @id @default(cuid())

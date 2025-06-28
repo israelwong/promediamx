@@ -37,12 +37,39 @@ export async function manejarConversacionGeneral(
         nombreTarea = 'cancelarCita';
     }
 
-    const keywordsBuscar = ['que citas tengo', 'mis citas', 'ver mis citas', 'ver mi agenda', 'muéstrame mis citas'];
+    const keywordsBuscar = [
+        'que citas tengo',
+        'mis citas',
+        'ver mis citas',
+        'ver mi agenda',
+        'muéstrame mis citas',
+        'cuando es mi cita',
+        'qué cita tengo',
+        'para cuando es mi cita',
+        'cuando tengo cita',
+        'tengo cita',
+        'cuándo es mi cita',
+        'qué citas tengo',
+        'cuándo tengo cita',
+        'cuándo tengo mi cita'
+    ];
     if (!nombreTarea && keywordsBuscar.some(kw => mensajeTexto.includes(kw))) {
         nombreTarea = 'buscarCitas';
     }
 
-    const keywordsAgendar = ['cita', 'agendar', 'reservar', 'reservación'];
+    const keywordsAgendar = [
+        'agendar cita',
+        'reservar cita',
+        'nueva cita',
+        'agendamiento',
+        'reservación',
+        'visitar la escuela',
+        'visitar el colegio',
+        'asistir a la escuela',
+        'conocer el colegio',
+        'conocer la escuela',
+        'ir a ver la escuela',
+    ];
     if (!nombreTarea && keywordsAgendar.some(kw => mensajeTexto.includes(kw))) {
         nombreTarea = 'agendarCita';
     }

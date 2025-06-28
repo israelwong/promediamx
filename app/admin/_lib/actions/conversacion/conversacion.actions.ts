@@ -24,7 +24,7 @@ import {
 import { z } from 'zod';
 
 // Importar la acción para enviar mensajes de WhatsApp y su tipo de input
-import { enviarMensajeWhatsAppApiAction } from '../whatsapp/helpers/actions.helpers';
+import { enviarMensajeWhatsAppApiAction } from '../whatsapp/helpers/actions.helpers-x';
 
 
 export async function crearInteraccionSistemaAction(

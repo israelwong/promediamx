@@ -19,7 +19,8 @@ import {
     CreditCard,
     UserCog, // Para Agentes
     Columns, // Para Pipeline
-    Tags, // Para Etiquetas
+    Tags,
+    VariableIcon, // Para Etiquetas
 } from 'lucide-react';
 
 // --- Interfaces (sin cambios) ---
@@ -58,13 +59,14 @@ const navSections: NavSection[] = [
         links: [
             { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil del Negocio' },
             { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
-            { hrefSuffix: '/agenda', icon: SlidersHorizontal, label: 'Config. de Agenda' },
+            { hrefSuffix: '/agenda', icon: SlidersHorizontal, label: 'Agendamiento' },
             { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente Virtual' },
-            { hrefSuffix: '/pagos', icon: CreditCard, label: 'Config. de Pagos' },
+            { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' },
             // NUEVO: Enlaces para la configuración específica del CRM.
             { hrefSuffix: '/agentes', icon: UserCog, label: 'Agentes' },
             { hrefSuffix: '/pipeline', icon: Columns, label: 'Ajustes de Pipeline' },
-            { hrefSuffix: '/etiquetas', icon: Tags, label: 'Etiquetas (Tags)' },
+            { hrefSuffix: '/etiquetas', icon: Tags, label: 'Etiquetas' },
+            { hrefSuffix: '/parametrosPersonalizados', icon: VariableIcon, label: 'Parametros' },
         ]
     },
 ];

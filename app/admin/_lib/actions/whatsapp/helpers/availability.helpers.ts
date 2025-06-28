@@ -153,24 +153,19 @@ export function findBestMatchingService(
 ): { id: string; nombre: string } | null {
 
     const userInputCorregido = userInput.toLowerCase();
-    // Podemos añadir aquí correcciones de typos comunes si es necesario
-
     const userKeywords = new Set(userInputCorregido.split(' ').filter(k => k.length > 1));
 
     let scoredServices = services.map(service => {
         let score = 0;
-        const serviceKeywords = new Set(service.nombre.toLowerCase().split(' '));
+        const serviceNameLower = service.nombre.toLowerCase();
+        const serviceKeywords = new Set(serviceNameLower.split(' '));
 
+        // Puntuación por coincidencia de palabras clave
         userKeywords.forEach(keyword => {
             if (serviceKeywords.has(keyword)) {
-                score += 10; // Coincidencia de palabra exacta
-            } else {
-                // Coincidencia parcial (ej. "info" en "información")
-                serviceKeywords.forEach(serviceKeyword => {
-                    if (serviceKeyword.includes(keyword)) {
-                        score += 5;
-                    }
-                });
+                score += 10; // Coincidencia de palabra completa, máxima puntuación
+            } else if (serviceNameLower.includes(keyword)) {
+                score += 5; // Coincidencia parcial (ej. "info" en "información")
             }
         });
 
@@ -183,6 +178,5 @@ export function findBestMatchingService(
     const maxScore = Math.max(...scoredServices.map(a => a.score));
     const bestMatches = scoredServices.filter(a => a.score === maxScore);
 
-    // Devuelve el resultado solo si hay un único ganador claro
     return bestMatches.length === 1 ? bestMatches[0] : null;
 }

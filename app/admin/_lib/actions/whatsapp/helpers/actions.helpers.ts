@@ -1,14 +1,12 @@
 // /helpers/actions.helpers.ts
-// Contiene las acciones finales que ejecutan cambios en la BD o llaman a APIs externas.
-
-'use server';
+// Este archivo contiene las acciones finales que ejecutan cambios en la base de datos (Crear, Actualizar, Borrar).
 
 import prisma from '@/app/admin/_lib/prismaClient';
-import type { Agenda } from '@prisma/client';
-import { StatusAgenda, InteraccionParteTipo } from '@prisma/client';
-import type { ActionResult } from '../../../types';
-import type { AgendarCitaContext, FsmContext, ReagendarCitaContext, EnviarMensajeWhatsAppApiInput } from '../whatsapp.schemas';
-import { EnviarMensajeWhatsAppApiInputSchema } from '../whatsapp.schemas';
+import { Agenda, StatusAgenda } from '@prisma/client';
+import type { ActionResult } from '@/app/admin/_lib/types';
+import type { AgendarCitaContext, FsmContext, ReagendarCitaContext } from '../whatsapp.schemas'; // Importamos los tipos desde su nuevo hogar
+import { EnviarMensajeWhatsAppApiInputSchema, type EnviarMensajeWhatsAppApiInput } from '../whatsapp.schemas';
+import { InteraccionParteTipo } from '@prisma/client';
 
 export async function ejecutarConfirmacionFinalCitaAction(
     tareaContexto: AgendarCitaContext,
@@ -111,11 +109,10 @@ export async function ejecutarBuscarCitasAction(
     const { leadId } = fsmContexto;
 
     try {
+        // La consulta ahora solo busca citas PENDIENTES, como definimos.
         const citasFuturas = await prisma.agenda.findMany({
             where: {
                 leadId: leadId,
-                // --- AJUSTE DE CONSISTENCIA ---
-                // La consulta ahora solo busca citas PENDIENTES, como definimos.
                 status: StatusAgenda.PENDIENTE,
                 fecha: { gte: new Date() }
             },
@@ -141,7 +138,7 @@ export async function ejecutarBuscarCitasAction(
     }
 }
 
-
+// Esta función ahora vive aquí
 export async function enviarMensajeInternoYWhatsAppAction(input: {
     conversacionId: string;
     contentFuncion: string;
@@ -151,6 +148,7 @@ export async function enviarMensajeInternoYWhatsAppAction(input: {
     destinatarioWaId: string;
     negocioPhoneNumberIdEnvia: string;
 }) {
+    // Lógica para guardar la interacción en la BD...
     await prisma.interaccion.create({
         data: {
             conversacionId: input.conversacionId,
@@ -161,6 +159,7 @@ export async function enviarMensajeInternoYWhatsAppAction(input: {
         }
     });
 
+    // Lógica para obtener el token del asistente...
     const asistente = await prisma.asistenteVirtual.findFirst({
         where: { phoneNumberId: input.negocioPhoneNumberIdEnvia }
     });
@@ -169,16 +168,19 @@ export async function enviarMensajeInternoYWhatsAppAction(input: {
         return;
     }
 
+    // Llamada a la API de WhatsApp
     await enviarMensajeWhatsAppApiAction({
         destinatarioWaId: input.destinatarioWaId,
         mensajeTexto: input.contentFuncion,
         negocioPhoneNumberIdEnvia: input.negocioPhoneNumberIdEnvia,
         tokenAccesoAsistente: asistente.token,
+        // --- ¡CORRECCIÓN AQUÍ! ---
+        // Añadimos la propiedad obligatoria que faltaba.
         tipoMensaje: 'text'
     });
 }
 
-
+// Esta función también vive aquí, ya que la anterior depende de ella.
 export async function enviarMensajeWhatsAppApiAction(
     input: EnviarMensajeWhatsAppApiInput
 ): Promise<ActionResult<string | null>> {
@@ -193,6 +195,8 @@ export async function enviarMensajeWhatsAppApiAction(
         negocioPhoneNumberIdEnvia,
         tokenAccesoAsistente,
         tipoMensaje = 'text',
+        // mediaUrl,
+        // caption,
     } = validation.data;
 
     const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v20.0';
@@ -224,5 +228,65 @@ export async function enviarMensajeWhatsAppApiAction(
         return { success: true, data: messageId || null };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Error de red al enviar mensaje." };
+    }
+}
+
+
+// /helpers/actions.helpers.ts
+// Actualización: Nueva función para construir dinámicamente un menú de agendamiento
+// basado en los campos personalizados y sus metadatos.
+// CORRECCIÓN: Ahora usa `crmId` como parámetro, que es el correcto.
+
+export async function construirMenuDeAgendamiento(crmId: string): Promise<string> {
+    try {
+        // 1. Obtenemos la información de los campos relevantes en una sola consulta
+        const campos = await prisma.cRMCampoPersonalizado.findMany({
+            where: {
+                crmId: crmId,
+                nombre: { in: ["Colegio", "Nivel Educativo"] }
+            },
+        });
+
+        const campoColegio = campos.find(c => c.nombre === "Colegio");
+        const campoNivel = campos.find(c => c.nombre === "Nivel Educativo");
+
+        // Fallback por si los campos no existen o no tienen metadata
+        if (!campoColegio || !campoNivel || !campoColegio.metadata || !campoNivel.metadata) {
+            return "Por favor, indícame el Colegio, Nivel Educativo y Grado para tu cita.";
+        }
+
+        // 2. Extraemos las opciones de la metadata
+        const metadataColegio = campoColegio.metadata as { opciones?: string[] };
+        const metadataNivel = campoNivel.metadata as { opcionesCondicionales?: Record<string, string[]> };
+
+        const opcionesColegio = metadataColegio.opciones || [];
+        const opcionesCondicionalesNivel = metadataNivel.opcionesCondicionales || {};
+
+        if (opcionesColegio.length === 0) {
+            return "Por favor, indícame el Colegio, Nivel Educativo y Grado para tu cita.";
+        }
+
+        // 3. Construimos el mensaje dinámicamente
+        let menu = `Entendido. ¿Para qué colegio, nivel educativo y grado te gustaría tu cita de Informes?\n\n`;
+
+        for (const colegio of opcionesColegio) {
+            const nombreNormalizado = colegio.charAt(0).toUpperCase() + colegio.slice(1).toLowerCase();
+            menu += `*${nombreNormalizado}*\n`;
+
+            const nivelesDisponibles = opcionesCondicionalesNivel[colegio] || [];
+            if (nivelesDisponibles.length > 0) {
+                // Normalizamos cada nivel para que se vea bien
+                const nivelesNormalizados = nivelesDisponibles.map(n => n.charAt(0).toUpperCase() + n.slice(1).toLowerCase());
+                menu += `_${nivelesNormalizados.join(' | ')}_\n\n`;
+            }
+        }
+
+        menu += `Puedes responder con todo junto para ir más rápido, por ejemplo:\n"primero de primaria en Tecno"`;
+
+        return menu;
+
+    } catch (error) {
+        console.error("Error al construir el menú de agendamiento:", error);
+        return "Por favor, indícame el Colegio, Nivel Educativo y Grado para tu cita.";
     }
 }

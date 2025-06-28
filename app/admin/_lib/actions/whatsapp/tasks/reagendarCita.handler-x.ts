@@ -5,20 +5,22 @@
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
-// Importamos los 'tipos' y 'valores' (Enums) de Prisma por separado.
+// Tipos y Enums de Prisma
 import type { TareaEnProgreso, Prisma } from '@prisma/client';
 import { StatusAgenda, EstadoTareaConversacional } from '@prisma/client';
 
+// Tipos personalizados y Schemas
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ReagendarCitaContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
 
-// Importando todos nuestros helpers y acciones desde sus nuevos hogares
+// Helpers
 import { construirFechaDesdePalabrasClave, sonElMismoDia } from '../helpers/date.helpers-x';
 import { extraerPalabrasClaveDeFecha } from '../helpers/ia.helpers-x';
 import { verificarDisponibilidad, findBestMatchingAppointment } from '../helpers/availability.helpers-x';
 import { ejecutarReagendamientoFinalCitaAction } from '../helpers/actions.helpers-x';
-import { enviarMensajeAsistente } from '../core/orchestrator';
 
+// Core
+import { enviarMensajeAsistente } from '../core/orchestrator';
 
 export async function manejarReagendarCita(
     tarea: TareaEnProgreso,
@@ -39,17 +41,27 @@ export async function manejarReagendarCita(
 
         case EstadoTareaConversacional.RECOLECTANDO_DATOS: {
             const citasActivas = await prisma.agenda.findMany({
-                where: { leadId, status: { in: [StatusAgenda.PENDIENTE] }, fecha: { gte: new Date() } },
-                orderBy: { fecha: 'asc' }, take: 5, select: { id: true, asunto: true, fecha: true, tipoDeCitaId: true }
+                where: { leadId, status: StatusAgenda.PENDIENTE, fecha: { gte: new Date() } },
+                orderBy: { fecha: 'asc' }, take: 10, select: { id: true, asunto: true, fecha: true, tipoDeCitaId: true }
             });
 
             if (citasActivas.length === 0) {
                 await enviarMensajeAsistente(conversacionId, "No encontré ninguna cita futura para reagendar.", usuarioWaId, negocioPhoneNumberId);
                 await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
-                break;
+                return { success: true, data: null };
             }
 
-            const citaIdentificada = findBestMatchingAppointment(textoUsuario, citasActivas);
+            // --- ¡LÓGICA DE CIRUGÍA LÁSER! ---
+            let textoCitaOriginal = textoUsuario;
+            const separadores = [' para el ', ' para la ', ' al ', ' a las '];
+            for (const sep of separadores) {
+                if (textoUsuario.toLowerCase().includes(sep)) {
+                    textoCitaOriginal = textoUsuario.split(new RegExp(sep, 'i'))[0];
+                    break;
+                }
+            }
+
+            const citaIdentificada = findBestMatchingAppointment(textoCitaOriginal, citasActivas);
 
             if (citaIdentificada) {
                 tareaContexto.citaOriginalId = citaIdentificada.id;
@@ -61,14 +73,11 @@ export async function manejarReagendarCita(
                 const palabrasClave = await extraerPalabrasClaveDeFecha(textoUsuario);
                 if (palabrasClave) {
 
-                    // LÍNEAS CORREGIDAS (SIN ADVERTENCIAS)
-                    const resultadoCalculo = construirFechaDesdePalabrasClave(palabrasClave, new Date());
-                    let fechaCalculada = resultadoCalculo.fecha; // 'let' porque puede cambiar a null
-                    const horaCalculada = resultadoCalculo.hora;   // 'const' porque nunca se reasigna
+                    const resultadoCalculo = construirFechaDesdePalabrasClave(palabrasClave, new Date(), fechaOriginal);
+                    let fechaCalculada = resultadoCalculo.fecha;
+                    const horaCalculada = resultadoCalculo.hora;
 
-                    // --- Control de Realidad ---
-                    // Si la "nueva" fecha extraída es la misma que la original, y no se dio una nueva hora,
-                    // asumimos que el usuario solo mencionó la cita original y no ha propuesto un cambio aún.
+
                     if (fechaCalculada && sonElMismoDia(fechaCalculada, fechaOriginal) && !horaCalculada) {
                         fechaCalculada = null;
                     }
@@ -88,13 +97,11 @@ export async function manejarReagendarCita(
                     }
                 }
 
-                // Si solo identificamos la cita original y no se extrajo ninguna fecha nueva, pedimos la información.
                 const fechaLegibleOriginal = fechaOriginal.toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' });
                 await enviarMensajeAsistente(conversacionId, `Ok, vamos a reagendar tu cita del ${fechaLegibleOriginal}. ¿Para qué nueva fecha y hora te gustaría?`, usuarioWaId, negocioPhoneNumberId);
                 await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.RECOLECTANDO_NUEVA_FECHA } });
 
             } else {
-                // Si no se pudo identificar una cita clara, listamos las opciones.
                 let mensajeLista = "Encontré estas citas a tu nombre. Por favor, dime cuál quieres mover y para qué nueva fecha y hora te gustaría:\n";
                 citasActivas.forEach((cita, index) => {
                     const fechaLegible = new Date(cita.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' });

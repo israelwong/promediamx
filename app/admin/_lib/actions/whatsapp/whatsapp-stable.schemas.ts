@@ -16,6 +16,8 @@ export const WhatsAppMessageInputSchema = z.union([
     }),
     z.object({
         type: z.literal('interactive'),
+        // Aquí defines la estructura del payload de una respuesta interactiva.
+        // Ejemplo simple, puedes expandirlo según la documentación de Meta.
         data: z.object({
             type: z.enum(['button_reply', 'list_reply']),
             reply: z.object({
@@ -28,14 +30,12 @@ export const WhatsAppMessageInputSchema = z.union([
     z.object({
         type: z.enum(['image', 'audio', 'document', 'video']),
         media: z.object({
-            id: z.string(),
+            id: z.string(), // ID de la media en la plataforma de Meta
             mime_type: z.string(),
             caption: z.string().optional(),
         }),
     }),
 ]);
-export type WhatsAppMessageInput = z.infer<typeof WhatsAppMessageInputSchema>;
-
 
 export const ProcesarMensajeWhatsAppInputSchema = z.object({
     negocioPhoneNumberId: z.string().min(1, "Phone Number ID del negocio es requerido."),
@@ -48,7 +48,7 @@ export const ProcesarMensajeWhatsAppInputSchema = z.object({
     messageIdOriginal: z.string().optional(),
 });
 export type ProcesarMensajeWhatsAppInput = z.infer<typeof ProcesarMensajeWhatsAppInputSchema>;
-
+export type WhatsAppMessageInput = z.infer<typeof WhatsAppMessageInputSchema>;
 
 
 // =========================================================================
@@ -89,6 +89,8 @@ export const EnviarMensajeWhatsAppApiInputSchema = z.object({
 
 export type EnviarMensajeWhatsAppApiInput = z.infer<typeof EnviarMensajeWhatsAppApiInputSchema>;
 
+
+
 export type AsistenteContext = {
     id: string;
     nombre: string;
@@ -116,12 +118,10 @@ export type AgendarCitaContext = {
     servicioNombre?: string;
     fechaHora?: string;
     fechaParcial?: string; // Fecha parcial en formato ISO String
-
-    // --- PROPIEDAD AÑADIDA ---
     camposPersonalizados?: { [campoId: string]: string };
-    ultimoCampoPedidoId?: string;
 
 };
+
 export type CancelarCitaContext = {
     citasEncontradas?: { id: string; asunto: string; fecha: Date; tipoDeCitaId: string | null }[];
     citaIdParaCancelar?: string;
