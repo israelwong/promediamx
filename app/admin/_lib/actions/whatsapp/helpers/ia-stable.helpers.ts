@@ -16,7 +16,6 @@ Extrae cualquier referencia a:
 - Un día relativo (ej: "hoy", "mañana").
 - Un número de día del mes (ej: "el 26", "día 30").
 - Una hora (ej: "a las 5pm", "14:30", "12pm").
-- Un concepto de hora relativa (ej: "a la misma hora").
 
 Responde ÚNICA Y EXCLUSIVAMENTE con un objeto JSON válido con el formato:
 {"dia_semana": "nombre_dia" | null, "dia_relativo": "relativo" | null, "dia_mes": numero | null, "hora_str": "texto_hora" | null}
@@ -25,8 +24,6 @@ Ejemplo 1: "para el sabado 12pm" -> {"dia_semana": "sábado", "dia_relativo": nu
 Ejemplo 2: "mañana a las 5" -> {"dia_semana": null, "dia_relativo": "mañana", "dia_mes": null, "hora_str": "a las 5"}
 Ejemplo 3: "agenda una cita para el miercoles a las 2pm" -> {"dia_semana": "miércoles", "dia_relativo": null, "dia_mes": null, "hora_str": "a las 2pm"}
 Ejemplo 4: "quiero cambiar mi cita del martes para el jueves a las 11am" -> {"dia_semana": "jueves", "dia_relativo": null, "dia_mes": null, "hora_str": "a las 11am"}
-Ejemplo 5: "mover la del lunes para el viernes a la misma hora" -> {"dia_semana": "viernes", "dia_relativo": null, "dia_mes": null, "hora_str": "misma hora"}
-
 
 Si no encuentras NADA relacionado a una fecha u hora, responde con 'null'.`;
 
