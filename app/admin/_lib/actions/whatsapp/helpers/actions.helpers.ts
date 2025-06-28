@@ -5,6 +5,8 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import { Agenda, StatusAgenda } from '@prisma/client';
 import type { ActionResult } from '@/app/admin/_lib/types';
 import type { AgendarCitaContext, FsmContext, ReagendarCitaContext } from '../whatsapp.schemas'; // Importamos los tipos desde su nuevo hogar
+import { EnviarMensajeWhatsAppApiInputSchema, type EnviarMensajeWhatsAppApiInput } from '../whatsapp.schemas';
+import { InteraccionParteTipo } from '@prisma/client';
 
 export async function ejecutarConfirmacionFinalCitaAction(
     tareaContexto: AgendarCitaContext,
@@ -133,5 +135,98 @@ export async function ejecutarBuscarCitasAction(
     } catch (error) {
         console.error("[ACTION ERROR] Error en ejecutarBuscarCitasAction:", error);
         return { success: false, error: "Tuve un problema al buscar tus citas." };
+    }
+}
+
+// Esta función ahora vive aquí
+export async function enviarMensajeInternoYWhatsAppAction(input: {
+    conversacionId: string;
+    contentFuncion: string;
+    role: 'assistant' | 'user' | 'system';
+    parteTipo: InteraccionParteTipo;
+    canalOriginal: string;
+    destinatarioWaId: string;
+    negocioPhoneNumberIdEnvia: string;
+}) {
+    // Lógica para guardar la interacción en la BD...
+    await prisma.interaccion.create({
+        data: {
+            conversacionId: input.conversacionId,
+            role: input.role,
+            mensajeTexto: input.contentFuncion,
+            parteTipo: input.parteTipo,
+            canalInteraccion: input.canalOriginal,
+        }
+    });
+
+    // Lógica para obtener el token del asistente...
+    const asistente = await prisma.asistenteVirtual.findFirst({
+        where: { phoneNumberId: input.negocioPhoneNumberIdEnvia }
+    });
+    if (!asistente || !asistente.token) {
+        console.error("No se encontró el token para el asistente con PNID:", input.negocioPhoneNumberIdEnvia);
+        return;
+    }
+
+    // Llamada a la API de WhatsApp
+    await enviarMensajeWhatsAppApiAction({
+        destinatarioWaId: input.destinatarioWaId,
+        mensajeTexto: input.contentFuncion,
+        negocioPhoneNumberIdEnvia: input.negocioPhoneNumberIdEnvia,
+        tokenAccesoAsistente: asistente.token,
+        // --- ¡CORRECCIÓN AQUÍ! ---
+        // Añadimos la propiedad obligatoria que faltaba.
+        tipoMensaje: 'text'
+    });
+}
+
+// Esta función también vive aquí, ya que la anterior depende de ella.
+export async function enviarMensajeWhatsAppApiAction(
+    input: EnviarMensajeWhatsAppApiInput
+): Promise<ActionResult<string | null>> {
+    const validation = EnviarMensajeWhatsAppApiInputSchema.safeParse(input);
+    if (!validation.success) {
+        console.error("[WhatsApp API Sender] Input inválido:", validation.error.flatten().fieldErrors);
+        return { success: false, error: "Datos de entrada inválidos para enviar mensaje WhatsApp." };
+    }
+    const {
+        destinatarioWaId,
+        mensajeTexto,
+        negocioPhoneNumberIdEnvia,
+        tokenAccesoAsistente,
+        tipoMensaje = 'text',
+        // mediaUrl,
+        // caption,
+    } = validation.data;
+
+    const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v20.0';
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${negocioPhoneNumberIdEnvia}/messages`;
+
+    const messagePayload: Record<string, unknown> = {
+        messaging_product: "whatsapp",
+        to: destinatarioWaId,
+        type: tipoMensaje,
+        text: { preview_url: false, body: mensajeTexto }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${tokenAccesoAsistente}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(messagePayload),
+        });
+
+        const responseData = await response.json();
+        if (!response.ok) {
+            const errorMsg = responseData.error?.message || `Error HTTP ${response.status} al enviar mensaje.`;
+            return { success: false, error: errorMsg };
+        }
+        const messageId = responseData.messages?.[0]?.id;
+        return { success: true, data: messageId || null };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "Error de red al enviar mensaje." };
     }
 }

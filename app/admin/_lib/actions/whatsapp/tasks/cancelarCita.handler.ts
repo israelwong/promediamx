@@ -12,6 +12,8 @@ import type { FsmContext, CancelarCitaContext, ProcesarMensajeWhatsAppOutput, Wh
 import { findBestMatchingAppointment } from '../helpers/availability.helpers';
 import { ejecutarCancelacionFinalCitaAction } from '../helpers/actions.helpers';
 import { enviarMensajeAsistente } from '../core/orchestrator';
+import { construirFechaDesdePalabrasClave, sonElMismoDia } from '../helpers/date.helpers';
+import { extraerPalabrasClaveDeFecha } from '../helpers/ia.helpers';
 
 export async function manejarCancelarCita(
     tarea: TareaEnProgreso,
@@ -29,7 +31,7 @@ export async function manejarCancelarCita(
     switch (tarea.estado) {
 
         case EstadoTareaConversacional.RECOLECTANDO_DATOS: {
-            // 1. Buscamos TODAS las citas activas del usuario, incluyendo las reagendadas.
+            // Buscamos TODAS las citas activas del usuario, incluyendo las reagendadas.
             const citasActivas = await prisma.agenda.findMany({
                 where: {
                     leadId: leadId,
@@ -46,11 +48,23 @@ export async function manejarCancelarCita(
                 return { success: true, data: null };
             }
 
-            // 2. Lógica Oportunista: Intentamos identificar la cita desde el primer mensaje.
-            const citaIdentificada = findBestMatchingAppointment(textoUsuario, citasActivas);
+            // --- ¡NUEVA LÓGICA INTELIGENTE! ---
+            // 1. Intentamos entender si el usuario mencionó una fecha.
+            const palabrasClave = await extraerPalabrasClaveDeFecha(textoUsuario);
+            const { fecha: fechaCalculada } = palabrasClave
+                ? construirFechaDesdePalabrasClave(palabrasClave, new Date())
+                : { fecha: null };
+
+            // 2. Pre-filtramos la lista de citas si se entendió una fecha.
+            const citasCandidatas = fechaCalculada
+                ? citasActivas.filter(cita => sonElMismoDia(new Date(cita.fecha), fechaCalculada))
+                : citasActivas;
+
+            // 3. Usamos nuestro helper de desambiguación sobre la lista (potencialmente ya filtrada).
+            const citaIdentificada = findBestMatchingAppointment(textoUsuario, citasCandidatas);
 
             if (citaIdentificada) {
-                // ¡Éxito! Encontramos una cita. Saltamos directo a la confirmación.
+                // ¡Éxito! Encontramos una cita única. Saltamos a la confirmación.
                 tareaContexto.citaIdParaCancelar = citaIdentificada.id;
                 await prisma.tareaEnProgreso.update({
                     where: { id: tarea.id },
@@ -61,7 +75,7 @@ export async function manejarCancelarCita(
                 await enviarMensajeAsistente(conversacionId, `Entendido. Solo para confirmar, ¿cancelamos la cita para "${citaIdentificada.asunto}" del ${fechaLegible}?`, usuarioWaId, negocioPhoneNumberId);
 
             } else {
-                // No hay coincidencia clara, listamos las opciones para que el usuario elija.
+                // No hay coincidencia clara o el usuario fue genérico. Listamos las opciones.
                 let mensajeLista = "Encontré estas citas futuras a tu nombre. ¿Cuál de ellas te gustaría cancelar?\n";
                 citasActivas.forEach((cita, index) => {
                     const fechaLegible = new Date(cita.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' });
@@ -72,6 +86,7 @@ export async function manejarCancelarCita(
                 await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject } });
                 await enviarMensajeAsistente(conversacionId, mensajeLista, usuarioWaId, negocioPhoneNumberId);
             }
+            return { success: true, data: null };
             return { success: true, data: null };
         }
 

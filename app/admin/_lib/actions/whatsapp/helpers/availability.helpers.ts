@@ -144,3 +144,45 @@ export function findBestMatchingAppointment(
 
     return bestMatches.length === 1 ? bestMatches[0] : null;
 }
+
+
+
+export function findBestMatchingService(
+    userInput: string,
+    services: { id: string; nombre: string }[]
+): { id: string; nombre: string } | null {
+
+    const userInputCorregido = userInput.toLowerCase();
+    // Podemos añadir aquí correcciones de typos comunes si es necesario
+
+    const userKeywords = new Set(userInputCorregido.split(' ').filter(k => k.length > 1));
+
+    let scoredServices = services.map(service => {
+        let score = 0;
+        const serviceKeywords = new Set(service.nombre.toLowerCase().split(' '));
+
+        userKeywords.forEach(keyword => {
+            if (serviceKeywords.has(keyword)) {
+                score += 10; // Coincidencia de palabra exacta
+            } else {
+                // Coincidencia parcial (ej. "info" en "información")
+                serviceKeywords.forEach(serviceKeyword => {
+                    if (serviceKeyword.includes(keyword)) {
+                        score += 5;
+                    }
+                });
+            }
+        });
+
+        return { ...service, score };
+    });
+
+    scoredServices = scoredServices.filter(a => a.score > 0);
+    if (scoredServices.length === 0) return null;
+
+    const maxScore = Math.max(...scoredServices.map(a => a.score));
+    const bestMatches = scoredServices.filter(a => a.score === maxScore);
+
+    // Devuelve el resultado solo si hay un único ganador claro
+    return bestMatches.length === 1 ? bestMatches[0] : null;
+}

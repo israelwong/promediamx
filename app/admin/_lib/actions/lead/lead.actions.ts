@@ -15,6 +15,16 @@ import {
     actualizarLeadParamsSchema,
     eliminarLeadParamsSchema,
     crearLeadParamsSchema,
+
+    // listarLeadsParamsSchema,
+    // type ListarLeadsResult,
+    // obtenerDetallesLeadParamsSchema,
+    leadDetalleSchema, // <-- El que faltaba
+    // type LeadDetalleData,
+    marcarLeadComoGanadoParamsSchema,
+    etiquetarYReubicarLeadParamsSchema,
+    cambiarEtapaLeadParamsSchema
+
 } from './lead.schemas'; // Asumiendo que los schemas están aquí
 
 // Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
@@ -210,6 +220,7 @@ export async function actualizarEtiquetasDelLeadAction( // Renombrada para clari
     }
 }
 
+// import { leadDetalleSchema } from './lead.schemas'; // Asegúrate de que este schema esté definido correctamente
 
 // Reemplaza tu función existente con esta versión
 export async function obtenerLeadDetallesAction(
@@ -634,7 +645,7 @@ export async function obtenerDetallesLeadAction(
     }
 }
 
-import { marcarLeadComoGanadoParamsSchema } from './lead.schemas';
+// import { marcarLeadComoGanadoParamsSchema } from './lead.schemas';
 
 export async function marcarLeadComoGanadoAction(
     params: z.infer<typeof marcarLeadComoGanadoParamsSchema>
@@ -739,7 +750,7 @@ export async function asignarEtiquetaLeadAction(
 }
 
 
-import { etiquetarYReubicarLeadParamsSchema } from './lead.schemas';
+// import { etiquetarYReubicarLeadParamsSchema } from './lead.schemas';
 export async function etiquetarYReubicarLeadAction(
     params: z.infer<typeof etiquetarYReubicarLeadParamsSchema>
 ): Promise<ActionResult<boolean>> {
@@ -795,7 +806,7 @@ export async function etiquetarYReubicarLeadAction(
     }
 }
 
-import { cambiarEtapaLeadParamsSchema } from './lead.schemas';
+// import { cambiarEtapaLeadParamsSchema } from './lead.schemas';
 
 export async function cambiarEtapaLeadAction(
     params: z.infer<typeof cambiarEtapaLeadParamsSchema>

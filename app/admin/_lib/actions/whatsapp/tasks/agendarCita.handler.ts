@@ -17,6 +17,7 @@ import { construirFechaDesdePalabrasClave } from '../helpers/date.helpers';
 import { extraerPalabrasClaveDeFecha } from '../helpers/ia.helpers';
 import { ejecutarConfirmacionFinalCitaAction } from '../helpers/actions.helpers';
 import { ejecutarListarServiciosDeCitasAction } from '../../../funciones/citas/listarServiciosDeCitas/listarServiciosDeCitas.actions';
+import { findBestMatchingService } from '../helpers/availability.helpers';
 
 import { enviarMensajeAsistente } from '../core/orchestrator';
 
@@ -41,7 +42,11 @@ export async function manejarAgendarCita(
             // 1. Intentamos extraer el SERVICIO si aún no lo tenemos en el contexto.
             if (!tareaContexto.servicioId) {
                 const serviciosDisponibles = await prisma.agendaTipoCita.findMany({ where: { negocioId: asistente.negocio!.id, activo: true } });
-                const servicioEncontrado = serviciosDisponibles.find(s => textoUsuario.toLowerCase().includes(s.nombre.toLowerCase()));
+
+                // --- LÍNEA ACTUALIZADA ---
+                // Usamos nuestro nuevo y más inteligente helper en lugar de .find()
+                const servicioEncontrado = findBestMatchingService(textoUsuario, serviciosDisponibles);
+
                 if (servicioEncontrado) {
                     tareaContexto.servicioId = servicioEncontrado.id;
                     tareaContexto.servicioNombre = servicioEncontrado.nombre;
