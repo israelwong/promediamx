@@ -390,3 +390,56 @@ export async function obtenerTareasCapacidadParaAsistente(
     }
     return tareasCapacidad;
 }
+
+
+// app/admin/_lib/ia/ia.actions.ts
+
+/**
+ * Convierte una cadena de texto en un vector de embeddings usando la API de Google.
+ * Este vector representa el significado semántico del texto y se usa para búsquedas por similitud.
+ * @param text El texto a convertir en embedding.
+ * @returns Una promesa que se resuelve en un array de números (el vector) o null si ocurre un error.
+ */
+export async function getEmbeddingForText(text: string): Promise<number[] | null> {
+    console.log(`[EMBEDDING] Generando vector para el texto: "${text.substring(0, 50)}..."`);
+
+    // 1. Validar que el input no esté vacío.
+    const cleanText = text.trim();
+    if (!cleanText) {
+        console.error("[EMBEDDING] El texto de entrada está vacío.");
+        return null;
+    }
+
+    // 2. Verificar que la clave de la API esté disponible.
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        console.error("[EMBEDDING] La variable de entorno GEMINI_API_KEY no está configurada.");
+        throw new Error("La configuración del servidor para la IA no está completa.");
+    }
+
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+
+        // 3. Seleccionar el modelo de embedding. 'text-embedding-004' es el más reciente y recomendado.
+        const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+
+        // 4. Llamar a la API para generar el embedding.
+        const result = await model.embedContent(cleanText);
+        const embedding = result.embedding;
+
+        if (!embedding || !embedding.values) {
+            console.error("[EMBEDDING] La respuesta de la API no contiene un vector válido.");
+            return null;
+        }
+
+        console.log(`[EMBEDDING] Vector generado exitosamente con una dimensión de ${embedding.values.length}.`);
+        return embedding.values;
+
+    } catch (error) {
+        console.error("[EMBEDDING] Ocurrió un error al generar el vector:", error);
+        // En un entorno de producción, podrías querer manejar este error de forma más granular.
+        return null;
+    }
+}
+
+// ... el resto de tus funciones en ia.actions.ts como generarRespuestaAsistente ...

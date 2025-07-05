@@ -1,27 +1,20 @@
+// Tu archivo... /conocimiento/ConocimientoForm.tsx
+
 'use client';
 
-import React, { useEffect, useTransition, useCallback } from 'react';
+import React, { useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller, SubmitHandler } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { z } from 'zod';
 
-// --- Acciones y Esquemas ---
+// --- Acciones y Esquemas Actualizados ---
 import {
-    getConocimientoItemById,
-    createConocimientoItem,
-    updateConocimientoItem,
+    crearOActualizarConocimientoItemAction,
     deleteConocimientoItem,
+    getConocimientoItemById, // Ahora sí se podrá importar
 } from '@/app/admin/_lib/actions/conocimiento/conocimiento.actions';
-import {
-    ConocimientoItemSchema, // Usaremos el schema base para el formulario
-    CreateConocimientoItemInputSchema,
-    UpdateConocimientoItemInputSchema,
-} from '@/app/admin/_lib/actions/conocimiento/conocimiento.schemas';
-// import type {
-//     CreateConocimientoItemInputType,
-//     UpdateConocimientoItemInputType,
-// } from '@/app/admin/_lib/actions/conocimiento/conocimiento.schemas';
+import { ConocimientoItemSchema } from '@/app/admin/_lib/actions/conocimiento/conocimiento.schemas';
 
 // --- Componentes UI y Enums ---
 import { Button } from '@/app/components/ui/button';
@@ -32,25 +25,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card';
 import { Loader2, Save, Trash2, ArrowLeft } from 'lucide-react';
 
-// --- CORRECCIÓN: Definir un tipo único y claro para el formulario ---
 type FormValues = z.infer<typeof ConocimientoItemSchema>;
 
-// Opciones para el <Select> de estado.
 const ESTADO_OPTIONS = [
     'PENDIENTE_RESPUESTA', 'RESPONDIDA', 'EN_REVISION', 'OBSOLETA', 'ARCHIVADA'
 ];
 
 interface Props {
     negocioId: string;
-    clienteId: string; // Necesario para la navegación
-    itemId?: string; // Opcional: si está presente, estamos en modo edición.
+    clienteId: string;
+    itemId?: string;
 }
 
 export default function ConocimientoForm({ negocioId, clienteId, itemId }: Props) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
-    const isEditMode = !!itemId; // Determina si es modo "crear" o "editar"
+    const isEditMode = !!itemId;
 
+
+    // estas variables ahora sí se utilizarán
     const {
         control,
         register,
@@ -58,7 +51,6 @@ export default function ConocimientoForm({ negocioId, clienteId, itemId }: Props
         reset,
         formState: { errors, isSubmitting, isDirty },
     } = useForm<FormValues>({
-        // Se elimina el resolver, la validación se hace en onSubmit
         defaultValues: {
             preguntaFormulada: '',
             respuesta: '',
@@ -67,70 +59,51 @@ export default function ConocimientoForm({ negocioId, clienteId, itemId }: Props
         },
     });
 
-    // Cargar datos si estamos en modo edición
-    const fetchItemData = useCallback(() => {
+    useEffect(() => {
         if (isEditMode && itemId) {
             startTransition(async () => {
                 const result = await getConocimientoItemById(itemId);
                 if (result.success && result.data) {
                     reset(result.data);
                 } else {
-                    toast.error(result.error || "No se pudo cargar el ítem de conocimiento.");
+                    toast.error(result.error || "No se pudo cargar el ítem.");
                 }
             });
         }
     }, [itemId, isEditMode, reset]);
 
-    useEffect(() => {
-        fetchItemData();
-    }, [fetchItemData]);
-
-    // Función para manejar el envío del formulario
+    // --- LÓGICA DE ENVÍO REFACTORIZADA ---
     const onSubmit: SubmitHandler<FormValues> = (data) => {
+        // La lógica de onSubmit se mantiene igual que en la respuesta anterior
         startTransition(async () => {
-            let result;
-            if (isEditMode) {
-                // --- Validar y Ejecutar Acción de Actualización ---
-                const validationResult = UpdateConocimientoItemInputSchema.safeParse(data);
-                if (!validationResult.success) {
-                    toast.error("Hay errores en el formulario. Por favor, revisa los campos.");
-                    console.error("Errores de validación (Update):", validationResult.error.flatten());
-                    return;
+            const formData = new FormData();
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== null && value !== undefined) {
+                    formData.append(key, String(value));
                 }
-                toast.loading("Actualizando...");
-                result = await updateConocimientoItem(itemId, validationResult.data);
-            } else {
-                // --- Validar y Ejecutar Acción de Creación ---
-                const dataToCreate = { ...data, negocioId };
-                const validationResult = CreateConocimientoItemInputSchema.safeParse(dataToCreate);
-                if (!validationResult.success) {
-                    toast.error("Hay errores en el formulario. Por favor, revisa los campos.");
-                    console.error("Errores de validación (Create):", validationResult.error.flatten());
-                    return;
-                }
-                toast.loading("Creando...");
-                result = await createConocimientoItem(validationResult.data);
+            });
+            formData.append('negocioId', negocioId);
+            if (isEditMode && itemId) {
+                formData.append('id', itemId);
             }
-
+            toast.loading(isEditMode ? "Actualizando..." : "Creando...");
+            const result = await crearOActualizarConocimientoItemAction(formData);
             toast.dismiss();
-
-            if (result.success && result.data) {
-                toast.success(isEditMode ? "Ítem actualizado." : "Ítem creado.");
+            if (result.success) {
+                toast.success(result.message || "Guardado con éxito.");
                 if (!isEditMode) {
                     router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/conocimiento`);
-                } else {
-                    reset(result.data);
                 }
             } else {
-                toast.error(result.error || "Ocurrió un error inesperado.");
+                toast.error(result.error || "Ocurrió un error.");
             }
         });
     };
 
-    // Función para eliminar el ítem
+    // La función de eliminar no cambia.
     const handleDelete = async () => {
         if (!itemId) return;
-        if (!window.confirm("¿Estás seguro de que quieres eliminar este ítem? Esta acción no se puede deshacer.")) return;
+        if (!window.confirm("¿Estás seguro de que quieres eliminar este ítem?")) return;
 
         startTransition(async () => {
             const result = await deleteConocimientoItem(itemId);
@@ -143,13 +116,14 @@ export default function ConocimientoForm({ negocioId, clienteId, itemId }: Props
         });
     }
 
+    // El JSX del formulario no necesita cambios.
     return (
         <form onSubmit={handleSubmit(onSubmit)}>
             {/* Cabecera con acciones */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-700">
                 <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending || isSubmitting}>
                     <ArrowLeft size={16} className="mr-2" />
-                    Volver a la Lista
+                    Volver
                 </Button>
                 <div className="flex items-center gap-3">
                     {isEditMode && (
@@ -165,7 +139,7 @@ export default function ConocimientoForm({ negocioId, clienteId, itemId }: Props
                 </div>
             </div>
 
-            {/* Contenido del Formulario */}
+            {/* --- CONTENIDO DEL FORMULARIO RESTAURADO --- */}
             <Card className="bg-zinc-800 border-zinc-700 shadow-xl">
                 <CardHeader>
                     <CardTitle>{isEditMode ? 'Editar Ítem de Conocimiento' : 'Nuevo Ítem de Conocimiento'}</CardTitle>

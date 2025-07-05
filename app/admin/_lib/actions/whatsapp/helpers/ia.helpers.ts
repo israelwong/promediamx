@@ -1,6 +1,8 @@
 // /helpers/ia.helpers.ts
 
 import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions';
+import type { CRMCampoPersonalizado } from '@prisma/client';
+import type { AgendaTipoCita } from '@prisma/client';
 
 // --- FUNCIÓN ORIGINAL (SIN CAMBIOS) ---
 export async function extraerPalabrasClaveDeFecha(
@@ -37,34 +39,54 @@ export type ReagendamientoExtractionResult = {
     nueva: { dia_semana?: string; dia_relativo?: string; dia_mes?: number; hora_str?: string; } | null;
 };
 
-// Exportamos la función para que pueda ser importada por el handler.
-export async function extraerFechasParaReagendamiento(
+// Esta función reemplaza a la anterior "extraerFechasParaReagendamiento"
+export async function extraerParametrosDeReagendamiento(
     textoUsuario: string
-): Promise<ReagendamientoExtractionResult | null> {
-    const prompt = `Tu tarea es analizar un texto de un usuario que quiere reagendar una cita y extraer dos conceptos clave: 1) La descripción de la CITA ORIGINAL a mover y 2) La descripción de la NUEVA FECHA Y HORA de destino.
-Texto del usuario: "${textoUsuario}"
-Analiza y extrae la información en el siguiente formato JSON. Si no encuentras información para un concepto, su valor debe ser 'null'.
-- "original.texto": Contiene el fragmento de texto que describe la cita a mover.
-- "nueva": Contiene las palabras clave de la nueva fecha de destino.
-Responde ÚNICA Y EXCLUSIVAMENTE con un objeto JSON válido.
-Ejemplo 1: "quiero cambiar mi cita del martes para el viernes a las 4pm" -> { "original": { "texto": "mi cita del martes" }, "nueva": { "dia_semana": "viernes", "dia_relativo": null, "dia_mes": null, "hora_str": "a las 4pm" } }
-Ejemplo 2: "mover la cita de mañana por favor" -> { "original": { "texto": "la cita de mañana" }, "nueva": null }
-Ejemplo 3: "necesito reagendar para el próximo lunes a las 10am" -> { "original": null, "nueva": { "dia_semana": "lunes", "dia_relativo": null, "dia_mes": null, "hora_str": "a las 10am" } }
-Si el texto no contiene ninguna referencia a una cita original ni a una nueva fecha, responde con 'null'.`;
+): Promise<{ original: string; nueva: string } | null> {
+    const prompt = `
+Tu tarea es analizar una frase de un usuario que quiere reagendar una cita y separar la descripción de la CITA ORIGINAL de la descripción de la NUEVA FECHA.
 
-    const resultadoIA = await generarRespuestaAsistente({ historialConversacion: [], mensajeUsuarioActual: prompt, contextoAsistente: { nombreAsistente: "Asistente", nombreNegocio: "Negocio" }, tareasDisponibles: [] });
+Analiza la siguiente frase:
+"${textoUsuario}"
+
+Responde con un objeto JSON con la siguiente estructura: { "original": "...", "nueva": "..." }.
+- En "original", pon la parte de la frase que describe la cita a cambiar.
+- En "nueva", pon la parte de la frase que describe el nuevo horario.
+- Si no puedes identificar claramente AMBAS partes, responde con 'null'.
+
+--- EJEMPLOS ---
+Frase: "reagenda la cita del martes 12pm para el miércoles 11am" -> { "original": "la cita del martes 12pm", "nueva": "miércoles a las 11am" }
+Frase: "quiero mover mi junta de mañana para el viernes" -> { "original": "mi junta de mañana", "nueva": "el viernes" }
+Frase: "cambia la de soporte de hoy a las 3 para el lunes a las 9" -> { "original": "la de soporte de hoy a las 3", "nueva": "lunes a las 9" }
+Frase: "quiero reagendar mi cita" -> null
+Frase: "para el martes a las 11am" -> null
+`;
+
+    const resultadoIA = await generarRespuestaAsistente({
+        historialConversacion: [],
+        mensajeUsuarioActual: prompt,
+        contextoAsistente: { nombreAsistente: "Asistente", nombreNegocio: "Negocio" },
+        tareasDisponibles: [],
+    });
+
     const respuestaJson = resultadoIA.data?.respuestaTextual;
-    if (resultadoIA.success && respuestaJson && respuestaJson.toLowerCase() !== 'null') {
+    if (respuestaJson && respuestaJson.toLowerCase().trim() !== 'null') {
         try {
             const match = respuestaJson.match(/{[\s\S]*}/);
             if (match) {
-                return JSON.parse(match[0]) as ReagendamientoExtractionResult;
+                const parsed = JSON.parse(match[0]);
+                // Aseguramos que ambas claves existan
+                if (parsed.original && parsed.nueva) {
+                    return { original: parsed.original, nueva: parsed.nueva };
+                }
             }
-        } catch (e) { console.error("Error parseando JSON de reagendamiento:", e); }
+        } catch (e) {
+            console.error("Error parseando JSON de extracción de reagendamiento:", e);
+            return null;
+        }
     }
     return null;
 }
-
 
 // =================================================================================
 // --- NUEVO SUPER-HELPER PARA AGENDAMIENTO ROBUSTO ---
@@ -85,67 +107,96 @@ export type AgendamientoRobustoResult = {
 // 2. Creamos la función que interactúa con la IA.
 export async function extraerContextoDeAgendamiento(
     textoUsuario: string,
-    nombresCamposDisponibles: string[] // Ej: ["Colegio", "Nivel Educativo", "Grado"]
+    serviciosDisponibles: Pick<AgendaTipoCita, 'nombre'>[],
+    camposRequeridos: CRMCampoPersonalizado[]
 ): Promise<AgendamientoRobustoResult | null> {
-    const prompt = `Tu tarea es ser un experto en analizar texto para extraer de forma estructurada toda la información relevante para agendar una cita.
-Te proporcionaré el texto del usuario y una lista de los NOMBRES DE CAMPOS que debes buscar.
+
+    const nombresServicios = serviciosDisponibles.map(s => s.nombre);
+    const nombresCampos = camposRequeridos.map(c => c.nombre);
+
+    // 1. Instrucciones base del prompt
+    let prompt = `Tu tarea es ser un experto en extraer datos estructurados de una solicitud de cita. Te proporcionaré el texto del usuario y listas de referencia.
 
 Texto del usuario: "${textoUsuario}"
-Lista de campos a buscar: [${nombresCamposDisponibles.join(', ')}]
 
-Analiza el texto y extrae la siguiente información en el formato JSON especificado. Si no encuentras información para un campo, omítelo o déjalo como 'null'.
-- "servicio": El servicio que el usuario solicita (ej. "Informes", "Inscripción").
-- "campos_personalizados": Un objeto donde las claves son los NOMBRES DE CAMPOS de la lista y los valores son lo que el usuario mencionó.
-- "fecha_hora": Un objeto con las palabras clave de la fecha y hora.
+Listas de Referencia:
+- Servicios Disponibles: [${nombresServicios.join(', ')}]
+- Otros Datos a Buscar: [${nombresCampos.join(', ')}]
 
-Responde ÚNICA Y EXCLUSIVAMENTE con un objeto JSON válido.
+Analiza el texto y extrae la siguiente información en formato JSON:
+1.  **servicio**: Debe ser UNO de los valores de la lista "Servicios Disponibles".
+2.  **campos_personalizados**: Un objeto con los valores para los "Otros Datos a Buscar".
 
-Ejemplo 1:
-Texto: "Quiero informes para mi hijo en primero de primaria en el colegio tecno para el martes a las 4pm"
-Campos: ["Colegio", "Nivel Educativo", "Grado"]
-Respuesta:
-{
-  "servicio": "Informes",
+Si una frase contiene múltiples valores, desglósala y asigna cada parte al campo correcto. Responde ÚNICA Y EXCLUSIVAMENTE con el objeto JSON.`;
+
+    // 2. Generación dinámica de la sección de ejemplo
+    let ejemploDinamico = '';
+    const camposConOpciones = camposRequeridos.filter(c => {
+        const meta = c.metadata as CampoMetadata;
+        return meta?.opciones && meta.opciones.length > 0;
+    });
+
+    if (camposConOpciones.length > 0) {
+        const ordenPreferido = ["Grado", "Nivel Educativo", "Colegio", "Tipo de Tratamiento", "Doctor"];
+        const camposOrdenados = [...camposConOpciones].sort((a, b) => {
+            const indexA = ordenPreferido.indexOf(a.nombre);
+            const indexB = ordenPreferido.indexOf(b.nombre);
+            return (indexA === -1 ? Infinity : indexA) - (indexB === -1 ? Infinity : indexB);
+        });
+
+        const camposParaEjemplo = camposOrdenados.slice(0, 3);
+        const servicioEjemplo = nombresServicios.length > 0 ? nombresServicios[0] : 'citas';
+
+        const partesTexto = camposParaEjemplo.map(c => (c.metadata as CampoMetadata).opciones![0]);
+        const ejemploTexto = `Quiero una cita de ${servicioEjemplo} para ${partesTexto.join(' ')}`;
+
+        const camposJson = camposParaEjemplo.map(c => {
+            const meta = c.metadata as CampoMetadata;
+            return `"${c.nombre}": "${meta.opciones![0]}"`;
+        }).join(',\n    ');
+
+        const ejemploJsonRespuesta = `{
+  "servicio": "${servicioEjemplo}",
   "campos_personalizados": {
-    "Colegio": "tecno",
-    "Nivel Educativo": "primaria",
-    "Grado": "primero"
-  },
-  "fecha_hora": { "dia_semana": "martes", "hora_str": "a las 4pm" }
-}
+    ${camposJson}
+  }
+}`;
 
-Ejemplo 2:
-Texto: "una cita de informes en el tecno por favor"
-Campos: ["Colegio", "Nivel Educativo", "Grado"]
+        ejemploDinamico = `
+--- EJEMPLO DINÁMICO ---
+Texto: "${ejemploTexto}"
 Respuesta:
-{
-  "servicio": "Informes",
-  "campos_personalizados": { "Colegio": "tecno" }
-}
+${ejemploJsonRespuesta}`;
+    }
 
-Ejemplo 3:
-Texto: "para mañana a las 10"
-Campos: ["Colegio", "Nivel Educativo", "Grado"]
-Respuesta:
-{
-  "fecha_hora": { "dia_relativo": "mañana", "hora_str": "a las 10" }
-}
+    prompt += `${ejemploDinamico}\n\nSi el texto no contiene información relevante, responde con 'null'.`;
 
-Si el texto es un saludo o no contiene NINGUNA información relevante, responde con 'null'.`;
+    // 3. Llamada a la IA y procesamiento de la respuesta
+    const resultadoIA = await generarRespuestaAsistente({
+        historialConversacion: [],
+        mensajeUsuarioActual: prompt,
+        contextoAsistente: { nombreAsistente: "Asistente", nombreNegocio: "Negocio" },
+        tareasDisponibles: [],
+    });
 
-    const resultadoIA = await generarRespuestaAsistente({ historialConversacion: [], mensajeUsuarioActual: prompt, contextoAsistente: { nombreAsistente: "Asistente", nombreNegocio: "Negocio" }, tareasDisponibles: [] });
     const respuestaJson = resultadoIA.data?.respuestaTextual;
 
-    if (resultadoIA.success && respuestaJson && respuestaJson.toLowerCase() !== 'null') {
+    if (resultadoIA.success && respuestaJson && respuestaJson.toLowerCase().trim() !== 'null') {
         try {
             const match = respuestaJson.match(/{[\s\S]*}/);
             if (match) {
-                return JSON.parse(match[0]) as AgendamientoRobustoResult;
+                const parsed = JSON.parse(match[0]);
+                const result: AgendamientoRobustoResult = {
+                    servicio: parsed.servicio || null,
+                    campos_personalizados: parsed.campos_personalizados || {},
+                };
+                return result;
             }
         } catch (e) {
             console.error("Error parseando JSON de contexto de agendamiento:", e);
         }
     }
+
     return null;
 }
 
@@ -208,4 +259,81 @@ Respuesta JSON: {"es_relevante": true, "valor_corregido": "ejemplo@mail.com"}
     return { es_relevante: true, valor_corregido: respuestaUsuario };
 }
 
+interface CampoMetadata {
+    opciones?: string[];
+}
 
+export function construirPromptDeExtraccionDinamico(
+    textoUsuario: string,
+    serviciosDisponibles: Pick<AgendaTipoCita, 'nombre'>[],
+    camposRequeridos: CRMCampoPersonalizado[]
+): string {
+    const nombresServicios = serviciosDisponibles.map(s => s.nombre);
+    const nombresCampos = camposRequeridos.map(c => c.nombre);
+
+    let prompt = `Tu tarea es ser un experto en extraer datos estructurados de una solicitud de cita. Te proporcionaré el texto del usuario y dos listas de referencia: "Servicios Disponibles" y "Otros Datos a Buscar".
+
+Texto del usuario: "${textoUsuario}"
+
+Listas de Referencia:
+- Servicios Disponibles: [${nombresServicios.join(', ')}]
+- Otros Datos a Buscar: [${nombresCampos.join(', ')}]
+
+Analiza el texto y extrae la siguiente información en formato JSON:
+1.  **servicio**: Debe ser UNO de los valores de la lista "Servicios Disponibles".
+2.  **campos_personalizados**: Un objeto con los valores para los "Otros Datos a Buscar".
+
+Si una frase contiene múltiples valores, desglósala y asigna cada parte al campo correcto. Responde ÚNICA Y EXCLUSIVAMENTE con el objeto JSON.
+`;
+
+    let ejemploDinamico = '';
+    const camposConOpciones = camposRequeridos.filter(c => {
+        // ✅ PASO 2: Usamos nuestra nueva interface para un casteo seguro.
+        const meta = c.metadata as CampoMetadata;
+        return meta?.opciones && meta.opciones.length > 0;
+    });
+
+    if (camposConOpciones.length > 0) {
+        const ordenPreferido = ["Grado", "Nivel Educativo", "Colegio", "Tipo de Tratamiento", "Doctor"];
+        const camposOrdenados = [...camposConOpciones].sort((a, b) => {
+            const indexA = ordenPreferido.indexOf(a.nombre);
+            const indexB = ordenPreferido.indexOf(b.nombre);
+            return (indexA === -1 ? Infinity : indexA) - (indexB === -1 ? Infinity : indexB);
+        });
+
+        const camposParaEjemplo = camposOrdenados.slice(0, 3);
+        const servicioEjemplo = nombresServicios.length > 0 ? nombresServicios[0] : 'citas';
+
+        const partesTexto = camposParaEjemplo.map(c => {
+            // ✅ PASO 2 (cont.): Usamos el casteo seguro aquí también.
+            const meta = c.metadata as CampoMetadata;
+            return meta.opciones![0];
+        });
+        const ejemploTexto = `Quiero una cita de ${servicioEjemplo} para ${partesTexto.join(' ')}`;
+
+        const camposJson = camposParaEjemplo.map(c => {
+            // ✅ PASO 2 (cont.): Y aquí también.
+            const meta = c.metadata as CampoMetadata;
+            return `"${c.nombre}": "${meta.opciones![0]}"`;
+        }).join(',\n    ');
+
+        const ejemploJsonRespuesta = `{
+  "servicio": "${servicioEjemplo}",
+  "campos_personalizados": {
+    ${camposJson}
+  }
+}`;
+
+        ejemploDinamico = `
+--- EJEMPLO DINÁMICO ---
+Texto: "${ejemploTexto}"
+Servicios Disponibles: [${nombresServicios.join(', ')}]
+Otros Datos a Buscar: [${nombresCampos.join(', ')}]
+Respuesta:
+${ejemploJsonRespuesta}`;
+    }
+
+    prompt += `${ejemploDinamico}\n\nSi el texto no contiene información relevante, responde con 'null'.`;
+
+    return prompt;
+}

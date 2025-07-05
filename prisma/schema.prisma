@@ -399,7 +399,9 @@ model Negocio{
   slug      String?    @unique // NUEVO: Para la URL amigable. Debe ser único.
   logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
   slogan   String? //Lema, Tagline, Frase de Impacto.
-  
+
+  mensajeBienvenida String? @db.Text // <-- NUEVO CAMPO
+
   telefonoLlamadas String?
   telefonoWhatsapp String?
   email     String?
@@ -436,7 +438,20 @@ model Negocio{
   itemsConocimiento       NegocioConocimientoItem[] // Base de Conocimiento del Negocio
   configuracionPago       NegocioConfiguracionPago? // Configuración de pagos para este negocio (relación uno-a-uno)
   transaccionesRecibidas  NegocioTransaccion[]      // Historial de transacciones recibidas por este negocio
-  
+    preguntasSinRespuestaGeneral PreguntaSinRespuestaGeneral[] // <-- AÑADIR ESTA LÍNEA
+
+}
+
+model PreguntaSinRespuestaGeneral {
+  id              String   @id @default(cuid())
+  negocioId       String
+  negocio         Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  conversacionId  String
+  preguntaUsuario String   @db.Text
+  estado          String   @default("PENDIENTE_REVISION") // PENDIENTE_REVISION, REVISADA, DESCARTADA
+  createdAt       DateTime @default(now())
+
+  @@index([negocioId, estado])
 }
 
 // Enum para los días de la semana (más claro que usar números 0-6)
@@ -528,9 +543,9 @@ model NegocioConocimientoItem {
   embeddingPregunta         Unsupported("vector")? 
   embeddingRespuesta        Unsupported("vector")?
 
-  // Futuro: Vinculación con Tareas
-  // tareaSugeridaFuncionId    String?   // FK a TareaFuncion.id
-  // tareaSugeridaFuncion      TareaFuncion? @relation(fields: [tareaSugeridaFuncionId], references: [id], onDelete: SetNull)
+  accionDeSeguimiento     Json?    // Contendrá las instrucciones para la siguiente tarea, si la hay.
+                                   // Ejemplo: { "siguienteTarea": "agendarCita", "campoAsociadoId": "..." }
+
   
   @@index([negocioId, estado])
   @@index([negocioId, categoria])
@@ -855,6 +870,10 @@ model Oferta {
   objetivoCitaLimiteConcurrencia Int?
 
   // Asegúrate de que la relación a AgendaTipoCita (si la añades arriba) tenga su contraparte
+
+ // --- NUEVOS CAMPOS PARA LA UBICACIÓN DE LA OFERTA ---
+  direccionUbicacion String? @db.Text  // Para la dirección textual. Ej: "Av. Principal 123, Zumpango Centro"
+  googleMapsUrl      String?           // Para el link directo de Google Maps
 
 
   status        EstadoOferta @default(BORRADOR)
@@ -1343,8 +1362,7 @@ model Agenda {
   tipo        String 
   asunto      String
   descripcion String?
-  meetingUrl String?
-  fechaRecordatorio DateTime?
+  // fechaRecordatorio DateTime?
   status      String   @default("pendiente")
   tipoDeCitaId String? 
   tipoDeCita AgendaTipoCita? @relation(fields: [tipoDeCitaId], references: [id], onDelete: SetNull)
@@ -1354,6 +1372,10 @@ model Agenda {
 
   historial AgendaHistorial[] 
   modalidad String? // Presencial, Virtual, Híbrido
+
+  // meetingUrl String?
+  googleMapsUrl String? // Para el link directo de Google Maps (opcional)
+  linkReunionVirtual String? // Link a la reunión virtual (ej: Zoom, Meet)
 
   @@index([negocioId])
   @@index([leadId])
@@ -1373,6 +1395,13 @@ model AgendaConfiguracion {
   requiereNombreParaCita  Boolean  @default(true)  // Ya estaba en true
   bufferMinutos           Int?      // Minutos de buffer entre citas
   metodosPagoTexto       String?   // Texto para mostrar los métodos de pago disponibles
+
+   // ✅ NUEVO CAMPO: Para las recomendaciones generales de la cita.
+  recomendacionesParaCita   String? @db.Text
+
+  // ✅ NUEVO CAMPO: Para definir el tiempo del recordatorio en minutos.
+  recordatorioMinutosAntes  Int?     @default(1440) // Ejemplo: default de 1440 mins = 24 horas
+
 
   agendaRecordatorios agendaRecordatorio[] // Relación con recordatorios de agenda
   createdAt               DateTime  @default(now())
@@ -1411,7 +1440,6 @@ model OfertaServicioCita {
 
   @@id([ofertaId, agendaTipoCitaId]) // Clave primaria compuesta
 }
-
 
 enum ActionType {
   CREATED      // Creación de la agenda
@@ -1466,6 +1494,18 @@ enum EstadoTareaConversacional {
   RECOLECTANDO_NUEVA_FECHA // <-- NUEVO
   RECOLECTANDO_NUEVA_HORA   // <-- NUEVO
   PENDIENTE_CONFIRMACION_FECHA_AMBIGUA
+  ESPERANDO_EMAIL
+  ESPERANDO_CORRECCION // <-- AÑADIR ESTA LÍNEA
+
+  VALIDANDO_FECHA_HORA
+  RECOLECTANDO_DATOS_ADICIONALES
+  ESPERANDO_SERVICIO
+  ESPERANDO_CAMPO_PERSONALIZADO
+  ANALIZANDO_CORRECCION
+  ESPERANDO_SELECCION_USUARIO
+  ESPERANDO_NUEVA_FECHA
+  CONFIRMANDO_CITA_ORIGINAL
+
 }
 
 //==================================================

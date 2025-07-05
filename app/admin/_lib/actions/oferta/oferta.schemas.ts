@@ -127,3 +127,34 @@ export type OfertaParaListaType = z.infer<typeof OfertaParaListaSchema>;
 export type EditarOfertaInputType = z.infer<typeof EditarOfertaInputSchema>;
 export type OfertaParaEditarFormType = z.infer<typeof OfertaCompletaParaEdicionSchema>;
 export type OfertaCompletaParaManagerType = z.infer<typeof OfertaCompletaParaManagerSchema>;
+
+
+export const CrearOfertaSuperSimplificadoInputSchema = z.object({
+    /**
+     * @property {string} nombre - El nombre de la oferta.
+     * @description Campo requerido. Debe ser una cadena de texto no vacía.
+     */
+    nombre: z.string({
+        required_error: "El nombre de la oferta es obligatorio."
+    })
+        .min(1, "El nombre de la oferta no puede estar vacío.")
+        .max(255, "El nombre de la oferta es demasiado largo."), // Ajusta la longitud máxima si es necesario
+
+    /**
+     * @property {string | null} descripcion - Una descripción breve de la oferta.
+     * @description Campo opcional. Puede ser una cadena de texto o `null`.
+     * Se transforma a `null` si es una cadena vacía para consistencia en la base de datos.
+     */
+    descripcion: z.string()
+        .max(1000, "La descripción es demasiado larga.") // Ajusta la longitud máxima si es necesario
+        .nullable() // Permite que el valor sea null
+        .transform(e => (e === "" ? null : e)) // Transforma cadena vacía a null
+        .optional(), // Hace el campo opcional en la entrada
+});
+
+/**
+ * @type CrearOfertaSuperSimplificadoDataInputType
+ * @description Tipo TypeScript inferido directamente del esquema Zod `CrearOfertaSuperSimplificadoInputSchema`.
+ * Representa la forma de los datos de entrada para la creación simplificada de una oferta.
+ */
+export type CrearOfertaSuperSimplificadoDataInputType = z.infer<typeof CrearOfertaSuperSimplificadoInputSchema>;

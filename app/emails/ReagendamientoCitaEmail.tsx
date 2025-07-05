@@ -1,70 +1,75 @@
-import { Body, Container, Head, Html, Preview, Section, Text, Row, Column } from '@react-email/components';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import * as React from 'react';
+// /app/emails/ReagendamientoCitaEmail.tsx
+
+import React from 'react';
+import {
+    Html, Body, Head, Heading, Container, Text, Section, Button, Preview
+} from '@react-email/components';
+import { Tailwind } from '@react-email/tailwind';
 
 interface ReagendamientoCitaEmailProps {
-    nombreUsuario?: string | null;
-    nombreNegocio?: string;
-    nombreServicio?: string;
-    fechaHoraAnterior?: Date;
-    fechaHoraNueva?: Date;
+    nombreDestinatario: string;
+    nombreNegocio: string;
+    nombreServicio: string;
+    fechaHoraOriginal: Date;
+    fechaHoraNueva: Date;
+    linkCancelar?: string;
+    linkReagendar?: string;
 }
 
-export const ReagendamientoCitaEmail = ({
-    nombreUsuario,
-    nombreNegocio,
-    nombreServicio,
-    fechaHoraAnterior,
-    fechaHoraNueva,
-}: ReagendamientoCitaEmailProps) => (
-    <Html>
-        <Head />
-        <Preview>Confirmación de Reagendamiento - Tu cita con {nombreNegocio || ''}</Preview>
-        <Body style={main}>
-            <Container style={container}>
-                <Text style={paragraph}>¡Hola {nombreUsuario || 'Cliente'},</Text>
-                <Text style={paragraph}>
-                    Te confirmamos que tu cita ha sido reagendada con éxito.
-                </Text>
-                <Section style={detailsSection}>
-                    <Text style={detailsTitle}>Detalles de tu cita actualizada:</Text>
-                    <Row>
-                        <Column style={label}>Servicio:</Column>
-                        <Column style={value}>{nombreServicio}</Column>
-                    </Row>
-                    <Row>
-                        <Column style={label}>Nueva Fecha y Hora:</Column>
-                        <Column style={value}>
-                            {fechaHoraNueva ? format(fechaHoraNueva, "EEEE, d 'de' MMMM 'de' yyyy 'a las' h:mm aa", { locale: es }) : 'N/A'}
-                        </Column>
-                    </Row>
-                    <Row style={oldDateRow}>
-                        <Column style={oldDateLabel}>(Esta cita reemplaza a la del {fechaHoraAnterior ? format(fechaHoraAnterior, "EEEE d 'a las' h:mm aa", { locale: es }) : 'N/A'})</Column>
-                    </Row>
-                </Section>
-                <Text style={paragraph}>
-                    Si necesitas hacer más cambios, por favor, responde a este correo o contáctanos directamente.
-                </Text>
-                <Text style={paragraph}>
-                    ¡Te esperamos!
-                    <br />
-                    El equipo de {nombreNegocio}
-                </Text>
-            </Container>
-        </Body>
-    </Html>
-);
+export const ReagendamientoCitaEmail: React.FC<ReagendamientoCitaEmailProps> = (props) => {
+    const { /* ... (extracción de props) ... */ } = props;
+
+    const formatearFecha = (fecha: Date) => {
+        return new Date(fecha).toLocaleString('es-MX', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City'
+        });
+    };
+
+    return (
+        <Html>
+            <Head />
+            <Preview>Tu cita en {props.nombreNegocio} ha sido reagendada</Preview>
+            <Tailwind>
+                <Body className="bg-gray-100 font-sans">
+                    <Container className="bg-white mx-auto my-10 p-8 rounded-lg shadow-md max-w-xl">
+                        <Heading className="text-2xl font-semibold text-gray-800 text-center mt-6">
+                            Cita Reagendada
+                        </Heading>
+                        <Text className="text-gray-600 text-base leading-relaxed mt-4">
+                            Hola, {props.nombreDestinatario},
+                        </Text>
+                        <Text className="text-gray-600 text-base leading-relaxed">
+                            Te confirmamos que tu cita de **{props.nombreServicio}** ha sido modificada con éxito.
+                        </Text>
+                        <Section className="bg-gray-50 my-6 p-6 rounded-md border border-gray-200">
+                            <Text className="text-gray-500 text-sm line-through m-0">
+                                Fecha Anterior: {formatearFecha(props.fechaHoraOriginal)}
+                            </Text>
+                            <Text className="text-green-600 font-bold text-lg m-0 mt-2">
+                                Nueva Fecha: {formatearFecha(props.fechaHoraNueva)}
+                            </Text>
+                        </Section>
+                        <Text className="text-gray-600 text-base leading-relaxed text-center">
+                            ¿Necesitas hacer otro cambio?
+                        </Text>
+                        <Section className="text-center">
+                            {props.linkReagendar && (
+                                <Button href={props.linkReagendar} className="bg-gray-500 text-white font-semibold px-5 py-2 rounded-md mr-2">
+                                    Reagendar de Nuevo
+                                </Button>
+                            )}
+                            {props.linkCancelar && (
+                                <Button href={props.linkCancelar} className="bg-red-600 text-white font-semibold px-5 py-2 rounded-md">
+                                    Cancelar Cita
+                                </Button>
+                            )}
+                        </Section>
+                    </Container>
+                </Body>
+            </Tailwind>
+        </Html>
+    );
+};
 
 export default ReagendamientoCitaEmail;
-
-// --- Estilos ---
-const main = { backgroundColor: '#f6f9fc', fontFamily: 'Arial, sans-serif' };
-const container = { backgroundColor: '#ffffff', margin: '0 auto', padding: '20px 0 48px', marginBottom: '64px', border: '1px solid #f0f0f0', borderRadius: '4px' };
-const paragraph = { fontSize: '16px', lineHeight: '26px', padding: '0 20px' };
-const detailsSection = { margin: '24px 0', padding: '12px 20px', backgroundColor: '#f2f3f3', borderRadius: '4px' };
-const detailsTitle = { fontSize: '18px', fontWeight: 'bold' as const, marginBottom: '16px' };
-const label = { fontSize: '14px', color: '#525f7f', width: '120px' };
-const value = { fontSize: '14px', color: '#000000', fontWeight: 'bold' as const };
-const oldDateRow = { paddingTop: '10px' };
-const oldDateLabel = { fontSize: '12px', color: '#8898aa', fontStyle: 'italic' };

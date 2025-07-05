@@ -1,140 +1,61 @@
-import {
-    Body,
-    Container,
-    Head,
-    Hr,
-    Html,
-    Img,
-    Preview,
-    Section,
-    Text,
-    Heading,
-    Font,
-    Link,
-} from '@react-email/components';
-import * as React from 'react';
+// /app/emails/CancelacionCitaEmail.tsx
 
-// Define las props que el componente recibirá para personalizar el correo.
+import React from 'react';
+import {
+    Html, Body, Head, Heading, Container, Text, Section, Button, Hr, Preview
+} from '@react-email/components';
+import { Tailwind } from '@react-email/tailwind';
+
 interface CancelacionCitaEmailProps {
-    nombreDestinatario?: string | null;
+    nombreDestinatario: string;
     nombreNegocio: string;
-    logoNegocioUrl?: string | null;
     nombreServicio: string;
-    fechaHoraCitaOriginal: string; // Recibe la fecha ya formateada
+    fechaHoraCitaOriginal: string;
+    linkAgendarNuevaCita: string;
 }
 
-// Estilos consistentes con tus otros correos para mantener la identidad visual.
-const main = {
-    backgroundColor: '#18181b', // zinc-900
-    fontFamily: 'Inter, -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif',
-};
-const container = {
-    margin: '15px auto',
-    padding: '10px 20px 48px',
-    width: '580px',
-    maxWidth: '100%',
-    backgroundColor: '#27272a', // zinc-800
-    borderRadius: '8px',
-    border: '1px solid #3f3f46', // zinc-700
-};
-const heading = {
-    color: '#f4f4f5', // zinc-100
-    fontSize: '28px',
-    fontWeight: 'bold',
-    textAlign: 'left' as const,
-    margin: '30px 0',
-};
-const paragraph = {
-    color: '#d4d4d8', // zinc-300
-    fontSize: '16px',
-    lineHeight: '26px',
-    margin: '16px 0',
-};
-const section = {
-    padding: '0 24px',
-};
-const logoContainer = {
-    textAlign: 'center' as const,
-    margin: '20px 20px 0',
-};
-const businessLogo = {
-    maxWidth: '200px',
-    maxHeight: '70px',
-    objectFit: 'contain' as const,
-};
-const hr = {
-    borderColor: '#3f3f46', // zinc-700
-    margin: '28px 0',
-};
-const footerText = {
-    color: '#71717a', // zinc-500
-    fontSize: '12px',
-    lineHeight: '1.5',
-    textAlign: 'center' as const,
-    padding: '0 20px'
-};
+export const CancelacionCitaEmail: React.FC<CancelacionCitaEmailProps> = (props) => {
+    const {
+        nombreDestinatario,
+        nombreNegocio,
+        nombreServicio,
+        fechaHoraCitaOriginal,
+        linkAgendarNuevaCita,
+    } = props;
 
-/**
- * Plantilla de correo electrónico para notificar al usuario
- * que su cita ha sido cancelada exitosamente.
- */
-export const CancelacionCitaEmail: React.FC<Readonly<CancelacionCitaEmailProps>> = ({
-    nombreDestinatario,
-    nombreNegocio,
-    logoNegocioUrl,
-    nombreServicio,
-    fechaHoraCitaOriginal,
-}) => {
-
-    const nombrePlataforma = 'ProMedia México';
-    const urlPlataforma = process.env.NEXT_PUBLIC_APP_URL || 'https://promedia.mx';
-    const emailSoportePlataforma = 'soporte.citas@promedia.mx';
+    const previewText = `Confirmación de cancelación de tu cita en ${nombreNegocio}`;
 
     return (
         <Html>
-            <Head>
-                <Font
-                    fontFamily="Inter"
-                    fallbackFontFamily="Verdana"
-                    webFont={{
-                        url: 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7W0Q5nw.woff2',
-                        format: 'woff2',
-                    }}
-                    fontWeight={400}
-                    fontStyle="normal"
-                />
-            </Head>
-            <Preview>Cancelación de tu cita en {nombreNegocio}</Preview>
-            <Body style={main}>
-                <Container style={container}>
-                    {logoNegocioUrl && (
-                        <Section style={logoContainer}>
-                            <Img src={logoNegocioUrl} alt={`Logo de ${nombreNegocio}`} style={businessLogo} />
+            <Head />
+            <Preview>{previewText}</Preview>
+            <Tailwind>
+                <Body className="bg-gray-100 font-sans">
+                    <Container className="bg-white mx-auto my-10 p-8 rounded-lg shadow-md max-w-xl">
+                        <Heading className="text-2xl font-semibold text-gray-800 text-center mt-6">
+                            Cita Cancelada
+                        </Heading>
+                        <Text className="text-gray-600 text-base leading-relaxed mt-4">
+                            Hola, {nombreDestinatario},
+                        </Text>
+                        <Text className="text-gray-600 text-base leading-relaxed">
+                            Te confirmamos que tu cita de **{nombreServicio}** para el **{fechaHoraCitaOriginal}** ha sido cancelada exitosamente.
+                        </Text>
+                        <Text className="text-gray-600 text-base leading-relaxed">
+                            Lamentamos que no puedas asistir y entendemos que surgen imprevistos. ¡No te preocupes! Estaremos encantados de recibirte en otra ocasión.
+                        </Text>
+                        <Section className="text-center my-8">
+                            <Button href={linkAgendarNuevaCita} className="bg-green-600 text-white font-semibold px-6 py-4 rounded-md">
+                                Agendar Nueva Cita
+                            </Button>
                         </Section>
-                    )}
-                    <Section style={section}>
-                        <Heading style={heading}>Cita Cancelada</Heading>
-                        <Text style={paragraph}>
-                            Hola {nombreDestinatario || 'Cliente'},
+                        <Hr className="border-gray-200 my-8" />
+                        <Text className="text-xs text-gray-400 text-center">
+                            Si tienes alguna duda, por favor, contacta directamente con {nombreNegocio}.
                         </Text>
-                        <Text style={paragraph}>
-                            Te confirmamos que tu cita para el servicio &quot;<strong>{nombreServicio}</strong>&quot;
-                            que tenías programada para el <strong>{fechaHoraCitaOriginal}</strong> ha sido cancelada exitosamente.
-                        </Text>
-                        <Text style={paragraph}>
-                            Si has cancelado esta cita por error o deseas agendar una nueva, no dudes en volver a contactarnos.
-                            ¡Estamos para ayudarte!
-                        </Text>
-                        <Hr style={hr} />
-                        <Text style={footerText}>
-                            Este servicio es facilitado por {nombrePlataforma}.<br />
-                            {urlPlataforma && <Link href={urlPlataforma} target="_blank" style={{ color: '#a1a1aa', textDecoration: 'underline' }}>{urlPlataforma}</Link>}
-                            <br />
-                            Si necesitas ayuda con la plataforma, contacta a <Link href={`mailto:${emailSoportePlataforma}`} style={{ color: '#a1a1aa', textDecoration: 'underline' }}>{emailSoportePlataforma}</Link>.
-                        </Text>
-                    </Section>
-                </Container>
-            </Body>
+                    </Container>
+                </Body>
+            </Tailwind>
         </Html>
     );
 };

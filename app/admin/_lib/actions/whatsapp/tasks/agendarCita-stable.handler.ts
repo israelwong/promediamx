@@ -25,7 +25,7 @@ import type { FsmContext, AgendarCitaContext, ProcesarMensajeWhatsAppOutput, Wha
 import { construirFechaDesdePalabrasClave } from '../helpers/date.helpers';
 import { extraerPalabrasClaveDeFecha, construirPromptDeExtraccionDinamico } from '../helpers/ia.helpers';
 import { construirPreguntaDinamica, ejecutarConfirmacionFinalCitaAction } from '../helpers/actions.helpers';
-import { findBestMatchingService, verificarDisponibilidad, findBestMatchingServiceWithIA } from '../helpers/availability.helpers';
+import { findBestMatchingService, verificarDisponibilidad } from '../helpers/availability.helpers';
 import { enviarMensajeAsistente } from '../core/orchestrator';
 import { enviarEmailConfirmacionCita } from '../../email/email.actions';
 import { generarRespuestaAsistente } from '../../../ia/ia.actions';
@@ -130,16 +130,13 @@ export async function manejarAgendarCita(
                 leadId: leadId,
             });
 
-            // ✅ CORRECCIÓN: Usamos el mensaje específico del helper.
             if (resultadoDisponibilidad.disponible) {
                 tareaContexto.fechaHora = fecha.toISOString();
-                await enviarMensajeAsistente(conversacionId, `¡Perfecto! El horario de ${fecha.toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' })} está disponible.`, usuarioWaId, negocioPhoneNumberId);
+                await enviarMensajeAsistente(conversacionId, `¡Perfecto! El horario de ${fecha.toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })} está disponible.`, usuarioWaId, negocioPhoneNumberId);
                 const tareaActualizada = await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.RECOLECTANDO_DATOS_ADICIONALES } });
                 return manejarAgendarCita(tareaActualizada, mensaje, contexto);
             } else {
-                // Si hay un mensaje específico (ej. "ya tienes una cita"), lo usamos. Si no, usamos el genérico.
-                const mensajeError = resultadoDisponibilidad.mensaje || "Lo siento, ese horario no está disponible. Por favor, elige otro día y hora.";
-                await enviarMensajeAsistente(conversacionId, mensajeError, usuarioWaId, negocioPhoneNumberId);
+                await enviarMensajeAsistente(conversacionId, `Lo siento, ese horario no está disponible. Por favor, elige otro día y hora.`, usuarioWaId, negocioPhoneNumberId);
                 return { success: true, data: null };
             }
         }
@@ -183,17 +180,14 @@ export async function manejarAgendarCita(
 
         case EstadoTareaConversacional.ESPERANDO_SERVICIO: {
             const serviciosDisponibles = await prisma.agendaTipoCita.findMany({ where: { negocioId: asistente.negocio!.id, activo: true } });
-
-            // ✅ CORRECCIÓN: Usamos el nuevo helper con IA.
-            const servicioEncontrado = await findBestMatchingServiceWithIA(textoUsuario, serviciosDisponibles);
-
+            const servicioEncontrado = findBestMatchingService(textoUsuario, serviciosDisponibles);
             if (servicioEncontrado) {
                 tareaContexto.servicioId = servicioEncontrado.id;
                 tareaContexto.servicioNombre = servicioEncontrado.nombre;
                 const tareaActualizada = await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.RECOLECTANDO_DATOS_ADICIONALES } });
                 return manejarAgendarCita(tareaActualizada, mensaje, contexto);
             } else {
-                await enviarMensajeAsistente(conversacionId, "No estoy seguro de a qué servicio te refieres. ¿Podrías elegir uno de la lista que te mencioné?", usuarioWaId, negocioPhoneNumberId);
+                await enviarMensajeAsistente(conversacionId, "No encontré ese servicio. ¿Podrías elegir uno de la lista que te mencioné?", usuarioWaId, negocioPhoneNumberId);
                 return { success: true, data: null };
             }
         }

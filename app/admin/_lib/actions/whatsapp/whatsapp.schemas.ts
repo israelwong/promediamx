@@ -120,20 +120,32 @@ export type AgendarCitaContext = {
     // --- PROPIEDAD AÑADIDA ---
     camposPersonalizados?: { [campoId: string]: string };
     ultimoCampoPedidoId?: string;
-
+    email?: string;
+    disponibilidadConfirmada?: boolean;
 };
+
 export type CancelarCitaContext = {
-    citasEncontradas?: { id: string; asunto: string; fecha: Date; tipoDeCitaId: string | null }[];
     citaIdParaCancelar?: string;
+    // ✅ MODIFICACIÓN: Guardamos un objeto más rico
+    posiblesCitasParaCancelar?: Record<number, {
+        id: string;
+        asunto: string;
+        fecha: Date; // Guardamos la fecha real
+        fechaFormateada: string; // Y también la versión para mostrar
+    }>;
+    citaSeleccionadaParaConfirmar?: string;
 };
 
 export type ReagendarCitaContext = {
-    citasEncontradas?: { id: string; asunto: string; fecha: Date; tipoDeCitaId: string | null }[];
     citaOriginalId?: string;
     citaOriginalAsunto?: string;
-    citaOriginalFecha?: Date;
-    citaOriginalTipoDeCitaId?: string | null;
-    nuevaFechaHora?: string;
+    citaOriginalFecha?: Date | string;
+    citaOriginalTipoDeCitaId?: string;
+
+    // Para guardar la nueva fecha mientras se pide la hora
     nuevaFechaParcial?: { año: number; mes: number; dia: number };
-    preguntaConfirmacionHecha?: boolean;
+    nuevaFechaHora?: string; // La nueva fecha y hora completas en formato ISO
+
+    // Para manejar la selección si hay múltiples citas
+    citasEncontradas?: { id: string; asunto: string; fecha: Date; tipoDeCitaId: string | null }[];
 };

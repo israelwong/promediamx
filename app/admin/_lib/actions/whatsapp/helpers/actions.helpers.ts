@@ -7,6 +7,8 @@ import type { ActionResult } from '@/app/admin/_lib/types';
 import type { AgendarCitaContext, FsmContext, ReagendarCitaContext } from '../whatsapp.schemas'; // Importamos los tipos desde su nuevo hogar
 import { EnviarMensajeWhatsAppApiInputSchema, type EnviarMensajeWhatsAppApiInput } from '../whatsapp.schemas';
 import { InteraccionParteTipo } from '@prisma/client';
+import type { CRMCampoPersonalizado } from '@prisma/client';
+
 
 export async function ejecutarConfirmacionFinalCitaAction(
     tareaContexto: AgendarCitaContext,
@@ -288,5 +290,81 @@ export async function construirMenuDeAgendamiento(crmId: string): Promise<string
     } catch (error) {
         console.error("Error al construir el menú de agendamiento:", error);
         return "Por favor, indícame el Colegio, Nivel Educativo y Grado para tu cita.";
+    }
+}
+
+export async function construirPreguntaDinamica(
+    camposFaltantes: CRMCampoPersonalizado[]
+): Promise<{ pregunta: string; ejemplo: string }> {
+    if (camposFaltantes.length === 0) {
+        return { pregunta: '', ejemplo: '' };
+    }
+
+    // Construye la pregunta principal
+    const nombresCampos = camposFaltantes.map(c => `**${c.nombre}**`).join(', ');
+    const pregunta = `Entendido. Para continuar, por favor, indícame: ${nombresCampos}.`;
+
+    // Construye un ejemplo dinámico
+    const partesEjemplo: string[] = [];
+    // Priorizamos estos campos para un ejemplo más lógico
+    const ordenEjemplo = ["Grado", "Nivel Educativo", "Colegio"];
+    const camposOrdenados = [...camposFaltantes].sort((a, b) => ordenEjemplo.indexOf(a.nombre) - ordenEjemplo.indexOf(b.nombre));
+
+    camposOrdenados.slice(0, 2).forEach(campo => {
+        const metadata = campo.metadata as { opciones?: string[] };
+        if (metadata?.opciones && metadata.opciones.length > 0) {
+            partesEjemplo.push(metadata.opciones[0]); // Usamos la primera opción como ejemplo
+        }
+    });
+
+    const ejemplo = partesEjemplo.length > 0
+        ? `\nPuedes escribirlos juntos (ej: "${partesEjemplo.join(' en ')}").`
+        : "";
+
+    return { pregunta, ejemplo };
+}
+
+export async function ejecutarReagendamientoFinalAction(
+    tareaContexto: ReagendarCitaContext,
+    fsmContexto: FsmContext
+): Promise<ActionResult<{ nuevaCita: Agenda }>> {
+    const { citaOriginalId, nuevaFechaHora } = tareaContexto;
+
+    if (!citaOriginalId || !nuevaFechaHora) {
+        return { success: false, error: "Faltan datos críticos para reagendar." };
+    }
+
+    try {
+        const citaOriginal = await prisma.agenda.findUniqueOrThrow({
+            where: { id: citaOriginalId }
+        });
+
+        const [, nuevaCita] = await prisma.$transaction([
+            prisma.agenda.update({
+                where: { id: citaOriginalId },
+                data: { status: StatusAgenda.REAGENDADA }
+            }),
+            prisma.agenda.create({
+                data: {
+                    negocioId: citaOriginal.negocioId,
+                    leadId: citaOriginal.leadId,
+                    asistenteId: fsmContexto.asistente.id,
+                    fecha: new Date(nuevaFechaHora),
+                    tipo: citaOriginal.tipo,
+                    asunto: citaOriginal.asunto,
+                    descripcion: `Cita reagendada desde la cita original ID: ${citaOriginalId}. Conversación ID: ${fsmContexto.conversacionId}`,
+                    tipoDeCitaId: citaOriginal.tipoDeCitaId,
+                    status: StatusAgenda.PENDIENTE,
+                    modalidad: citaOriginal.modalidad,
+                }
+            })
+        ]);
+
+        console.log(`[REAGENDAR] Cita reagendada con éxito. Nueva cita ID: ${nuevaCita.id}`);
+        return { success: true, data: { nuevaCita } };
+
+    } catch (error) {
+        console.error("[FSM ERROR] Error al reagendar la cita:", error);
+        return { success: false, error: "Error interno al procesar el reagendamiento." };
     }
 }

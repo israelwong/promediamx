@@ -16,15 +16,112 @@ import {
     type EnviarCancelacionCitaInput
 } from './email.schemas';
 
+import { EnviarReagendamientoCitaInputSchema, type EnviarReagendamientoCitaInput } from './email.schemas';
+
+
 // Plantillas componentes de email
 import { ConfirmacionPagoEmail } from '@/app/emails/ConfirmacionPagoEmail';
 import { ConfirmacionCitaEmail } from '@/app/emails/ConfirmacionCitaEmail';
 import { CancelacionCitaEmail } from '@/app/emails/CancelacionCitaEmail';
 import { ReagendamientoCitaEmail } from '@/app/emails/ReagendamientoCitaEmail';
 
-
-
 //! Acción para enviar correo de confirmación de pago
+
+export async function enviarEmailConfirmacionCita(
+    input: EnviarConfirmacionCitaInput
+): Promise<ActionResult<string | null>> {
+
+    const validationResult = EnviarConfirmacionCitaInputSchema.safeParse(input);
+    if (!validationResult.success) {
+        console.error("Error de validación en enviarEmailConfirmacionCitaAction:", validationResult.error.flatten());
+        return { success: false, error: "Datos de entrada inválidos para enviar correo de cita.", errorDetails: validationResult.error.flatten().fieldErrors };
+    }
+
+    // Asegúrate de que modalidadCita esté presente en los props
+    const modalidadCita: "presencial" | "virtual" =
+        validationResult.data.modalidadCita === "virtual" ? "virtual" : "presencial";
+    const props = {
+        ...validationResult.data,
+        modalidadCita
+    };
+
+    try {
+        const emailHtml = await render(React.createElement(ConfirmacionCitaEmail, props));
+
+        const { data, error } = await resend.emails.send({
+            from: `${props.nombreNegocio} vía ProMedia <citas@promedia.mx>`, // Dominio/subdominio verificado
+            to: [props.emailDestinatario],
+            subject: `Tu cita para "${props.nombreServicio}" ha sido confirmada`,
+            replyTo: props.emailRespuestaNegocio,
+            html: emailHtml,
+        });
+
+        if (error) {
+            console.error("Error al enviar correo de cita desde Resend:", error);
+            return { success: false, error: error.message || "Error del servicio de email." };
+        }
+
+        console.log(`Correo de confirmación de cita enviado a ${props.emailDestinatario}. ID: ${data?.id}`);
+        return { success: true, data: data?.id || null };
+
+    } catch (error: unknown) {
+        console.error("Error catastrófico en enviarEmailConfirmacionCitaAction:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo enviar el correo de confirmación de cita." };
+    }
+}
+
+
+export async function enviarEmailCancelacionCita(
+    input: EnviarCancelacionCitaInput
+): Promise<ActionResult<string | null>> {
+    const validationResult = EnviarCancelacionCitaInputSchema.safeParse(input);
+    if (!validationResult.success) {
+        return { success: false, error: "Datos inválidos para correo de cancelación." };
+    }
+    const props = validationResult.data;
+    try {
+        const emailHtml = await render(React.createElement(CancelacionCitaEmail, props));
+        const { data, error } = await resend.emails.send({
+            from: `${props.nombreNegocio} <cancelaciones@promedia.mx>`,
+            to: [props.emailDestinatario],
+            subject: `Confirmación de cancelación de tu cita en ${props.nombreNegocio}`,
+            replyTo: props.emailRespuestaNegocio,
+            html: emailHtml,
+        });
+        if (error) return { success: false, error: error.message };
+        return { success: true, data: data?.id || null };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "Error al enviar correo." };
+    }
+}
+
+
+export async function enviarEmailReagendamientoAction(
+    input: EnviarReagendamientoCitaInput
+): Promise<ActionResult<string | null>> {
+    const validationResult = EnviarReagendamientoCitaInputSchema.safeParse(input);
+    if (!validationResult.success) {
+        return { success: false, error: "Datos inválidos para correo de reagendamiento." };
+    }
+    const props = validationResult.data;
+    try {
+        const emailHtml = await render(React.createElement(ReagendamientoCitaEmail, props));
+        const { data, error } = await resend.emails.send({
+            from: `${props.nombreNegocio} <citas@promedia.mx>`,
+            to: [props.emailDestinatario],
+            subject: `Tu cita de "${props.nombreServicio}" ha sido reagendada`,
+            replyTo: props.emailRespuestaNegocio,
+            html: emailHtml,
+        });
+        if (error) return { success: false, error: error.message };
+        return { success: true, data: data?.id || null };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "Error al enviar correo." };
+    }
+}
+
+
+
 export async function enviarCorreoConfirmacionPagoAction(
     input: EnviarConfirmacionPagoInput
 ): Promise<ActionResult<string | null>> { // Devuelve el ID del mensaje de Resend o null
@@ -102,97 +199,5 @@ export async function enviarCorreoConfirmacionPagoAction(
             errorMessage = error.message;
         }
         return { success: false, error: errorMessage };
-    }
-}
-
-export async function enviarEmailConfirmacionCitaAction(
-    input: EnviarConfirmacionCitaInput
-): Promise<ActionResult<string | null>> {
-
-    const validationResult = EnviarConfirmacionCitaInputSchema.safeParse(input);
-    if (!validationResult.success) {
-        console.error("Error de validación en enviarEmailConfirmacionCitaAction:", validationResult.error.flatten());
-        return { success: false, error: "Datos de entrada inválidos para enviar correo de cita.", errorDetails: validationResult.error.flatten().fieldErrors };
-    }
-
-    const props = validationResult.data;
-
-    try {
-        const emailHtml = await render(React.createElement(ConfirmacionCitaEmail, props));
-
-        const { data, error } = await resend.emails.send({
-            from: `${props.nombreNegocio} vía ProMedia <citas@promedia.mx>`, // Dominio/subdominio verificado
-            to: [props.emailDestinatario],
-            subject: `Tu cita para "${props.nombreServicio}" ha sido confirmada`,
-            replyTo: props.emailRespuestaNegocio,
-            html: emailHtml,
-        });
-
-        if (error) {
-            console.error("Error al enviar correo de cita desde Resend:", error);
-            return { success: false, error: error.message || "Error del servicio de email." };
-        }
-
-        console.log(`Correo de confirmación de cita enviado a ${props.emailDestinatario}. ID: ${data?.id}`);
-        return { success: true, data: data?.id || null };
-
-    } catch (error: unknown) {
-        console.error("Error catastrófico en enviarEmailConfirmacionCitaAction:", error);
-        return { success: false, error: error instanceof Error ? error.message : "No se pudo enviar el correo de confirmación de cita." };
-    }
-}
-
-
-export async function enviarEmailCancelacionCitaAction(
-    input: EnviarCancelacionCitaInput
-): Promise<ActionResult<string | null>> {
-    const validationResult = EnviarCancelacionCitaInputSchema.safeParse(input);
-    if (!validationResult.success) {
-        return { success: false, error: "Datos inválidos para correo de cancelación." };
-    }
-    const props = validationResult.data;
-    try {
-        const emailHtml = await render(React.createElement(CancelacionCitaEmail, props));
-        const { data, error } = await resend.emails.send({
-            from: `${props.nombreNegocio} <cancelaciones@promedia.mx>`,
-            to: [props.emailDestinatario],
-            subject: `Confirmación de cancelación de tu cita en ${props.nombreNegocio}`,
-            replyTo: props.emailRespuestaNegocio,
-            html: emailHtml,
-        });
-        if (error) return { success: false, error: error.message };
-        return { success: true, data: data?.id || null };
-    } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : "Error al enviar correo." };
-    }
-}
-
-
-export async function enviarEmailReagendamientoAction(input: {
-    emailDestinatario: string;
-    nombreDestinatario: string | null;
-    nombreNegocio: string;
-    nombreServicio: string;
-    fechaHoraOriginal: Date;
-    fechaHoraNueva: Date;
-}) {
-    try {
-        const data = await resend.emails.send({
-            from: 'ProMedia <no-reply@promedia.mx>',
-            to: [input.emailDestinatario],
-            subject: `Tu cita de "${input.nombreServicio}" ha sido Reagendada`,
-            react: ReagendamientoCitaEmail({
-                nombreUsuario: input.nombreDestinatario,
-                nombreNegocio: input.nombreNegocio,
-                nombreServicio: input.nombreServicio,
-                fechaHoraAnterior: input.fechaHoraOriginal,
-                fechaHoraNueva: input.fechaHoraNueva,
-            }) as React.ReactElement,
-        });
-        console.log(`Correo de reagendamiento enviado a ${input.emailDestinatario}. ID: ${data.data?.id}`);
-        return { success: true, data: data.data?.id };
-    } catch (error) {
-        console.error("Error al enviar email de reagendamiento:", error);
-        return { success: false, error: 'Error al enviar email.' };
     }
 }

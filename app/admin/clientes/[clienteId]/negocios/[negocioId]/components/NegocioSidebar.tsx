@@ -51,6 +51,7 @@ const navSections: NavSection[] = [
     {
         title: 'Campañas',
         links: [
+            { hrefSuffix: '/mensajeInicial', icon: Tag, label: 'Mensaje de bienvenida' },
             { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
         ]
     },

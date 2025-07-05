@@ -275,3 +275,41 @@ export async function deleteNegocioDefinitivamente(negocioId: string, clienteId:
         return { success: false, error: "Ocurrió un error al eliminar el negocio." };
     }
 }
+
+
+
+
+export async function getMensajeBienvenida(negocioId: string) {
+    try {
+        const negocio = await prisma.negocio.findUnique({
+            where: { id: negocioId },
+            select: { mensajeBienvenida: true },
+        });
+        return { success: true, data: negocio?.mensajeBienvenida || '' };
+    } catch {
+        return { success: false, error: "No se pudo cargar el mensaje." };
+    }
+}
+
+/**
+ * Actualiza el mensaje de bienvenida de un negocio.
+ */
+export async function updateMensajeBienvenida(negocioId: string, mensaje: string) {
+    const schema = z.string().min(10, "El mensaje debe tener al menos 10 caracteres.");
+    const validation = schema.safeParse(mensaje);
+
+    if (!validation.success) {
+        return { success: false, error: validation.error.flatten().formErrors[0] };
+    }
+
+    try {
+        await prisma.negocio.update({
+            where: { id: negocioId },
+            data: { mensajeBienvenida: validation.data },
+        });
+        revalidatePath(`/admin/ruta/a/la/configuracion`); // Ajusta esta ruta
+        return { success: true, message: "Mensaje de bienvenida guardado." };
+    } catch {
+        return { success: false, error: "No se pudo guardar el mensaje." };
+    }
+}

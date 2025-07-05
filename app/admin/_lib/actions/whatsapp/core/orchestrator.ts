@@ -6,7 +6,7 @@
 import prisma from '@/app/admin/_lib/prismaClient';
 // Tipos y Enums de Prisma
 import type { TareaEnProgreso } from '@prisma/client';
-import { InteraccionParteTipo, StatusAgenda } from '@prisma/client';
+import { InteraccionParteTipo } from '@prisma/client';
 
 // Tipos personalizados y Schemas de Zod
 import type { ActionResult } from '../../../types';
@@ -17,7 +17,8 @@ import { manejarAgendarCita } from '../tasks/agendarCita.handler';
 import { manejarReagendarCita } from '../tasks/reagendarCita.handler';
 import { manejarCancelarCita } from '../tasks/cancelarCita.handler';
 import { manejarBuscarCitas } from '../tasks/buscarCitas.handler';
-
+import { manejarSeguimiento } from '../tasks/manejarSeguimiento.handler';
+import { manejarEsperandoClarificacionCostos } from '../tasks/esperandoClarificacionCostos.handler';
 
 // Detector de Intenciones
 import { manejarConversacionGeneral } from './intent-detector';
@@ -98,77 +99,47 @@ export async function manejarTareaEnProgreso(
     mensaje: WhatsAppMessageInput,
     contexto: FsmContext
 ): Promise<ActionResult<ProcesarMensajeWhatsAppOutput | null>> {
-    // Ya no extraemos las variables aquí para evitar que queden sin usar.
 
-    if (mensaje.type === 'text') {
-        const textoUsuario = mensaje.content.toLowerCase();
-
-        // MANEJO DE "META-PREGUNTAS"
-        const keywordsListarCitas = ['que citas tengo', 'mis citas', 'ver mis citas'];
-        if (keywordsListarCitas.some(kw => textoUsuario.includes(kw))) {
-
-            // --- CORRECCIÓN AQUÍ ---
-            // Extraemos las variables solo dentro de este bloque, donde sí se utilizan.
-            const { conversacionId, leadId, usuarioWaId, negocioPhoneNumberId } = contexto;
-
-            console.log(`[META-PREGUNTA] El usuario solicitó la lista de sus citas.`);
-            const citasActivas = await prisma.agenda.findMany({
-                where: { leadId, status: StatusAgenda.PENDIENTE, fecha: { gte: new Date() } },
-                orderBy: { fecha: 'asc' }
-            });
-            if (citasActivas.length > 0) {
-                let mensajeLista = "Claro, estas son tus próximas citas:\n";
-                citasActivas.forEach(cita => {
-                    const fechaLegible = new Date(cita.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' });
-                    mensajeLista += `\n- ${cita.asunto} para el ${fechaLegible}`;
-                });
-                await enviarMensajeAsistente(conversacionId, mensajeLista, usuarioWaId, negocioPhoneNumberId);
-            } else {
-                await enviarMensajeAsistente(conversacionId, "Actualmente no tienes ninguna cita futura agendada.", usuarioWaId, negocioPhoneNumberId);
-            }
-
-            await enviarMensajeAsistente(conversacionId, "Continuando con nuestra tarea anterior...", usuarioWaId, negocioPhoneNumberId);
-            return { success: true, data: null };
-        }
-
-        // Lógica de Escape y Reinicio (no necesita las variables destructuradas)
-        const keywordsReagendar = ['reagendar', 'reagenda', 'cambiar', 'mover', 'modificar', 'reprogramar'];
-        if (tarea.nombreTarea !== 'reagendarCita' && keywordsReagendar.some(kw => textoUsuario.includes(kw))) {
-            console.log(`[ESCAPE] Intención 'reagendar' detectada. Abortando tarea actual: '${tarea.nombreTarea}'.`);
-            await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
-            return manejarConversacionGeneral(mensaje, contexto);
-        }
-
-        if (tarea.nombreTarea === 'reagendarCita' && keywordsReagendar.some(kw => textoUsuario.includes(kw))) {
-            console.log(`[REINICIO] El usuario quiere reiniciar la tarea 'reagendarCita'. Eliminando tarea actual.`);
-            await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
-            return manejarConversacionGeneral(mensaje, contexto);
-        }
-
-        const keywordsCancelar = ['cancela', 'cancelar', 'eliminar', 'borrar'];
-        if (tarea.nombreTarea !== 'cancelarCita' && keywordsCancelar.some(kw => textoUsuario.includes(kw))) {
-            console.log(`[ESCAPE] Intención 'cancelar' detectada. Abortando tarea actual: '${tarea.nombreTarea}'.`);
-            await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
-            return manejarConversacionGeneral(mensaje, contexto);
-        }
+    if (mensaje.type !== 'text') {
+        // Si no es texto, por ahora simplemente continuamos con la tarea actual.
+        return enrutarASubGestor(tarea, mensaje, contexto);
     }
 
-    // Enrutamiento a sub-gestor
-    console.log(`[Paso 3.1] Gestor de Tareas: Enrutando a sub-gestor para la tarea: "${tarea.nombreTarea}"`);
-    switch (tarea.nombreTarea) {
-        case 'agendarCita':
-            return manejarAgendarCita(tarea, mensaje, contexto);
-        case 'cancelarCita':
-            return manejarCancelarCita(tarea, mensaje, contexto);
-        case 'reagendarCita':
-            return manejarReagendarCita(tarea, mensaje, contexto);
-        case 'buscarCitas':
-            return manejarBuscarCitas(tarea, mensaje, contexto);
-        default:
-            console.warn(`[FSM ADVERTENCIA] Tarea desconocida: ${tarea.nombreTarea}`);
-            await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
-            return { success: false, error: "Tarea desconocida." };
+    // First, remove all characters that are not letters, numbers, or spaces.
+    const textoLimpio = mensaje.content.replace(/[^a-z0-9\s]/gi, '');
+
+    // Then, perform the rest of your normalization.
+    const textoNormalizado = textoLimpio
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    // --- LÓGICA DE ESCAPE GLOBAL ---
+    // Antes de continuar, revisamos si el usuario quiere hacer algo diferente.
+
+    // 1. Escape por negación explícita o cancelación
+    const keywordsDeCancelacion = ['no gracias', 'ya no', 'cancelar', 'olvidalo', 'detener'];
+    if (keywordsDeCancelacion.some(kw => textoNormalizado.includes(kw))) {
+        console.log(`[ESCAPE] Negación detectada. Abortando tarea actual: '${tarea.nombreTarea}'.`);
+        await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
+        await enviarMensajeAsistente(contexto.conversacionId, "Entendido, cancelamos lo que estábamos haciendo. ¿Hay algo más en lo que pueda ayudarte?", contexto.usuarioWaId, contexto.negocioPhoneNumberId);
+        return { success: true, data: null };
     }
+
+    // 2. Escape por una nueva intención de alta prioridad (Costos)
+    // Se verifica que no estemos ya en un flujo de seguimiento para evitar bucles.
+    const keywordsCostos = ['costo', 'precio', 'colegiatura', 'inscripcion'];
+    if (tarea.nombreTarea !== 'seguimientoGenerico' && keywordsCostos.some(kw => textoNormalizado.includes(kw))) {
+        console.log(`[ESCAPE] Nueva intención 'solicitarCostos' detectada. Abortando tarea actual: '${tarea.nombreTarea}'.`);
+        await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
+        // Pasamos el control al gestor general para que inicie el nuevo flujo de costos.
+        return manejarConversacionGeneral(mensaje, contexto);
+    }
+
+    // Aquí podrías añadir más reglas de escape para otras intenciones en el futuro (ej. "ver mis citas")
+
+    // Si no se detectó ninguna intención de escape, continuamos con la tarea actual.
+    return enrutarASubGestor(tarea, mensaje, contexto);
 }
 
 export async function procesarMensajeWhatsAppEntranteAction(
@@ -180,6 +151,20 @@ export async function procesarMensajeWhatsAppEntranteAction(
         return { success: false, error: "Datos de entrada inválidos.", errorDetails: validation.error.flatten().fieldErrors };
     }
 
+    // --- ¡NUEVA LÓGICA DE IDEMPOTENCIA! ---
+    const { messageIdOriginal } = validation.data;
+    if (messageIdOriginal) {
+        const interaccionExistente = await prisma.interaccion.findFirst({
+            where: { messageId: messageIdOriginal }
+        });
+
+        if (interaccionExistente) {
+            console.log(`[IDEMPOTENCIA] Mensaje con ID ${messageIdOriginal} ya procesado. Omitiendo.`);
+            return { success: true, data: null }; // Detenemos la ejecución
+        }
+    }
+    // --- FIN DE LA LÓGICA DE IDEMPOTENCIA ---
+
     try {
         const setup = await setupConversacion(validation.data);
         if (!setup.success) {
@@ -189,13 +174,18 @@ export async function procesarMensajeWhatsAppEntranteAction(
         let tareaActiva = setup.data ? await prisma.tareaEnProgreso.findUnique({ where: { conversacionId: setup.data.conversacionId } }) : null;
 
         if (tareaActiva) {
+            // --- LÓGICA DE TIMEOUT MEJORADA ---
+            // Leemos el timeout desde las variables de entorno, con un default generoso.
+            const TIMEOUT_MINUTES = parseInt(process.env.TASK_TIMEOUT_MINUTES || '120'); // Default: 2 horas
+
             const AHORA = new Date();
             const ULTIMA_ACTUALIZACION = new Date(tareaActiva.updatedAt);
             const MINUTOS_INACTIVA = (AHORA.getTime() - ULTIMA_ACTUALIZACION.getTime()) / 60000;
-            if (MINUTOS_INACTIVA > 15) {
+
+            if (MINUTOS_INACTIVA > TIMEOUT_MINUTES) {
                 console.warn(`[LIMPIEZA] Tarea obsoleta encontrada (inactiva por ${MINUTOS_INACTIVA.toFixed(2)} min). Eliminando.`);
                 await prisma.tareaEnProgreso.delete({ where: { id: tareaActiva.id } });
-                tareaActiva = null;
+                tareaActiva = null; // La tarea ya no existe
             }
         }
 
@@ -211,5 +201,37 @@ export async function procesarMensajeWhatsAppEntranteAction(
     } catch (error: unknown) {
         console.error('[WhatsApp Orquestador] Error en el procesamiento principal:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Error interno al procesar mensaje.' };
+    }
+}
+
+/**
+ * Función de ayuda para enrutar al handler correcto basado en el nombre de la tarea.
+ * Evita repetir el bloque switch.
+ */
+function enrutarASubGestor(
+    tarea: TareaEnProgreso,
+    mensaje: WhatsAppMessageInput,
+    contexto: FsmContext
+) {
+    console.log(`[Paso 3.1] Gestor de Tareas: Enrutando a sub-gestor para la tarea: "${tarea.nombreTarea}"`);
+
+    switch (tarea.nombreTarea) {
+        case 'agendarCita':
+            return manejarAgendarCita(tarea, mensaje, contexto);
+        case 'cancelarCita':
+            return manejarCancelarCita(tarea, mensaje, contexto);
+        case 'reagendarCita':
+            return manejarReagendarCita(tarea, mensaje, contexto);
+        case 'buscarCitas':
+            return manejarBuscarCitas(tarea, mensaje, contexto);
+        case 'seguimientoGenerico':
+            return manejarSeguimiento(tarea, mensaje, contexto);
+        // --- AÑADIR EL NUEVO CASE ---
+        case 'esperandoClarificacionCostos':
+            return manejarEsperandoClarificacionCostos(tarea, mensaje, contexto);
+
+        default:
+            console.warn(`[FSM ADVERTENCIA] Tarea desconocida: ${tarea.nombreTarea}`);
+            return prisma.tareaEnProgreso.delete({ where: { id: tarea.id } }).then(() => ({ success: false, error: "Tarea desconocida." }));
     }
 }

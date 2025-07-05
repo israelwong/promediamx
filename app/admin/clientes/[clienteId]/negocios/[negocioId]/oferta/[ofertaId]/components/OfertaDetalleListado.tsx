@@ -50,7 +50,7 @@ export default function OfertaDetalleListado({
                     <CardDescription className="text-xs">Puntos de conocimiento, FAQs y argumentos para el asistente.</CardDescription>
                 </div>
                 <Button onClick={handleAddNewDetalle} size="sm">
-                    <PlusCircle size={16} className="mr-2" /> Añadir detallea
+                    <PlusCircle size={16} className="mr-2" /> Añadir detalles
                 </Button>
             </CardHeader>
             <CardContent>

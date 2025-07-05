@@ -29,36 +29,48 @@ export type EnviarConfirmacionPagoInput = z.infer<typeof EnviarConfirmacionPagoI
 
 
 // Datos que la acción necesita para enviar una confirmación de CITA
+
 export const EnviarConfirmacionCitaInputSchema = z.object({
-    // Datos del Destinatario (quien agendó)
-    emailDestinatario: z.string().email("Email del destinatario inválido."),
-    nombreDestinatario: z.string().nullable().optional(),
+    emailDestinatario: z.string().email(),
+    nombreDestinatario: z.string(),
+    nombreNegocio: z.string(),
+    logoNegocioUrl: z.string().url().optional(),
+    nombreServicio: z.string(),
+    fechaHoraCita: z.date(),
+    emailRespuestaNegocio: z.string().email(),
 
-    // Datos del Negocio
-    nombreNegocio: z.string().min(1, "El nombre del negocio es requerido."),
-    logoNegocioUrl: z.string().url("URL de logo inválida").nullable().optional(),
-    emailRespuestaNegocio: z.string().email("Email de respuesta del negocio inválido."),
-
-    // Datos de la Cita
-    nombreServicio: z.string().min(1, "El nombre del servicio es requerido."),
-    fechaHoraCita: z.date({ errorMap: () => ({ message: "Se requiere un objeto Date válido para la fecha de la cita." }) }),
-    modalidadCita: z.enum(['presencial', 'virtual']),
-
-    // Opcionales según modalidad
-    direccionNegocio: z.string().nullable().optional(), // Para citas presenciales
-    meetingUrl: z.string().url("URL de reunión inválida.").nullable().optional(), // Para citas virtuales
+    // --- CAMPOS MEJORADOS Y NUEVOS ---
+    detallesAdicionales: z.string().optional(), // Para "Colegio: Albatros", etc.
+    modalidadCita: z.enum(['presencial', 'virtual']).optional(), // Hacemos el tipo más estricto
+    ubicacionCita: z.string().optional(), // Dirección para citas presenciales
+    googleMapsUrl: z.string().url().optional(), // Link de Google Maps para presenciales
+    linkReunionVirtual: z.string().url().optional(), // Link de Zoom/Meet para virtuales
+    linkCancelar: z.string().url().optional(),
+    linkReagendar: z.string().url().optional(),
+    duracionCitaMinutos: z.number().optional()
 });
 export type EnviarConfirmacionCitaInput = z.infer<typeof EnviarConfirmacionCitaInputSchema>;
 
-// Datos para enviar un correo de cancelación de cita
 export const EnviarCancelacionCitaInputSchema = z.object({
     emailDestinatario: z.string().email(),
-    nombreDestinatario: z.string().nullable().optional(),
+    nombreDestinatario: z.string(),
     nombreNegocio: z.string(),
     nombreServicio: z.string(),
-    fechaHoraCitaOriginal: z.string(), // Pasaremos la fecha ya formateada
-    emailRespuestaNegocio: z.string().email("Email de respuesta del negocio inválido."),
-    fechaHoraCita: z.date({ errorMap: () => ({ message: "Se requiere un objeto Date válido para la fecha de la cita." }) }),
-
+    fechaHoraCitaOriginal: z.string(), // La fecha ya formateada de la cita que se canceló
+    linkAgendarNuevaCita: z.string().url(), // El link de WhatsApp para agendar de nuevo
+    emailRespuestaNegocio: z.string().email(),
 });
 export type EnviarCancelacionCitaInput = z.infer<typeof EnviarCancelacionCitaInputSchema>;
+
+export const EnviarReagendamientoCitaInputSchema = z.object({
+    emailDestinatario: z.string().email(),
+    nombreDestinatario: z.string(),
+    nombreNegocio: z.string(),
+    nombreServicio: z.string(),
+    fechaHoraOriginal: z.date(),
+    fechaHoraNueva: z.date(),
+    emailRespuestaNegocio: z.string().email(),
+    linkCancelar: z.string().url().optional(),
+    linkReagendar: z.string().url().optional(),
+});
+export type EnviarReagendamientoCitaInput = z.infer<typeof EnviarReagendamientoCitaInputSchema>;
