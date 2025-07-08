@@ -16,7 +16,6 @@
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
-import type { TareaEnProgreso, Prisma } from '@prisma/client';
 import { EstadoTareaConversacional } from '@prisma/client';
 import { z } from 'zod';
 
@@ -29,6 +28,10 @@ import { findBestMatchingService, verificarDisponibilidad, findBestMatchingServi
 import { enviarMensajeAsistente } from '../core/orchestrator';
 import { enviarEmailConfirmacionCita } from '../../email/email.actions';
 import { generarRespuestaAsistente } from '../../../ia/ia.actions';
+import { validarConfirmacionConIA } from '../helpers/ia.helpers';
+import type { Agenda, TareaEnProgreso, Prisma } from '@prisma/client';
+import { verificarYmanejarEscape } from '../helpers/fsm.helpers'; // Importa el nuevo helper
+
 
 
 export async function manejarAgendarCita(
@@ -39,6 +42,14 @@ export async function manejarAgendarCita(
     const tareaContexto = (tarea.contexto as AgendarCitaContext) || {};
     const { conversacionId, leadId, asistente, usuarioWaId, negocioPhoneNumberId } = contexto;
     const textoUsuario = mensaje.type === 'text' ? mensaje.content : '';
+
+
+    // ✅ INICIO DEL PROTOCOLO DE ESCAPE UNIVERSAL
+    const escapeManejado = await verificarYmanejarEscape(tarea, mensaje, contexto);
+    if (escapeManejado) {
+        return { success: true, data: null }; // Si se manejó un escape, la función termina aquí.
+    }
+    // ✅ FIN DEL PROTOCOLO
 
     console.log(`[AGENDAR CITA vFINAL] Estado: ${tarea.estado}. Contexto:`, tareaContexto);
 
@@ -311,92 +322,44 @@ export async function manejarAgendarCita(
             }
             resumen += `\n\n¿Es todo correcto? Responde "sí" para confirmar.`;
 
+
             await enviarMensajeAsistente(conversacionId, resumen, usuarioWaId, negocioPhoneNumberId);
             await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { estado: EstadoTareaConversacional.EJECUTANDO_ACCION_FINAL } });
             return { success: true, data: null };
         }
 
         case EstadoTareaConversacional.EJECUTANDO_ACCION_FINAL: {
-            const keywordsAfirmativos = ['si', 'sí', 'claro', 'ok', 'perfecto', 'de acuerdo', 'correcto'];
-            if (keywordsAfirmativos.some(kw => textoUsuario.toLowerCase().includes(kw))) {
+            // Usamos el helper de IA para una confirmación inteligente y conversacional
+            const esConfirmacion = await validarConfirmacionConIA(textoUsuario);
+
+            if (esConfirmacion) {
+                // 1. Ejecutamos la acción principal en la base de datos
                 const resultadoAgendado = await ejecutarConfirmacionFinalCitaAction(tareaContexto, contexto);
 
                 if (resultadoAgendado.success) {
+                    const agendaCreada = resultadoAgendado.data!.agenda;
                     let mensajeFinal = resultadoAgendado.data!.mensajeAdicional!;
 
+                    // 2. Si hay un email, delegamos la tarea de notificar
                     if (tareaContexto.email) {
                         mensajeFinal += `\n\nTe hemos enviado una confirmación a tu correo electrónico. ¡Te esperamos!`;
-                        try {
-                            const [leadInfo, tipoCitaInfo, negocioInfo, camposInfo] = await prisma.$transaction([
-                                prisma.lead.findUniqueOrThrow({ where: { id: leadId } }),
-                                prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: resultadoAgendado.data!.agenda.tipoDeCitaId! } }),
-                                prisma.negocio.findUniqueOrThrow({
-                                    where: { id: asistente.negocio!.id },
-                                    include: { AsistenteVirtual: true }
-                                }),
-                                prisma.cRMCampoPersonalizado.findMany({
-                                    where: { id: { in: Object.keys(tareaContexto.camposPersonalizados || {}) } },
-                                    select: { id: true, nombre: true },
-                                    orderBy: { orden: 'asc' }
-                                })
-                            ]);
 
-                            let detallesAdicionales = '';
-                            camposInfo.forEach(campo => {
-                                const valor = tareaContexto.camposPersonalizados?.[campo.id];
-                                if (valor) {
-                                    detallesAdicionales += `<p style="margin:0;color:#374151;"><b>${campo.nombre}:</b> ${valor}</p>`;
-                                }
-                            });
-
-                            const fechaCita = new Date(resultadoAgendado.data!.agenda.fecha);
-                            const fechaFormateadaParaLink = fechaCita.toLocaleString('es-MX', {
-                                dateStyle: 'long',
-                                timeStyle: 'short',
-                                timeZone: 'America/Mexico_City'
-                            });
-
-                            let linkCancelarWhatsApp: string | undefined = undefined;
-                            let linkReagendarWhatsApp: string | undefined = undefined;
-
-                            const asistenteActivo = negocioInfo.AsistenteVirtual.find(a => a.id === asistente.id);
-                            const numeroWhatsappAsistente = asistenteActivo?.whatsappBusiness?.replace(/\D/g, '');
-
-                            if (numeroWhatsappAsistente) {
-                                const textoCancelar = `Quiero "cancelar" mi cita de "${tipoCitaInfo.nombre}" del ${fechaFormateadaParaLink}.`;
-                                const textoReagendar = `Quiero "reagendar" mi cita de "${tipoCitaInfo.nombre}" del ${fechaFormateadaParaLink}.`;
-
-                                linkCancelarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoCancelar)}`;
-                                linkReagendarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoReagendar)}`;
-                            } else {
-                                console.warn(`[HANDLER] No se generaron links de acción porque el AsistenteVirtual ID ${asistente.id} no tiene un 'whatsappBusiness' configurado.`);
-                            }
-
-                            await enviarEmailConfirmacionCita({
-                                emailDestinatario: tareaContexto.email,
-                                nombreDestinatario: leadInfo.nombre,
-                                nombreNegocio: negocioInfo.nombre,
-                                nombreServicio: tipoCitaInfo.nombre,
-                                fechaHoraCita: resultadoAgendado.data!.agenda.fecha,
-                                detallesAdicionales: detallesAdicionales,
-                                modalidadCita: tipoCitaInfo.esVirtual ? 'virtual' : 'presencial',
-                                ubicacionCita: negocioInfo.direccion || undefined,
-                                googleMapsUrl: negocioInfo.googleMaps || undefined,
-                                linkCancelar: linkCancelarWhatsApp,
-                                linkReagendar: linkReagendarWhatsApp,
-                                emailRespuestaNegocio: negocioInfo.email || 'contacto@promedia.mx',
-                            });
-
-                        } catch (error) {
-                            console.error("[AGENDAR] Fallo el envío del correo, pero la cita fue exitosa.", error);
-                        }
+                        // Llamamos a nuestra nueva función auxiliar limpia
+                        await enviarNotificacionesDeCita(agendaCreada, tareaContexto, contexto);
                     }
+
+                    // 3. Enviamos el mensaje de éxito por WhatsApp
                     await enviarMensajeAsistente(conversacionId, mensajeFinal, usuarioWaId, negocioPhoneNumberId);
+
                 } else {
                     await enviarMensajeAsistente(conversacionId, `Hubo un problema al agendar: ${resultadoAgendado.error}`, usuarioWaId, negocioPhoneNumberId);
                 }
+
+                // 4. Limpiamos la tarea en progreso
                 await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
+
             } else {
+                // El usuario no confirmó, pasamos al flujo de corrección
                 await enviarMensajeAsistente(conversacionId, "De acuerdo. ¿Qué dato te gustaría corregir? (ej. 'la fecha', 'el colegio', 'el grado')", usuarioWaId, negocioPhoneNumberId);
                 await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { estado: EstadoTareaConversacional.ANALIZANDO_CORRECCION } });
             }
@@ -445,5 +408,74 @@ export async function manejarAgendarCita(
             await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
             return { success: false, error: `Estado no manejado en agendarCita: ${tarea.estado}` };
         }
+    }
+}
+
+
+async function enviarNotificacionesDeCita(
+    agenda: Agenda,
+    tareaContexto: AgendarCitaContext,
+    contexto: FsmContext
+) {
+    const { leadId, asistente } = contexto;
+
+    try {
+        const [leadInfo, tipoCitaInfo, negocioInfo, camposInfo] = await prisma.$transaction([
+            prisma.lead.findUniqueOrThrow({ where: { id: leadId } }),
+            prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: agenda.tipoDeCitaId! } }),
+            prisma.negocio.findUniqueOrThrow({
+                where: { id: asistente.negocio!.id },
+                include: { AsistenteVirtual: true }
+            }),
+            prisma.cRMCampoPersonalizado.findMany({
+                where: { id: { in: Object.keys(tareaContexto.camposPersonalizados || {}) } },
+                select: { id: true, nombre: true },
+                orderBy: { orden: 'asc' }
+            })
+        ]);
+
+        let detallesAdicionales = '';
+        camposInfo.forEach(campo => {
+            const valor = tareaContexto.camposPersonalizados?.[campo.id];
+            if (valor) {
+                detallesAdicionales += `<p style="margin:0;color:#374151;"><b>${campo.nombre}:</b> ${valor}</p>`;
+            }
+        });
+
+        const fechaFormateadaParaLink = new Date(agenda.fecha).toLocaleString('es-MX', {
+            dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City'
+        });
+
+        let linkCancelarWhatsApp: string | undefined;
+        let linkReagendarWhatsApp: string | undefined;
+
+        // ✅ CORRECCIÓN: Accedemos directamente al objeto AsistenteVirtual y usamos encadenamiento opcional.
+        const asistenteActivo = negocioInfo.AsistenteVirtual;
+        const numeroWhatsappAsistente = asistenteActivo?.whatsappBusiness?.replace(/\D/g, '');
+
+        if (numeroWhatsappAsistente) {
+            const textoCancelar = `Quiero "cancelar" mi cita de "${tipoCitaInfo.nombre}" del ${fechaFormateadaParaLink}.`;
+            const textoReagendar = `Quiero "reagendar" mi cita de "${tipoCitaInfo.nombre}" del ${fechaFormateadaParaLink}.`;
+            linkCancelarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoCancelar)}`;
+            linkReagendarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoReagendar)}`;
+        }
+
+        await enviarEmailConfirmacionCita({
+            emailDestinatario: tareaContexto.email!,
+            nombreDestinatario: leadInfo.nombre,
+            nombreNegocio: negocioInfo.nombre,
+            nombreServicio: tipoCitaInfo.nombre,
+            fechaHoraCita: agenda.fecha,
+            detallesAdicionales: detallesAdicionales,
+            modalidadCita: tipoCitaInfo.esVirtual ? 'virtual' : 'presencial',
+            ubicacionCita: negocioInfo.direccion || undefined,
+            googleMapsUrl: negocioInfo.googleMaps || undefined,
+            linkCancelar: linkCancelarWhatsApp,
+            linkReagendar: linkReagendarWhatsApp,
+            emailRespuestaNegocio: negocioInfo.email || 'contacto@promedia.mx',
+        });
+
+    } catch (error) {
+        console.error("[AGENDAR] Fallo el envío del correo, pero la cita fue exitosa.", error);
     }
 }

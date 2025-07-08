@@ -1,0 +1,114 @@
+// /app/admin/_lib/actions/whatsapp/tasks/responderPreguntaGeneral.handler.ts
+// VERSIÓN FINAL Y SELLADA - CON MANEJO DE AMBIGÜEDAD DINÁMICO
+
+'use server';
+
+import prisma from '@/app/admin/_lib/prismaClient';
+import { Prisma, ObjetivoOferta } from '@prisma/client';
+import type { ActionResult } from '../../../types';
+import type { FsmContext, ProcesarMensajeWhatsAppOutput } from '../whatsapp.schemas';
+import { enviarMensajeAsistente } from '../core/orchestrator';
+import { getEmbeddingForText } from '@/app/admin/_lib/ia/ia.actions';
+
+type ResultadoBusquedaSemantica = {
+    id: string;
+    nombre: string;
+    descripcion: string;
+    similitud: number;
+    fuente: 'Oferta' | 'ConocimientoGeneral';
+    objetivos?: ObjetivoOferta[];
+}
+
+// Este helper ahora devuelve un ARRAY de todas las buenas coincidencias.
+export async function buscarMejoresRespuestas(
+    texto: string,
+    negocioId: string,
+    umbral: number
+): Promise<ResultadoBusquedaSemantica[]> {
+    const textoVector = await getEmbeddingForText(texto);
+    if (!textoVector) return [];
+
+    const resultados = await prisma.$queryRaw<ResultadoBusquedaSemantica[]>`
+        SELECT 
+            id, 
+            "preguntaFormulada" as nombre, 
+            respuesta as descripcion, 
+            1 - ("embeddingPregunta" <=> ${textoVector}::vector) as similitud
+        FROM "NegocioConocimientoItem"
+        WHERE "negocioId" = ${negocioId} AND "embeddingPregunta" IS NOT NULL
+        ORDER BY similitud DESC
+        LIMIT 5;
+    `;
+
+    return resultados.filter(r => r.similitud > umbral);
+}
+
+// Esta es la función principal y única para responder preguntas.
+export async function responderPreguntaGeneral(
+    contexto: FsmContext
+): Promise<ActionResult<ProcesarMensajeWhatsAppOutput | null>> {
+
+    const textoUsuario = contexto.mensaje.type === 'text' ? contexto.mensaje.content : '';
+    const { conversacionId, usuarioWaId, negocioPhoneNumberId, asistente } = contexto;
+
+    if (!textoUsuario) return { success: true, data: null };
+
+    const umbralDeConfianza = asistente.umbralSimilitud ?? 0.72;
+    const mejoresRespuestas = await buscarMejoresRespuestas(textoUsuario, asistente.negocio!.id, umbralDeConfianza);
+
+    if (mejoresRespuestas.length > 0) {
+        // La lógica de ambigüedad se mantiene: si hay más de 1 resultado, se pide clarificación.
+        if (mejoresRespuestas.length > 1) {
+
+            await prisma.tareaEnProgreso.create({
+                data: {
+                    conversacionId,
+                    nombreTarea: 'esperandoClarificacionCostos',
+                    contexto: {
+                        opciones: mejoresRespuestas.map(r => r.id),
+                        // ✅ AÑADIMOS MEMORIA: Guardamos la pregunta original
+                        preguntaOriginal: textoUsuario
+                    } as Prisma.JsonObject
+                }
+            });
+
+            let mensajeLista = "Claro, encontré información sobre varios temas. ¿Cuál de ellos te interesa más?\n";
+            mejoresRespuestas.forEach((respuesta, index) => {
+                mensajeLista += `\n${index + 1}. **${respuesta.nombre}**`;
+            });
+            await enviarMensajeAsistente(conversacionId, mensajeLista, usuarioWaId, negocioPhoneNumberId);
+            // Aquí podríamos necesitar una tarea de clarificación genérica si queremos que elija.
+            return { success: true, data: null };
+        }
+
+        // Si solo hay una respuesta clara, la damos y ofrecemos el seguimiento.
+        const mejorRespuesta = mejoresRespuestas[0];
+        await enviarMensajeAsistente(conversacionId, mejorRespuesta.descripcion, usuarioWaId, negocioPhoneNumberId);
+
+        const algunaOfertaConCita = await prisma.oferta.findFirst({
+            where: { negocioId: asistente.negocio!.id, status: 'ACTIVO', objetivos: { has: 'CITA' } }
+        });
+        if (algunaOfertaConCita) {
+            await prisma.tareaEnProgreso.create({
+                data: {
+                    conversacionId,
+                    nombreTarea: 'seguimientoGenerico',
+                    contexto: {
+                        siguienteTarea: 'agendarCita',
+                        preguntaDeCierre: 'Además de esto, ¿te gustaría agendar una cita para resolver todas tus dudas?'
+                    } as Prisma.JsonObject
+                }
+            });
+            await enviarMensajeAsistente(conversacionId, 'Además de esto, ¿te gustaría agendar una cita para resolver todas tus dudas?', usuarioWaId, negocioPhoneNumberId);
+        }
+
+    } else {
+        // Knowledge Gap
+        await prisma.preguntaSinRespuestaGeneral.create({
+            data: { negocioId: asistente.negocio!.id, preguntaUsuario: textoUsuario, conversacionId }
+        });
+        await enviarMensajeAsistente(conversacionId, "Esa es una excelente pregunta. Permíteme consultarlo con un asesor.", usuarioWaId, negocioPhoneNumberId);
+    }
+
+    return { success: true, data: null };
+}

@@ -15,9 +15,6 @@ import { manejarCancelarCita } from '../tasks/cancelarCita.handler';
 import { manejarBuscarCitas } from '../tasks/buscarCitas.handler';
 import { manejarBienvenida } from '../tasks/manejarBienvenida.handler';
 import { responderPreguntaGeneral } from '../tasks/responderPreguntaGeneral.handler';
-import { responderPreguntaNoSoportada } from '../tasks/responderPreguntaNoSoportada.handler'; // <-- NUEVO HANDLER
-import { manejarSolicitudDeCostos } from '../tasks/manejarSolicitudDeCostos.handler';
-
 // import { manejarCostos } from '../tasks/manejarCostos.handler';
 
 // ====================================================================================
@@ -123,36 +120,16 @@ export async function manejarConversacionGeneral(
     let nombreTareaFSM: string | null = null;
 
     switch (intencionDetectada) {
-        case 'agendar_cita':
-            nombreTareaFSM = 'agendarCita';
-            break;
-        case 'reagendar_cita':
-            nombreTareaFSM = 'reagendarCita';
-            break;
-        case 'cancelar_cita':
-            nombreTareaFSM = 'cancelarCita';
-            break;
-        case 'ver_citas_agendadas':
-            nombreTareaFSM = 'buscarCitas';
-            break;
-        case 'saludar':
-            handlerDirecto = manejarBienvenida;
-            break;
+        case 'agendar_cita': nombreTareaFSM = 'agendarCita'; break;
+        case 'reagendar_cita': nombreTareaFSM = 'reagendarCita'; break;
+        case 'cancelar_cita': nombreTareaFSM = 'cancelarCita'; break;
+        case 'ver_citas_agendadas': nombreTareaFSM = 'buscarCitas'; break;
+        case 'saludar': handlerDirecto = manejarBienvenida; break;
 
-        // ✅ NUESTRA REGLA DE EXCEPCIÓN
         case 'solicitar_costos':
-            handlerDirecto = manejarSolicitudDeCostos;
-            break;
-
-        // "Catch-all": Cualquier otra pregunta va a nuestro nuevo handler.
         case 'pregunta_general':
         default:
-            // ✅ NUEVA VERIFICACIÓN
-            if (contexto.asistente.conocimientoActivado) {
-                handlerDirecto = responderPreguntaGeneral; // Si está ON, usa la IA
-            } else {
-                handlerDirecto = responderPreguntaNoSoportada; // Si está OFF, usa el Plan B
-            }
+            handlerDirecto = responderPreguntaGeneral;
             break;
     }
 

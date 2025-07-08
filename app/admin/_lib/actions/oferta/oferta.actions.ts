@@ -1,10 +1,12 @@
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
+
 import { ActionResult } from '@/app/admin/_lib/types';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { EstadoOferta, TipoPagoOferta } from '@prisma/client';
+import { getEmbeddingForText } from '../../ia/ia.actions';
 
 import {
     CrearOfertaSimplificadoSchema,
@@ -34,21 +36,45 @@ export async function crearOfertaAction(
     if (!validation.success) return { success: false, error: "Datos inválidos." };
 
     try {
-        const nuevaOferta = await prisma.oferta.create({
-            data: {
-                negocioId,
-                ...validation.data,
-                objetivos: [],
-                tipoPago: TipoPagoOferta.UNICO,
-                fechaInicio: new Date(),
-                fechaFin: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
-                status: EstadoOferta.BORRADOR,
-            },
-            select: { id: true, nombre: true }
+        const nuevaOferta = await prisma.$transaction(async (tx) => {
+            // Paso 1: Crear la oferta con los datos de texto, como antes.
+            const ofertaCreada = await tx.oferta.create({
+                data: {
+                    negocioId,
+                    ...validation.data,
+                    objetivos: [],
+                    tipoPago: TipoPagoOferta.UNICO,
+                    fechaInicio: new Date(),
+                    fechaFin: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+                    status: EstadoOferta.BORRADOR,
+                },
+                select: { id: true, nombre: true }
+            });
+
+            // Paso 2: Generar el embedding.
+            const textoParaEmbedding = `${validation.data.nombre}. ${validation.data.descripcion || ''}`;
+            const embedding = await getEmbeddingForText(textoParaEmbedding);
+
+            if (!embedding) {
+                throw new Error("La generación del embedding falló.");
+            }
+
+            // ✅ SOLUCIÓN: Usamos $executeRaw para actualizar la columna de tipo 'vector'.
+            // Prisma se encarga de proteger contra inyección SQL al usar `${...}`.
+            await tx.$executeRaw`
+                UPDATE "Oferta"
+                SET "embedding" = ${embedding}::vector
+                WHERE "id" = ${ofertaCreada.id}
+            `;
+
+            return ofertaCreada;
         });
+
         revalidatePath(getPathToOfertaList(clienteId, negocioId));
         return { success: true, data: nuevaOferta };
-    } catch {
+
+    } catch (error) {
+        console.error("Error al crear la oferta con embedding:", error);
         return { success: false, error: "No se pudo crear la oferta." };
     }
 }
@@ -130,19 +156,45 @@ export async function editarOfertaAction(
     const { serviciosDeCitaIds, ...dataToUpdate } = validation.data;
 
     try {
-        const updatedOferta = await prisma.oferta.update({
-            where: { id: ofertaId },
-            data: {
-                ...dataToUpdate,
-                serviciosDeCita: {
-                    deleteMany: {},
-                    create: serviciosDeCitaIds?.map(servicioId => ({ agendaTipoCitaId: servicioId })),
+        // ✅ Usamos una transacción para asegurar que todas las operaciones se completen
+        const updatedOferta = await prisma.$transaction(async (tx) => {
+            // 1. Actualizamos los campos de texto y relaciones como siempre
+            const ofertaActualizada = await tx.oferta.update({
+                where: { id: ofertaId },
+                data: {
+                    ...dataToUpdate,
+                    serviciosDeCita: {
+                        deleteMany: {},
+                        create: serviciosDeCitaIds?.map(servicioId => ({ agendaTipoCitaId: servicioId })),
+                    }
+                },
+            });
+
+            // 2. Verificamos si el texto cambió para decidir si regenerar el embedding
+            const necesitaNuevoEmbedding = dataToUpdate.nombre || dataToUpdate.descripcion;
+
+            if (necesitaNuevoEmbedding) {
+                const textoCompleto = `${ofertaActualizada.nombre} ${ofertaActualizada.descripcion || ''}`;
+                const nuevoEmbedding = await getEmbeddingForText(textoCompleto);
+
+                if (nuevoEmbedding) {
+                    // 3. Usamos $executeRaw para actualizar la columna de tipo 'vector'
+                    await tx.$executeRaw`
+                        UPDATE "Oferta"
+                        SET "embedding" = ${nuevoEmbedding}::vector
+                        WHERE "id" = ${ofertaId}
+                    `;
                 }
-            },
+            }
+
+            return ofertaActualizada;
         });
+
         revalidatePath(`/admin/`);
         return await obtenerOfertaParaEdicionAction(ofertaId, updatedOferta.negocioId);
-    } catch {
+
+    } catch (error) {
+        console.error("Error al actualizar la oferta:", error);
         return { success: false, error: "No se pudo actualizar la oferta." };
     }
 }

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "email": "email dev -p 3001 --dir ./app/emails"
+    "email": "email dev -p 3001 --dir ./app/emails",
+    "seed": "ts-node-esm prisma/seed.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

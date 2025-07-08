@@ -18,6 +18,7 @@ import {
 } from './negocio.schemas';
 
 import type {
+    Negocio,
     NegocioProfileType,
     UpdateNegocioProfileInputType,
 } from './negocio.schemas';
@@ -311,5 +312,29 @@ export async function updateMensajeBienvenida(negocioId: string, mensaje: string
         return { success: true, message: "Mensaje de bienvenida guardado." };
     } catch {
         return { success: false, error: "No se pudo guardar el mensaje." };
+    }
+}
+
+/**
+ * Obtiene todos los negocios asociados a un cliente por su ID.
+ */
+export async function obtenerNegociosPorClienteId(clienteId: string): Promise<ActionResult<Negocio[]>> {
+    if (!clienteId) {
+        return { success: false, error: "ID de cliente no proporcionado." };
+    }
+    try {
+        const negocios = await prisma.negocio.findMany({
+            where: { clienteId },
+            orderBy: { nombre: 'asc' },
+        });
+        // Map status to the correct union type
+        const negociosTyped = negocios.map(n => ({
+            ...n,
+            status: n.status as "activo" | "inactivo" | "pendiente"
+        }));
+        return { success: true, data: negociosTyped };
+    } catch (error) {
+        console.error("Error al obtener negocios por clienteId:", error);
+        return { success: false, error: "No se pudieron obtener los negocios del cliente." };
     }
 }

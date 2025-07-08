@@ -23,22 +23,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'react-hot-toast';
 import { Loader2, Save, Trash2, InfoIcon } from 'lucide-react';
 
-
 interface OfertaDetalleFormProps {
     ofertaId: string;
     negocioId: string;
     clienteId: string;
-    initialData: OfertaDetalleCompletoType; // En modo edición, initialData es requerido
+    initialData: OfertaDetalleCompletoType;
     ofertaDetalleIdToEdit: string;
 }
 
-// Definimos el schema que usará el formulario.
-// UpdateOfertaDetalleInputSchema define los campos que el usuario PUEDE editar en este form.
 const currentFormSchema = UpdateOfertaDetalleInputSchema;
-
-// Tipos para el formulario basados en el schema Zod
-type FormInputValues = z.input<typeof currentFormSchema>;   // Lo que el form maneja y Zod espera como ENTRADA
-type FormOutputValues = z.output<typeof currentFormSchema>; // Lo que Zod devuelve DESPUÉS de validar (y lo que recibe onSubmit)
+type FormInputValues = z.input<typeof currentFormSchema>;
+type FormOutputValues = z.output<typeof currentFormSchema>;
 
 
 export default function OfertaDetalleEditarForm({
@@ -50,15 +45,12 @@ export default function OfertaDetalleEditarForm({
 }: OfertaDetalleFormProps) {
     const router = useRouter();
 
-    // defaultValues deben ser del tipo FormInputValues.
-    // Para campos con .default() en Zod, podemos pasar 'undefined' aquí,
-    // y Zod aplicará el default. Para otros, el valor inicial o null/undefined.
     const defaultFormValues: DefaultValues<FormInputValues> = useMemo(() => ({
         tituloDetalle: initialData.tituloDetalle || '',
         contenido: initialData.contenido || '',
-        tipoDetalle: initialData.tipoDetalle === undefined ? undefined : (initialData.tipoDetalle || null), // string | null | undefined
-        palabrasClave: initialData.palabrasClave === undefined ? undefined : (initialData.palabrasClave || []), // string[] | undefined
-        estadoContenido: initialData.estadoContenido || undefined, // Zod tomará el default si es undefined
+        tipoDetalle: initialData.tipoDetalle === undefined ? undefined : (initialData.tipoDetalle || null),
+        palabrasClave: initialData.palabrasClave === undefined ? undefined : (initialData.palabrasClave || []),
+        estadoContenido: initialData.estadoContenido || undefined,
     }), [initialData]);
 
     const {
@@ -67,7 +59,7 @@ export default function OfertaDetalleEditarForm({
         register,
         reset,
         formState: { errors, isSubmitting, isDirty },
-    } = useForm<FormInputValues, unknown, FormOutputValues>({ // TFieldValues, TContext, TTransformedValues
+    } = useForm<FormInputValues, unknown, FormOutputValues>({
         resolver: zodResolver(currentFormSchema),
         defaultValues: defaultFormValues,
     });
@@ -84,17 +76,13 @@ export default function OfertaDetalleEditarForm({
     }, [initialData, reset]);
 
     const onSubmit: SubmitHandler<FormOutputValues> = async (data) => {
-        // 'data' aquí es FormOutputValues (z.infer), ya validada y con defaults/transformaciones.
         const loadingToastId = toast.loading("Actualizando detalle...");
         try {
-            // UpdateOfertaDetalleInputType es FormOutputValues
             const result = await updateOfertaDetalleAction(ofertaDetalleIdToEdit, data, clienteId, negocioId, ofertaId);
 
             toast.dismiss(loadingToastId);
             if (result.success && result.data) {
                 toast.success(`Detalle "${result.data.tituloDetalle}" actualizado exitosamente.`);
-                // Resetear el form con los nuevos datos guardados para actualizar 'isDirty'
-                // y reflejar los valores transformados por Zod si los hay (ej. default).
                 const resetData: DefaultValues<FormInputValues> = {
                     tituloDetalle: result.data.tituloDetalle,
                     contenido: result.data.contenido,
@@ -115,8 +103,6 @@ export default function OfertaDetalleEditarForm({
             toast.error(err instanceof Error ? err.message : "Ocurrió un error inesperado al actualizar.");
         }
     };
-
-    // Adaptado para este componente (no hay isEditMode, ofertaDetalleIdToEdit siempre existe)
 
     const handleEliminar = async () => {
         if (!ofertaDetalleIdToEdit) { // ofertaDetalleIdToEdit es una prop de este form
@@ -139,20 +125,7 @@ export default function OfertaDetalleEditarForm({
 
             if (result.success) {
                 toast.success("Detalle eliminado exitosamente. Redirigiendo...");
-
-                // *** PUNTO CRÍTICO: LA REDIRECCIÓN ***
-                // Debes redirigir a una página que NO sea la del detalle eliminado.
-                // Generalmente, es la página de la oferta principal.
-                // router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta/${ofertaId}`);
                 router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/oferta/${ofertaId}`);
-
-
-                // router.refresh() aquí refrescaría la página a la que acabas de redirigir,
-                // lo cual es bueno para asegurar que la lista de detalles (si está en esa página) se actualice.
-                // La action ya hace revalidatePath, por lo que el refresh del router podría ser redundante,
-                // pero no dañino.
-                // Lo importante es que el router.push te saque de la URL del detalle eliminado.
-
             } else {
                 toast.error(result.error || "No se pudo eliminar el detalle.");
             }

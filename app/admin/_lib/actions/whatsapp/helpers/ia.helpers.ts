@@ -337,3 +337,40 @@ ${ejemploJsonRespuesta}`;
 
     return prompt;
 }
+
+
+export async function validarConfirmacionConIA(
+    textoUsuario: string
+): Promise<boolean> {
+    const prompt = `Tu tarea es determinar si la respuesta de un usuario es una confirmación afirmativa. Analiza la intención del texto, ignorando typos. Responde únicamente con la palabra "SI" o "NO".
+
+Respuesta del usuario: "${textoUsuario}"
+
+--- EJEMPLOS ---
+- "si está bien" -> SI
+- "todo perfecto, gracias" -> SI
+- "así es, es correcto" -> SI
+- "adelante" -> SI
+- "confirmo" -> SI
+- "no, la fecha está mal" -> NO
+- "espera, el nombre no es ese" -> NO
+- "cuánto cuesta?" -> NO
+`;
+
+    try {
+        const resultadoIA = await generarRespuestaAsistente({
+            historialConversacion: [],
+            mensajeUsuarioActual: prompt,
+            contextoAsistente: { nombreAsistente: "Asistente", nombreNegocio: "Negocio" },
+            tareasDisponibles: [],
+        });
+
+        const respuesta = resultadoIA.data?.respuestaTextual?.trim().toUpperCase();
+        return respuesta === 'SI';
+
+    } catch (error) {
+        console.error("Error en validarConfirmacionConIA:", error);
+        // Como fallback seguro, si la IA falla, asumimos que no es una confirmación.
+        return false;
+    }
+}

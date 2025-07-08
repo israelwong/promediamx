@@ -47,3 +47,11 @@ export const updateNegocioNombreSchema = z.object({
 });
 export type UpdateNegocioNombreInput = z.infer<typeof updateNegocioNombreSchema>;
 
+
+
+export type Negocio = {
+    id: string;
+    nombre: string;
+    // El status puede ser un tipo más estricto si solo hay valores definidos.
+    status: 'activo' | 'inactivo' | 'pendiente';
+};

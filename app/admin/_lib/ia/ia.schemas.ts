@@ -146,3 +146,15 @@ export const GenerarRespuestaAsistenteConHerramientasInputSchema = z.object({
     tareasDisponibles: z.array(TareaCapacidadIASchema), // Asumiendo que TareaCapacidadIASchema está definido
 });
 export type GenerarRespuestaAsistenteConHerramientasInput = z.infer<typeof GenerarRespuestaAsistenteConHerramientasInputSchema>;
+
+
+export type TareaFuncionConParametros = {
+    name: string;
+    description: string;
+    // El 'parameters' sigue el formato que espera la API de Google Gemini
+    parameters: {
+        type: 'object';
+        properties: Record<string, unknown>;
+        required: string[];
+    };
+};

@@ -89,9 +89,67 @@ async function setupConversacion(
     return { success: true, data: result };
 }
 
-export async function enviarMensajeAsistente(conversacionId: string, mensaje: string, destinatarioWaId: string, negocioPhoneNumberIdEnvia: string) {
-    console.log(`[LOG ASISTENTE] Enviando a ${destinatarioWaId}: "${mensaje}"`);
-    return enviarMensajeInternoYWhatsAppAction({ conversacionId, contentFuncion: mensaje, role: 'assistant', parteTipo: InteraccionParteTipo.TEXT, canalOriginal: 'WhatsApp', destinatarioWaId, negocioPhoneNumberIdEnvia });
+//! envio de ensaje en un solo bloque de texto
+// export async function enviarMensajeAsistente(conversacionId: string, mensaje: string, destinatarioWaId: string, negocioPhoneNumberIdEnvia: string) {
+//     console.log(`[LOG ASISTENTE] Enviando a ${destinatarioWaId}: "${mensaje}"`);
+//     return enviarMensajeInternoYWhatsAppAction({ conversacionId, contentFuncion: mensaje, role: 'assistant', parteTipo: InteraccionParteTipo.TEXT, canalOriginal: 'WhatsApp', destinatarioWaId, negocioPhoneNumberIdEnvia });
+// }
+
+export async function enviarMensajeAsistente(
+    conversacionId: string,
+    mensaje: string,
+    destinatarioWaId: string,
+    negocioPhoneNumberIdEnvia: string
+) {
+    // ✅ INICIO DE LA NUEVA LÓGICA DE CHUNKING
+    // Usamos una expresión regular para dividir por uno o más saltos de línea,
+    // lo que captura dobles "Enter" (párrafos).
+    const chunks = mensaje.split(/\n\s*\n/).filter(chunk => chunk.trim() !== '');
+
+    console.log(`[LOG ASISTENTE] Mensaje dividido en ${chunks.length} chunks.`);
+
+    for (const chunk of chunks) {
+        const mensajeLimpio = chunk.trim();
+        console.log(`[LOG ASISTENTE] Enviando a ${destinatarioWaId}: "${mensajeLimpio}"`);
+
+        // Guardamos la interacción en nuestra base de datos
+        await prisma.interaccion.create({
+            data: {
+                conversacionId: conversacionId,
+                role: 'assistant',
+                mensajeTexto: mensajeLimpio,
+                parteTipo: InteraccionParteTipo.TEXT,
+                canalInteraccion: 'WhatsApp',
+            }
+        });
+
+        // Obtenemos el token del asistente para poder enviar el mensaje
+        const asistente = await prisma.asistenteVirtual.findFirst({
+            where: { phoneNumberId: negocioPhoneNumberIdEnvia }
+        });
+        if (!asistente || !asistente.token) {
+            console.error("No se encontró el token para el asistente con PNID:", negocioPhoneNumberIdEnvia);
+            continue; // Saltamos este chunk si no hay token
+        }
+
+        // Llamamos a la API de WhatsApp para enviar el mensaje
+        await enviarMensajeInternoYWhatsAppAction({
+            conversacionId: conversacionId,
+            contentFuncion: mensajeLimpio,
+            role: 'assistant',
+            parteTipo: InteraccionParteTipo.TEXT,
+            canalOriginal: 'WhatsApp',
+            destinatarioWaId: destinatarioWaId,
+            negocioPhoneNumberIdEnvia: negocioPhoneNumberIdEnvia,
+        });
+
+
+        // Añadimos una pequeña pausa entre mensajes para que se sienta más natural
+        if (chunks.length > 1) {
+            await new Promise(resolve => setTimeout(resolve, 800)); // Pausa de 800ms
+        }
+    }
+    // ✅ FIN DE LA NUEVA LÓGICA
 }
 
 export async function manejarTareaEnProgreso(
@@ -122,7 +180,7 @@ export async function manejarTareaEnProgreso(
     if (keywordsDeCancelacion.some(kw => textoNormalizado.includes(kw))) {
         console.log(`[ESCAPE] Negación detectada. Abortando tarea actual: '${tarea.nombreTarea}'.`);
         await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
-        await enviarMensajeAsistente(contexto.conversacionId, "Entendido, cancelamos lo que estábamos haciendo. ¿Hay algo más en lo que pueda ayudarte?", contexto.usuarioWaId, contexto.negocioPhoneNumberId);
+        await enviarMensajeAsistente(contexto.conversacionId, "Entendido, ¿Hay algo más en lo que pueda ayudarte?", contexto.usuarioWaId, contexto.negocioPhoneNumberId);
         return { success: true, data: null };
     }
 

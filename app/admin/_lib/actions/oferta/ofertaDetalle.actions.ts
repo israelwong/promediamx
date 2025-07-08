@@ -16,6 +16,7 @@ import {
 } from './ofertaDetalle.schemas';
 
 import { eliminarImagenStorage as eliminarArchivoStorage } from '@/app/admin/_lib/imageHandler.actions';
+import { getEmbeddingForText } from '@/app/admin/_lib/ia/ia.actions'; // Asegúrate de que esta función esté implementada
 
 
 import { revalidatePath } from 'next/cache';
@@ -30,69 +31,61 @@ const getPathToOfertaEdicionPage = (clienteId: string, negocioId: string, oferta
 
 export async function createOfertaDetalleAction(
     input: CreateOfertaDetalleInputType,
-    clienteId: string, // Para revalidatePath
-    negocioId: string  // Para revalidatePath y potencialmente permisos
+    clienteId: string,
+    negocioId: string
 ): Promise<ActionResult<OfertaDetalleCompletoType>> {
     const validationResult = CreateOfertaDetalleInputSchema.safeParse(input);
     if (!validationResult.success) {
-        return {
-            success: false,
-            error: "Datos de entrada inválidos para crear detalle.",
-            errorDetails: validationResult.error.flatten().fieldErrors,
-        };
+        return { success: false, error: "Datos inválidos.", errorDetails: validationResult.error.flatten().fieldErrors };
     }
     const data = validationResult.data;
 
     try {
-        // Verificar que la ofertaId existe y pertenece al negocio (si tienes esa lógica de permisos)
         const ofertaPadre = await prisma.oferta.findUnique({
-            where: { id: data.ofertaId, negocioId: negocioId }, // Asumiendo que pasas negocioId para verificar
+            where: { id: data.ofertaId, negocioId: negocioId },
         });
         if (!ofertaPadre) {
-            return { success: false, error: "Oferta asociada no encontrada o no pertenece al negocio." };
+            return { success: false, error: "Oferta asociada no encontrada." };
         }
 
-        const nuevoDetalle = await prisma.ofertaDetalle.create({
-            data: {
-                ofertaId: data.ofertaId,
-                tituloDetalle: data.tituloDetalle,
-                contenido: data.contenido,
-                tipoDetalle: data.tipoDetalle,
-                palabrasClave: data.palabrasClave,
-                orden: data.orden,
-                estadoContenido: data.estadoContenido,
-                preguntaOriginalUsuario: data.resolverPreguntaId ?
-                    (await prisma.preguntaSinRespuestaOferta.findUnique({ where: { id: data.resolverPreguntaId } }))?.preguntaUsuario : null,
-                creadoPorHumano: true, // Asumimos que se crea desde el form por un humano
-                // La multimedia se gestionará por separado después de la creación
-            },
-            include: { // Incluir para devolver el objeto completo
-                galeriaDetalle: true, videoDetalle: true, documentosDetalle: true,
+        const nuevoDetalle = await prisma.$transaction(async (tx) => {
+            const detalleCreado = await tx.ofertaDetalle.create({
+                data: {
+                    ofertaId: data.ofertaId,
+                    tituloDetalle: data.tituloDetalle,
+                    contenido: data.contenido,
+                    tipoDetalle: data.tipoDetalle,
+                    palabrasClave: data.palabrasClave,
+                    orden: data.orden,
+                    estadoContenido: data.estadoContenido,
+                    preguntaOriginalUsuario: data.resolverPreguntaId ? (await tx.preguntaSinRespuestaOferta.findUnique({ where: { id: data.resolverPreguntaId } }))?.preguntaUsuario : null,
+                    creadoPorHumano: true,
+                },
+                include: { galeriaDetalle: true, videoDetalle: true, documentosDetalle: true }
+            });
+
+            const textoParaEmbedding = `${detalleCreado.tituloDetalle}. ${detalleCreado.contenido}`;
+            const embedding = await getEmbeddingForText(textoParaEmbedding);
+
+            if (embedding) {
+                await tx.$executeRaw`UPDATE "OfertaDetalle" SET "embedding" = ${embedding}::vector WHERE "id" = ${detalleCreado.id}`;
             }
+            return detalleCreado;
         });
 
-        // Si se está resolviendo una pregunta, actualizarla
         if (data.resolverPreguntaId) {
             await prisma.preguntaSinRespuestaOferta.update({
                 where: { id: data.resolverPreguntaId },
-                data: {
-                    estado: 'RESPONDIDA_LISTA_PARA_NOTIFICAR', // O el estado que corresponda
-                    ofertaDetalleRespuestaId: nuevoDetalle.id,
-                    fechaRespuesta: new Date(),
-                },
+                data: { estado: 'RESPONDIDA_LISTA_PARA_NOTIFICAR', ofertaDetalleRespuestaId: nuevoDetalle.id, fechaRespuesta: new Date() },
             });
         }
 
-        const parsedData = OfertaDetalleCompletoSchema.parse(nuevoDetalle); // Validar/transformar salida
-
+        const parsedData = OfertaDetalleCompletoSchema.parse(nuevoDetalle);
         revalidatePath(getPathToOfertaEdicionPage(clienteId, negocioId, data.ofertaId));
         return { success: true, data: parsedData };
 
     } catch (error) {
         console.error("Error en createOfertaDetalleAction:", error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            // Manejar errores específicos de Prisma si es necesario
-        }
         return { success: false, error: "No se pudo crear el detalle de la oferta." };
     }
 }
@@ -213,76 +206,58 @@ export async function eliminarOfertaDetalleAction(
 // --- NUEVA ACTION para creación básica ---
 export async function crearOfertaDetalleBasicoAction(
     input: CrearOfertaDetalleBasicoInputType,
-    clienteId: string, // Para revalidatePath y construcción de URL de redirección
-    negocioId: string  // Para revalidatePath y construcción de URL de redirección
-): Promise<ActionResult<OfertaDetalleCompletoType>> { // Devolvemos el detalle completo para la redirección
+    clienteId: string,
+    negocioId: string
+): Promise<ActionResult<OfertaDetalleCompletoType>> {
     const validationResult = CrearOfertaDetalleBasicoInputSchema.safeParse(input);
     if (!validationResult.success) {
-        return {
-            success: false,
-            error: "Datos de entrada inválidos para crear el detalle.",
-            errorDetails: validationResult.error.flatten().fieldErrors,
-        };
+        return { success: false, error: "Datos inválidos.", errorDetails: validationResult.error.flatten().fieldErrors };
     }
     const data = validationResult.data;
 
     try {
-        // Verificar que la ofertaId existe y pertenece al negocio (si tienes esa lógica de permisos)
-        const ofertaPadre = await prisma.oferta.findUnique({
-            where: { id: data.ofertaId, negocioId: negocioId },
-        });
+        const ofertaPadre = await prisma.oferta.findUnique({ where: { id: data.ofertaId, negocioId: negocioId } });
         if (!ofertaPadre) {
             return { success: false, error: "Oferta asociada no encontrada." };
         }
 
-        // Asignar orden por defecto al crear
         const ultimoDetalle = await prisma.ofertaDetalle.findFirst({
-            where: { ofertaId: data.ofertaId },
-            orderBy: { orden: 'desc' },
-            select: { orden: true }
+            where: { ofertaId: data.ofertaId }, orderBy: { orden: 'desc' }, select: { orden: true }
         });
         const nuevoOrden = (ultimoDetalle?.orden ?? -1) + 1;
 
-        const nuevoDetalle = await prisma.ofertaDetalle.create({
-            data: {
-                ofertaId: data.ofertaId,
-                tituloDetalle: data.tituloDetalle,
-                contenido: data.contenido,
-                // Valores por defecto para los campos no incluidos en este form básico:
-                tipoDetalle: null,
-                palabrasClave: [], // Default a array vacío
-                orden: nuevoOrden,
-                estadoContenido: "BORRADOR", // Iniciar como borrador, ya que faltan detalles/multimedia
-                creadoPorHumano: true,
-                preguntaOriginalUsuario: data.resolverPreguntaId ?
-                    (await prisma.preguntaSinRespuestaOferta.findUnique({ where: { id: data.resolverPreguntaId } }))?.preguntaUsuario : null,
+        const nuevoDetalle = await prisma.$transaction(async (tx) => {
+            const detalleCreado = await tx.ofertaDetalle.create({
+                data: {
+                    ofertaId: data.ofertaId,
+                    tituloDetalle: data.tituloDetalle,
+                    contenido: data.contenido,
+                    orden: nuevoOrden,
+                    estadoContenido: "BORRADOR",
+                    creadoPorHumano: true,
+                    preguntaOriginalUsuario: data.resolverPreguntaId ? (await tx.preguntaSinRespuestaOferta.findUnique({ where: { id: data.resolverPreguntaId } }))?.preguntaUsuario : null,
+                },
+                include: { galeriaDetalle: true, videoDetalle: true, documentosDetalle: true }
+            });
 
-                // Multimedia se añadirá en la página de edición
-            },
-            include: { // Incluir para devolver el objeto completo y pasarlo a la pág de edición
-                galeriaDetalle: true, videoDetalle: true, documentosDetalle: true,
+            const textoParaEmbedding = `${detalleCreado.tituloDetalle}. ${detalleCreado.contenido}`;
+            const embedding = await getEmbeddingForText(textoParaEmbedding);
+            if (embedding) {
+                await tx.$executeRaw`UPDATE "OfertaDetalle" SET "embedding" = ${embedding}::vector WHERE "id" = ${detalleCreado.id}`;
             }
+            return detalleCreado;
         });
 
-        // Si se está resolviendo una pregunta, actualizarla
         if (data.resolverPreguntaId) {
             await prisma.preguntaSinRespuestaOferta.update({
                 where: { id: data.resolverPreguntaId },
-                data: {
-                    estado: 'RESPONDIDA_LISTA_PARA_NOTIFICAR', // O un estado intermedio como 'RESPUESTA_EN_BORRADOR'
-                    ofertaDetalleRespuestaId: nuevoDetalle.id,
-                    fechaRespuesta: new Date(),
-                },
+                data: { estado: 'RESPONDIDA_LISTA_PARA_NOTIFICAR', ofertaDetalleRespuestaId: nuevoDetalle.id, fechaRespuesta: new Date() },
             });
         }
 
-        // Validar la data completa que se devuelve
         const parsedData = OfertaDetalleCompletoSchema.parse(nuevoDetalle);
-
-        // Revalidar la página de edición de la oferta principal (donde se lista OfertaDetalleManager)
         revalidatePath(getPathToOfertaEdicionPage(clienteId, negocioId, data.ofertaId));
-
-        return { success: true, data: parsedData }; // Devolver el detalle completo con su ID
+        return { success: true, data: parsedData };
 
     } catch (error) {
         console.error("Error en crearOfertaDetalleBasicoAction:", error);
@@ -293,52 +268,46 @@ export async function crearOfertaDetalleBasicoAction(
 // Esta acción es para el formulario de EDICIÓN COMPLETO (OfertaDetalleForm.tsx)
 export async function updateOfertaDetalleAction(
     ofertaDetalleId: string,
-    input: UpdateOfertaDetalleInputType, // Schema ya no incluye 'orden'
+    input: UpdateOfertaDetalleInputType,
     clienteId: string,
     negocioId: string,
     ofertaId: string
 ): Promise<ActionResult<OfertaDetalleCompletoType>> {
     const validationResult = UpdateOfertaDetalleInputSchema.safeParse(input);
     if (!validationResult.success) {
-        return {
-            success: false,
-            error: "Datos de entrada inválidos para actualizar detalle.",
-            errorDetails: validationResult.error.flatten().fieldErrors,
-        };
+        return { success: false, error: "Datos inválidos.", errorDetails: validationResult.error.flatten().fieldErrors };
     }
     const data = validationResult.data;
 
     try {
-        const detalleExistente = await prisma.ofertaDetalle.findFirst({
-            where: { id: ofertaDetalleId, ofertaId: ofertaId, oferta: { negocioId: negocioId } }
-        });
-        if (!detalleExistente) {
-            return { success: false, error: "Detalle de oferta no encontrado o no modificable." };
-        }
+        const detalleActualizado = await prisma.$transaction(async (tx) => {
+            const detalle = await tx.ofertaDetalle.update({
+                where: { id: ofertaDetalleId },
+                data: {
+                    tituloDetalle: data.tituloDetalle,
+                    contenido: data.contenido,
+                    tipoDetalle: data.tipoDetalle,
+                    palabrasClave: data.palabrasClave,
+                    estadoContenido: data.estadoContenido,
+                },
+                include: { galeriaDetalle: true, videoDetalle: true, documentosDetalle: true }
+            });
 
-        const detalleActualizado = await prisma.ofertaDetalle.update({
-            where: { id: ofertaDetalleId },
-            data: {
-                tituloDetalle: data.tituloDetalle,
-                contenido: data.contenido,
-                tipoDetalle: data.tipoDetalle,
-                palabrasClave: data.palabrasClave,
-                estadoContenido: data.estadoContenido,
-                // 'orden' NO se actualiza desde este formulario.
-                // La reordenación se haría con una action separada desde el listado.
-            },
-            include: {
-                galeriaDetalle: true, videoDetalle: true, documentosDetalle: true,
+            const necesitaNuevoEmbedding = data.tituloDetalle || data.contenido;
+            if (necesitaNuevoEmbedding) {
+                const textoCompleto = `${detalle.tituloDetalle}. ${detalle.contenido}`;
+                const nuevoEmbedding = await getEmbeddingForText(textoCompleto);
+                if (nuevoEmbedding) {
+                    await tx.$executeRaw`
+                        UPDATE "OfertaDetalle" SET "embedding" = ${nuevoEmbedding}::vector WHERE "id" = ${detalle.id}
+                    `;
+                }
             }
+            return detalle;
         });
 
         const parsedData = OfertaDetalleCompletoSchema.parse(detalleActualizado);
-
-        const mainOfertaPagePath = getPathToOfertaEdicionPage(clienteId, negocioId, ofertaId);
-        revalidatePath(mainOfertaPagePath);
-        // También la página específica de edición de este detalle, si existiera y se quisiera revalidar
-        // revalidatePath(getPathToOfertaDetalleEdicionPage(clienteId, negocioId, ofertaId, ofertaDetalleId));
-
+        revalidatePath(getPathToOfertaEdicionPage(clienteId, negocioId, ofertaId));
         return { success: true, data: parsedData };
 
     } catch (error) {

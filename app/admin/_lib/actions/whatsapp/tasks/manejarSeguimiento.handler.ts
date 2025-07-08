@@ -1,95 +1,65 @@
-// app/admin/_lib/actions/whatsapp/tasks/manejarSeguimiento.handler.ts
+// /app/admin/_lib/actions/whatsapp/tasks/manejarSeguimiento.handler.ts
+// VERSIÓN FINAL - CON MANEJO DE DIGRESIONES
 
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
 import type { TareaEnProgreso, Prisma } from '@prisma/client';
 import { EstadoTareaConversacional } from '@prisma/client';
-
-// Tipos y Helpers
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
 import { enviarMensajeAsistente } from '../core/orchestrator';
-
-// Importamos el handler de agendamiento para poder llamarlo
 import { manejarAgendarCita } from './agendarCita.handler';
+import { manejarConversacionGeneral } from '../core/intent-detector';
 
-/**
- * Handler para gestionar la respuesta del usuario después de una invitación proactiva del bot.
- * Decide si iniciar una nueva tarea (como agendar cita) o finalizar la interacción.
- */
 export async function manejarSeguimiento(
     tarea: TareaEnProgreso,
     mensaje: WhatsAppMessageInput,
     contexto: FsmContext
 ): Promise<ActionResult<ProcesarMensajeWhatsAppOutput | null>> {
-    console.log('[SEGUIMIENTO HANDLER] Procesando respuesta a invitación.');
-    const { conversacionId, usuarioWaId, negocioPhoneNumberId } = contexto;
 
-    if (mensaje.type !== 'text') {
-        return { success: true, data: null };
+    const { conversacionId, usuarioWaId, negocioPhoneNumberId } = contexto;
+    const textoUsuario = mensaje.type === 'text' ? mensaje.content : '';
+
+    const { siguienteTarea } = (tarea.contexto as { siguienteTarea?: string }) || {};
+
+    if (!siguienteTarea) {
+        await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
+        return { success: false, error: "Contexto de seguimiento inválido." };
     }
 
-    const textoUsuario = mensaje.content.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const tareaContexto = tarea.contexto as { preguntaAnterior?: string; contextoOriginal?: { colegioSugerido?: string } };
+    const keywordsAfirmativos = ['si', 'sí', 'claro', 'ok', 'por favor', 'me gustaría', 'agenda', 'agendar'];
+    const keywordsNegativos = ['no', 'nel', 'despues', 'luego', 'ahora no', 'gracias'];
 
-    const keywordsAfirmativos = ['si', 'claro', 'ok', 'perfecto', 'de acuerdo', 'me gustaria', 'dale', 'proceder', 'adelante'];
-    const keywordsNegativos = ['no', 'no gracias', 'en otro momento', 'despues'];
-
-    // Verificamos si la respuesta es afirmativa
-    if (keywordsAfirmativos.some(kw => textoUsuario.includes(kw))) {
-
-        // El usuario quiere continuar, eliminamos la tarea de seguimiento actual.
+    if (keywordsAfirmativos.some(kw => textoUsuario.toLowerCase().includes(kw))) {
+        // --- CAMINO 1: El usuario dice "SÍ" ---
         await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
 
-        // Verificamos si la invitación era para agendar una cita
-        if (tareaContexto.preguntaAnterior === 'invitacion_agendar_cita' || tareaContexto.preguntaAnterior === 'invitacion_agendar_cita_desde_info') {
-
-            console.log('[SEGUIMIENTO HANDLER] Respuesta afirmativa. Iniciando tarea de agendamiento.');
-
-
-            // --- LÓGICA DE CONTEXTO CORREGIDA ---
-            let camposPersonalizadosIniciales = {};
-            if (tareaContexto.contextoOriginal?.colegioSugerido) {
-                // Buscamos el ID del campo personalizado "Colegio"
-                const campoColegio = await prisma.cRMCampoPersonalizado.findFirst({
-                    where: { crmId: contexto.asistente.negocio!.CRM!.id, nombre: 'Colegio' }
-                });
-                if (campoColegio) {
-                    // Usamos el ID del campo como clave, no el nombre.
-                    camposPersonalizadosIniciales = { [campoColegio.id]: tareaContexto.contextoOriginal.colegioSugerido };
-                }
+        const nuevaTarea = await prisma.tareaEnProgreso.create({
+            data: {
+                conversacionId,
+                nombreTarea: siguienteTarea,
+                contexto: {} as Prisma.JsonObject,
+                estado: EstadoTareaConversacional.INICIADA
             }
+        });
 
-            const nuevaTareaAgendar = await prisma.tareaEnProgreso.create({
-                data: {
-                    conversacionId: conversacionId,
-                    nombreTarea: 'agendarCita',
-                    estado: EstadoTareaConversacional.INICIADA,
-                    contexto: {
-                        camposPersonalizados: camposPersonalizadosIniciales
-                    } as Prisma.JsonObject,
-                },
-            });
-
-            return manejarAgendarCita(nuevaTareaAgendar, mensaje, contexto);
+        if (siguienteTarea === 'agendarCita') {
+            return manejarAgendarCita(nuevaTarea, mensaje, contexto);
         }
 
-    } else if (keywordsNegativos.some(kw => textoUsuario.includes(kw))) {
-        // El usuario no quiere continuar.
-        console.log('[SEGUIMIENTO HANDLER] Respuesta negativa. Finalizando flujo.');
-        await enviarMensajeAsistente(conversacionId, "Entendido. Si necesitas algo más, no dudes en preguntar.", usuarioWaId, negocioPhoneNumberId);
-        // Eliminamos la tarea de seguimiento para limpiar el estado.
+    } else if (keywordsNegativos.some(kw => textoUsuario.toLowerCase().includes(kw))) {
+        // --- CAMINO 2: El usuario dice "NO" ---
+        await enviarMensajeAsistente(conversacionId, "Entendido. ¿Hay algo más en lo que pueda ayudarte?", usuarioWaId, negocioPhoneNumberId);
         await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
-        return { success: true, data: null };
 
     } else {
-        // Respuesta ambigua
-        console.log('[SEGUIMIENTO HANDLER] Respuesta ambigua.');
-        await enviarMensajeAsistente(conversacionId, "Disculpa, no entendí tu respuesta. ¿Te gustaría agendar una cita?", usuarioWaId, negocioPhoneNumberId);
-        return { success: true, data: null };
+        // --- CAMINO 3: El usuario cambió de tema (hizo otra pregunta) ---
+        console.log("[SEGUIMIENTO] Digresión detectada. Abortando seguimiento y pasando a GESTOR GENERAL.");
+        await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
+        // Le devolvemos la estafeta al director de orquesta para que analice la nueva pregunta.
+        return manejarConversacionGeneral(mensaje, contexto);
     }
 
-    // Si por alguna razón no se entra en ninguna de las lógicas anteriores
     return { success: true, data: null };
 }

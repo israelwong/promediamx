@@ -7,454 +7,1288 @@ datasource db {
   url      = env("DIRECT_URL")
 }
 
-//! SISTEMA
 model Usuario {
-  id        String    @id @default(cuid())
-  rolId     String?
-  rol       Rol?      @relation(fields: [rolId], references: [id])
+  id        String   @id @default(cuid())
   status    String   @default("activo")
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  username  String    @unique
-  email     String    @unique
-  telefono  String    @unique @default("")
+  username  String   @unique
+  email     String   @unique
+  telefono  String   @unique @default("")
   password  String
+  rolId     String?
   sesiones  Sesion[]
+  rol       Rol?     @relation(fields: [rolId], references: [id])
 }
 
 model Rol {
-  id        String   @id @default(cuid())
-  nombre    String   @unique
+  id          String    @id @default(cuid())
+  nombre      String    @unique
   descripcion String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  usuarios  Usuario[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  usuarios    Usuario[]
 }
 
 model Sesion {
   id        String   @id @default(cuid())
   usuarioId String
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
   token     String
   status    String   @default("activo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
 }
 
-//! CLIENTE
-model Cliente{
-  id        String   @id @default(cuid())
-  nombre    String?
-  email     String @unique
-  telefono  String
-  password  String //considerar hasing
-  rfc      String?
-  curp     String?
-  razonSocial String?
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  stripeCustomerId     String?   @unique // ID de Cliente en Stripe (MUY importante)
-  
-  contrato  Contrato[]
-  negocio Negocio[]
-  Factura Factura[]
-  Notificacion Notificacion[]
+model Cliente {
+  id               String         @id @default(cuid())
+  nombre           String?
+  email            String         @unique
+  telefono         String
+  password         String
+  rfc              String?
+  curp             String?
+  razonSocial      String?
+  status           String         @default("activo")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  stripeCustomerId String?        @unique
+  contrato         Contrato[]
+  Factura          Factura[]
+  negocio          Negocio[]
+  Notificacion     Notificacion[]
 }
 
-//! CONTRATO 
-model Contrato{ 
-  id        String   @id @default(cuid())
-  clienteId String
-  cliente   Cliente @relation(fields: [clienteId], references: [id])
+model Contrato {
+  id           String   @id @default(cuid())
+  clienteId    String
   cotizacionId String
-  fechaInicio DateTime
-  fechaFin   DateTime
-  status    String   @default("activo") // activo, inactivo, cancelado
-  suscripcion Boolean @default(true)
-  recurrencia String // mensual, trimestral, semestral, anual
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  fechaInicio  DateTime
+  fechaFin     DateTime
+  status       String   @default("activo")
+  suscripcion  Boolean  @default(true)
+  recurrencia  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  cliente      Cliente  @relation(fields: [clienteId], references: [id])
 }
 
-//! ASISTENTE VIRTUAL
-model AsistenteVirtual{
-  id        String   @id @default(cuid())
-  clienteId String?
+model AsistenteVirtual {
+  id                        String                      @id @default(cuid())
+  urlImagen                 String?
+  nombre                    String
+  origen                    String?
+  whatsappBusiness          String?
+  phoneNumberId             String?                     @unique
+  token                     String?
+  version                   Float
+  status                    String                      @default("activo")
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  descripcion               String?
+  clienteId                 String?
+  negocioId                 String?                     @unique
+  canalConversacionalId     String?
+  whatsappBusinessAccountId String?
+  whatsappConnectionStatus  String?
+  whatsappDisplayName       String?
+  whatsappQualityRating     String?
+  whatsappTokenLastSet      DateTime?
+  umbralSimilitud       Float?    @default(0.72) // Umbral de confianza para la búsqueda semántica
+  conocimientoActivado   Boolean @default(true)
 
-  negocioId String? @unique
-  // negocio   Negocio? @relation(fields: [negocioId], references: [id])
-  negocio   Negocio?  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
 
-  urlImagen String?
-  nombre    String
-  descripcion String?
-  origen String? // sistema, cliente
-
-  whatsappBusiness String? //Telefono de WhatsApp Business
-  phoneNumberId String? @unique //API de WhatsApp Business
-  token String? //Identificador de acceso a la API de WhatsApp Business
-
-   // --- Nuevos campos sugeridos para WhatsApp ---
-  whatsappBusinessAccountId String?      // ID de la Cuenta de WhatsApp Business (WABA) (obtenido de Meta)
-  whatsappConnectionStatus  String?      // Estado de la conexión: "NO_CONECTADO", "CONECTADO", "ERROR_CONFIGURACION", "REQUIERE_REAUTENTICACION"
-  whatsappDisplayName       String?      // Nombre público aprobado por WhatsApp para este número
-  whatsappQualityRating     String?      // Calificación de calidad del número: "GREEN", "YELLOW", "RED", "UNKNOWN" (informativo)
-  whatsappTokenLastSet      DateTime?    // Fecha y hora en que el token fue configurado/actualizado por última vez
-
-  version   Float
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  canalConversacionalId String?
-  canalConversacional CanalConversacional? @relation(fields: [canalConversacionalId], references: [id], onDelete: SetNull) // Si se borra el canal, se quita la relación
-
+  Agenda                    Agenda[]
   AsistenteTareaSuscripcion AsistenteTareaSuscripcion[]
-  TareaEjecutada TareaEjecutada[]
-  Conversacion Conversacion[]
-  FacturaItem          FacturaItem[] 
-  ItemInteraccion ItemInteraccion[] 
-  Agenda Agenda[] // Relación a la agenda
+  canalConversacional       CanalConversacional?        @relation(fields: [canalConversacionalId], references: [id])
+  negocio                   Negocio?                    @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  Conversacion              Conversacion[]
+  FacturaItem               FacturaItem[]
+  ItemInteraccion           ItemInteraccion[]
+  TareaEjecutada            TareaEjecutada[]
 }
 
 model CanalConversacional {
-  id          String   @id @default(cuid())
-  nombre      String   @unique // Ej: "WhatsApp", "Web Chat", "Facebook Messenger"
-  icono       String?  // Opcional: Nombre o clase de icono para UI
-  descripcion String?
-  status      String   @default("activo") // activo, inactivo, beta
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  orden     Int? // Orden de aparición en la UI
-  tareasSoportadas TareaCanal[]
+  id               String             @id @default(cuid())
+  nombre           String             @unique
+  icono            String?
+  descripcion      String?
+  status           String             @default("activo")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  orden            Int?
   AsistenteVirtual AsistenteVirtual[]
+  tareasSoportadas TareaCanal[]
 }
 
-model AsistenteTareaSuscripcion{
-  id        String   @id @default(cuid())
+model AsistenteTareaSuscripcion {
+  id                 String           @id @default(cuid())
   asistenteVirtualId String
-  // asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
-  asistenteVirtual     AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id], onDelete: Cascade) // <-- AÑADIR ESTO AQUÍ
-  tareaId    String
-  tarea      Tarea @relation(fields: [tareaId], references: [id])
-  fechaSuscripcion DateTime @default(now())
+  tareaId            String
+  fechaSuscripcion   DateTime         @default(now())
   fechaDesuscripcion DateTime?
-  montoSuscripcion     Float?    // Costo mensual de esta tarea específica (puede ser 0 o null para incluidas)
-  status    String   @default("activo") //Activo, Inactivo, Cancelado
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status             String           @default("activo")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  montoSuscripcion   Float?
+  asistenteVirtual   AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id], onDelete: Cascade)
+  tarea              Tarea            @relation(fields: [tareaId], references: [id])
+  FacturaItem        FacturaItem[]
 
-  // Opcional: Link a los items de factura donde se cobró esta suscripción
-  FacturaItem          FacturaItem[]
   @@unique([asistenteVirtualId, tareaId])
   @@index([asistenteVirtualId])
 }
 
-//! TAREAS
 model Tarea {
-  id                       String    @id @default(cuid())
-  nombre                   String    @unique // Nombre único y descriptivo de la Tarea.
-  orden                    Int?      // Para la organización visual en listas.
-  // --- Descripciones ---
-  descripcionMarketplace   String?   //! Para mostrar al cliente en el Marketplace de Tareas (orientada al usuario).
-  // descripcionTool          String?   //! se moueve a TareaFuncion
-  instruccion              String?   //! se depara para ver si sirve para algo
-  // --- Configuración y Estado ---
-  precio                   Float?    // Precio de la tarea si no es gratuita.
-  status                   String    @default("activo") // Ej: "activo", "inactivo", "beta", "proximamente".
-  esTareaPorDefecto        Boolean   @default(false)   // Si es una tarea base ofrecida por el sistema.
-  iconoUrl                 String?   // URL del ícono para la UI.
-
-  // --- Clasificación y Contexto Adicional (Opcional) ---
-  categoriaTareaId         String?
-  CategoriaTarea           CategoriaTarea? @relation(fields: [categoriaTareaId], references: [id])
-  rol                      String?   // A qué rol de usuario podría estar más orientada esta tarea (ej: "admin", "cliente", "supervisor").
-  personalidad             String?   // Tono o estilo sugerido para el asistente al ejecutar esta tarea (ej: "introvertido", "formal", "creativo").
-  version                  Float?    // Versión de la tarea para control de cambios.
-
-  // --- Relación UNO-A-UNO con TareaFuncion ---
-  // Cada Tarea tiene una (y solo una) TareaFuncion asociada, que es única para esta Tarea.
-  // La TareaFuncion es "propiedad" de la Tarea.
-  tareaFuncion             TareaFuncion? // El '?' indica que podría crearse la Tarea y luego su TareaFuncion, pero la relación es 1:1.
-                                       // Desde el punto de vista de la base de datos, TareaFuncion tendrá una FK a Tarea.
-  
-  // --- Otras Relaciones ---
-  etiquetas                TareaEtiqueta[]             // Etiquetas descriptivas para la tarea.
-  canalesSoportados        TareaCanal[]                // Canales conversacionales donde esta tarea puede operar.
-  TareaGaleria             TareaGaleria[]              // Galería de imágenes/videos para la tarea.
-  
-  camposPersonalizadosRequeridos TareaCampoPersonalizado[] // Todavía presente, pendiente de tu decisión final.
-
-  // --- Tracking y Uso ---
-  AsistenteTareaSuscripcion AsistenteTareaSuscripcion[] // Qué asistentes están suscritos a esta tarea.
-  TareaEjecutada            TareaEjecutada[]            // Historial de ejecuciones de esta tarea.
-
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  id                             String                      @id @default(cuid())
+  orden                          Int?
+  nombre                         String                      @unique
+  instruccion                    String?
+  precio                         Float?
+  rol                            String?
+  personalidad                   String?
+  version                        Float?
+  status                         String                      @default("activo")
+  createdAt                      DateTime                    @default(now())
+  updatedAt                      DateTime                    @updatedAt
+  categoriaTareaId               String?
+  iconoUrl                       String?
+  esTareaPorDefecto              Boolean                     @default(false)
+  descripcionMarketplace         String?
+  AsistenteTareaSuscripcion      AsistenteTareaSuscripcion[]
+  CategoriaTarea                 CategoriaTarea?             @relation(fields: [categoriaTareaId], references: [id])
+  camposPersonalizadosRequeridos TareaCampoPersonalizado[]
+  canalesSoportados              TareaCanal[]
+  TareaEjecutada                 TareaEjecutada[]
+  etiquetas                      TareaEtiqueta[]
+  tareaFuncion                   TareaFuncion?
+  TareaGaleria                   TareaGaleria[]
 }
 
 model TareaFuncion {
-  id            String     @id @default(cuid())
-  nombre        String?     // Nombre de la función en camelCase (ej: agendarCita). 
-                           // Este nombre se usará para la FunctionDeclaration de Gemini.
-                           // Será único porque la función es única para la tarea.
-  descripcion   String?    //! definición para gemini tool
-  // --- Relación UNO-A-UNO Inversa con Tarea ---
-  // Esto establece que una TareaFuncion pertenece exclusivamente a una Tarea.
-  tareaId       String?     @unique // Campo de clave foránea que apunta a Tarea. El @unique aquí es CRUCIAL para la relación 1:1.
-  tarea         Tarea?     @relation(fields: [tareaId], references: [id], onDelete: Cascade) // Si se borra la Tarea, su TareaFuncion asociada también se borra.
-
-  // --- Parámetros de esta Función ---
-  // Cada función define su propia lista de parámetros.
-  parametros    TareaFuncionParametro[] 
-
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id          String                  @id @default(cuid())
+  descripcion String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  nombre      String?
+  tareaId     String?                 @unique
+  tarea       Tarea?                  @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  parametros  TareaFuncionParametro[]
 }
 
 model TareaFuncionParametro {
-  id                 String       @id @default(cuid())
-  tareaFuncionId     String       // A qué TareaFuncion pertenece este parámetro.
-  tareaFuncion       TareaFuncion @relation(fields: [tareaFuncionId], references: [id], onDelete: Cascade) // Si se borra la TareaFuncion, se borran sus parámetros.
+  id                String       @id @default(cuid())
+  tareaFuncionId    String
+  descripcionParaIA String
+  tipoDato          String
+  esObligatorio     Boolean      @default(true)
+  orden             Int?
+  valorPorDefecto   String?
+  ejemploValor      String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  nombre            String
+  tareaFuncion      TareaFuncion @relation(fields: [tareaFuncionId], references: [id], onDelete: Cascade)
 
-  nombre             String       // Nombre del parámetro en snake_case (ej: "producto_id", "fecha_inicio").
-                                  // Será la clave del argumento que espera la función y que Gemini debe proporcionar.
-  
-  descripcionParaIA  String       @db.Text // Descripción detallada de ESTE PARÁMETRO EN EL CONTEXTO DE ESTA FUNCIÓN para Gemini.
-                                  // CRUCIAL para que Gemini lo entienda, lo solicite si es necesario, y lo pueble correctamente.
-                                  // Ejemplo: "El identificador numérico del producto sobre el que el usuario está preguntando. Extraer de la conversación."
-
-  tipoDato           String       // Tipo de dato del parámetro (ej: "string", "number", "boolean", "date", "email").
-                                  // Ayuda a Gemini (para el schema de la FunctionDeclaration) y a la validación interna.
-  
-  esObligatorio      Boolean      @default(true) // Indica si el parámetro es conceptualmente obligatorio para que la función se ejecute correctamente.
-                                                 // Recordar que el array 'required' en la FunctionDeclaration para Gemini se dejará vacío por estrategia,
-                                                 // por lo que la 'descripcionParaIA' debe guiar a Gemini sobre la necesidad de este parámetro.
-  
-  orden              Int?         // Orden sugerido para la UI o para solicitar los parámetros en secuencia en la conversación.
-
-  // --- Opcionales para mayor detalle y guía (principalmente para el admin y para construir buenas descripcionesParaIA) ---
-  valorPorDefecto    String?      // Un valor por defecto si el usuario no proporciona uno (más para lógica interna que para Gemini).
-  ejemploValor       String?      // Un ejemplo concreto del valor esperado (ej: "Para una fecha, podría ser '2025-12-31'"). 
-                                  //! Útil para el admin e idealmente para incluir en 'descripcionParaIA'.
-
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-
-  @@unique([tareaFuncionId, nombre]) // El nombre del parámetro debe ser único DENTRO de una misma TareaFuncion.
+  @@unique([tareaFuncionId, nombre])
   @@index([tareaFuncionId])
 }
 
 model TareaCanal {
   tareaId               String
-  tarea                 Tarea               @relation(fields: [tareaId], references: [id], onDelete: Cascade)
   canalConversacionalId String
   canalConversacional   CanalConversacional @relation(fields: [canalConversacionalId], references: [id], onDelete: Cascade)
-  @@id([tareaId, canalConversacionalId]) // Clave primaria compuesta
+  tarea                 Tarea               @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+
+  @@id([tareaId, canalConversacionalId])
   @@index([tareaId])
   @@index([canalConversacionalId])
 }
 
 model TareaEtiqueta {
   tareaId         String
-  tarea           Tarea         @relation(fields: [tareaId], references: [id], onDelete: Cascade)
   etiquetaTareaId String
-  etiquetaTarea   EtiquetaTarea @relation(fields: [etiquetaTareaId], references: [id], onDelete: Cascade)
   asignadoEn      DateTime      @default(now())
+  etiquetaTarea   EtiquetaTarea @relation(fields: [etiquetaTareaId], references: [id], onDelete: Cascade)
+  tarea           Tarea         @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+
   @@id([tareaId, etiquetaTareaId])
   @@index([tareaId])
   @@index([etiquetaTareaId])
 }
 
-model CategoriaTarea{ 
-  id        String   @id @default(cuid())
-  orden     Int?
-  nombre    String @unique 
-  descripcion String?
-  color String? // Opcional: color para UI
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Tarea     Tarea[]
-}
-
-model EtiquetaTarea { 
+model CategoriaTarea {
   id          String   @id @default(cuid())
-  nombre      String   @unique // Nombre de la etiqueta (ej: "Ventas", "Soporte", "Automatización")
-  descripcion String?
   orden       Int?
+  nombre      String   @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  descripcion String?
+  color       String?
+  Tarea       Tarea[]
+}
+
+model EtiquetaTarea {
+  id          String          @id @default(cuid())
+  nombre      String          @unique
+  descripcion String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  orden       Int?
   tareas      TareaEtiqueta[]
 }
 
 model TareaCampoPersonalizado {
   tareaId                 String
   crmCampoPersonalizadoId String
-  esRequerido             Boolean               @default(true) // Indica si este campo personalizado es obligatorio para la IA en esta tarea específica
-  tarea                   Tarea                 @relation(fields: [tareaId], references: [id], onDelete: Cascade) // Si se borra la tarea, se borra el vínculo
-  crmCampoPersonalizado   CRMCampoPersonalizado @relation(fields: [crmCampoPersonalizadoId], references: [id], onDelete: Restrict) // Evita borrar un campo personalizado si está siendo usado por una tarea
+  esRequerido             Boolean               @default(true)
+  crmCampoPersonalizado   CRMCampoPersonalizado @relation(fields: [crmCampoPersonalizadoId], references: [id])
+  tarea                   Tarea                 @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+
   @@id([tareaId, crmCampoPersonalizadoId])
-  @@index([crmCampoPersonalizadoId]) // Índice para buscar tareas por campo personalizado
+  @@index([crmCampoPersonalizadoId])
 }
 
-//! TAREA EJECUTADA
-model TareaEjecutada{
-  id        String   @id @default(cuid())
+model TareaEjecutada {
+  id                 String           @id @default(cuid())
   asistenteVirtualId String
-  asistenteVirtual AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
-  tareaId    String
-  tarea      Tarea @relation(fields: [tareaId], references: [id])
-  fechaEjecutada DateTime
-  metadata String? // JSON con la metadata de la tarea ejecutada
-  createdAt DateTime @default(now())
+  tareaId            String
+  fechaEjecutada     DateTime
+  metadata           String?
+  createdAt          DateTime         @default(now())
+  asistenteVirtual   AsistenteVirtual @relation(fields: [asistenteVirtualId], references: [id])
+  tarea              Tarea            @relation(fields: [tareaId], references: [id])
 }
 
 model TareaGaleria {
-  id            String      @id @default(cuid())
-  tareaId       String
-  tarea         Tarea       @relation(fields: [tareaId], references: [id], onDelete: Cascade) // Si se borra la tarea, se borran sus imágenes
-  imageUrl      String      // URL de la imagen (ej: en Supabase Storage)
-  altText       String?     // Texto alternativo para accesibilidad
-  descripcion   String?     // Descripción opcional de la imagen
-  orden         Int?        // Para ordenar las imágenes en la galería
-  tamañoBytes   Int?        // Opcional: Tamaño en bytes
-  createdAt     DateTime    @default(now())
-  @@index([tareaId]) // Índice para buscar imágenes por tarea
+  id           String   @id @default(cuid())
+  tareaId      String
+  imageUrl     String
+  altText      String?
+  descripcion  String?
+  orden        Int?
+  tamañoBytes Int?
+  createdAt    DateTime @default(now())
+  tarea        Tarea    @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+
+  @@index([tareaId])
 }
 
-model ParametroRequerido{ //! descontinuar
-  id        String   @id @default(cuid())
-  orden     Int?
-  tipoDato String // texto, numero, fecha, booleano
-  nombreVisible String?    //!no me sirve 
-  nombreInterno String?    @unique // usar _ para separar palabras (ej: "nombre_cliente", "fecha_cita")
-  descripcion String? // Descripción del parámetro de lo que va a recibir
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  funciones   TareaFuncionParametroRequerido[]
+model ParametroRequerido {
+  id            String                           @id @default(cuid())
+  orden         Int?
+  tipoDato      String
+  descripcion   String?
+  createdAt     DateTime                         @default(now())
+  updatedAt     DateTime                         @updatedAt
+  nombreInterno String?                          @unique
+  nombreVisible String?
+  funciones     TareaFuncionParametroRequerido[]
 }
 
-model TareaFuncionParametroRequerido { //!Descontinuar
+model TareaFuncionParametroRequerido {
   tareaFuncionId       String
   parametroRequeridoId String
-  esObligatorio        Boolean          @default(true) // Indica si este parámetro estándar es obligatorio para esta función específica
-  // tareaFuncion         TareaFuncion     @relation(fields: [tareaFuncionId], references: [id], onDelete: Cascade)
-  parametroRequerido   ParametroRequerido @relation(fields: [parametroRequeridoId], references: [id], onDelete: Cascade) // Si se borra un parámetro, se quita de las funciones
+  esObligatorio        Boolean            @default(true)
+  parametroRequerido   ParametroRequerido @relation(fields: [parametroRequeridoId], references: [id], onDelete: Cascade)
+
   @@id([tareaFuncionId, parametroRequeridoId])
-  @@index([parametroRequeridoId]) // Índice para buscar funciones por parámetro
+  @@index([parametroRequeridoId])
 }
 
-
-//! FACTURACIÓN
 model Factura {
-  id                   String    @id @default(cuid())
-  clienteId            String    // Cliente al que se factura
-  // cliente              Cliente   @relation(fields: [clienteId], references: [id])
-  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
-  fechaEmision         DateTime  @default(now()) // Cuando se genera
-  fechaVencimiento     DateTime  // Cuando se debe pagar (ej: día 1 del ciclo)
-  periodoInicio        DateTime  // Inicio del ciclo cubierto (ej: 1 del mes)
-  periodoFin           DateTime  // Fin del ciclo cubierto (ej: fin de mes)
-  montoTotal           Float     // Suma de los items
-  status               String    @default("pendiente") // pendiente, pagada, vencida, fallida, cancelada
-  stripeInvoiceId      String?   @unique // ID de la Invoice en Stripe
-  stripePaymentIntentId String?  @unique // ID del Payment Intent en Stripe (si aplica)
-  // Puedes añadir más campos relacionados con el pago si es necesario
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  
-  items                FacturaItem[] // Items incluidos en esta factura
+  id                    String        @id @default(cuid())
+  clienteId             String
+  fechaEmision          DateTime      @default(now())
+  fechaVencimiento      DateTime
+  periodoInicio         DateTime
+  periodoFin            DateTime
+  montoTotal            Float
+  status                String        @default("pendiente")
+  stripeInvoiceId       String?       @unique
+  stripePaymentIntentId String?       @unique
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  cliente               Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  items                 FacturaItem[]
+
   @@index([clienteId])
   @@index([status])
   @@index([fechaVencimiento])
 }
 
-//! FACTURA ITEM ---
 model FacturaItem {
-  id                   String    @id @default(cuid())
-  facturaId            String
-  factura              Factura   @relation(fields: [facturaId], references: [id], onDelete: Cascade) // Si se borra factura, se borran items
-  descripcion          String    // Descripción clara del concepto (ej: "Asistente 'X' - Base", "Tarea 'Y'", "Prorrateo Tarea 'Z'")
-  monto                Float     // Monto de este item específico
-  cantidad             Int       @default(1)
-  periodoInicio        DateTime?
-  periodoFin           DateTime?
-  asistenteVirtualId   String?   // Si es el cobro base del asistente
-  asistenteVirtual     AsistenteVirtual? @relation(fields: [asistenteVirtualId], references: [id], onDelete: SetNull)
-  asistenteTareaSuscripcionId String? // Si es el cobro de una tarea suscrita
-  asistenteTareaSuscripcion AsistenteTareaSuscripcion? @relation(fields: [asistenteTareaSuscripcionId], references: [id], onDelete: SetNull)
+  id                          String                     @id @default(cuid())
+  facturaId                   String
+  descripcion                 String
+  monto                       Float
+  cantidad                    Int                        @default(1)
+  periodoInicio               DateTime?
+  periodoFin                  DateTime?
+  asistenteVirtualId          String?
+  asistenteTareaSuscripcionId String?
+  asistenteTareaSuscripcion   AsistenteTareaSuscripcion? @relation(fields: [asistenteTareaSuscripcionId], references: [id])
+  asistenteVirtual            AsistenteVirtual?          @relation(fields: [asistenteVirtualId], references: [id])
+  factura                     Factura                    @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+
   @@index([facturaId])
   @@index([asistenteVirtualId])
   @@index([asistenteTareaSuscripcionId])
 }
 
-//! NEGOCIO 
-model Negocio{
-  id        String   @id @default(cuid())
-  clienteId String?
-  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: Cascade) // <-- Cambiar y añadir onDelete
-  
-  nombre    String
-  slug      String?    @unique // NUEVO: Para la URL amigable. Debe ser único.
-  logo      String? //Logo, Imagen de Portada, Imágenes de Productos/Servicios.
-  slogan   String? //Lema, Tagline, Frase de Impacto.
-
-  mensajeBienvenida String? @db.Text // <-- NUEVO CAMPO
-
-  telefonoLlamadas String?
-  telefonoWhatsapp String?
-  email     String?
-  direccion String?
-  googleMaps String?
-  paginaWeb String?
-  
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  logoTamañoBytes Int? // Tamaño del logo en bytes
-  almacenamientoUsadoBytes BigInt? @default(0) // Contador total
-
-  AsistenteVirtual AsistenteVirtual[]
-  CRM       CRM?   // Added opposite relation field
-  itemsCatalogo ItemCatalogo[] // Relación a la galería
-  Catalogo   Catalogo[]
-  categorias    NegocioCategoria[] // <-- RENOMBRADO
-  etiquetas     NegocioEtiqueta[]  // <-- RENOMBRADO
-  ofertas      Oferta[]
-  Notificacion Notificacion[]
-  redesSociales NegocioRedSocial[] // Relación a redes sociales
-  GaleriaNegocio GaleriaNegocio[] // Relación a galerías de negocio
-  agendaTipoCita AgendaTipoCita[] // Relación a tipos de cita
-  horariosAtencion HorarioAtencion[] // Relación a horarios de atención
-  excepcionesHorario ExcepcionHorario[] // Relación a excepciones de horario
-  agenda Agenda[] // Relación a la agenda
-
-  NegocioPaquete NegocioPaquete[] // Relación a paquetes
-  NegocioPaqueteCategoria NegocioPaqueteCategoria[] // Relación a categorías de paquetes
-
-  AgendaConfiguracion AgendaConfiguracion? // Relación a configuración de agenda
-  itemsConocimiento       NegocioConocimientoItem[] // Base de Conocimiento del Negocio
-  configuracionPago       NegocioConfiguracionPago? // Configuración de pagos para este negocio (relación uno-a-uno)
-  transaccionesRecibidas  NegocioTransaccion[]      // Historial de transacciones recibidas por este negocio
-    preguntasSinRespuestaGeneral PreguntaSinRespuestaGeneral[] // <-- AÑADIR ESTA LÍNEA
-
+model Negocio {
+  id                           String                        @id @default(cuid())
+  clienteId                    String?
+  logo                         String?
+  nombre                       String
+  telefonoLlamadas             String?
+  telefonoWhatsapp             String?
+  email                        String?
+  direccion                    String?
+  googleMaps                   String?
+  paginaWeb                    String?
+  status                       String                        @default("activo")
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  almacenamientoUsadoBytes     BigInt?                       @default(0)
+  slogan                       String?
+  logoTamañoBytes             Int?
+  slug                         String?                       @unique
+  mensajeBienvenida            String?
+  agenda                       Agenda[]
+  AgendaConfiguracion          AgendaConfiguracion?
+  agendaTipoCita               AgendaTipoCita[]
+  AsistenteVirtual             AsistenteVirtual?
+  CRM                          CRM?
+  Catalogo                     Catalogo[]
+  excepcionesHorario           ExcepcionHorario[]
+  GaleriaNegocio               GaleriaNegocio[]
+  horariosAtencion             HorarioAtencion[]
+  itemsCatalogo                ItemCatalogo[]
+  cliente                      Cliente?                      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  categorias                   NegocioCategoria[]
+  configuracionPago            NegocioConfiguracionPago?
+  itemsConocimiento            NegocioConocimientoItem[]
+  etiquetas                    NegocioEtiqueta[]
+  NegocioPaquete               NegocioPaquete[]
+  NegocioPaqueteCategoria      NegocioPaqueteCategoria[]
+  redesSociales                NegocioRedSocial[]
+  transaccionesRecibidas       NegocioTransaccion[]
+  Notificacion                 Notificacion[]
+  ofertas                      Oferta[]
+  preguntasSinRespuestaGeneral PreguntaSinRespuestaGeneral[]
 }
 
 model PreguntaSinRespuestaGeneral {
   id              String   @id @default(cuid())
   negocioId       String
-  negocio         Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   conversacionId  String
-  preguntaUsuario String   @db.Text
-  estado          String   @default("PENDIENTE_REVISION") // PENDIENTE_REVISION, REVISADA, DESCARTADA
+  preguntaUsuario String
+  estado          String   @default("PENDIENTE_REVISION")
   createdAt       DateTime @default(now())
+  negocio         Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
 
   @@index([negocioId, estado])
 }
 
-// Enum para los días de la semana (más claro que usar números 0-6)
+model HorarioAtencion {
+  id         String    @id @default(cuid())
+  negocioId  String
+  dia        DiaSemana
+  horaInicio String
+  horaFin    String
+  negocio    Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  @@unique([negocioId, dia])
+  @@index([negocioId])
+}
+
+model ExcepcionHorario {
+  id               String   @id @default(cuid())
+  negocioId        String
+  fecha            DateTime
+  esDiaNoLaborable Boolean
+  horaInicio       String?
+  horaFin          String?
+  descripcion      String?
+  negocio          Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  @@unique([negocioId, fecha])
+  @@index([negocioId])
+  @@index([fecha])
+}
+
+model NegocioRedSocial {
+  id        String   @id @default(cuid())
+  negocioId String
+  nombreRed String
+  url       String
+  icono     String?
+  orden     Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  @@unique([negocioId, nombreRed])
+  @@index([negocioId])
+}
+
+model NegocioConocimientoItem {
+  id                      String                 @id @default(cuid())
+  negocioId               String
+  preguntaOriginalUsuario String?
+  preguntaFormulada       String
+  respuesta               String?
+  estado                  String                 @default("PENDIENTE_RESPUESTA")
+  categoria               String?
+  fechaRespuesta          DateTime?
+  creadoPorTipo           String?
+  creadoPorId             String?
+  respondidoPorAgenteId   String?
+  contadorConsultas       Int                    @default(0)
+  ultimaConsulta          DateTime?
+  notasInternas           String?
+  embeddingPregunta       Unsupported("vector")?
+  embeddingRespuesta      Unsupported("vector")?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  accionDeSeguimiento     Json?
+  negocio                 Negocio                @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  @@index([negocioId, estado])
+  @@index([negocioId, categoria])
+}
+
+model NegocioConfiguracionPago {
+  id                              String   @id @default(cuid())
+  negocioId                       String   @unique
+  aceptaPagosOnline               Boolean  @default(false)
+  stripeCuentaConectada           Boolean  @default(false)
+  plataformaProcesaConSuStripe    Boolean  @default(true)
+  aceptaTarjetasCreditoDebito     Boolean  @default(true)
+  aceptaMesesSinIntereses         Boolean  @default(false)
+  aceptaOxxoPay                   Boolean  @default(false)
+  aceptaTransferenciaBancaria     Boolean  @default(false)
+  datosBancariosParaTransferencia String?
+  monedaPrincipal                 String   @default("MXN")
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+  stripeAccountId                 String?  @unique
+  stripeAccountType               String?
+  stripeChargesEnabled            Boolean  @default(false)
+  stripeOnboardingComplete        Boolean  @default(false)
+  stripePayoutsEnabled            Boolean  @default(false)
+  mesesPermitidosMSI              Int[]    @default([])
+  negocio                         Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+}
+
+model NegocioTransaccion {
+  id                     String            @id @default(cuid())
+  negocioId              String
+  fechaTransaccion       DateTime          @default(now())
+  concepto               String
+  montoBruto             Float
+  moneda                 String
+  comisionProcesadorPago Float             @default(0)
+  comisionPlataforma     Float             @default(0)
+  montoNetoRecibido      Float
+  metodoPagoUtilizado    String
+  referenciaProcesador   String?           @unique
+  emailComprador         String?
+  nombreComprador        String?
+  estado                 EstadoTransaccion @default(PENDIENTE)
+  origenPagoId           String?
+  origenPagoTipo         String?
+  metadata               Json?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  negocio                Negocio           @relation(fields: [negocioId], references: [id])
+
+  @@index([negocioId, fechaTransaccion])
+  @@index([negocioId, estado])
+  @@index([referenciaProcesador])
+}
+
+model NegocioCategoria {
+  id           String         @id @default(cuid())
+  negocioId    String
+  nombre       String
+  descripcion  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  orden        Int?
+  status       String         @default("activo")
+  ItemCatalogo ItemCatalogo[]
+  negocio      Negocio        @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+}
+
+model NegocioEtiqueta {
+  id            String                 @id @default(cuid())
+  negocioId     String
+  nombre        String
+  descripcion   String?
+  status        String                 @default("activo")
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  orden         Int?
+  itemEtiquetas ItemCatalogoEtiqueta[]
+  negocio       Negocio                @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+}
+
+model GaleriaNegocio {
+  id          String                 @id @default(cuid())
+  negocioId   String
+  nombre      String
+  descripcion String?
+  orden       Int?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  status      String                 @default("activo")
+  negocio     Negocio                @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  imagenes    ImagenGaleriaNegocio[]
+
+  @@unique([negocioId, nombre])
+  @@index([negocioId])
+}
+
+model ImagenGaleriaNegocio {
+  id               String         @id @default(cuid())
+  galeriaNegocioId String
+  imageUrl         String
+  altText          String?
+  descripcion      String?
+  orden            Int?
+  tamañoBytes     Int?
+  createdAt        DateTime       @default(now())
+  galeriaNegocio   GaleriaNegocio @relation(fields: [galeriaNegocioId], references: [id], onDelete: Cascade)
+
+  @@index([galeriaNegocioId])
+}
+
+model NegocioPaquete {
+  id                        String                   @id @default(cuid())
+  negocioId                 String
+  nombre                    String
+  descripcion               String?
+  precio                    Float
+  orden                     Int?
+  status                    String                   @default("activo")
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  negocioPaqueteCategoriaId String?
+  descripcionCorta          String?
+  linkPago                  String?
+  negocio                   Negocio                  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioPaqueteCategoria   NegocioPaqueteCategoria? @relation(fields: [negocioPaqueteCategoriaId], references: [id])
+  galeria                   NegocioPaqueteGaleria[]
+  items                     NegocioPaqueteItem[]
+  videos                    NegocioPaqueteVideos[]
+
+  @@index([negocioId])
+}
+
+model NegocioPaqueteCategoria {
+  id             String           @id @default(cuid())
+  nombre         String
+  orden          Int?
+  status         String           @default("activo")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  negocioId      String
+  NegocioPaquete NegocioPaquete[]
+  negocio        Negocio          @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+}
+
+model NegocioPaqueteItem {
+  id               String         @id @default(cuid())
+  negocioPaqueteId String
+  itemCatalogoId   String
+  itemCatalogo     ItemCatalogo   @relation(fields: [itemCatalogoId], references: [id])
+  negocioPaquete   NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade)
+
+  @@index([negocioPaqueteId])
+}
+
+model NegocioPaqueteGaleria {
+  id               String         @id @default(cuid())
+  negocioPaqueteId String
+  imageUrl         String
+  altText          String?
+  descripcion      String?
+  orden            Int?
+  tamañoBytes     Int?
+  createdAt        DateTime       @default(now())
+  negocioPaquete   NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade)
+
+  @@index([negocioPaqueteId])
+}
+
+model NegocioPaqueteVideos {
+  id               String         @id @default(cuid())
+  negocioPaqueteId String
+  videoUrl         String
+  tipoVideo        String?
+  titulo           String?
+  descripcion      String?
+  orden            Int?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  tamañoBytes     Int?
+  negocioPaquete   NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade)
+
+  @@index([negocioPaqueteId])
+}
+
+model Oferta {
+  id                             String                       @id @default(cuid())
+  negocioId                      String
+  nombre                         String
+  descripcion                    String?
+  fechaInicio                    DateTime
+  fechaFin                       DateTime
+  createdAt                      DateTime                     @default(now())
+  updatedAt                      DateTime                     @updatedAt
+  intervaloRecurrencia           IntervaloRecurrenciaOferta?
+  precio                         Float?
+  tipoPago                       TipoPagoOferta?              @default(UNICO)
+  objetivos                      ObjetivoOferta[]
+  anticipo                       Float?
+  porcentajeAnticipo             Float?
+  tipoAnticipo                   TipoAnticipoOferta?
+  objetivoCitaDuracionMinutos    Int?
+  objetivoCitaFecha              DateTime?
+  objetivoCitaLimiteConcurrencia Int?
+  objetivoCitaTipo               ObjetivoCitaTipoEnum?
+  objetivoCitaUbicacion          String?
+  status                         EstadoOferta                 @default(BORRADOR)
+  direccionUbicacion             String?
+  googleMapsUrl                  String?
+  embedding                      Unsupported("vector")?
+  ItemCatalogoOferta             ItemCatalogoOferta[]
+  negocio                        Negocio                      @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  detallesAdicionales            OfertaDetalle[]
+  documentosOferta               OfertaDocumento[]
+  OfertaGaleria                  OfertaGaleria[]
+  serviciosDeCita                OfertaServicioCita[]
+  videos                         OfertaVideos[]
+  PreguntaSinRespuestaOferta     PreguntaSinRespuestaOferta[]
+
+  @@index([negocioId, status, fechaFin])
+}
+
+model ItemCatalogoOferta {
+  id             String       @id @default(cuid())
+  itemCatalogoId String
+  ofertaId       String
+  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade)
+  oferta         Oferta       @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  @@unique([itemCatalogoId, ofertaId])
+  @@index([itemCatalogoId])
+  @@index([ofertaId])
+}
+
+model OfertaGaleria {
+  id           String   @id @default(cuid())
+  ofertaId     String
+  imageUrl     String
+  altText      String?
+  descripcion  String?
+  orden        Int?
+  tamañoBytes Int?
+  createdAt    DateTime @default(now())
+  oferta       Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  @@index([ofertaId])
+}
+
+model OfertaVideos {
+  id           String   @id @default(cuid())
+  ofertaId     String
+  videoUrl     String
+  tipoVideo    String?
+  titulo       String?
+  descripcion  String?
+  orden        Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tamañoBytes Int?
+  oferta       Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  @@index([ofertaId])
+}
+
+model OfertaDocumento {
+  id                   String   @id @default(cuid())
+  ofertaId             String
+  documentoUrl         String
+  documentoNombre      String?
+  documentoTipo        String?
+  documentoTamanoBytes Int?
+  descripcion          String?
+  orden                Int?
+  createdAt            DateTime @default(now())
+  oferta               Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  @@index([ofertaId])
+}
+
+model OfertaDetalle {
+  id                         String                      @id @default(cuid())
+  ofertaId                   String
+  tituloDetalle              String
+  contenido                  String
+  tipoDetalle                String?
+  palabrasClave              String[]
+  orden                      Int?
+  estadoContenido            String                      @default("PUBLICADO")
+  preguntaOriginalUsuario    String?
+  creadoPorHumano            Boolean                     @default(true)
+  notificacionEnviada        Boolean                     @default(false)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  embedding                  Unsupported("vector")?
+  oferta                     Oferta                      @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+  documentosDetalle          OfertaDetalleDocumento[]
+  galeriaDetalle             OfertaDetalleGaleria[]
+  videoDetalle               OfertaDetalleVideo?
+  PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta?
+
+  @@index([ofertaId, tipoDetalle])
+  @@index([ofertaId, estadoContenido])
+}
+
+model OfertaDetalleGaleria {
+  id              String        @id @default(cuid())
+  ofertaDetalleId String
+  imageUrl        String
+  altText         String?
+  descripcion     String?
+  orden           Int?
+  createdAt       DateTime      @default(now())
+  tamañoBytes    Int?
+  ofertaDetalle   OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
+}
+
+model OfertaDetalleVideo {
+  id              String        @id @default(cuid())
+  ofertaDetalleId String        @unique
+  videoUrl        String
+  tipoVideo       String?
+  createdAt       DateTime      @default(now())
+  tamañoBytes    Int?
+  descripcion     String?
+  orden           Int?
+  titulo          String?
+  updatedAt       DateTime      @updatedAt
+  ofertaDetalle   OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
+}
+
+model OfertaDetalleDocumento {
+  id                   String        @id @default(cuid())
+  ofertaDetalleId      String
+  documentoUrl         String
+  documentoNombre      String?
+  documentoTipo        String?
+  documentoTamanoBytes Int?
+  descripcion          String?
+  orden                Int?
+  createdAt            DateTime      @default(now())
+  ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
+
+  @@index([ofertaDetalleId])
+}
+
+model PreguntaSinRespuestaOferta {
+  id                       String         @id @default(cuid())
+  ofertaId                 String
+  conversacionId           String
+  preguntaUsuario          String
+  estado                   String         @default("PENDIENTE_REVISION")
+  asignadoAId              String?
+  ofertaDetalleRespuestaId String?        @unique
+  fechaCreacion            DateTime       @default(now())
+  fechaRespuesta           DateTime?
+  fechaNotificacionUsuario DateTime?
+  ofertaDetalleRespuesta   OfertaDetalle? @relation(fields: [ofertaDetalleRespuestaId], references: [id])
+  oferta                   Oferta         @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  @@index([ofertaId, estado])
+  @@index([asignadoAId])
+}
+
+model Catalogo {
+  id                        String            @id @default(cuid())
+  negocioId                 String
+  descripcion               String?
+  status                    String            @default("activo")
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+  nombre                    String
+  imagenPortadaUrl          String?
+  imagenPortadaTamañoBytes Int?
+  negocio                   Negocio           @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  CatalogoGaleria           CatalogoGaleria[]
+  ItemCatalogo              ItemCatalogo[]
+}
+
+model CatalogoGaleria {
+  id           String   @id @default(cuid())
+  catalogoId   String
+  imageUrl     String
+  altText      String?
+  descripcion  String?
+  orden        Int?
+  tamañoBytes Int?
+  createdAt    DateTime @default(now())
+  catalogo     Catalogo @relation(fields: [catalogoId], references: [id], onDelete: Cascade)
+
+  @@index([catalogoId])
+}
+
+model ItemCatalogo {
+  id                  String                 @id @default(cuid())
+  catalogoId          String
+  nombre              String
+  descripcion         String?
+  precio              Float
+  linkPago            String?
+  funcionPrincipal    String?
+  AquienVaDirigido    String?
+  status              String                 @default("activo")
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  categoriaId         String?
+  orden               Int?
+  negocioId           String?
+  esPromocionado      Boolean                @default(false)
+  palabrasClave       String?
+  sku                 String?                @unique
+  stock               Int?
+  stockMinimo         Int?
+  tipoItem            String?                @default("PRODUCTO")
+  unidadMedida        String?
+  videoUrl            String?
+  variantesNombre     String[]
+  catalogo            Catalogo               @relation(fields: [catalogoId], references: [id], onDelete: Cascade)
+  categoria           NegocioCategoria?      @relation(fields: [categoriaId], references: [id])
+  negocio             Negocio?               @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  itemEtiquetas       ItemCatalogoEtiqueta[]
+  galeria             ItemCatalogoGaleria[]
+  itemCatalogoOfertas ItemCatalogoOferta[]
+  videos              ItemCatalogoVideos[]
+  interacciones       ItemInteraccion[]
+  negocioPaqueteItems NegocioPaqueteItem[]
+
+  @@index([catalogoId])
+  @@index([categoriaId])
+  @@index([negocioId])
+  @@index([status])
+  @@index([esPromocionado])
+}
+
+model ItemInteraccion {
+  id              String            @id @default(cuid())
+  itemCatalogoId  String
+  tipoInteraccion String
+  timestamp       DateTime          @default(now())
+  asistenteId     String?
+  conversacionId  String?
+  metadata        Json?
+  asistente       AsistenteVirtual? @relation(fields: [asistenteId], references: [id])
+  conversacion    Conversacion?     @relation(fields: [conversacionId], references: [id])
+  itemCatalogo    ItemCatalogo      @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade)
+
+  @@index([itemCatalogoId, timestamp])
+  @@index([tipoInteraccion])
+  @@index([asistenteId])
+  @@index([conversacionId])
+}
+
+model ItemCatalogoGaleria {
+  id             String       @id @default(cuid())
+  itemCatalogoId String
+  imageUrl       String
+  altText        String?
+  descripcion    String?
+  orden          Int?
+  tamañoBytes   Int?
+  createdAt      DateTime     @default(now())
+  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade)
+
+  @@index([itemCatalogoId])
+}
+
+model ItemCatalogoVideos {
+  id             String       @id @default(cuid())
+  itemCatalogoId String
+  videoUrl       String
+  tipoVideo      String?
+  titulo         String?
+  descripcion    String?
+  orden          Int?
+  tamañoBytes   Int?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade)
+}
+
+model ItemCatalogoEtiqueta {
+  id             String          @id @default(cuid())
+  itemCatalogoId String
+  etiquetaId     String
+  etiqueta       NegocioEtiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+  itemCatalogo   ItemCatalogo    @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade)
+
+  @@unique([itemCatalogoId, etiquetaId])
+}
+
+model CRM {
+  id                 String                  @id @default(cuid())
+  negocioId          String                  @unique
+  status             String                  @default("activo")
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  Agente             Agente[]
+  negocio            Negocio                 @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  CampoPersonalizado CRMCampoPersonalizado[]
+  Canal              CanalCRM[]
+  Etiqueta           EtiquetaCRM[]
+  Lead               Lead[]
+  Pipeline           PipelineCRM[]
+}
+
+model CRMCampoPersonalizado {
+  id                   String                    @id @default(cuid())
+  crmId                String
+  nombre               String
+  tipo                 String
+  requerido            Boolean                   @default(false)
+  orden                Int?
+  status               String                    @default("activo")
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  nombreCampo          String?
+  descripcionParaIA    String?
+  metadata             Json?
+  crm                  CRM                       @relation(fields: [crmId], references: [id], onDelete: Cascade)
+  tareasQueLoRequieren TareaCampoPersonalizado[]
+
+  @@unique([crmId, nombre])
+  @@index([crmId])
+}
+
+model CanalCRM {
+  id        String   @id @default(cuid())
+  crmId     String
+  orden     Int?
+  nombre    String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  crm       CRM      @relation(fields: [crmId], references: [id])
+  Lead      Lead[]
+
+  @@unique([crmId, nombre])
+}
+
+model PipelineCRM {
+  id        String   @id @default(cuid())
+  crmId     String
+  orden     Int?
+  nombre    String
+  status    String   @default("activo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Lead      Lead[]
+  crm       CRM      @relation(fields: [crmId], references: [id])
+
+  @@unique([crmId, nombre])
+}
+
+model EtiquetaCRM {
+  id        String         @id @default(cuid())
+  crmId     String
+  orden     Int?
+  nombre    String
+  color     String?
+  status    String         @default("activo")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  crm       CRM            @relation(fields: [crmId], references: [id], onDelete: Cascade)
+  Leads     LeadEtiqueta[]
+
+  @@unique([crmId, nombre])
+}
+
+model Lead {
+  id            String         @id @default(cuid())
+  crmId         String?
+  agenteId      String?
+  canalId       String?
+  nombre        String
+  email         String? @unique
+  telefono      String?
+  jsonParams    Json?
+  status        String         @default("nuevo")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  pipelineId    String?
+  valorEstimado Float?
+  Agenda        Agenda[]
+  Bitacora      Bitacora[]
+  Conversacion  Conversacion[]
+  agente        Agente?        @relation(fields: [agenteId], references: [id])
+  Canal         CanalCRM?      @relation(fields: [canalId], references: [id])
+  crm           CRM?           @relation(fields: [crmId], references: [id], onDelete: Cascade)
+  Pipeline      PipelineCRM?   @relation(fields: [pipelineId], references: [id])
+  Etiquetas     LeadEtiqueta[]
+
+  @@index([crmId])
+  @@index([agenteId])
+  @@index([canalId])
+  @@index([pipelineId])
+  @@index([email])
+  @@index([telefono])
+}
+
+model LeadEtiqueta {
+  leadId     String
+  etiquetaId String
+  asignadoEn DateTime    @default(now())
+  etiqueta   EtiquetaCRM @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+  lead       Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, etiquetaId])
+  @@index([leadId])
+  @@index([etiquetaId])
+}
+
+model Agente {
+  id                      String         @id @default(cuid())
+  crmId                   String
+  email                   String         @unique
+  telefono                String?
+  password                String
+  status                  String         @default("activo")
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  nombre                  String?
+  rol                     String?
+  userId                  String?        @unique
+  Agenda                  Agenda[]
+  crm                     CRM            @relation(fields: [crmId], references: [id], onDelete: Cascade)
+  Bitacora                Bitacora[]
+  conversacionesAsignadas Conversacion[] @relation("ConversacionesAsignadas")
+  interaccionesRealizadas Interaccion[]  @relation("InteraccionesPorAgente")
+  Lead                    Lead[]
+  Notificacion            Notificacion[]
+}
+
+model Bitacora {
+  id          String   @id @default(cuid())
+  agenteId    String?
+  leadId      String
+  descripcion String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  metadata    Json?
+  tipoAccion  String
+  agente      Agente?  @relation(fields: [agenteId], references: [id])
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([agenteId])
+}
+
+model Agenda {
+  id                 String            @id @default(cuid())
+  agenteId           String?
+  leadId             String
+  fecha              DateTime
+  asunto             String
+  descripcion        String?
+  status             String            @default("pendiente")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  tipo               String
+  asistenteId        String?
+  tipoDeCitaId       String?
+  negocioId          String?
+  modalidad          String?
+  googleMapsUrl      String?
+  linkReunionVirtual String?
+  agente             Agente?           @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  asistente          AsistenteVirtual? @relation(fields: [asistenteId], references: [id])
+  lead               Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  negocio            Negocio?          @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  tipoDeCita         AgendaTipoCita?   @relation(fields: [tipoDeCitaId], references: [id])
+  historial          AgendaHistorial[]
+
+  @@index([negocioId])
+  @@index([leadId])
+  @@index([agenteId])
+  @@index([fecha])
+}
+
+model AgendaConfiguracion {
+  id                       String               @id @default(cuid())
+  negocioId                String               @unique
+  aceptaCitasPresenciales  Boolean              @default(false)
+  aceptaCitasVirtuales     Boolean              @default(false)
+  requiereTelefonoParaCita Boolean              @default(false)
+  requiereEmailParaCita    Boolean              @default(false)
+  requiereNombreParaCita   Boolean              @default(true)
+  bufferMinutos            Int?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  metodosPagoTexto         String?
+  recomendacionesParaCita  String?
+  recordatorioMinutosAntes Int?                 @default(1440)
+  negocio                  Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  agendaRecordatorios      agendaRecordatorio[]
+}
+
+model AgendaTipoCita {
+  id                   String               @id @default(cuid())
+  nombre               String
+  descripcion          String?
+  duracionMinutos      Int?
+  esVirtual            Boolean              @default(false)
+  esPresencial         Boolean              @default(false)
+  negocioId            String
+  orden                Int?
+  limiteConcurrencia   Int                  @default(1)
+  activo               Boolean              @default(true)
+  todoElDia            Boolean?             @default(false)
+  agendas              Agenda[]
+  negocio              Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  ofertasQueLoIncluyen OfertaServicioCita[]
+
+  @@unique([negocioId, nombre])
+  @@index([negocioId])
+}
+
+model OfertaServicioCita {
+  ofertaId         String
+  agendaTipoCitaId String
+  agendaTipoCita   AgendaTipoCita @relation(fields: [agendaTipoCitaId], references: [id], onDelete: Cascade)
+  oferta           Oferta         @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  @@id([ofertaId, agendaTipoCitaId])
+}
+
+model AgendaHistorial {
+  id            String   @id @default(cuid())
+  agendaId      String
+  actionType    String
+  changedByType String?
+  changedById   String?
+  createdAt     DateTime @default(now())
+  reason        String?
+  agenda        Agenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade)
+
+  @@index([agendaId])
+}
+
+model agendaRecordatorio {
+  id                    String              @id @default(cuid())
+  agendaConfiguracionId String
+  minutosAntes          Int
+  mensaje               String
+  activo                Boolean             @default(true)
+  agendaConfiguracion   AgendaConfiguracion @relation(fields: [agendaConfiguracionId], references: [id])
+
+  @@index([agendaConfiguracionId])
+}
+
+model TareaEnProgreso {
+  id             String                    @id @default(cuid())
+  conversacionId String                    @unique
+  nombreTarea    String
+  contexto       Json
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  estado         EstadoTareaConversacional @default(INICIADA)
+  mensajeError   String?
+  conversacion   Conversacion              @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+
+  @@index([conversacionId, estado])
+}
+
+model Conversacion {
+  id                 String            @id @default(cuid())
+  whatsappId         String?           @unique
+  phoneNumberId      String?
+  status             String            @default("abierta")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  intencion          String?
+  interes            String?
+  asistenteVirtualId String?
+  leadId             String?
+  agenteCrmActualId  String?
+  agenteCrmActual    Agente?           @relation("ConversacionesAsignadas", fields: [agenteCrmActualId], references: [id])
+  asistenteVirtual   AsistenteVirtual? @relation(fields: [asistenteVirtualId], references: [id])
+  lead               Lead?             @relation(fields: [leadId], references: [id])
+  Interaccion        Interaccion[]
+  itemInteracciones  ItemInteraccion[]
+  tareaEnProgreso    TareaEnProgreso?
+
+  @@index([leadId])
+  @@index([asistenteVirtualId])
+  @@index([status])
+  @@index([updatedAt])
+  @@index([agenteCrmActualId])
+}
+
+model Interaccion {
+  id                     String               @id @default(cuid())
+  conversacionId         String
+  messageId              String?
+  role                   String
+  intencion              String?
+  entidad                String?
+  interes                String?
+  sentimiento            String?
+  mediaType              String?
+  createdAt              DateTime             @default(now())
+  mediaUrl               String?
+  agenteCrmId            String?
+  functionCallArgs       Json?
+  functionCallNombre     String?
+  functionResponseData   Json?
+  mensajeTexto           String?
+  parteTipo              InteraccionParteTipo @default(TEXT)
+  functionResponseNombre String?
+  uiComponentPayload     Json?
+  canalInteraccion       String?
+  agenteCrm              Agente?              @relation("InteraccionesPorAgente", fields: [agenteCrmId], references: [id])
+  conversacion           Conversacion         @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+
+  @@index([conversacionId, createdAt], map: "Interaccion_conversacionId_createdAt_unique_idx")
+  @@index([agenteCrmId])
+}
+
+model Notificacion {
+  id         String    @id @default(cuid())
+  clienteId  String
+  negocioId  String?
+  tipo       String
+  mensaje    String
+  leida      Boolean   @default(false)
+  fechaLeida DateTime?
+  urlDestino String?
+  createdAt  DateTime  @default(now())
+  agenteId   String?
+  agente     Agente?   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  cliente    Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  negocio    Negocio?  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId, leida])
+  @@index([negocioId])
+}
+
 enum DiaSemana {
   LUNES
   MARTES
@@ -465,130 +1299,6 @@ enum DiaSemana {
   DOMINGO
 }
 
-model HorarioAtencion {
-  id         String    @id @default(cuid())
-  negocioId  String    // A qué negocio pertenece este horario
-  negocio    Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  dia        DiaSemana // El día de la semana (LUNES, MARTES, etc.)
-  horaInicio String    // Hora de inicio en formato "HH:MM" (ej: "09:00")
-  horaFin    String    // Hora de fin en formato "HH:MM" (ej: "19:00")
-  @@unique([negocioId, dia])
-  @@index([negocioId])
-}
-
-model ExcepcionHorario {
-  id               String    @id @default(cuid())
-  negocioId        String    // A qué negocio pertenece esta excepción
-  negocio          Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-
-  fecha            DateTime  // La fecha específica de la excepción (solo la parte de la fecha es relevante)
-  esDiaNoLaborable Boolean   // Si es true, el negocio está cerrado TODO ese día.
-  horaInicio       String?   // Opcional: Hora especial de inicio para ESE día (formato "HH:MM")
-  horaFin          String?   // Opcional: Hora especial de fin para ESE día (formato "HH:MM")
-  descripcion      String?   // Motivo de la excepción (ej: "Navidad", "Mantenimiento Anual")
-
-  @@unique([negocioId, fecha]) // Solo una regla de excepción por día/negocio
-  @@index([negocioId])
-  @@index([fecha])
-}
-
-model NegocioRedSocial {
-  id          String   @id @default(cuid())
-  negocioId   String
-  negocio     Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra negocio, se borran sus redes
-  nombreRed   String   // Nombre de la red (Ej: "Facebook", "Instagram", "TikTok", "LinkedIn", "Sitio Web", "Otro") - Podría ser un Enum si prefieres limitar opciones
-  url         String   // La URL completa del perfil o página
-  icono       String?  // Nombre o clase del icono a usar (ej. 'facebook', 'instagram', 'globe')
-  orden       Int?     // Para ordenar la visualización de los iconos/links
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@unique([negocioId, nombreRed]) // Evitar duplicados de la misma red para un negocio
-  @@index([negocioId])
-}
-
-model NegocioConocimientoItem { 
-  id                        String    @id @default(cuid())
-  negocioId                 String
-  negocio                   Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-
-  preguntaOriginalUsuario   String?   @db.Text // Pregunta literal del usuario final
-  preguntaFormulada         String    @db.Text // Versión curada/estandarizada de la pregunta (esta se usaría para el matching y embeddings)
-  respuesta                 String?   @db.Text // Respuesta oficial. Nullable si está pendiente.
-
-  estado                    String    @default("PENDIENTE_RESPUESTA") // PENDIENTE_RESPUESTA, RESPONDIDA, EN_REVISION, OBSOLETA, ARCHIVADA
-  categoria                 String?   // Ej: "Pagos", "Envíos", "Producto X", "Política de Devolución"
-  
-  // Auditoría y seguimiento
-  fechaRespuesta            DateTime? // Última vez que se actualizó la respuesta
-  // fechaCreacion             DateTime  @default(now())
-  // fechaUltimaActualizacion  DateTime  @updatedAt
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
-
-  creadoPorTipo             String?   // Origen: "SISTEMA" (pregunta no respondida), "AGENTE_NEGOCIO", "ADMIN_PLATAFORMA"
-  creadoPorId               String?   // ID del usuario/agente/sistema (según creadoPorTipo)
-  
-  respondidoPorAgenteId     String?   // Opcional: ID del Agente del CRM que proporcionó/validó la respuesta
-  // respondidoPorAgente       Agente?   @relation("ConocimientoRespondidoPorAgente", fields: [respondidoPorAgenteId], references: [id], onDelete: SetNull) // Descomentar y ajustar si se vincula al modelo Agente
-
-  // Análisis y mejora
-  contadorConsultas         Int       @default(0)
-  ultimaConsulta            DateTime?
-  // confianzaAsistentePrevia  Float?    // Se podría registrar si el asistente intentó responder antes
-
-  notasInternas             String?   @db.Text // Notas solo para el personal del negocio
-
-  // Para búsqueda semántica (requiere extensión pg_vector en PostgreSQL)
-  // La dimensión del vector (ej. 384, 1536) se especifica en la migración SQL, no en el tipo Prisma.
-  embeddingPregunta         Unsupported("vector")? 
-  embeddingRespuesta        Unsupported("vector")?
-
-  accionDeSeguimiento     Json?    // Contendrá las instrucciones para la siguiente tarea, si la hay.
-                                   // Ejemplo: { "siguienteTarea": "agendarCita", "campoAsociadoId": "..." }
-
-  
-  @@index([negocioId, estado])
-  @@index([negocioId, categoria])
-  // Para pg_vector, los índices se crean con SQL: CREATE INDEX ON "NegocioConocimientoItem" USING hnsw (embeddingPregunta vector_l2_ops); (ejemplo)
-}
-
-model NegocioConfiguracionPago {
-  id                            String    @id @default(cuid())
-  negocioId                     String    @unique // Clave foránea y asegura relación uno-a-uno con Negocio
-  negocio                       Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-
-  aceptaPagosOnline             Boolean   @default(false) // Habilita globalmente la recepción de pagos
-  
-  // Configuración de Stripe (si es el procesador principal)
-  stripeCuentaConectada         Boolean   @default(false) // Si el negocio ha conectado su propia cuenta de Stripe (Stripe Connect)
-  plataformaProcesaConSuStripe  Boolean   @default(true)  // Si la plataforma procesa con su Stripe y luego liquida (si stripeCuentaConectada = false)
-
-   // --- Stripe Connect Fields ---
-  stripeAccountId               String?   @unique
-  stripeAccountType             String?   
-  stripeOnboardingComplete      Boolean   @default(false) 
-  stripeChargesEnabled          Boolean   @default(false) 
-  stripePayoutsEnabled          Boolean   @default(false) 
-  
-  // Opciones de pago específicas
-  aceptaTarjetasCreditoDebito   Boolean   @default(true) // Asumiendo que Stripe es la base
-  aceptaMesesSinIntereses       Boolean   @default(false)
-  mesesPermitidosMSI               Int[]   @default([])   // Ej: [3, 6, 9, 12] - Almacenado como array de enteros
-  aceptaOxxoPay                 Boolean   @default(false) // Si se integra OXXO Pay
-
-  
-  // oxxoPayComisionExtraCliente Float?    // Si hay una comisión adicional por usar OXXO que se traslada al cliente final
-
-  aceptaTransferenciaBancaria   Boolean   @default(false)
-  datosBancariosParaTransferencia String? @db.Text // Instrucciones y datos de la cuenta del negocio
-
-  monedaPrincipal               String    @default("MXN") // Moneda en la que opera el negocio para pagos
-
-  createdAt                     DateTime  @default(now())
-  updatedAt                     DateTime  @updatedAt
-}
-
-
 enum EstadoTransaccion {
   PENDIENTE
   COMPLETADA
@@ -598,905 +1308,83 @@ enum EstadoTransaccion {
   EN_PROCESO
   CANCELADA
 }
-//! NEGOCIO TRANSACCIONES
-model NegocioTransaccion { 
-  id                        String    @id @default(cuid())
-  negocioId                 String
-  // negocio                   Negocio   @relation(fields: [negocioId], references: [id], onDelete:Restrict) // No borrar transacciones si se borra el negocio, o SetNull negocioId
-  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Restrict) // <-- ¡Importante!
 
-  fechaTransaccion          DateTime  @default(now())
-  concepto                  String    // Descripción de lo que se pagó
-  
-  montoBruto                Float     // Monto total pagado por el cliente final
-  moneda                    String    // Ej: "MXN", "USD"
-  
-  comisionProcesadorPago    Float     @default(0) // Comisión del procesador de pagos (Stripe, OXXO, etc.)
-  comisionPlataforma        Float     @default(0) // Comisión retenida por nuestra plataforma
-  montoNetoRecibido         Float     // MontoBruto - comisionProcesadorPago - comisionPlataforma
-
-  metodoPagoUtilizado       String    // Ej: "TARJETA_CREDITO", "TARJETA_DEBITO", "OXXO_PAY", "TRANSFERENCIA", "STRIPE_LINK"
-  referenciaProcesador      String?   @unique // ID de la transacción en el procesador de pago (ej. Stripe Charge ID)
-  
-  // Información del comprador (opcional, pero útil)
-  emailComprador            String?
-  nombreComprador           String?
-  // clienteFinalId            String? // Si tienes un modelo para usuarios finales no registrados como Cliente de la plataforma
-
-  estado                    EstadoTransaccion @default(PENDIENTE)
-  
-  // Referencia al origen del pago (qué se vendió)
-  origenPagoId              String?   // ID del ItemCatalogo, Oferta, NegocioPaquete, Suscripcion, etc.
-  origenPagoTipo            String?   // "ItemCatalogo", "Oferta", "NegocioPaquete", "SuscripcionAsistente", etc.
-
-  // Para notas internas o metadatos adicionales
-  metadata                  Json?
-  
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
-
-  @@index([negocioId, fechaTransaccion])
-  @@index([negocioId, estado])
-  @@index([referenciaProcesador])
-}
-
-model NegocioCategoria { 
-  id            String   @id @default(cuid())
-  negocioId     String
-  negocio       Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  nombre        String   // Considerar @@unique([negocioId, nombre])
-  descripcion   String?
-  orden         Int?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  status        String   @default("activo")
-
-  // Relación: Una categoría puede tener muchos ítems
-  ItemCatalogo  ItemCatalogo[]
-}
-
-model NegocioEtiqueta { // <-- RENOMBRADO
-  id            String   @id @default(cuid())
-  negocioId     String
-  negocio       Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  nombre        String   // Considerar @@unique([negocioId, nombre])
-  orden         Int?
-  descripcion   String?
-  status        String   @default("activo")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relación: Una etiqueta puede estar en muchos ítems (a través de la tabla intermedia)
-  itemEtiquetas ItemCatalogoEtiqueta[] // <-- RENOMBRADO: Ahora usa ItemCatalogoEtiqueta
-}
-
-model GaleriaNegocio {
-  id            String   @id @default(cuid())
-  negocioId     String
-  negocio       Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra negocio, se borran sus galerías
-  nombre        String   // Nombre de la galería (ej: "Fotos del Local")
-  descripcion   String?  // Descripción opcional
-  orden         Int?     // Para ordenar las galerías entre sí
-  status        String   @default("activo") // activo, inactivo
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relación uno-a-muchos con las imágenes de esta galería
-  imagenes      ImagenGaleriaNegocio[]
-
-
-  @@unique([negocioId, nombre]) // Nombre de galería único por negocio
-  @@index([negocioId])
-}
-
-model ImagenGaleriaNegocio {
-  id               String         @id @default(cuid())
-  galeriaNegocioId String
-  galeriaNegocio   GaleriaNegocio @relation(fields: [galeriaNegocioId], references: [id], onDelete: Cascade) // Si se borra la galería, se borran sus imágenes
-  imageUrl         String         // URL de Supabase Storage
-  altText          String?
-  descripcion      String?
-  orden            Int?
-  tamañoBytes      Int?
-  createdAt        DateTime       @default(now())
-  // No se necesita updatedAt aquí generalmente
-
-  @@index([galeriaNegocioId]) // Índice para buscar imágenes por galería
-}
-
-//! NEGOCIO PAQUETE
-model NegocioPaquete {
-  id            String    @id @default(cuid())
-  negocioId     String
-  // negocio       Negocio   @relation(fields: [negocioId], references: [id])
-  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
-  nombre        String    // Ej: "Paquete Boda Esencial", "Paquete XV Años Premium"
-  descripcionCorta String? // Descripción corta para mostrar en listados
-  descripcion   String?
-  precio        Float     // Precio total del paquete
-  linkPago     String?   // URL para el pago (ej: Stripe, PayPal, etc.)
-  orden         Int?      // Para ordenar los paquetes entre sí
-  status        String    @default("activo")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  negocioPaqueteCategoriaId String?
-  negocioPaqueteCategoria NegocioPaqueteCategoria? @relation(fields: [negocioPaqueteCategoriaId], references: [id], onDelete: SetNull) // Si se borra la categoría, se quita la relación
-  items         NegocioPaqueteItem[]
-  galeria       NegocioPaqueteGaleria[] // Relación a la galería de este paquete
-  videos        NegocioPaqueteVideos[] // Relación a los videos de este paquete
-  @@index([negocioId])
-}
-
-model NegocioPaqueteCategoria{
-  id            String    @id @default(cuid())
-  negocioId     String
-  negocio       Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borran sus categorías
-  nombre        String    // Ej: "Fotografía", "Video", "Música"
-  orden         Int?      // Para ordenar las categorías entre sí
-  status        String    @default("activo")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  NegocioPaquete NegocioPaquete[]
-}
-
-model NegocioPaqueteItem {
-  id            String    @id @default(cuid())
-  negocioPaqueteId String
-  negocioPaquete NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade)
-  itemCatalogoId String
-  itemCatalogo  ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Restrict)
-  @@index([negocioPaqueteId])
-}
-
-model NegocioPaqueteGaleria{
-  id            String    @id @default(cuid())
-  negocioPaqueteId String
-  negocioPaquete NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade) // Si se borra el paquete, se borran sus imágenes
-  imageUrl      String    // URL de la imagen (ej: Supabase Storage)
-  altText       String?   // Texto alternativo
-  descripcion   String?   // Descripción opcional
-  orden         Int?      // Orden visual
-  tamañoBytes   Int?      // Opcional: Tamaño
-  createdAt     DateTime  @default(now())
-
-  @@index([negocioPaqueteId]) // Índice para buscar imágenes por paquete
-
-}
-
-model NegocioPaqueteVideos{
-  id            String    @id @default(cuid())
-  negocioPaqueteId String
-  negocioPaquete NegocioPaquete @relation(fields: [negocioPaqueteId], references: [id], onDelete: Cascade) // Relación con Paquete
-  videoUrl      String    // URL del video (YouTube, Vimeo, o un archivo directo si lo alojas tú)
-  tipoVideo     String?   // Podría ser 'YOUTUBE', 'VIMEO', 'DIRECTO_MP4' para ayudar al frontend a decidir cómo renderizarlo
-  titulo        String?   // Un título o descripción corta para el video
-  descripcion   String?   // Descripción más larga si es necesaria
-  orden         Int?      // Para ordenar los videos si hay varios
-  tamañoBytes   Int?      // Opcional: Tamaño
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  @@index([negocioPaqueteId])
-
-}
-
-//! OFERTA
-// Enum para el tipo de pago de la oferta
 enum TipoPagoOferta {
-  UNICO      // Para pagos únicos
-  RECURRENTE // Para pagos recurrentes/suscripciones
+  UNICO
+  RECURRENTE
 }
 
-// Enum para el intervalo de recurrencia
 enum IntervaloRecurrenciaOferta {
   SEMANAL
   QUINCENAL
   MENSUAL
-  BIMESTRAL   // Cada 2 meses
-  TRIMESTRAL  // Cada 3 meses
-  SEMESTRAL   // Cada 6 meses
+  BIMESTRAL
+  TRIMESTRAL
+  SEMESTRAL
   ANUAL
 }
 
 enum ObjetivoOferta {
-  CITA  // Para agendar citas/reservas
-  VENTA // Para generar ventas directas
+  CITA
+  VENTA
 }
 
 enum TipoAnticipoOferta {
-  PORCENTAJE // Porcentaje del total
-  MONTO_FIJO // Monto fijo a pagar como anticipo
+  PORCENTAJE
+  MONTO_FIJO
 }
 
 enum ObjetivoCitaTipoEnum {
-  POR_HORA       // La cita se elige de los slots disponibles del negocio/servicio general
-  DIA_ESPECIFICO // La cita es para una fecha (y quizás hora) específica definida por la oferta (ej. un evento)
+  POR_HORA
+  DIA_ESPECIFICO
 }
 
-// Enum para el estado de una oferta
 enum EstadoOferta {
   ACTIVO
   INACTIVO
-  BORRADOR     // Utilizado al crear ofertas simplificadas
-  PROGRAMADA   // Para ofertas que inician en el futuro
-  FINALIZADA   // Para ofertas cuya fecha de fin ya pasó
-  BETA         // Para pruebas
-  PROXIMAMENTE // Para anunciar futuras ofertas
+  BORRADOR
+  PROGRAMADA
+  FINALIZADA
+  BETA
+  PROXIMAMENTE
 }
 
-model Oferta {
-  id            String    @id @default(cuid())
-  negocioId     String
-  negocio       Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borran sus ofertas
-  nombre        String    // Ej: "Descuento Primera Compra", "Promo Día Padre", "Cupón BIENVENIDO10"
-  descripcion   String?
-  fechaInicio   DateTime
-  fechaFin      DateTime
-
-  precio                Float?                             // El monto de la oferta (para pago único o por ciclo recurrente)
-  tipoPago              TipoPagoOferta? @default(UNICO)   // Por defecto, un pago único
-  intervaloRecurrencia  IntervaloRecurrenciaOferta?     // Solo aplica si tipoPago es RECURRENTE
-  tipoAnticipo         TipoAnticipoOferta?
-  porcentajeAnticipo   Float?                             // Porcentaje de anticipo requerido (si aplica)
-  anticipo              Float?                             // Anticipo requerido (si aplica)
-
-  ItemCatalogoOferta ItemCatalogoOferta[]
-  OfertaGaleria      OfertaGaleria[]
-  videos        OfertaVideos[]
-  documentosOferta OfertaDocumento[] // Nueva relación
-
-  objetivos ObjetivoOferta[]
-
-  // --- CAMPOS PARA OFERTAS CON OBJETIVO CITA ---
-  objetivoCitaTipo          ObjetivoCitaTipoEnum? // Nuevo Enum: ¿Es por hora o día específico?
-  objetivoCitaFecha         DateTime?             // Si es DIA_ESPECIFICO, esta es la fecha (y opcionalmente hora de inicio) del evento/cita.
-                                                  // Si es un evento de todo el día, la hora podría ser 00:00:00 UTC.
-                                                  // Si es un evento con hora de inicio, aquí se especifica.
-
-  serviciosDeCita         OfertaServicioCita[]
-  // objetivoCitaServicioId    String?               // FK Opcional a AgendaTipoCita.
-  //                                                 // Si la cita de la oferta SIEMPRE corresponde a un servicio específico
-  //                                                 // (ej. "Oferta: Taller de Fotografía"), aquí iría el ID de ese AgendaTipoCita.
-  //                                                 // Esto permitiría usar la duración y concurrencia de ese servicio.
-  //                                                 // Relación explícita (opcional pero recomendada si usas objetivoCitaServicioId):
-  // objetivoCitaServicio    AgendaTipoCita?       @relation("OfertasParaServicioCitaEspecifico", fields: [objetivoCitaServicioId], references: [id], onDelete: SetNull, onUpdate:Cascade)
-
-  objetivoCitaUbicacion     String?               // Opcional: Si la cita de la oferta tiene una ubicación específica diferente a la del negocio.
-  objetivoCitaDuracionMinutos Int?                // Opcional: Si la cita de la oferta tiene una duración específica que sobrescribe la del AgendaTipoCita.
-  
-  // El campo 'objetivoCitaLimiteConcurrencia' que mencionamos antes podría manejarse a través del 'objetivoCitaServicioId'.
-  // Si el evento es masivo, se crea un AgendaTipoCita para ese evento con un 'limiteConcurrencia' alto.
-  // Si una oferta específica necesita su propio límite, entonces sí añadiríamos:
-  objetivoCitaLimiteConcurrencia Int?
-
-  // Asegúrate de que la relación a AgendaTipoCita (si la añades arriba) tenga su contraparte
-
- // --- NUEVOS CAMPOS PARA LA UBICACIÓN DE LA OFERTA ---
-  direccionUbicacion String? @db.Text  // Para la dirección textual. Ej: "Av. Principal 123, Zumpango Centro"
-  googleMapsUrl      String?           // Para el link directo de Google Maps
-
-
-  status        EstadoOferta @default(BORRADOR)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  detallesAdicionales      OfertaDetalle[]          // NUEVA: Detalles granulares de la oferta
-  PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // NUEVA: Preguntas sin respuesta relacionadas a esta oferta
-  @@index([negocioId, status, fechaFin]) // Índice útil para buscar ofertas activas por negocio
-}
-
-model ItemCatalogoOferta {
-  id            String @id @default(cuid()) // Usar ID propio es buena práctica
-  itemCatalogoId String
-  itemCatalogo  ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Si se borra item, se borra vínculo
-  ofertaId      String
-  oferta        Oferta       @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Si se borra oferta, se borra vínculo
-  @@unique([itemCatalogoId, ofertaId]) // Asegurar que un item solo se vincule una vez a la misma oferta
-  @@index([itemCatalogoId])
-  @@index([ofertaId])
-}
-
-model OfertaGaleria {
-  id          String   @id @default(cuid())
-  ofertaId    String
-  oferta      Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Si se borra oferta, se borran imágenes
-  imageUrl    String   // URL de la imagen (ej: Supabase Storage)
-  altText     String?  // Texto alternativo
-  descripcion String?  // Descripción opcional
-  orden       Int?     // Orden visual
-  tamañoBytes Int?     // Opcional: Tamaño
-  createdAt   DateTime @default(now())
-  @@index([ofertaId]) // Índice para buscar imágenes por oferta
-}
-
-model OfertaVideos {
-  id          String   @id @default(cuid())
-  ofertaId    String
-  oferta      Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade) // Relación con Oferta
-  videoUrl    String   // URL del video (YouTube, Vimeo, o un archivo directo si lo alojas tú)
-  tamañoBytes Int?     // Opcional: Tamaño
-  tipoVideo   String?  // Podría ser 'YOUTUBE', 'VIMEO', 'DIRECTO_MP4' para ayudar al frontend a decidir cómo renderizarlo
-  titulo      String?  // Un título o descripción corta para el video
-  descripcion String?  // Descripción más larga si es necesaria
-  orden       Int?     // Para ordenar los videos si hay varios
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  @@index([ofertaId])
-}
-
-model OfertaDocumento {
-  id                String   @id @default(cuid())
-  ofertaId          String
-  oferta            Oferta   @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
-  
-  documentoUrl      String   // URL al archivo
-  documentoNombre   String?  // Nombre del archivo
-  documentoTipo     String?  // MIME type o extensión
-  documentoTamanoBytes Int?   // Tamaño
-  descripcion       String?  // Descripción breve del documento
-  orden             Int?     // Para ordenar la visualización de varios documentos
-
-  createdAt         DateTime @default(now())
-
-  @@index([ofertaId])
-}
-
-
-model OfertaDetalle {
-  id                     String    @id @default(cuid())
-  ofertaId               String
-  oferta                 Oferta    @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
-  tituloDetalle          String    
-  contenido              String    @db.Text // La respuesta detallada, argumentos, FAQs, etc. (puede ser Markdown)
-  tipoDetalle            String?   // Ej: "USO", "BENEFICIO", "FAQ_OFERTA", "CONDICION_ESPECIFICA" 
-  palabrasClave          String[]  // Para ayudar en la búsqueda o matching
-  orden                  Int?      // Para mostrar detalles en un orden específico si es necesario
-  galeriaDetalle         OfertaDetalleGaleria[]
-  videoDetalle           OfertaDetalleVideo? // Asumiendo un solo video por detalle
-  estadoContenido        String    @default("PUBLICADO") 
-  preguntaOriginalUsuario String?  // Si este detalle se originó de una pregunta no respondida
-  creadoPorHumano        Boolean   @default(true) // Para diferenciar si fue creado por admin o por el sistema (pregunta pendiente)
-  notificacionEnviada    Boolean   @default(false) // Para controlar si ya se notificó al admin sobre este detalle pendiente
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-  documentosDetalle OfertaDetalleDocumento[] // Nueva relación
-  PreguntaSinRespuestaOferta PreguntaSinRespuestaOferta[] // Relación a preguntas sin respuesta asociadas a este detalle
-
-  @@index([ofertaId, tipoDetalle])
-  @@index([ofertaId, estadoContenido])
-}
-
-model OfertaDetalleGaleria {
-  id                   String        @id @default(cuid())
-  ofertaDetalleId      String
-  ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
-  imageUrl             String
-  tamañoBytes          Int?     // AÑADIR ESTE CAMPO
-  altText              String?
-  descripcion          String?
-  orden                Int?
-  createdAt            DateTime      @default(now())
-}
-
-model OfertaDetalleVideo {
-  id                   String        @id @default(cuid())
-  ofertaDetalleId      String        @unique // Si solo permites un video por OfertaDetalle
-  ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
-  videoUrl             String        // URL del video (YouTube, Vimeo, archivo directo)
-  tamañoBytes          Int?     // AÑADIR ESTE CAMPO (si aplica para videos directos)
-  tipoVideo            String?       // 'YOUTUBE', 'VIMEO', 'MP4_DIRECTO'
-  titulo          String?
-  descripcion     String?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  orden                Int?          // Para ordenar los videos si hay varios
-}
-
-model OfertaDetalleDocumento {
-  id                   String        @id @default(cuid())
-  ofertaDetalleId      String
-  ofertaDetalle        OfertaDetalle @relation(fields: [ofertaDetalleId], references: [id], onDelete: Cascade)
-  documentoUrl         String
-  documentoNombre      String?
-  documentoTipo        String?
-  documentoTamanoBytes Int?
-  descripcion          String?       // Podría ser útil para que el asistente sepa de qué trata este doc específico
-  orden              Int?          // Si un detalle puede tener MÚLTIPLES documentos, sino no es necesario
-  createdAt            DateTime      @default(now())
-  @@index([ofertaDetalleId])
-}
-
-model PreguntaSinRespuestaOferta {
-    id                  String @id @default(cuid())
-    ofertaId            String
-    oferta              Oferta @relation(fields: [ofertaId], references: [id], onDelete:Cascade)
-    conversacionId      String // Para saber de qué conversación vino la pregunta
-    preguntaUsuario     String @db.Text // La pregunta exacta que no se pudo responder
-    estado              String @default("PENDIENTE_REVISION") 
-    asignadoAId         String? // Podría ser un Usuario admin o Agente
-    ofertaDetalleRespuestaId String? @unique
-    ofertaDetalleRespuesta   OfertaDetalle? @relation(fields: [ofertaDetalleRespuestaId], references: [id], onDelete: SetNull)
-    fechaCreacion       DateTime @default(now())
-    fechaRespuesta      DateTime? // Cuando el humano responde en el panel
-    fechaNotificacionUsuario DateTime? // Cuando se le notifica al usuario original (si es posible)
-    @@index([ofertaId, estado])
-    @@index([asignadoAId])
-}
-
-//! CATALOGO
-model Catalogo {
-  id            String   @id @default(cuid())
-  negocioId     String
-  negocio       Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  nombre        String   
-  descripcion   String? 
-  imagenPortadaUrl String? 
-  imagenPortadaTamañoBytes Int? 
-  status        String   @default("activo")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  ItemCatalogo  ItemCatalogo[]
-  CatalogoGaleria CatalogoGaleria[]
-}
-
-model CatalogoGaleria{
-  id            String   @id @default(cuid())
-  catalogoId    String
-  catalogo      Catalogo @relation(fields: [catalogoId], references: [id], onDelete: Cascade) // Correcto: onDelete Cascade
-  imageUrl      String   // URL en Supabase Storage
-  altText       String?
-  descripcion   String?
-  orden         Int?
-  tamañoBytes   Int?     // Tamaño en bytes, guardado al subir
-  createdAt     DateTime @default(now())
-  @@index([catalogoId]) // Correcto: Índice para eficiencia
-}
-
-model ItemCatalogo {
-  id            String     @id @default(cuid())
-  catalogoId    String
-  catalogo      Catalogo   @relation(fields: [catalogoId], references: [id], onDelete: Cascade)
-  categoriaId   String?
-  categoria     NegocioCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  negocioId     String?
-  negocio       Negocio?    @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  nombre        String
-  variantesNombre String[] // modismos locales 
-  descripcion   String?    @db.Text
-  precio        Float
-  tipoItem      String?    @default("PRODUCTO") // PRODUCTO, SERVICIO
-  sku           String?    @unique // Considerar unicidad por negocio si es necesario
-  stock         Int?
-  stockMinimo   Int?
-  unidadMedida  String?    // pieza, kg, hora, sesión
-  linkPago      String?
-  funcionPrincipal String? // Para IA
-  esPromocionado Boolean   @default(false) // Para IA/Promoción activa
-  AquienVaDirigido String? // Para IA
-  palabrasClave String?    // Comma-separated keywords for search/SEO/IA
-
-  videoUrl         String?
-  orden         Int?
-  status        String     @default("activo") // activo, inactivo, agotado, proximamente
-
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  // Relaciones
-  itemEtiquetas         ItemCatalogoEtiqueta[]
-  galeria               ItemCatalogoGaleria[]
-  videos                ItemCatalogoVideos[]
-  interacciones         ItemInteraccion[]
-
-  itemCatalogoOfertas ItemCatalogoOferta[] // Relación a la tabla intermedia de ofertas
-  negocioPaqueteItems NegocioPaqueteItem[] // Relación a la tabla intermedia de paquetes
-
-  @@index([catalogoId])
-  @@index([categoriaId])
-  @@index([negocioId])
-  @@index([status])
-  @@index([esPromocionado])
-}
-
-// Registra eventos específicos relacionados con un ItemCatalogo
-model ItemInteraccion {
-  id              String    @id @default(cuid())
-  itemCatalogoId  String    // A qué ítem se refiere
-  itemCatalogo    ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Si se borra ítem, se borran interacciones
-
-  tipoInteraccion String    // Ej: "CHAT_QUERY", "LANDING_CLICK", "PURCHASE", "FAQ_LINK_CLICK"
-  timestamp       DateTime  @default(now()) // Cuándo ocurrió
-
-  // Campos opcionales para dar contexto
-  asistenteId     String?   // Qué asistente estuvo involucrado (si aplica)
-  asistente       AsistenteVirtual? @relation(fields: [asistenteId], references: [id], onDelete: SetNull)
-  conversacionId  String?   // En qué conversación ocurrió (si aplica)
-  conversacion    Conversacion? @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
-  // podrías añadir sessionId, userId (del cliente final), etc. si tienes esa info
-  metadata        Json?     // Para guardar detalles adicionales específicos de la interacción
-
-  @@index([itemCatalogoId, timestamp]) // Índice común
-  @@index([tipoInteraccion])
-  @@index([asistenteId])
-  @@index([conversacionId])
-}
-
-model ItemCatalogoGaleria {
-  id            String      @id @default(cuid())
-  itemCatalogoId String
-  itemCatalogo  ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade)
-  imageUrl      String      // URL en Supabase Storage
-  altText       String?
-  descripcion   String?
-  orden         Int?
-  tamañoBytes   Int?        // Tamaño en bytes, guardado al subir
-  createdAt     DateTime    @default(now())
-  @@index([itemCatalogoId])
-}
-
-model ItemCatalogoVideos {
-  id          String   @id @default(cuid())
-  itemCatalogoId String
-  itemCatalogo ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade) // Relación con ItemCatalogo
-  videoUrl    String   // URL del video (YouTube, Vimeo, o un archivo directo si lo alojas tú)
-  tipoVideo   String?  // Podría ser 'YOUTUBE', 'VIMEO', 'DIRECTO_MP4' para ayudar al frontend a decidir cómo renderizarlo
-  titulo      String?  // Un título o descripción corta para el video
-  descripcion String?  // Descripción más larga si es necesaria
-  orden       Int?     // Para ordenar los videos si hay varios
-  tamañoBytes Int?     // Opcional: Tamaño
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-
-model ItemCatalogoEtiqueta { // <-- RENOMBRADO
-  id             String @id @default(cuid())
-  itemCatalogoId String
-  itemCatalogo   ItemCatalogo @relation(fields: [itemCatalogoId], references: [id], onDelete: Cascade)
-  etiquetaId     String // <-- RENOMBRADO: Nombre del campo FK
-  etiqueta       NegocioEtiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade) // <-- RENOMBRADO: Tipo y relación
-
-  @@unique([itemCatalogoId, etiquetaId])
-}
-
-//!CRM
-model CRM{
-  id        String   @id @default(cuid())
-  negocioId String   @unique // Cada Negocio solo puede tener un CRM
-  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // onDelete: Cascade (opcional, si quieres borrar CRM al borrar Negocio)
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  Lead      Lead[]
-  Agente    Agente[]
-  Etiqueta  EtiquetaCRM[]
-  Pipeline  PipelineCRM[]
-  Canal     CanalCRM[]
-  CampoPersonalizado CRMCampoPersonalizado[]
-}
-
-model CRMCampoPersonalizado{
-  id        String   @id @default(cuid())
-  crmId     String
-  crm       CRM      @relation(fields: [crmId], references: [id], onDelete: Cascade)
-  nombre    String   // Nombre del campo personalizado
-  nombreCampo String?   // Nombre interno para la base de datos
-  descripcionParaIA String? // Descripción para IA para entender el campo
-  tipo      String   // Tipo de dato (ej: texto, número, fecha, booleano)
-  requerido Boolean  @default(false) // Si es obligatorio o no
-  orden     Int?
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  metadata  Json? // Para almacenar metadatos adicionales si es necesario
-
-  tareasQueLoRequieren TareaCampoPersonalizado[]
-  @@unique([crmId, nombre]) // Nombre visible único por CRM
-  @@index([crmId]) // Índice añadido
-}
-
-model CanalCRM{
-  id        String   @id @default(cuid())
-  crmId     String
-  crm       CRM @relation(fields: [crmId], references: [id])
-  orden     Int?
-  nombre    String //facebook, google, instagram, email, whatsapp
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  Lead      Lead[]
-    @@unique([crmId, nombre]) // Asegura nombres únicos por CRM
-}
-
-model PipelineCRM{
-  id        String   @id @default(cuid())
-  crmId     String
-  crm       CRM @relation(fields: [crmId], references: [id])
-  orden     Int?
-  nombre    String //nuevo, seguimiento, promesa, ganado, perdido
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Lead      Lead[]
-    @@unique([crmId, nombre]) // Asegura nombres únicos por CRM
-
-}
-
-model EtiquetaCRM{
-  id        String   @id @default(cuid())
-  crmId     String
-  crm       CRM      @relation(fields: [crmId], references: [id], onDelete: Cascade)
-  orden     Int?
-  nombre    String   // Ej: Interesado, Seguimiento, VIP, No Contactar
-  color     String?  // Opcional: para UI (ej: #FF0000)
-  status    String   @default("activo")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt // Corregido
-
-  // Relación muchos-a-muchos explícita con Lead
-  Leads     LeadEtiqueta[]
-    @@unique([crmId, nombre]) // Asegura nombres únicos por CRM
-
-}
-
-//! LEAD
-model Lead{
-  id         String    @id @default(cuid())
-
-  // **SUGERENCIA: Hacer crmId requerido si un lead siempre pertenece a un CRM**
-  crmId      String?
-  crm        CRM?       @relation(fields: [crmId], references: [id], onDelete: Cascade) // O Restrict si no quieres borrar leads al borrar CRM
-  agenteId   String?   // Agente asignado (opcional)
-  agente     Agente?   @relation(fields: [agenteId], references: [id], onDelete: SetNull) // Si se borra agente, el lead queda sin asignar
-  canalId    String?   // Canal de origen (opcional)
-  Canal      CanalCRM? @relation(fields: [canalId], references: [id], onDelete: SetNull) // Si se borra canal, el lead queda sin canal
-
-  // **SUGERENCIA: Corregir typo y relación opcional con Pipeline**
-  pipelineId String?   // Etapa actual (opcional)
-  Pipeline   PipelineCRM? @relation(fields: [pipelineId], references: [id], onDelete: SetNull) // Si se borra etapa, el lead queda sin etapa asignada
-  nombre     String
-
-  // **SUGERENCIA: Hacer email y telefono opcionales**
-  email      String?
-  telefono   String?
-  jsonParams Json?     // Para datos extra de formularios, etc.
-  valorEstimado Float? // Opcional: Valor potencial del lead
-  status     String    @default("nuevo") // nuevo, contactado, calificado, etc.
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  // Relación muchos-a-muchos explícita con Etiqueta
-  Etiquetas  LeadEtiqueta[]
-
-  // Relación uno-a-muchos con Conversacion (un lead puede tener varias conversaciones)
-  Conversacion Conversacion[] // <-- AÑADIDO
-
-  // Relaciones inversas
-  Bitacora   Bitacora[]
-  Agenda     Agenda[]
-
-  @@index([crmId])
-  @@index([agenteId])
-  @@index([canalId])
-  @@index([pipelineId])
-  @@index([email]) // Útil para buscar leads por email
-  @@index([telefono]) // Útil para buscar leads por teléfono
-}
-
-// Tabla intermedia para relación muchos-a-muchos Lead <-> Etiqueta
-model LeadEtiqueta {
-  leadId     String
-  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  etiquetaId String
-  etiqueta   EtiquetaCRM @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
-  asignadoEn DateTime @default(now())
-
-  @@id([leadId, etiquetaId]) // Clave primaria compuesta
-  @@index([leadId])
-  @@index([etiquetaId]) 
-}
-
-//! AGENTE
-model Agente{
-  id        String   @id @default(cuid())
-  crmId     String   // Agente pertenece a un CRM
-  crm       CRM      @relation(fields: [crmId], references: [id], onDelete: Cascade)
-  // Datos del agente (ajustar según necesidad)
-  userId    String?  @unique // Opcional: ID del usuario si tienes un modelo User global
-  nombre    String?  // Podría venir del modelo User
-  email     String   @unique
-  telefono  String?
-  password  String   // ¡Asegúrate de hashear esto!
-  rol       String?  // Ej: 'admin_crm', 'agente_ventas'
-  status    String   @default("activo")
-  createdAt DateTime @default(now())  
-  updatedAt DateTime @updatedAt
-  conversacionesAsignadas Conversacion[] @relation("ConversacionesAsignadas")
-  interaccionesRealizadas Interaccion[] @relation("InteraccionesPorAgente")
-  Lead      Lead[]
-  Bitacora  Bitacora[]
-  Agenda    Agenda[]
-  Notificacion Notificacion[]
-}
-
-//! BITÁCORA
-model Bitacora {
-  id          String   @id @default(cuid())
-  agenteId    String?  // Puede ser una acción del sistema (null) o de un agente
-  agente      Agente?  @relation(fields: [agenteId], references: [id], onDelete: SetNull)
-  leadId      String
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  tipoAccion  String   // Ej: 'creacion', 'cambio_status', 'nota', 'email_enviado', 'llamada'
-  descripcion String
-  metadata    Json?    // Detalles adicionales
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([leadId])
-  @@index([agenteId])
-}
-
-//! AGENDA
 enum StatusAgenda {
-  PENDIENTE     // La cita/tarea está programada pero no ha ocurrido/completado
-  COMPLETADA    // La cita/tarea ya se realizó/completó
-  CANCELADA     // La cita/tarea fue cancelada
-  REAGENDADA 
+  PENDIENTE
+  COMPLETADA
+  CANCELADA
+  REAGENDADA
   NO_ASISTIO
 }
 
-model Agenda {
-  id          String   @id @default(cuid()) 
-  negocioId String? 
-  negocio   Negocio? @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  agenteId    String?
-  agente      Agente?   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
-  asistenteId String?
-  asistente   AsistenteVirtual? @relation(fields: [asistenteId], references: [id], onDelete: SetNull)
-  leadId      String
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  fecha       DateTime
-  tipo        String 
-  asunto      String
-  descripcion String?
-  // fechaRecordatorio DateTime?
-  status      String   @default("pendiente")
-  tipoDeCitaId String? 
-  tipoDeCita AgendaTipoCita? @relation(fields: [tipoDeCitaId], references: [id], onDelete: SetNull)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  historial AgendaHistorial[] 
-  modalidad String? // Presencial, Virtual, Híbrido
-
-  // meetingUrl String?
-  googleMapsUrl String? // Para el link directo de Google Maps (opcional)
-  linkReunionVirtual String? // Link a la reunión virtual (ej: Zoom, Meet)
-
-  @@index([negocioId])
-  @@index([leadId])
-  @@index([agenteId])
-  @@index([fecha])
-}
-
-model AgendaConfiguracion {
-  id                      String    @id @default(cuid())
-  negocioId               String    @unique // Asegura la relación 1:1 con Negocio
-  negocio                 Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade) // Si se borra el negocio, se borra su config de agenda
-
-  aceptaCitasPresenciales Boolean   @default(false)
-  aceptaCitasVirtuales    Boolean   @default(false)
-  requiereTelefonoParaCita Boolean  @default(false)
-  requiereEmailParaCita   Boolean  @default(false)
-  requiereNombreParaCita  Boolean  @default(true)  // Ya estaba en true
-  bufferMinutos           Int?      // Minutos de buffer entre citas
-  metodosPagoTexto       String?   // Texto para mostrar los métodos de pago disponibles
-
-   // ✅ NUEVO CAMPO: Para las recomendaciones generales de la cita.
-  recomendacionesParaCita   String? @db.Text
-
-  // ✅ NUEVO CAMPO: Para definir el tiempo del recordatorio en minutos.
-  recordatorioMinutosAntes  Int?     @default(1440) // Ejemplo: default de 1440 mins = 24 horas
-
-
-  agendaRecordatorios agendaRecordatorio[] // Relación con recordatorios de agenda
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-}
-
-model AgendaTipoCita{
-  id              String   @id @default(cuid())
-  nombre          String   // Ej: "Corte de Cabello", "Consulta Virtual"
-  descripcion     String?
-  duracionMinutos Int?     // Duración estimada en minutos
-  todoElDia       Boolean?  @default(false) // Si la cita es para todo el día
-  esVirtual       Boolean  @default(false)
-  esPresencial    Boolean  @default(false)
-  negocioId       String   // A qué negocio pertenece este tipo de cita
-  ofertasQueLoIncluyen    OfertaServicioCita[] // Un tipo de cita puede estar en muchas ofertas
-  // negocio         Negocio  @relation(fields: [negocioId], references: [id]) // Asumiendo un modelo Negocio
-  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
-  agendas         Agenda[] // Relación inversa
-  orden           Int?     // Para ordenar los tipos de cita en el frontend
-  limiteConcurrencia Int @default(1) // Limite de citas concurrentes para este tipo de cita
-  activo         Boolean @default(true) // Si está activo o no
-  // ofertasConEsteServicioParaCita Oferta[] @relation("OfertasParaServicioCitaEspecifico")
-  @@unique([negocioId, nombre])
-  @@index([negocioId])
-}
-
-// --- NUEVO MODELO: LA TABLA INTERMEDIA ---
-// Esta tabla conecta Ofertas y AgendaTipoCita
-model OfertaServicioCita {
-  ofertaId         String
-  oferta           Oferta         @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
-
-  agendaTipoCitaId String
-  agendaTipoCita   AgendaTipoCita @relation(fields: [agendaTipoCitaId], references: [id], onDelete: Cascade)
-
-  @@id([ofertaId, agendaTipoCitaId]) // Clave primaria compuesta
-}
-
 enum ActionType {
-  CREATED      // Creación de la agenda
-  UPDATED      // Modificación general de la agenda (podrías detallar más si quisieras)
-  CANCELED     // Cancelación de la agenda
-  RESCHEDULED  // Reagendamiento específico (cambio de fecha/hora)
+  CREATED
+  UPDATED
+  CANCELED
+  RESCHEDULED
 }
 
 enum ChangedByType {
-  AGENT      // Un agente humano
-  ASSISTANT  // Un asistente virtual
-  USER       // El cliente/lead final (si tienen capacidad de modificar/cancelar)
-  SYSTEM     // Un proceso automático del sistema
+  AGENT
+  ASSISTANT
+  USER
+  SYSTEM
 }
 
-model AgendaHistorial{
-  id          String   @id @default(cuid())
-  agendaId    String
-  agenda      Agenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade)
-  actionType      String   // CREATED, UPDATED, CANCELED, RESCHEDULED
-  changedByType String? // AGENT, ASSISTANT, USER, SYSTEM
-  changedById String? // ID del agente, asistente o usuario que realizó el cambio
-  reason String?
-  createdAt   DateTime @default(now())
-  @@index([agendaId])
-}
-
-model agendaRecordatorio {
-  id                    String   @id @default(cuid())
-  agendaConfiguracionId String
-  agendaConfiguracion   AgendaConfiguracion @relation(fields: [agendaConfiguracionId], references: [id])
-
-  // La lógica del recordatorio
-  minutosAntes          Int      // 2 horas = 120, 30 mins = 30, 1 día = 1440
-  mensaje               String   // El texto a enviar. "Hola {{nombre}}, tu cita para {{servicio}} es en {{tiempo_restante}}."
-  activo                Boolean  @default(true)
-
-  @@index([agendaConfiguracionId])
-}
-
-// NUEVO ENUM PARA GESTIONAR LOS ESTADOS DE LAS TAREAS
 enum EstadoTareaConversacional {
-  // --- Estados Genéricos ---
-  INICIADA                      // La tarea acaba de empezar.
-  RECOLECTANDO_DATOS            // Estado general mientras se piden parámetros.
-  PENDIENTE_CONFIRMACION_USUARIO // Se han recolectado todos los datos y se espera el "sí, confirma" del usuario.
-  EJECUTANDO_ACCION_FINAL       // El sistema está escribiendo en la base de datos (ej. creando la cita).
-  COMPLETADA                    // La tarea terminó exitosamente.
-  FALLIDA                       // La tarea falló por un error interno.
-  CANCELADA_POR_USUARIO         // El usuario decidió no continuar.
-  VALIDANDO_DISPONIBILIDAD // Estado específico para validar disponibilidad de citas.
-  RECOLECTANDO_NUEVA_FECHA // <-- NUEVO
-  RECOLECTANDO_NUEVA_HORA   // <-- NUEVO
+  INICIADA
+  RECOLECTANDO_DATOS
+  PENDIENTE_CONFIRMACION_USUARIO
+  EJECUTANDO_ACCION_FINAL
+  COMPLETADA
+  FALLIDA
+  CANCELADA_POR_USUARIO
+  VALIDANDO_DISPONIBILIDAD
+  RECOLECTANDO_NUEVA_FECHA
+  RECOLECTANDO_NUEVA_HORA
   PENDIENTE_CONFIRMACION_FECHA_AMBIGUA
   ESPERANDO_EMAIL
-  ESPERANDO_CORRECCION // <-- AÑADIR ESTA LÍNEA
-
+  ESPERANDO_CORRECCION
   VALIDANDO_FECHA_HORA
   RECOLECTANDO_DATOS_ADICIONALES
   ESPERANDO_SERVICIO
@@ -1505,156 +1393,10 @@ enum EstadoTareaConversacional {
   ESPERANDO_SELECCION_USUARIO
   ESPERANDO_NUEVA_FECHA
   CONFIRMANDO_CITA_ORIGINAL
-
 }
 
-//==================================================
-// GESTOR DE ESTADO DE TAREAS CONVERSACIONALES
-//==================================================
-// Este modelo guarda el estado de una tarea activa para una conversación,
-// permitiendo que el servidor gestione el contexto en lugar de la IA.
-model TareaEnProgreso {
-  id               String       @id @default(cuid())
-  conversacionId   String       @unique
-  conversacion     Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
-  
-  nombreTarea      String
-  
-  contexto         Json
-  
-  // --- CAMBIO CLAVE ---
-  // Reemplazamos el String por nuestro nuevo Enum.
-  // El estado por defecto ahora es INICIADA.
-  estado           EstadoTareaConversacional @default(INICIADA) // ANTES: status String
-  
-  // --- ADICIÓN ESTRATÉGICA (Opcional pero Recomendado) ---
-  // Un campo para guardar el último error o mensaje para el usuario.
-  mensajeError     String? @db.Text
-
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-
-  @@index([conversacionId, estado]) // ANTES: @@index([conversacionId, status])
-}
-
-//!CONVERSACIONES
-model Conversacion {
-  id                 String    @id @default(cuid())
-  
-  // Datos del canal específico (ej: WhatsApp)
-  whatsappId         String?   @unique // ID de la conversación en WhatsApp
-  phoneNumberId      String?   // ID del número de teléfono del negocio que recibió/envió
-
-  // Vínculos
-  asistenteVirtualId String?   // Puede no estar asociada a un asistente (ej: iniciada por agente)
-  asistenteVirtual   AsistenteVirtual? @relation(fields: [asistenteVirtualId], references: [id], onDelete: SetNull)
-  leadId             String?   // <-- AÑADIDO: Vínculo al Lead en el CRM
-  lead               Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-
-  // Estado y Metadatos
-  status             String    @default("abierta") // abierta, cerrada, en_espera_agente, seguimiento, archivada
-  intencion          String?   // Intención general detectada
-  interes            String?   // Nivel de interés general detectado
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt // Corregido
-
-  agenteCrmActualId  String?   // ID del Agente CRM actualmente asignado a esta conversación
-  agenteCrmActual    Agente?   @relation("ConversacionesAsignadas", fields: [agenteCrmActualId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  // --- FIN DE NUEVOS CAMPOS ---
-
-  tareaEnProgreso     TareaEnProgreso? // Una conversación puede tener una tarea en progreso.
-
-  Interaccion        Interaccion[]
-  itemInteracciones  ItemInteraccion[] 
-  
-  @@index([leadId])
-  @@index([asistenteVirtualId])
-  @@index([status])
-  @@index([updatedAt]) // Útil para buscar conversaciones recientes
-  @@index([agenteCrmActualId]) 
-}
-
-//!INTERACCIÓN
 enum InteraccionParteTipo {
   TEXT
   FUNCTION_CALL
   FUNCTION_RESPONSE
 }
-
-model Interaccion {
-  id             String    @id @default(cuid())
-  conversacionId String
-  conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
-  messageId      String?   // ID del mensaje específico (ej: de WhatsApp)
-  role           String    // user, assistant, agent, system
-
-  //! Campos para la estructura de Gemini
-  parteTipo      InteraccionParteTipo @default(TEXT)
-  mensajeTexto   String?   @db.Text // Usado si parteTipo es TEXT, o como fallback
-
-  //! Para parteTipo = FUNCTION_CALL (role será 'assistant'/'model')
-  functionCallNombre String?
-  functionCallArgs   Json?   // Los argumentos que la IA generó
-
-  //! Para parteTipo = FUNCTION_RESPONSE (role será 'function')
-  functionResponseNombre String? // Nombre de la función que se invocó
-  functionResponseData Json? // El objeto de respuesta que tu sistema genera para la IA
-
- // NUEVO CAMPO PROPUESTO:
-  uiComponentPayload      Json?   // Nombre más específico que "uiPayload" quizás
-                                  // Ejemplo: si functionResponseData.content es texto plano y 
-                                  // functionResponseData.media es para WhatsApp,
-                                  // uiComponentPayload es para el JSON del WebChat.
-
-  canalInteraccion        String?   // Ej: "whatsapp", "webchat_test", "crm", "webchat_publico", "api_directa"
-
-  // Metadatos de análisis (opcional)
-  intencion      String?
-  entidad        String?
-  interes        String?
-  sentimiento    String?
-
-  // Datos adjuntos
-  mediaUrl       String?   // URL del archivo adjunto (imagen, audio, etc.)
-  mediaType      String?   // image, audio, video, document, sticker
-  createdAt      DateTime  @default(now())
-  agenteCrmId    String?   // ID del Agente CRM que realizó esta interacción (si role == 'agent')
-  agenteCrm      Agente?   @relation("InteraccionesPorAgente", fields: [agenteCrmId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-
-  @@index([conversacionId, createdAt(sort: Asc)], map: "Interaccion_conversacionId_createdAt_unique_idx")
-  @@index([agenteCrmId]) // Nuevo índice si añades agenteCrmId
-  @@index([conversacionId, createdAt(sort: Asc)]) // Índice principal para ordenar interacciones
-
-}
-
-model Notificacion {
-  id          String    @id @default(cuid())
-  clienteId   String    // A quién pertenece la notificación (el dueño de la cuenta)
-  // cliente     Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade) // <-- Añadir onDelete
-  negocioId   String?   // Opcional: Si la notificación es específica de un negocio
-  negocio     Negocio?  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  agenteId    String? // Opcional: Si es para un agente específico del CRM (más avanzado)
-  agente      Agente?   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
-
-  tipo        String    // Ej: 'facturacion', 'lead_nuevo', 'tarea_completada', 'sistema', 'hitl_requerido'
-  mensaje     String    // El texto de la notificación
-  leida       Boolean   @default(false) // Para marcar si el usuario la vio
-  fechaLeida  DateTime? // Cuándo se marcó como leída
-  urlDestino  String?   // Opcional: Link para llevar al usuario a la sección relevante (ej: /admin/clientes/CLIENTE_ID/facturacion/FACTURA_ID)
-  createdAt   DateTime  @default(now())
-
-  @@index([clienteId, leida]) // Índice útil para buscar no leídas por cliente
-  @@index([negocioId])
-}
-
-// model LandingPage{
-//   id        String   @id @default(cuid())
-//   negocioId String
-//   negocio   Negocio @relation(fields: [negocioId], references: [id])
-//   nombre    String
-//   url       String
-//   status    String   @default("activo")
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }

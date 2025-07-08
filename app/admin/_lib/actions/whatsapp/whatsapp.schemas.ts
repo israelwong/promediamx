@@ -92,6 +92,8 @@ export type EnviarMensajeWhatsAppApiInput = z.infer<typeof EnviarMensajeWhatsApp
 export type AsistenteContext = {
     id: string;
     nombre: string;
+    umbralSimilitud?: number; // Umbral de confianza para la búsqueda semántica
+    conocimientoActivado: boolean;
     negocio: {
         id: string;
         nombre: string;

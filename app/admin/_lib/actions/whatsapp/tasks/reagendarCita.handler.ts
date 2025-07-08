@@ -28,6 +28,7 @@ import { construirFechaDesdePalabrasClave } from '../helpers/date.helpers';
 import { ejecutarReagendamientoFinalAction } from '../helpers/actions.helpers';
 import { enviarEmailReagendamientoAction } from '../../email/email.actions';
 import { sonElMismoDia } from '../helpers/date.helpers';
+import { verificarYmanejarEscape } from '../helpers/fsm.helpers'; // Importa el nuevo helper
 
 
 type CitaParaSeleccion = {
@@ -46,6 +47,13 @@ export async function manejarReagendarCita(
     const tareaContexto = (tarea.contexto as ReagendarCitaContext) || {};
     const { conversacionId, leadId, asistente, usuarioWaId, negocioPhoneNumberId } = contexto;
     const textoUsuario = mensaje.type === 'text' ? mensaje.content : '';
+
+    // ✅ INICIO DEL PROTOCOLO DE ESCAPE UNIVERSAL
+    const escapeManejado = await verificarYmanejarEscape(tarea, mensaje, contexto);
+    if (escapeManejado) {
+        return { success: true, data: null }; // Si se manejó un escape, la función termina aquí.
+    }
+    // ✅ FIN DEL PROTOCOLO
 
     console.log(`[REAGENDAR CITA v7.0] Estado: ${tarea.estado}. Contexto:`, tareaContexto);
 
@@ -226,7 +234,9 @@ export async function manejarReagendarCita(
                         ]);
 
                         if (leadInfo.email && leadInfo.nombre) {
-                            const asistenteActivo = negocioInfo.AsistenteVirtual.find(a => a.id === asistente.id);
+                            const asistenteActivo = negocioInfo.AsistenteVirtual && negocioInfo.AsistenteVirtual.id === asistente.id
+                                ? negocioInfo.AsistenteVirtual
+                                : undefined;
                             const numeroWhatsappAsistente = asistenteActivo?.whatsappBusiness?.replace(/\D/g, '');
                             let linkCancelarWhatsApp: string | undefined, linkReagendarWhatsApp: string | undefined;
 

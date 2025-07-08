@@ -2,6 +2,8 @@
 
 'use server';
 
+
+
 import prisma from '@/app/admin/_lib/prismaClient';
 import { ActionResult } from '@/app/admin/_lib/types';
 import { revalidatePath } from 'next/cache';
@@ -9,6 +11,8 @@ import { z } from 'zod';
 
 // Importamos la función que genera embeddings
 import { getEmbeddingForText } from '../../ia/ia.actions';
+
+
 
 import {
     ConocimientoItemParaEditarSchema
@@ -42,39 +46,69 @@ export async function crearOActualizarConocimientoItemAction(formData: FormData)
         return { success: false, error: "Datos inválidos.", validationErrors: validation.error.flatten().fieldErrors };
     }
 
-    const { id, preguntaFormulada, ...restOfData } = validation.data;
+    const { id, preguntaFormulada, respuesta, negocioId, ...restOfData } = validation.data;
 
     try {
-        // 1. Generar el embedding a partir del título/pregunta del ítem.
-        console.log(`[ACCIÓN CONOCIMIENTO] Generando embedding para: "${preguntaFormulada}"`);
-        const vector = await getEmbeddingForText(preguntaFormulada);
+        console.log(`[ACCIÓN CONOCIMIENTO] Generando embeddings para: "${preguntaFormulada}"`);
 
-        if (!vector) {
-            throw new Error("No se pudo generar el embedding para la pregunta. El registro no se guardará.");
+        const [vectorPregunta, vectorRespuesta] = await Promise.all([
+            getEmbeddingForText(preguntaFormulada),
+            respuesta ? getEmbeddingForText(respuesta) : Promise.resolve(null)
+        ]);
+
+        if (!vectorPregunta) {
+            throw new Error("No se pudo generar el embedding para la pregunta.");
         }
 
-        // 2. Preparamos los datos a guardar, incluyendo el vector.
-        const dataToSave = {
-            ...restOfData,
-            preguntaFormulada,
-            embeddingPregunta: vector, // Guardamos el vector en la BD
-        };
-
-        // 3. Decidimos si crear o actualizar.
         if (id) {
-            await prisma.negocioConocimientoItem.update({
-                where: { id },
-                data: dataToSave,
+            // Lógica de ACTUALIZACIÓN usando una transacción
+            await prisma.$transaction(async (tx) => {
+                // 1. Actualizamos los campos de texto
+                await tx.negocioConocimientoItem.update({
+                    where: { id },
+                    data: {
+                        ...restOfData,
+                        preguntaFormulada,
+                        respuesta,
+                    },
+                });
+
+                // 2. Actualizamos los campos de vector con $executeRaw
+                await tx.$executeRaw`
+                    UPDATE "NegocioConocimientoItem"
+                    SET "embeddingPregunta" = ${vectorPregunta}::vector,
+                        "embeddingRespuesta" = ${vectorRespuesta}::vector
+                    WHERE "id" = ${id}
+                `;
             });
-            console.log(`[ACCIÓN CONOCIMIENTO] Item ${id} actualizado con su nuevo embedding.`);
+            console.log(`[ACCIÓN CONOCIMIENTO] Item ${id} actualizado con sus nuevos embeddings.`);
+
         } else {
-            await prisma.negocioConocimientoItem.create({
-                data: dataToSave,
+            // Lógica de CREACIÓN usando una transacción
+            const newItem = await prisma.$transaction(async (tx) => {
+                // 1. Creamos el item solo con los datos de texto y la relación
+                const itemCreado = await tx.negocioConocimientoItem.create({
+                    data: {
+                        ...restOfData,
+                        preguntaFormulada,
+                        respuesta,
+                        negocio: { connect: { id: negocioId } }
+                    }
+                });
+
+                // 2. Actualizamos el item recién creado con sus vectores
+                await tx.$executeRaw`
+                    UPDATE "NegocioConocimientoItem"
+                    SET "embeddingPregunta" = ${vectorPregunta}::vector,
+                        "embeddingRespuesta" = ${vectorRespuesta}::vector
+                    WHERE "id" = ${itemCreado.id}
+                `;
+                return itemCreado;
             });
-            console.log(`[ACCIÓN CONOCIMIENTO] Nuevo item creado con su embedding.`);
+            console.log(`[ACCIÓN CONOCIMIENTO] Nuevo item creado con id ${newItem.id} y sus embeddings.`);
         }
 
-        revalidatePath('/admin/conocimiento'); // Asegúrate que esta ruta sea correcta
+        revalidatePath('/admin/conocimiento');
         return { success: true, message: "Ítem de conocimiento guardado exitosamente." };
 
     } catch (error) {
@@ -82,9 +116,6 @@ export async function crearOActualizarConocimientoItemAction(formData: FormData)
         return { success: false, error: error instanceof Error ? error.message : "Error desconocido al guardar el ítem." };
     }
 }
-
-
-// --- TUS FUNCIONES EXISTENTES DE LECTURA Y BORRADO (SE MANTIENEN IGUAL) ---
 
 /**
  * Obtiene todos los ítems de conocimiento para un negocio específico.

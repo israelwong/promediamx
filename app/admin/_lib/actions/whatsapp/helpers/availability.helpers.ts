@@ -5,6 +5,7 @@
 import prisma from '@/app/admin/_lib/prismaClient';
 import { StatusAgenda, DiaSemana, type HorarioAtencion, type ExcepcionHorario } from '@prisma/client';
 import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions';
+import type { Oferta } from '@prisma/client';
 
 
 
@@ -291,4 +292,55 @@ Frase: "cuánto cuesta?" | Servicios: ["Informes", "Inscripción"] -> Respuesta:
     }
 
     return null;
+}
+
+/**
+ * Compara el texto de un usuario con una lista de ofertas y devuelve la mejor coincidencia.
+ * @param textoUsuario El texto escrito por el usuario.
+ * @param ofertas La lista de objetos de oferta para comparar.
+ * @returns Un array con la(s) mejor(es) coincidencia(s). Vacío si no hay ninguna.
+ */
+export function findBestMatchingOffer(
+    textoUsuario: string,
+    ofertas: Oferta[]
+): Oferta[] {
+    if (!textoUsuario.trim() || ofertas.length === 0) {
+        return [];
+    }
+
+    const textoNormalizado = textoUsuario
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    const userKeywords = new Set(textoNormalizado.split(' ').filter(k => k.length > 2));
+
+    const scoredOffers = ofertas.map(oferta => {
+        let score = 0;
+        const offerNameLower = oferta.nombre.toLowerCase();
+
+        // Si el texto del usuario contiene el nombre completo de la oferta, es un gran acierto.
+        if (textoNormalizado.includes(offerNameLower)) {
+            score += 50;
+        }
+
+        // Puntuación por cada palabra clave que coincida.
+        const offerKeywords = new Set(offerNameLower.split(' '));
+        userKeywords.forEach(keyword => {
+            if (offerKeywords.has(keyword)) {
+                score += 10;
+            }
+        });
+
+        return { ...oferta, score };
+    });
+
+    const maxScore = Math.max(...scoredOffers.map(o => o.score));
+
+    // Devolvemos todas las ofertas que tengan la puntuación más alta (si es mayor a cero).
+    // Esto permite al handler decidir qué hacer si hay un empate (ambigüedad).
+    if (maxScore > 0) {
+        return scoredOffers.filter(o => o.score === maxScore);
+    }
+
+    return [];
 }
