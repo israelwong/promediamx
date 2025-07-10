@@ -65,6 +65,7 @@ const LoginForm = () => {
             try {
                 setLoading(true);
                 const response = await login(email, password);
+                console.log(response);
                 if (response.status) {
                     //redirect to dashboard
                     Cookies.set('token', response.token, { expires: 7 }); // La cookie expira en 7 días
