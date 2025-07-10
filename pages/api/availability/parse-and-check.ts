@@ -18,25 +18,42 @@ function construirFechaEnTimeZone(
 ): Date | null {
     try {
         const ahoraEnZona = toZonedTime(new Date(), timeZone);
-        const fechaBase = new Date(ahoraEnZona.getFullYear(), ahoraEnZona.getMonth(), ahoraEnZona.getDate());
+
+        // Empezamos con los componentes de la fecha actual en la zona correcta
+        let año = ahoraEnZona.getFullYear();
+        let mes = ahoraEnZona.getMonth(); // 0-11
+        let dia = ahoraEnZona.getDate();
 
         // 1. Determinar el día correcto
         if (extraccion.dia_relativo?.toLowerCase() === 'mañana') {
-            fechaBase.setDate(fechaBase.getDate() + 1);
+            const mañana = new Date(ahoraEnZona.getTime());
+            mañana.setDate(mañana.getDate() + 1);
+            año = mañana.getFullYear();
+            mes = mañana.getMonth();
+            dia = mañana.getDate();
         } else if (extraccion.dia_semana) {
+            const tempDate = new Date(ahoraEnZona.getTime());
             const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
             const diaTargetIndex = diasSemana.indexOf(extraccion.dia_semana.toLowerCase());
             if (diaTargetIndex !== -1) {
-                let diasAAñadir = diaTargetIndex - fechaBase.getDay();
-                if (diasAAñadir < 0) { diasAAñadir += 7; } // Siempre ir al próximo día de la semana
-                fechaBase.setDate(fechaBase.getDate() + diasAAñadir);
+                let diasAAñadir = diaTargetIndex - tempDate.getDay();
+                if (diasAAñadir < 0) { diasAAñadir += 7; }
+                tempDate.setDate(tempDate.getDate() + diasAAñadir);
+                año = tempDate.getFullYear();
+                mes = tempDate.getMonth();
+                dia = tempDate.getDate();
             }
         } else if (extraccion.dia_mes) {
-            fechaBase.setDate(extraccion.dia_mes);
-            // Si el día del mes ya pasó este año, asumimos que es del próximo mes/año
-            if (fechaBase < toZonedTime(new Date(), timeZone)) {
-                fechaBase.setMonth(fechaBase.getMonth() + 1);
+            const diaUsuario = extraccion.dia_mes;
+            // Si el día ya pasó este mes, asumimos que es del próximo mes
+            if (diaUsuario < dia) {
+                mes += 1;
+                if (mes > 11) {
+                    mes = 0;
+                    año += 1;
+                }
             }
+            dia = diaUsuario;
         }
 
         // 2. Determinar la hora correcta
@@ -54,18 +71,12 @@ function construirFechaEnTimeZone(
                 }
 
                 // 3. Construimos un string de fecha local y lo convertimos a la zona horaria correcta
-                const año = fechaBase.getFullYear();
-                const mes = String(fechaBase.getMonth() + 1).padStart(2, '0');
-                const dia = String(fechaBase.getDate()).padStart(2, '0');
-                const horaStr = String(hora).padStart(2, '0');
-                const minStr = String(minuto).padStart(2, '0');
-
-                const fechaLocalString = `${año}-${mes}-${dia}T${horaStr}:${minStr}:00`;
+                const fechaLocalString = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
 
                 return toZonedTime(fechaLocalString, timeZone);
             }
         }
-        return null;
+        return null; // No se pudo construir una fecha y hora completas
     } catch (error) {
         console.error("Error construyendo fecha en timezone:", error);
         return null;
@@ -116,7 +127,6 @@ export default async function handler(
 
         const fechaFormateada = format(fecha, "EEEE d 'de' MMMM 'a las' h:mm aa", { locale: es, timeZone });
 
-        // ✅ CORRECCIÓN: Comparamos la fecha deseada con la hora actual EN LA MISMA ZONA HORARIA
         const ahoraEnZona = toZonedTime(new Date(), timeZone);
         if (isBefore(fecha, ahoraEnZona)) {
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, la fecha que buscas (${fechaFormateada}) ya pasó.` });
