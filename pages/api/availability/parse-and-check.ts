@@ -3,59 +3,65 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { isBefore } from 'date-fns';
-// ✅ CORRECCIÓN: Importamos 'toZonedTime', que es el nombre correcto de la función.
 import { toZonedTime, format } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 import { extraerPalabrasClaveDeFecha } from '@/app/admin/_lib/actions/whatsapp/helpers/ia.helpers';
 
-// Helper interno para construir la fecha de forma segura
+/**
+ * Helper robusto para construir un objeto Date a partir de texto,
+ * respetando la zona horaria especificada.
+ */
 function construirFechaEnTimeZone(
     extraccion: { dia_semana?: string; dia_relativo?: string; dia_mes?: number; hora_str?: string },
     timeZone: string
 ): Date | null {
-    const ahora = new Date(); // La hora actual del servidor, usualmente en UTC
+    try {
+        const ahoraEnZona = toZonedTime(new Date(), timeZone);
+        const fechaTarget = new Date(ahoraEnZona.getFullYear(), ahoraEnZona.getMonth(), ahoraEnZona.getDate());
 
-    // ✅ CORRECCIÓN: Usamos 'toZonedTime' para obtener un objeto Date que representa la hora actual en la zona horaria de destino.
-    const fechaTarget = toZonedTime(ahora, timeZone);
-
-    // Lógica para determinar el día
-    if (extraccion.dia_relativo?.toLowerCase() === 'mañana') {
-        fechaTarget.setDate(fechaTarget.getDate() + 1);
-    } else if (extraccion.dia_semana) {
-        const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-        const diaTargetIndex = diasSemana.indexOf(extraccion.dia_semana.toLowerCase());
-        if (diaTargetIndex !== -1) {
-            let diasAAñadir = diaTargetIndex - fechaTarget.getDay();
-            if (diasAAñadir <= 0) { diasAAñadir += 7; }
-            fechaTarget.setDate(fechaTarget.getDate() + diasAAñadir);
-        }
-    } else if (extraccion.dia_mes) {
-        fechaTarget.setDate(extraccion.dia_mes);
-    }
-
-    // Lógica para determinar la hora
-    if (extraccion.hora_str) {
-        const matchHora = extraccion.hora_str.match(/(\d{1,2}):?(\d{2})?/);
-        if (matchHora) {
-            let hora = parseInt(matchHora[1], 10);
-            const minuto = matchHora[2] ? parseInt(matchHora[2], 10) : 0;
-
-            if (extraccion.hora_str.toLowerCase().includes('pm') && hora < 12) {
-                hora += 12;
+        // 1. Determinar el día correcto
+        if (extraccion.dia_relativo?.toLowerCase() === 'mañana') {
+            fechaTarget.setDate(fechaTarget.getDate() + 1);
+        } else if (extraccion.dia_semana) {
+            const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+            const diaTargetIndex = diasSemana.indexOf(extraccion.dia_semana.toLowerCase());
+            if (diaTargetIndex !== -1) {
+                let diasAAñadir = diaTargetIndex - fechaTarget.getDay();
+                if (diasAAñadir <= 0) { diasAAñadir += 7; }
+                fechaTarget.setDate(fechaTarget.getDate() + diasAAñadir);
             }
-            if (extraccion.hora_str.toLowerCase().includes('am') && hora === 12) {
-                hora = 0; // Medianoche
+        } else if (extraccion.dia_mes) {
+            fechaTarget.setDate(extraccion.dia_mes);
+            if (fechaTarget < ahoraEnZona) { // Si el día del mes ya pasó, asumimos que es del próximo mes
+                fechaTarget.setMonth(fechaTarget.getMonth() + 1);
             }
-
-            fechaTarget.setHours(hora, minuto, 0, 0);
-            return fechaTarget;
         }
-    }
 
-    return null; // Si no se pudo construir una fecha y hora completas
+        // 2. Determinar la hora correcta
+        if (extraccion.hora_str) {
+            const matchHora = extraccion.hora_str.match(/(\d{1,2}):?(\d{2})?/);
+            if (matchHora) {
+                let hora = parseInt(matchHora[1], 10);
+                const minuto = matchHora[2] ? parseInt(matchHora[2], 10) : 0;
+
+                if (extraccion.hora_str.toLowerCase().includes('pm') && hora < 12) {
+                    hora += 12;
+                }
+                if (extraccion.hora_str.toLowerCase().includes('am') && hora === 12) {
+                    hora = 0; // Medianoche
+                }
+
+                // 3. Construir la fecha final en la zona horaria correcta
+                return toZonedTime(new Date(fechaTarget.getFullYear(), fechaTarget.getMonth(), fechaTarget.getDate(), hora, minuto), timeZone);
+            }
+        }
+        return null; // No se pudo construir una fecha y hora completas
+    } catch (error) {
+        console.error("Error construyendo fecha en timezone:", error);
+        return null;
+    }
 }
-
 
 const ParseAndCheckSchema = z.object({
     textoFecha: z.string().min(3, "El texto de la fecha es requerido."),
@@ -85,7 +91,7 @@ export default async function handler(
         }
 
         const { textoFecha, negocioId, tipoDeCitaId } = validation.data;
-        const timeZone = 'America/Mexico_City'; // Definimos nuestra zona horaria de negocio
+        const timeZone = 'America/Mexico_City';
 
         const extraccion = await extraerPalabrasClaveDeFecha(textoFecha);
         if (!extraccion) {
