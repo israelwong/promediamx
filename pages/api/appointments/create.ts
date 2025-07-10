@@ -6,7 +6,7 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import { StatusAgenda, Prisma } from '@prisma/client';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 import { enviarEmailConfirmacionCita } from '@/app/admin/_lib/actions/email/email.actions';
-import { revalidatePath } from 'next/cache';
+// import { revalidatePath } from 'next/cache';
 import { isBefore } from 'date-fns';
 
 // ✅ 1. Actualizamos el schema para aceptar el nuevo campo 'source'
@@ -161,10 +161,10 @@ export default async function handler(
             });
         }
 
-        if (negocio.clienteId) {
-            const pathToRevalidate = `/admin/clientes/${negocio.clienteId}/negocios/${data.negocioId}/citas`;
-            revalidatePath(pathToRevalidate);
-        }
+        // if (negocio.clienteId) {
+        //     const pathToRevalidate = `/admin/clientes/${negocio.clienteId}/negocios/${data.negocioId}/citas`;
+        //     revalidatePath(pathToRevalidate);
+        // }
 
         return res.status(201).json({ message: 'Cita creada exitosamente.', data: { citaId: nuevaCita.id } });
 
