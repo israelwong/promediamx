@@ -182,7 +182,62 @@ export async function enviarMensajeInternoYWhatsAppAction(input: {
     });
 }
 
-// Esta función también vive aquí, ya que la anterior depende de ella.
+
+// export async function enviarMensajeWhatsAppApiAction(
+//     input: EnviarMensajeWhatsAppApiInput
+// ): Promise<ActionResult<string | null>> {
+//     const validation = EnviarMensajeWhatsAppApiInputSchema.safeParse(input);
+//     if (!validation.success) {
+//         console.error("[WhatsApp API Sender] Input inválido:", validation.error.flatten().fieldErrors);
+//         return { success: false, error: "Datos de entrada inválidos para enviar mensaje WhatsApp." };
+//     }
+//     const {
+//         destinatarioWaId,
+//         mensajeTexto,
+//         negocioPhoneNumberIdEnvia,
+//         tokenAccesoAsistente,
+//         tipoMensaje = 'text',
+//     } = validation.data;
+
+//     const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v20.0';
+//     const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${negocioPhoneNumberIdEnvia}/messages`;
+
+//     const messagePayload: Record<string, unknown> = {
+//         messaging_product: "whatsapp",
+//         to: destinatarioWaId,
+//         type: tipoMensaje,
+//         text: { preview_url: false, body: mensajeTexto }
+//     };
+
+//     try {
+//         const response = await fetch(url, {
+//             method: 'POST',
+//             headers: {
+//                 'Authorization': `Bearer ${tokenAccesoAsistente}`,
+//                 'Content-Type': 'application/json',
+//             },
+//             body: JSON.stringify(messagePayload),
+//         });
+
+//         const responseData = await response.json();
+//         if (!response.ok) {
+//             const errorMsg = responseData.error?.message || `Error HTTP ${response.status} al enviar mensaje.`;
+//             return { success: false, error: errorMsg };
+//         }
+//         const messageId = responseData.messages?.[0]?.id;
+//         return { success: true, data: messageId || null };
+//     } catch (error) {
+//         return { success: false, error: error instanceof Error ? error.message : "Error de red al enviar mensaje." };
+//     }
+// }
+
+
+// /helpers/actions.helpers.ts
+// Actualización: Nueva función para construir dinámicamente un menú de agendamiento
+// basado en los campos personalizados y sus metadatos.
+// CORRECCIÓN: Ahora usa `crmId` como parámetro, que es el correcto.
+
+
 export async function enviarMensajeWhatsAppApiAction(
     input: EnviarMensajeWhatsAppApiInput
 ): Promise<ActionResult<string | null>> {
@@ -197,8 +252,6 @@ export async function enviarMensajeWhatsAppApiAction(
         negocioPhoneNumberIdEnvia,
         tokenAccesoAsistente,
         tipoMensaje = 'text',
-        // mediaUrl,
-        // caption,
     } = validation.data;
 
     const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v20.0';
@@ -211,6 +264,15 @@ export async function enviarMensajeWhatsAppApiAction(
         text: { preview_url: false, body: mensajeTexto }
     };
 
+    // ✅ INICIO DEL DIAGNÓSTICO: Logueamos todo antes de enviar.
+    console.log("--- [DIAGNÓSTICO DE ENVÍO] ---");
+    console.log(`[API Sender] Intentando enviar a la URL: ${url}`);
+    console.log(`[API Sender] Usando Phone Number ID: ${negocioPhoneNumberIdEnvia}`);
+    // Ocultamos la mayor parte del token por seguridad, pero vemos si existe.
+    console.log(`[API Sender] ¿Token de Acceso recibido? ${tokenAccesoAsistente ? `Sí, termina en "...${tokenAccesoAsistente.slice(-5)}"` : "No, es undefined o null"}`);
+    console.log("---------------------------------");
+    // ✅ FIN DEL DIAGNÓSTICO
+
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -222,22 +284,25 @@ export async function enviarMensajeWhatsAppApiAction(
         });
 
         const responseData = await response.json();
+
+        // Logueamos la respuesta de Meta para ver si hay un error específico
+        console.log("[API Sender] Respuesta de Meta:", JSON.stringify(responseData, null, 2));
+
         if (!response.ok) {
             const errorMsg = responseData.error?.message || `Error HTTP ${response.status} al enviar mensaje.`;
+            console.error(`[API Sender] Fallo en el envío: ${errorMsg}`);
             return { success: false, error: errorMsg };
         }
+
         const messageId = responseData.messages?.[0]?.id;
         return { success: true, data: messageId || null };
+
     } catch (error) {
+        console.error("[API Sender] Error catastrófico en fetch:", error);
         return { success: false, error: error instanceof Error ? error.message : "Error de red al enviar mensaje." };
     }
 }
 
-
-// /helpers/actions.helpers.ts
-// Actualización: Nueva función para construir dinámicamente un menú de agendamiento
-// basado en los campos personalizados y sus metadatos.
-// CORRECCIÓN: Ahora usa `crmId` como parámetro, que es el correcto.
 
 export async function construirMenuDeAgendamiento(crmId: string): Promise<string> {
     try {
