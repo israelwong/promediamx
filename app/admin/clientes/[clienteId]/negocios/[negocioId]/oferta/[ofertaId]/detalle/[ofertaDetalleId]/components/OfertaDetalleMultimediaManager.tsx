@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app
 import { Image as ImageIcon, Video, FileText } from 'lucide-react';
 
 import OfertaDetalleGaleria from './OfertaDetalleGaleria';
-import OfertaDetalleVideo from './OfertaDetalleVideos';
+// import OfertaDetalleVideo from './OfertaDetalleVideos';
 import OfertaDetalleDocumentos from './OfertaDetalleDocumentos';
 
 
@@ -51,12 +51,12 @@ export default function OfertaDetalleMultimediaManager({
                         />
                     </TabsContent>
                     <TabsContent value="video">
-                        <OfertaDetalleVideo
+                        {/* <OfertaDetalleVideo
                             ofertaId={ofertaId}
                             ofertaDetalleId={ofertaDetalleId}
                             negocioId={negocioId}
                             clienteId={clienteId}
-                        />
+                        /> */}
                     </TabsContent>
                     <TabsContent value="archivos">
                         <OfertaDetalleDocumentos

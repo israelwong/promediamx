@@ -149,7 +149,9 @@ export async function manejarCancelarCita(
                     await enviarMensajeAsistente(conversacionId, mensajeConfirmacion, usuarioWaId, negocioPhoneNumberId);
 
                     if (citaCancelada.lead.email) {
-                        const asistenteActivo = citaCancelada.negocio?.AsistenteVirtual.find(a => a.id === asistente.id);
+                        const asistenteActivo = citaCancelada.negocio?.AsistenteVirtual && citaCancelada.negocio.AsistenteVirtual.id === asistente.id
+                            ? citaCancelada.negocio.AsistenteVirtual
+                            : null;
                         const numeroWhatsappAsistente = asistenteActivo?.whatsappBusiness?.replace(/\D/g, '');
 
                         if (numeroWhatsappAsistente) {

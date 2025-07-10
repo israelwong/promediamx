@@ -8,8 +8,8 @@ import {
     // CrearCitaResult, 
     // EditarCitaResult, 
     EliminarCitaResult,
-    ObtenerDatosFormularioCitaResult, DatosFormularioCita, CalendarEvent,
-    ActionResult, AgendaData
+    ObtenerDatosFormularioCitaResult, DatosFormularioCita,
+    ActionResult
 } from './types';
 import { Prisma } from '@prisma/client';
 
@@ -220,98 +220,97 @@ export async function eliminarCitaLead(citaId: string): Promise<EliminarCitaResu
 }
 
 
-export async function obtenerEventosAgenda(
-    negocioId: string,
-    rangeStart?: Date,
-    rangeEnd?: Date
-): Promise<ActionResult<AgendaData>> {
-    if (!negocioId) {
-        return { success: false, error: "ID de negocio no proporcionado." };
-    }
+// export async function obtenerEventosAgenda(
+//     negocioId: string,
+//     rangeStart?: Date,
+//     rangeEnd?: Date
+// ): Promise<ActionResult<AgendaData>> {
+//     if (!negocioId) {
+//         return { success: false, error: "ID de negocio no proporcionado." };
+//     }
 
-    try {
-        // 1. Buscar el CRM asociado al negocio
-        const crm = await prisma.cRM.findUnique({
-            where: { negocioId },
-            select: { id: true } // Solo necesitamos el ID del CRM
-        });
+//     try {
+//         // 1. Buscar el CRM asociado al negocio
+//         const crm = await prisma.cRM.findUnique({
+//             where: { negocioId },
+//             select: { id: true } // Solo necesitamos el ID del CRM
+//         });
 
-        // 2. Si no hay CRM, devolver éxito pero indicando que no hay CRM
-        if (!crm) {
-            console.log(`CRM no encontrado para negocioId ${negocioId}. No se cargarán eventos de agenda.`);
-            return { success: true, data: { crmId: null, eventos: [] } };
-        }
+//         // 2. Si no hay CRM, devolver éxito pero indicando que no hay CRM
+//         if (!crm) {
+//             console.log(`CRM no encontrado para negocioId ${negocioId}. No se cargarán eventos de agenda.`);
+//             return { success: true, data: { crmId: null, eventos: [] } };
+//         }
 
-        // 3. Construir el filtro base y de fecha
-        // --- CORRECCIÓN: Filtrar por crmId a través de la relación con Lead ---
-        const baseFilter: Prisma.AgendaWhereInput = {
-            lead: { // Acceder a la relación 'lead'
-                crmId: crm.id // Filtrar por el crmId dentro del lead
-            }
-        };
-        // --- FIN CORRECCIÓN ---
+//         // 3. Construir el filtro base y de fecha
+//         // --- CORRECCIÓN: Filtrar por crmId a través de la relación con Lead ---
+//         const baseFilter: Prisma.AgendaWhereInput = {
+//             lead: { // Acceder a la relación 'lead'
+//                 crmId: crm.id // Filtrar por el crmId dentro del lead
+//             }
+//         };
+//         // --- FIN CORRECCIÓN ---
 
-        // Añadir filtro de fecha si se proporcionan las fechas
-        if (rangeStart && rangeEnd) {
-            const endOfDay = new Date(rangeEnd);
-            endOfDay.setHours(23, 59, 59, 999);
-            baseFilter.fecha = {
-                gte: rangeStart,
-                lte: endOfDay,
-            };
-        } else if (rangeStart) {
-            baseFilter.fecha = { gte: rangeStart };
-        } else if (rangeEnd) {
-            const endOfDay = new Date(rangeEnd);
-            endOfDay.setHours(23, 59, 59, 999);
-            baseFilter.fecha = { lte: endOfDay };
-        }
+//         // Añadir filtro de fecha si se proporcionan las fechas
+//         if (rangeStart && rangeEnd) {
+//             const endOfDay = new Date(rangeEnd);
+//             endOfDay.setHours(23, 59, 59, 999);
+//             baseFilter.fecha = {
+//                 gte: rangeStart,
+//                 lte: endOfDay,
+//             };
+//         } else if (rangeStart) {
+//             baseFilter.fecha = { gte: rangeStart };
+//         } else if (rangeEnd) {
+//             const endOfDay = new Date(rangeEnd);
+//             endOfDay.setHours(23, 59, 59, 999);
+//             baseFilter.fecha = { lte: endOfDay };
+//         }
 
-        // 4. Buscar los registros de Agenda usando el filtro construido
-        const agendaItems = await prisma.agenda.findMany({
-            where: baseFilter, // Usar el filtro combinado
-            include: {
-                lead: { select: { id: true, nombre: true } },
-                agente: { select: { id: true, nombre: true, email: true } }
-            },
-            orderBy: {
-                fecha: 'asc'
-            }
-        });
+//         // 4. Buscar los registros de Agenda usando el filtro construido
+//         // const agendaItems = await prisma.agenda.findMany({
+//         //     where: baseFilter, // Usar el filtro combinado
+//         //     include: {
+//         //         lead: { select: { id: true, nombre: true } },
+//         //         agente: { select: { id: true, nombre: true, email: true } }
+//         //     },
+//         //     orderBy: {
+//         //         fecha: 'asc'
+//         //     }
+//         // });
 
-        // 5. Mapear los registros de Agenda al formato CalendarEvent (sin cambios en el mapeo)
-        const eventos: CalendarEvent[] = agendaItems.map(item => {
-            const agenteNombre = item.agente?.nombre || item.agente?.email || 'N/A';
-            const leadNombre = item.lead?.nombre || 'Lead Desconocido';
-            const eventTitle = `${item.tipo}: ${item.asunto} (${agenteNombre} / ${leadNombre})`;
+//         // 5. Mapear los registros de Agenda al formato CalendarEvent (sin cambios en el mapeo)
+//         // const eventos: CalendarEvent[] = agendaItems.map(item => {
+//         //     const agenteNombre = item.agente?.nombre || item.agente?.email || 'N/A';
+//         //     const leadNombre = item.lead?.nombre || 'Lead Desconocido';
+//         //     const eventTitle = `${item.tipo}: ${item.asunto} (${agenteNombre} / ${leadNombre})`;
 
-            return {
-                id: item.id,
-                title: eventTitle,
-                start: item.fecha,
-                end: item.fecha, // Asumiendo eventos puntuales
-                allDay: false,
-                resource: {
-                    tipo: item.tipo,
-                    asunto: item.asunto,
-                    descripcion: item.descripcion,
-                    status: item.status,
-                    meetingUrl: item.meetingUrl,
-                    lead: item.lead ? { id: item.lead.id, nombre: item.lead.nombre } : null,
-                    agente: item.agente ? { id: item.agente.id, nombre: agenteNombre } : null,
-                }
-            };
-        });
+//         //     return {
+//         //         id: item.id,
+//         //         title: eventTitle,
+//         //         start: item.fecha,
+//         //         end: item.fecha, // Asumiendo eventos puntuales
+//         //         allDay: false,
+//         //         resource: {
+//         //             tipo: item.tipo,
+//         //             asunto: item.asunto,
+//         //             descripcion: item.descripcion,
+//         //             status: item.status,
+//         //             lead: item.lead ? { id: item.lead.id, nombre: item.lead.nombre } : null,
+//         //             agente: item.agente ? { id: item.agente.id, nombre: agenteNombre } : null,
+//         //         }
+//         //     };
+//         // });
 
-        // 6. Devolver éxito con el crmId y los eventos mapeados
-        return { success: true, data: { crmId: crm.id, eventos: eventos } };
+//         // 6. Devolver éxito con el crmId y los eventos mapeados
+//         return { success: true, data: { crmId: crm.id, eventos: eventos } };
 
-    } catch (error: unknown) {
-        console.error(`Error fetching agenda events for negocio ${negocioId}:`, error);
-        const errorMessage = error instanceof Error ? error.message : 'Error desconocido.';
-        return { success: false, error: `No se pudieron obtener los eventos de la agenda: ${errorMessage}` };
-    }
-}
+//     } catch (error: unknown) {
+//         console.error(`Error fetching agenda events for negocio ${negocioId}:`, error);
+//         const errorMessage = error instanceof Error ? error.message : 'Error desconocido.';
+//         return { success: false, error: `No se pudieron obtener los eventos de la agenda: ${errorMessage}` };
+//     }
+// }
 
 
 
@@ -381,8 +380,6 @@ export async function obtenerCitasDelDiaPorNegocio(
                 asignadoANombre: asignadoANombre,
                 asignadoATipo: asignadoATipo,
                 descripcion: cita.descripcion,
-                meetingUrl: cita.meetingUrl,
-                fechaRecordatorio: cita.fechaRecordatorio,
             };
         });
 
@@ -407,7 +404,7 @@ export async function obtenerCitasLead(leadId: string): Promise<ObtenerCitasLead
             orderBy: { fecha: 'desc' }
         });
         const citasFormateadas: CitaExistente[] = citas.map(cita => ({
-            id: cita.id, tipo: cita.tipo, asunto: cita.asunto, fecha: cita.fecha.toISOString(), status: cita.status, descripcion: cita.descripcion, meetingUrl: cita.meetingUrl, fechaRecordatorio: cita.fechaRecordatorio ? cita.fechaRecordatorio.toISOString() : null, agenteId: cita.agenteId,
+            id: cita.id, tipo: cita.tipo, asunto: cita.asunto, fecha: cita.fecha.toISOString(), status: cita.status, agenteId: cita.agenteId,
             agente: cita.agente ? { id: cita.agente.id, nombre: cita.agente.nombre || cita.agente.email } : null
         }));
         return { success: true, data: citasFormateadas };
@@ -462,8 +459,6 @@ export async function obtenerTodasLasCitasDelNegocio(
             fecha: cita.fecha.toISOString(), // Convertir a string
             status: cita.status,
             descripcion: cita.descripcion,
-            meetingUrl: cita.meetingUrl,
-            fechaRecordatorio: cita.fechaRecordatorio ? cita.fechaRecordatorio.toISOString() : null, // Convertir a string si no es null
             agenteId: cita.agenteId,
             agente: cita.agente
                 ? { id: cita.agente.id, nombre: cita.agente.nombre || cita.agente.email }

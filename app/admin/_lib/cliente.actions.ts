@@ -19,66 +19,66 @@ export interface ClienteConDetalles extends Cliente {
     })[];
 }
 
-export async function obtenerClientesConDetalles(): Promise<ClienteConDetalles[]> {
-    try {
-        const clientes = await prisma.cliente.findMany({
-            orderBy: {
-                nombre: 'asc'
-            },
-            select: {
-                id: true,
-                nombre: true,
-                createdAt: true,
-                status: true,
-                email: true,
-                _count: {
-                    select: { negocio: true } // Usar Negocio (mayúscula) si así está en schema
-                },
-                negocio: { // Usar Negocio (mayúscula) si así está en schema
-                    select: {
-                        id: true,
-                        nombre: true, // **AÑADIDO: Incluir nombre del negocio**
-                        AsistenteVirtual: {
-                            where: { status: 'activo' },
-                            select: {
-                                id: true,
-                                // precioBase: true,
-                                status: true,
-                                AsistenteTareaSuscripcion: {
-                                    where: { status: 'activo' },
-                                    select: {
-                                        montoSuscripcion: true,
-                                        status: true,
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
-        // El tipo devuelto por Prisma ahora debería ser más compatible,
-        // pero un casteo puede seguir siendo necesario si tu tipo TS es más específico
-        return clientes.map(cliente => ({
-            ...cliente,
-            Negocio: cliente.negocio?.map(negocio => ({
-                ...negocio,
-                AsistenteVirtual: negocio.AsistenteVirtual?.map(asistente => ({
-                    ...asistente,
-                    // precioBase: asistente.precioBase ?? undefined,
-                    AsistenteTareaSuscripcion: asistente.AsistenteTareaSuscripcion?.map(tarea => ({
-                        ...tarea,
-                        montoSuscripcion: tarea.montoSuscripcion ?? undefined,
-                    })) ?? undefined,
-                })) ?? undefined,
-            })) ?? undefined,
-            _count: cliente._count ? { Negocio: cliente._count.negocio } : undefined,
-        })) as ClienteConDetalles[];
-    } catch (error) {
-        console.error("Error fetching detailed clients:", error);
-        throw new Error("Error al obtener la lista detallada de clientes.");
-    }
-}
+// export async function obtenerClientesConDetalles(): Promise<ClienteConDetalles[]> {
+//     try {
+//         const clientes = await prisma.cliente.findMany({
+//             orderBy: {
+//                 nombre: 'asc'
+//             },
+//             select: {
+//                 id: true,
+//                 nombre: true,
+//                 createdAt: true,
+//                 status: true,
+//                 email: true,
+//                 _count: {
+//                     select: { negocio: true } // Usar Negocio (mayúscula) si así está en schema
+//                 },
+//                 negocio: { // Usar Negocio (mayúscula) si así está en schema
+//                     select: {
+//                         id: true,
+//                         nombre: true, // **AÑADIDO: Incluir nombre del negocio**
+//                         AsistenteVirtual: {
+//                             where: { status: 'activo' },
+//                             select: {
+//                                 id: true,
+//                                 // precioBase: true,
+//                                 status: true,
+//                                 AsistenteTareaSuscripcion: {
+//                                     where: { status: 'activo' },
+//                                     select: {
+//                                         montoSuscripcion: true,
+//                                         status: true,
+//                                     }
+//                                 }
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//         });
+//         // El tipo devuelto por Prisma ahora debería ser más compatible,
+//         // pero un casteo puede seguir siendo necesario si tu tipo TS es más específico
+//         return clientes.map(cliente => ({
+//             ...cliente,
+//             Negocio: cliente.negocio?.map(negocio => ({
+//                 ...negocio,
+//                 AsistenteVirtual: negocio.AsistenteVirtual?.map(asistente => ({
+//                     ...asistente,
+//                     // precioBase: asistente.precioBase ?? undefined,
+//                     AsistenteTareaSuscripcion: asistente.AsistenteTareaSuscripcion?.map(tarea => ({
+//                         ...tarea,
+//                         montoSuscripcion: tarea.montoSuscripcion ?? undefined,
+//                     })) ?? undefined,
+//                 })) ?? undefined,
+//             })) ?? undefined,
+//             _count: cliente._count ? { Negocio: cliente._count.negocio } : undefined,
+//         })) as ClienteConDetalles[];
+//     } catch (error) {
+//         console.error("Error fetching detailed clients:", error);
+//         throw new Error("Error al obtener la lista detallada de clientes.");
+//     }
+// }
 
 
 export async function obtenerClientes() {

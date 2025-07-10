@@ -1,6 +1,6 @@
 // --- NUEVO ARCHIVO: @/app/dev-test-chat/page.tsx ---
 import React from 'react';
-import ChatTestPanel from './components/ChatTestPanel';
+// import ChatTestPanel from './components/ChatTestPanel';
 
 import { Metadata } from 'next';
 
@@ -19,7 +19,7 @@ export default function DevTestChatPage() {
                         Simulador para enviar mensajes como usuario final a una conversación existente.
                     </p>
                 </header>
-                <ChatTestPanel />
+                {/* <ChatTestPanel /> */}
                 <footer className="mt-8 text-center text-xs text-zinc-500">
                     <p>Este panel es solo para fines de desarrollo y pruebas.</p>
                     <p>Asegúrate de tener IDs de conversación válidos de tu base de datos.</p>

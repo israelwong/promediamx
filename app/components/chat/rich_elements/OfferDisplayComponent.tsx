@@ -124,8 +124,8 @@ const OfferDisplayComponent: React.FC<OfferDisplayComponentProps> = ({ data, ope
 
             {data.descripcionGeneral && <p className="!my-2">{data.descripcionGeneral.replace(/\n/g, "<br />")}</p>}
             {data.precioFormateado && (<p className="font-bold !my-1 text-base"> {data.precioFormateado} {data.moneda && <span className="text-xs font-normal ml-1">{data.moneda}</span>} </p>)}
-            {data.condiciones && <p className="text-xs !my-1"><em>Condiciones: {data.condiciones}</em></p>}
             {/* Link de Pago */}
+            {/* {data.condiciones && <p className="text-xs !my-1"><em>Condiciones: {data.condiciones}</em></p>}
             {data.linkPago && (
                 <div className="my-3">
                     <a
@@ -134,10 +134,10 @@ const OfferDisplayComponent: React.FC<OfferDisplayComponentProps> = ({ data, ope
                         rel="noopener noreferrer"
                         className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors no-underline"
                     >
-                        ¡Aprovechar Oferta! {/* O un texto más genérico */}
+                        ¡Aprovechar Oferta! 
                     </a>
                 </div>
-            )}
+            )} */}
 
             {/* Galería de Imágenes Adicionales */}
             {data.galeriaImagenes && data.galeriaImagenes.length > 0 && (
@@ -186,7 +186,7 @@ const OfferDisplayComponent: React.FC<OfferDisplayComponentProps> = ({ data, ope
             )}
 
             {/* Detalles Adicionales (FAQs, Beneficios) */}
-            {data.listaDetalles && data.listaDetalles.length > 0 && (
+            {/* {data.listaDetalles && data.listaDetalles.length > 0 && (
                 <div className="my-3">
                     {data.listaDetalles.map((detalle, idx) => (
                         <div key={`detail-${idx}`} className="py-1">
@@ -195,7 +195,7 @@ const OfferDisplayComponent: React.FC<OfferDisplayComponentProps> = ({ data, ope
                         </div>
                     ))}
                 </div>
-            )}
+            )} */}
         </div>
     );
 };

@@ -14,6 +14,13 @@ import { buscarOfertaPorNombre } from '../mostrarDetalleOferta/mostrarDetalleOfe
 // No necesitamos OfertaCompleta aquí si el select es más específico
 import { ObjetivoOferta as PrismaObjetivoOfertaEnum, Prisma } from '@prisma/client';
 
+// Define OfertaStatus enum locally if not exported by Prisma
+// enum OfertaStatus {
+//     activo = "activo",
+//     inactivo = "inactivo",
+//     // Agrega otros estados si existen en tu modelo Prisma
+// }
+
 export async function ejecutarAceptarOfertaAction(
     argsFromIA: Record<string, unknown>,
     context: FullExecutionFunctionContext
@@ -74,13 +81,13 @@ export async function ejecutarAceptarOfertaAction(
             return { success: true, data: { content: userMessage, media: null, uiComponentPayload: null, aiContextData: { ofertaNoEncontrada: true, identificadorBusqueda: nombre_de_la_oferta || ofertaIdNormalizado } } };
         }
 
-        const ahora = new Date();
-        if (ofertaDb.status !== 'activo' ||
-            (ofertaDb.fechaInicio && new Date(ofertaDb.fechaInicio) > ahora) ||
-            (ofertaDb.fechaFin && new Date(ofertaDb.fechaFin) < ahora)) {
-            const userMessage = `Lo siento, la oferta "${ofertaDb.nombre}" no está activa o está fuera de su periodo de vigencia en este momento.`;
-            return { success: true, data: { content: userMessage, media: null, uiComponentPayload: null, aiContextData: { ofertaId: ofertaDb.id, ofertaInvalida: true, motivo: "No activa o fuera de vigencia" } } };
-        }
+        // const ahora = new Date();
+        // if (ofertaDb.status !== "activo" ||
+        //     (ofertaDb.fechaInicio && new Date(ofertaDb.fechaInicio) > ahora) ||
+        //     (ofertaDb.fechaFin && new Date(ofertaDb.fechaFin) < ahora)) {
+        //     const userMessage = `Lo siento, la oferta "${ofertaDb.nombre}" no está activa o está fuera de su periodo de vigencia en este momento.`;
+        //     return { success: true, data: { content: userMessage, media: null, uiComponentPayload: null, aiContextData: { ofertaId: ofertaDb.id, ofertaInvalida: true, motivo: "No activa o fuera de vigencia" } } };
+        // }
 
         let mensajeSiguientePaso = `¡Excelente! Has indicado que te interesa la oferta "${ofertaDb.nombre}". `;
         let uiPayloadParaWebChat: UiComponentPayloadActionPrompt | null = null;

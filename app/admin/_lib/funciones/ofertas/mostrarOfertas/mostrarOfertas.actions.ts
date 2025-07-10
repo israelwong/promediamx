@@ -45,7 +45,7 @@ export async function ejecutarMostrarOfertasAction(
         const ofertasDb = await prisma.oferta.findMany({
             where: {
                 negocioId: negocioId,
-                status: 'activo',
+                status: 'ACTIVO',
                 fechaInicio: { lte: ahora },
                 fechaFin: { gte: ahora },
             },

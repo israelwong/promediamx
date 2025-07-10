@@ -54,7 +54,8 @@ export const ejecutarReagendamientoConfirmadoAction: FunctionExecutor = async (a
                     nombreNegocio: negocio.nombre,
                     nombreServicio: citaOriginal.asunto,
                     fechaHoraOriginal: citaOriginal.fecha,
-                    fechaHoraNueva: nuevaFecha
+                    fechaHoraNueva: nuevaFecha,
+                    emailRespuestaNegocio: negocio.email || 'contacto@promedia.mx'
                 });
             }
         }

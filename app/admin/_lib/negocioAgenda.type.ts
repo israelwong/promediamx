@@ -84,14 +84,14 @@ export interface ExcepcionHorarioParaTabla extends ExcepcionHorarioBase {
 }
 
 // --- Tipo para actualizar las preferencias generales de agenda en Negocio ---
-export type PreferenciasAgendaNegocioInput = Pick<
-    Negocio,
-    'aceptaCitasPresenciales' |
-    'aceptaCitasVirtuales' |
-    'requiereTelefonoParaCita' |
-    'requiereEmailParaCita' |
-    'metodosPagoTexto'
->;
+// Si los campos no existen en el modelo Negocio de Prisma, define una interfaz personalizada:
+export interface PreferenciasAgendaNegocioInput {
+    aceptaCitasPresenciales: boolean;
+    aceptaCitasVirtuales: boolean;
+    requiereTelefonoParaCita: boolean;
+    requiereEmailParaCita: boolean;
+    metodosPagoTexto: string;
+}
 
 // Tipo de resultado estándar para acciones (si no lo tienes global)
 export interface AgendaActionResult<T = null> {
@@ -107,13 +107,13 @@ export interface AgendaActionResult<T = null> {
 // --- Tipo para los datos completos de configuración (revisado por si se usa en la nueva action) ---
 export type NegocioAgendaConfig = Pick<
     Negocio,
-    'id' |
-    'aceptaCitasPresenciales' |
-    'aceptaCitasVirtuales' |
-    'requiereTelefonoParaCita' |
-    'requiereEmailParaCita' |
-    'metodosPagoTexto'
+    'id'
 > & {
+    aceptaCitasPresenciales: boolean;
+    aceptaCitasVirtuales: boolean;
+    requiereTelefonoParaCita: boolean;
+    requiereEmailParaCita: boolean;
+    metodosPagoTexto: string;
     agendaTiposCita: AgendaTipoCita[];
     horariosAtencion: HorarioAtencionBase[];
     excepcionesHorario: ExcepcionHorarioBase[];

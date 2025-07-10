@@ -9,7 +9,7 @@ import {
     OrdenarTareasInput,
     ActionResult,
     Tarea,
-    TareaFuncion,
+    // TareaFuncion,
     ParametroRequerido,
     CrearTareaBasicaInput,
     ActualizarTareaConRelacionesInput,
@@ -40,7 +40,7 @@ export async function obtenerTareasActivas() {
             select: {
                 id: true,
                 nombre: true,
-                descripcion: true,
+                // descripcion: true,
                 precio: true,
                 categoriaTareaId: true
             }
@@ -69,8 +69,8 @@ export async function actualizarTarea(
         // 2. Preparar datos para actualizar los campos escalares de Tarea
         const dataToUpdateTarea: Prisma.TareaUpdateInput = {
             nombre: data.nombre.trim(),
-            descripcion: data.descripcion?.trim() ?? null,
-            descripcionTool: data.descripcionTool?.trim() ?? null,
+            // descripcion: data.descripcion?.trim() ?? null,
+            // descripcionTool: data.descripcionTool?.trim() ?? null,
             instruccion: data.instruccion?.trim() ?? null,
             precio: data.precio ?? null,
             rol: data.rol?.trim() ?? null,
@@ -202,7 +202,7 @@ export async function obtenerTareaPorId(tareaId: string): Promise<TareaParaEdita
             where: { id: tareaId },
             include: {
                 // Incluir función asociada (solo ID y nombre)
-                tareaFuncion: { select: { id: true, nombreVisible: true } },
+                tareaFuncion: { select: { id: true } },
                 // Contar suscripciones para validación de borrado
                 _count: { select: { AsistenteTareaSuscripcion: true } },
                 // Incluir canales asociados (solo necesitamos el ID del canal)
@@ -277,14 +277,14 @@ export async function actualizarInstruccionTarea(tareaId: string, nuevaInstrucci
 }
 
 // --- OBTENER FUNCIONES TAREA DISPONIBLES (sin cambios) ---
-export async function obtenerFuncionesTareaDisponibles(): Promise<Pick<TareaFuncion, 'id' | 'nombreVisible' | 'nombreInterno'>[]> {
-    try {
-        return await prisma.tareaFuncion.findMany({
-            orderBy: { nombreVisible: 'asc' },
-            select: { id: true, nombreVisible: true, nombreInterno: true }
-        });
-    } catch (error) { console.error(error); throw new Error('No se pudieron obtener las funciones disponibles.'); }
-}
+// export async function obtenerFuncionesTareaDisponibles(): Promise<Pick<TareaFuncion, 'id' | 'nombreVisible' | 'nombreInterno'>[]> {
+//     try {
+//         return await prisma.tareaFuncion.findMany({
+//             orderBy: { nombreVisible: 'asc' },
+//             select: { id: true, nombreVisible: true, nombreInterno: true }
+//         });
+//     } catch (error) { console.error(error); throw new Error('No se pudieron obtener las funciones disponibles.'); }
+// }
 
 export async function obtenerParametrosPorFuncionId(funcionId: string): Promise<ParametroRequerido[]> {
     if (!funcionId) return [];
@@ -318,7 +318,7 @@ export async function obtenerTareasBase(): Promise<TareaBaseInfo[]> {
             select: {
                 id: true,
                 nombre: true,
-                descripcion: true
+                // descripcion: true
             }
         });
 
@@ -340,7 +340,7 @@ export async function obtenerTareasParaMarketplace(): Promise<TareaParaMarketpla
             select: {
                 id: true,
                 nombre: true,
-                descripcion: true,
+                // descripcion: true,
                 precio: true,
                 categoriaTareaId: true,
                 CategoriaTarea: { // Incluir nombre de categoría
@@ -389,7 +389,7 @@ export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConD
                 orden: true,
                 iconoUrl: true,
                 categoriaTareaId: true,
-                tareaFuncionId: true,
+                // tareaFuncionId: true,
                 version: true, // <-- AÑADIDO: Seleccionar versión
 
                 CategoriaTarea: {
@@ -401,7 +401,7 @@ export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConD
                 tareaFuncion: {
                     select: {
                         id: true,
-                        nombreVisible: true
+                        // nombreVisible: true
                     }
                 },
                 etiquetas: {
@@ -425,7 +425,7 @@ export async function obtenerTareasConDetalles(): Promise<ActionResult<TareaConD
         });
 
         // El tipo TareaConDetalles ya debe ser compatible con esta estructura
-        return { success: true, data: tareas as TareaConDetalles[] };
+        return { success: true, data: tareas as unknown as TareaConDetalles[] };
 
     } catch (error: unknown) {
         console.error('Error fetching tasks with details:', error);

@@ -15,8 +15,8 @@ interface PageProps {
     clienteId: string; // Asumiendo que clienteId está en la ruta y es necesario
 }
 
-export default async function CategoriasPage({ params }: { params: PageProps }) { // params es un objeto, no una Promise
-    const { negocioId, clienteId } = params; // Extraer clienteId y negocioId directamente
+export default async function CategoriasPage({ params }: { params: Promise<PageProps> }) { // params es un objeto, no una Promise
+    const { negocioId, clienteId } = await params; // Extraer clienteId y negocioId directamente
 
     return (
         <div className="flex flex-col lg:flex-row gap-6 h-full">

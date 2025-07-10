@@ -1,9 +1,9 @@
 
 import { Oferta } from '@prisma/client';
-export type EditarOfertaInput = Partial<Pick<
-    Oferta,
-    'nombre' | 'descripcion' | 'tipoOferta' | 'valor' | 'codigo' | 'fechaInicio' | 'fechaFin' | 'status' | 'condiciones' | 'linkPago'
->>;
+// export type EditarOfertaInput = Partial<Pick<
+//     Oferta,
+//     'nombre' | 'descripcion' | 'valor' | 'codigo' | 'fechaInicio' | 'fechaFin' | 'status' | 'condiciones'
+// >>;
 
 // Tipo para el estado del formulario (sin cambios)
 export type OfertaEditFormData = Partial<Omit<Oferta, 'id' | 'negocioId' | 'createdAt' | 'updatedAt' | 'negocio' | 'ItemCatalogoOferta' | 'OfertaGaleria'>> & {

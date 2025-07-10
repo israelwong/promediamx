@@ -173,7 +173,7 @@ function TareaSuscripcionContent({ tareaId }: Props) {
     const mainGridClasses = "md:grid md:grid-cols-5 md:gap-6 lg:gap-8";
     const infoColumnClasses = "md:col-span-3 p-4 sm:p-6 flex flex-col"; // Añadido flex flex-col
     const titleClasses = "text-xl sm:text-2xl font-semibold text-white";
-    const descriptionClasses = "text-sm text-zinc-300 leading-relaxed mt-2";
+    // const descriptionClasses = "text-sm text-zinc-300 leading-relaxed mt-2";
     const priceClasses = "text-lg font-semibold";
     const statusLabelClasses = "text-xs font-medium uppercase tracking-wider px-2.5 py-0.5 rounded-full inline-flex items-center gap-1";
     const statusActiveClasses = "bg-green-500/20 text-green-300";
@@ -259,12 +259,12 @@ function TareaSuscripcionContent({ tareaId }: Props) {
                         </div>
 
                         {/* Descripción */}
-                        {tarea.descripcion && (
+                        {/* {tarea.descripcion && (
                             <div className="pt-4">
                                 <h2 className="text-sm font-semibold text-zinc-200 mb-1">Descripción</h2>
                                 <div className={`${descriptionClasses} prose prose-sm prose-invert max-w-none`} dangerouslySetInnerHTML={{ __html: tarea.descripcion.replace(/\n/g, '<br />') }} />
                             </div>
-                        )}
+                        )} */}
 
                         {/* Etiquetas */}
                         {tarea.etiquetas && tarea.etiquetas.length > 0 && (

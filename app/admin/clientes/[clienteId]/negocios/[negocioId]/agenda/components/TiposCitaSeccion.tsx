@@ -21,8 +21,9 @@ import {
 import {
     upsertAgendaTipoCitaFormSchema,
     type AgendaTipoCitaData as BaseAgendaTipoCitaData,
-    type UpsertAgendaTipoCitaFormInput,
 } from '@/app/admin/_lib/actions/agendaTipoCita/agendaTipoCita.schemas';
+import { z } from 'zod';
+type UpsertAgendaTipoCitaFormInput = z.infer<typeof upsertAgendaTipoCitaFormSchema>;
 import type { ActionResult } from '@/app/admin/_lib/types';
 
 // Extiende el tipo para incluir _count opcionalmente

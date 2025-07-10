@@ -20,7 +20,7 @@ import { ejecutarReagendarCitaAction } from '../funciones/citas/reagendarCita/re
 import { ejecutarReagendamientoConfirmadoAction } from '../funciones/citas/confirmarReagendamiento/confirmarReagendamiento.actions';
 
 import { ejecutarCancelarCitaAction } from '../funciones/citas/cancelarCita/cancelarCita.actions';
-import { ejecutarConfirmarCancelacionCitaAction } from '../funciones/citas/confirmarCancelacionCita/confirmarCancelacionCita.actions';
+// import { ejecutarConfirmarCancelacionCitaAction } from '../funciones/citas/confirmarCancelacionCita/confirmarCancelacionCita.actions';
 
 
 
@@ -51,7 +51,7 @@ export const functionRegistry: Record<string, FunctionExecutor> = {
     'reagendarCita': ejecutarReagendarCitaAction,
     'confirmarReagendamiento': ejecutarReagendamientoConfirmadoAction,
     'cancelarCita': ejecutarCancelarCitaAction,
-    'confirmarCancelacionCita': ejecutarConfirmarCancelacionCitaAction,
+    // 'confirmarCancelacionCita': ejecutarConfirmarCancelacionCitaAction,
     // 'listarHorariosDisponiblesAgenda': ejecutarListarHorariosDisponiblesAction,
     // 'listarServiciosAgenda': ejecutarListarServiciosAgendaAction,
 

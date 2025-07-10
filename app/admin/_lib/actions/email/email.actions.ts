@@ -120,8 +120,6 @@ export async function enviarEmailReagendamientoAction(
     }
 }
 
-
-
 export async function enviarCorreoConfirmacionPagoAction(
     input: EnviarConfirmacionPagoInput
 ): Promise<ActionResult<string | null>> { // Devuelve el ID del mensaje de Resend o null

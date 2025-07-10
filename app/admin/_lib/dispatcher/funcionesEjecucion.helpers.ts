@@ -5,7 +5,7 @@ import type { MediaItem } from '../actions/conversacion/conversacion.schemas';
 import { InteraccionParteTipo, Prisma } from '@prisma/client';
 import { ChatMessageItemSchema, type ChatMessageItem } from '../ia/ia.schemas';
 import prisma from '../prismaClient';
-import { enviarMensajeWhatsAppApiAction } from '../actions/whatsapp/whatsapp.actions';
+import { enviarMensajeWhatsAppApiAction } from '../actions/whatsapp/helpers/actions.helpers';
 
 // Esta función auxiliar para marcar errores se mantiene sin cambios
 export async function actualizarTareaEjecutadaFallidaDispatcher(

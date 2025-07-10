@@ -1,8 +1,8 @@
 // Ruta: app/admin/_lib/funciones/brindarInformacionDelNegocio.actions.ts
 'use server';
 
-import prisma from '../../prismaClient';
-import { ActionResult } from '../../types';
+import prisma from '@/app/admin/_lib/prismaClient';
+import { ActionResult } from '../../../types';
 import { BrindarInfoArgs, BrindarInfoData } from './brindarInformacionDelNegocio.schemas';
 
 /**
@@ -25,8 +25,8 @@ export async function ejecutarBrindarInfoNegocioAction(
             where: { id: argumentos.negocioId },
             select: {
                 nombre: true,
-                descripcion: true,
                 slogan: true,
+                // descripcion: true, // Asegúrate de que 'descripcion' está incluido
             }
         });
 
@@ -36,7 +36,7 @@ export async function ejecutarBrindarInfoNegocioAction(
 
         let info = `Sobre ${negocio.nombre}: `;
         if (negocio.slogan) info += `${negocio.slogan}. `;
-        if (negocio.descripcion) info += `${negocio.descripcion}`;
+        // if (negocio.descripcion) info += `${negocio.descripcion}`;
         else info += `Somos un negocio dedicado a ofrecer excelentes productos/servicios.`; // Fallback
 
         await prisma.tareaEjecutada.update({

@@ -64,26 +64,20 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
         try {
             const paramsForAction: ListarLeadsParams = {
                 negocioId,
-                filtros: {
-                    ...filtros,
-                    searchTerm: debouncedSearchTerm,
-                    // Convertir 'all' a null para la action si es necesario, o la action lo maneja
-                    pipelineId: filtros.pipelineId === 'all' ? null : filtros.pipelineId,
-                    canalId: filtros.canalId === 'all' ? null : filtros.canalId,
-                    etiquetaId: filtros.etiquetaId === 'all' ? null : filtros.etiquetaId,
-                    agenteId: filtros.agenteId === 'all' ? null : filtros.agenteId,
-                },
-                sort,
+                page: 1, // Puedes ajustar la paginación según sea necesario
+                pageSize: 20, // Ajusta el tamaño de página según tu requerimiento
+                searchTerm: debouncedSearchTerm,
+                // pipelineId: filtros.pipelineId === 'all' ? null : filtros.pipelineId,
+                // canalId: filtros.canalId === 'all' ? null : filtros.canalId,
+                // etiquetaId: filtros.etiquetaId === 'all' ? null : filtros.etiquetaId,
+                // agenteId: filtros.agenteId === 'all' ? null : filtros.agenteId,
+                // sort,
             };
             const result = await listarLeadsAction(paramsForAction); // Nueva Action
 
             if (result.success && result.data) {
-                setCrmId(result.data.crmId); // Actualizar crmId (puede ser null si no hay CRM)
                 setLeads(result.data.leads);
-                if (result.data.crmId === null && result.data.leads.length === 0) {
-                    // setError("CRM no configurado para este negocio. No se pueden mostrar leads."); 
-                    // O simplemente mostrar "No hay leads" como ya hace
-                }
+                // Si necesitas saber si hay CRM, usa el resultado de obtenerDatosFiltrosLeadAction
             } else {
                 throw new Error(result.error || "Error desconocido al cargar leads.");
             }
@@ -94,7 +88,7 @@ export default function LeadLista({ clienteId, negocioId }: Props) {
         } finally {
             setLoading(false);
         }
-    }, [negocioId, debouncedSearchTerm, filtros, sort, crmId]); // crmId como dependencia
+    }, [negocioId, debouncedSearchTerm, crmId]); // crmId como dependencia
 
     const fetchFilterData = useCallback(async () => {
         setLoadingFilters(true);

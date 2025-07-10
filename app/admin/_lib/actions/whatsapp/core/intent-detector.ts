@@ -14,7 +14,7 @@ import { manejarReagendarCita } from '../tasks/reagendarCita.handler';
 import { manejarCancelarCita } from '../tasks/cancelarCita.handler';
 import { manejarBuscarCitas } from '../tasks/buscarCitas.handler';
 import { manejarBienvenida } from '../tasks/manejarBienvenida.handler';
-import { responderPreguntaGeneral } from '../tasks/responderPreguntaGeneral.handler';
+// import { responderPreguntaGeneral } from '../tasks/responderPreguntaGeneral.handler';
 import { responderPreguntaNoSoportada } from '../tasks/responderPreguntaNoSoportada.handler'; // <-- NUEVO HANDLER
 import { manejarSolicitudDeCostos } from '../tasks/manejarSolicitudDeCostos.handler';
 
@@ -148,11 +148,13 @@ export async function manejarConversacionGeneral(
         case 'pregunta_general':
         default:
             // ✅ NUEVA VERIFICACIÓN
-            if (contexto.asistente.conocimientoActivado) {
-                handlerDirecto = responderPreguntaGeneral; // Si está ON, usa la IA
-            } else {
-                handlerDirecto = responderPreguntaNoSoportada; // Si está OFF, usa el Plan B
-            }
+            handlerDirecto = responderPreguntaNoSoportada; // Si está OFF, usa el Plan B
+            //!! Si quieres que use IA, descomenta la siguiente línea:
+            // if (contexto.asistente.conocimientoActivado) {
+            //     handlerDirecto = responderPreguntaGeneral; // Si está ON, usa la IA
+            // } else {
+            //     handlerDirecto = responderPreguntaNoSoportada; // Si está OFF, usa el Plan B
+            // }
             break;
     }
 

@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 
 import ListaTareas from './ListaTareas';
-import TareasCategorias from '../categorias/components/TareasCategorias_no';
+// import TareasCategorias from '../categorias/components/TareasCategorias_no';
 import TareasEtiquetas from '../etiquetas/components/TareasEtiquetas';
 import TareasCanales from '../canales/components/TareasCanales';
 import TareaParametros from '../parametros/components/TareaParametros';
-import TareaFunciones from '../funciones/components/TareaFunciones';
+// import TareaFunciones from '../funciones/components/TareaFunciones';
 
 import { LayoutList, List, Cog, ListTree, Tags } from 'lucide-react';
 // import { useRouter } from 'next/navigation';
@@ -98,7 +98,7 @@ export default function TareasDashboard() {
                         {/* El contenedor de contenido ahora tiene flex-col */}
                         <div className={`${sideTabContentContainerClasses}`}>
                             {/* Los componentes hijos (TareasCategorias/Etiquetas) deberían tener flex-grow si necesitan llenar espacio */}
-                            {activeSideTab === 'categorias' && <TareasCategorias />}
+                            {/* {activeSideTab === 'categorias' && <TareasCategorias />} */}
                             {activeSideTab === 'etiquetas' && <TareasEtiquetas />}
                             {activeSideTab === 'canales' && <TareasCanales />}
 
@@ -136,7 +136,7 @@ export default function TareasDashboard() {
                         </div>
                         <div className={rightTabContentContainerClasses}>
                             {activeRightTab === 'tareas' && <ListaTareas />}
-                            {activeRightTab === 'funciones' && <TareaFunciones />}
+                            {/* {activeRightTab === 'funciones' && <TareaFunciones />} */}
                             {activeRightTab === 'parametros' && <TareaParametros />}
                         </div>
                     </div>

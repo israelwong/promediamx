@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import ItemGaleria from './ItemGaleria';
-import ItemVideo from './ItemVideo';
+// import ItemVideo from './ItemVideo';
 
 interface TabButtonProps {
     active: boolean;
@@ -78,14 +78,14 @@ export default function Multimedia({
                         clienteId={clienteId}
                     />
                 </TabContent>
-                <TabContent active={activeTab === 'video'}>
+                {/* <TabContent active={activeTab === 'video'}>
                     <ItemVideo
                         itemId={itemId}
                         catalogoId={catalogoId}
                         negocioId={negocioId}
                         clienteId={clienteId}
                     />
-                </TabContent>
+                </TabContent> */}
             </div>
         </div>
     );

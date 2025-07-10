@@ -19,7 +19,7 @@ type ResultadoBusquedaSemantica = {
     similitud: number;
 }
 
-async function buscarMejoresRespuestas(texto: string, negocioId: string, umbral: number): Promise<ResultadoBusquedaSemantica[]> {
+export async function buscarMejoresRespuestas(texto: string, negocioId: string, umbral: number): Promise<ResultadoBusquedaSemantica[]> {
     const textoVector = await getEmbeddingForText(texto);
     if (!textoVector) return [];
 

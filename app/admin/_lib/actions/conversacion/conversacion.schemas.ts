@@ -117,3 +117,7 @@ export const desarchivarConversacionParamsSchema = z.object({
     conversacionId: z.string().cuid(),
     nombreUsuarioQueDesarchiva: z.string().nullable().optional(),
 });
+
+
+
+export type ListarConversacionesParams = z.infer<typeof listarConversacionesParamsSchema>;

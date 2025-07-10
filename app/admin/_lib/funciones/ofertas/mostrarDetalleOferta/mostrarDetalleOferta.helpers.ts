@@ -165,7 +165,7 @@ export async function buscarOfertaPorNombre(
         where: {
             negocioId: negocioId,
             nombre: { contains: nombreOferta, mode: "insensitive" },
-            status: 'activo',
+            status: "ACTIVO",
             fechaInicio: { lte: ahora },
             fechaFin: { gte: ahora },
         },

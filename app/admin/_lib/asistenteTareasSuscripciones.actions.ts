@@ -18,7 +18,7 @@ export async function obtenerSuscripcionesAsistenteTareas(asistenteId: string): 
             },
             include: {
                 tarea: { // Asegúrate de incluir los detalles de la tarea
-                    select: { id: true, nombre: true, descripcion: true, precio: true }
+                    select: { id: true, nombre: true, precio: true }
                 }
             },
             orderBy: { // Ordenar opcionalmente
@@ -112,60 +112,60 @@ export interface TareaSuscritaDetalle {
     ejecuciones: number; // Conteo de TareaEjecutada
 }
 
-export async function obtenerTareasSuscritasDetalladas(asistenteId: string): Promise<TareaSuscritaDetalle[]> {
-    if (!asistenteId) return [];
-    try {
-        const suscripciones = await prisma.asistenteTareaSuscripcion.findMany({
-            where: {
-                asistenteVirtualId: asistenteId,
-                status: 'activo', // Solo suscripciones activas
-            },
-            select: {
-                id: true,
-                montoSuscripcion: true,
-                tarea: {
-                    select: {
-                        id: true,
-                        nombre: true,
-                        descripcion: true,
-                        precio: true, // Seleccionar precio original para referencia
-                        // Contar las ejecuciones para esta tarea y este asistente
-                        _count: {
-                            select: {
-                                TareaEjecutada: {
-                                    where: { asistenteVirtualId: asistenteId }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            // Opcional: Ordenar por nombre de tarea
-            orderBy: {
-                tarea: {
-                    nombre: 'asc'
-                }
-            }
-        });
+// export async function obtenerTareasSuscritasDetalladas(asistenteId: string): Promise<TareaSuscritaDetalle[]> {
+//     if (!asistenteId) return [];
+//     try {
+//         const suscripciones = await prisma.asistenteTareaSuscripcion.findMany({
+//             where: {
+//                 asistenteVirtualId: asistenteId,
+//                 status: 'activo', // Solo suscripciones activas
+//             },
+//             select: {
+//                 id: true,
+//                 montoSuscripcion: true,
+//                 tarea: {
+//                     select: {
+//                         id: true,
+//                         nombre: true,
+//                         descripcion: true, // <-- Añadir descripcion aquí
+//                         precio: true, // Seleccionar precio original para referencia
+//                         // Contar las ejecuciones para esta tarea y este asistente
+//                         _count: {
+//                             select: {
+//                                 TareaEjecutada: {
+//                                     where: { asistenteVirtualId: asistenteId }
+//                                 }
+//                             }
+//                         }
+//                     }
+//                 }
+//             },
+//             // Opcional: Ordenar por nombre de tarea
+//             orderBy: {
+//                 tarea: {
+//                     nombre: 'asc'
+//                 }
+//             }
+//         });
 
-        // Mapear el resultado al formato deseado
-        return suscripciones.map(s => ({
-            suscripcionId: s.id,
-            tarea: {
-                id: s.tarea.id,
-                nombre: s.tarea.nombre,
-                descripcion: s.tarea.descripcion,
-                precio: s.tarea.precio,
-            },
-            montoSuscripcion: s.montoSuscripcion,
-            ejecuciones: s.tarea._count.TareaEjecutada,
-        }));
+//         // Mapear el resultado al formato deseado
+//         return suscripciones.map(s => ({
+//             suscripcionId: s.id,
+//             tarea: {
+//                 id: s.tarea.id,
+//                 nombre: s.tarea.nombre,
+//                 descripcion: s.tarea.descripcion ?? null, // <-- Añadir descripcion aquí
+//                 precio: s.tarea.precio,
+//             },
+//             montoSuscripcion: s.montoSuscripcion,
+//             ejecuciones: s.tarea._count.TareaEjecutada,
+//         }));
 
-    } catch (error) {
-        console.error(`Error al obtener tareas suscritas para asistente ${asistenteId}:`, error);
-        return []; // Devolver vacío en caso de error
-    }
-}
+//     } catch (error) {
+//         console.error(`Error al obtener tareas suscritas para asistente ${asistenteId}:`, error);
+//         return []; // Devolver vacío en caso de error
+//     }
+// }
 
 export async function obtenerDetallesSuscripcionTarea(
     asistenteId: string,
@@ -183,7 +183,6 @@ export async function obtenerDetallesSuscripcionTarea(
             select: {
                 id: true,
                 nombre: true,
-                descripcion: true,
                 precio: true,
                 iconoUrl: true,
                 CategoriaTarea: { select: { nombre: true, color: true } },
@@ -237,7 +236,6 @@ export async function obtenerDetallesSuscripcionTarea(
             tarea: {
                 id: tareaData.id,
                 nombre: tareaData.nombre,
-                descripcion: tareaData.descripcion,
                 precio: tareaData.precio,
                 iconoUrl: tareaData.iconoUrl ?? undefined,
                 TareaGaleria: tareaData.TareaGaleria.map(g => ({

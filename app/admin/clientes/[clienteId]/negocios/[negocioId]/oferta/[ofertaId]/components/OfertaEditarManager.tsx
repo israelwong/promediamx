@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/app/components/ui/card'; // Para la estruct
 import { Loader2, AlertTriangle, Info } from 'lucide-react';
 
 import OfertaGaleria from './OfertaGaleria';
-import OfertaVideos from './OfertaVideos';
+// import OfertaVideos from './OfertaVideos';
 import OfertaDocumentos from './OfertaDocumentos'; // Importar los managers de multimedia
 
 // Importar el formulario principal y los placeholders para los managers de multimedia
@@ -113,11 +113,11 @@ export default function OfertaEditarManager({ ofertaId, negocioId, clienteId }: 
             </TabsContent>
 
             <TabsContent value="videos" className="mt-2">
-                <OfertaVideos
+                {/* <OfertaVideos
                     ofertaId={ofertaId}
                     negocioId={negocioId}
                     clienteId={clienteId}
-                />
+                /> */}
             </TabsContent>
 
             <TabsContent value="archivos" className="mt-2">

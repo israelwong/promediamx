@@ -338,3 +338,49 @@ export async function obtenerNegociosPorClienteId(clienteId: string): Promise<Ac
         return { success: false, error: "No se pudieron obtener los negocios del cliente." };
     }
 }
+
+/**
+ * Crea un nuevo negocio y realiza la configuración inicial del entorno.
+ * - Genera un slug único.
+ * - Crea el registro del negocio.
+ * - (Opcional) Aquí puedes agregar lógica para crear datos iniciales relacionados.
+ */
+export async function createNegocioAndSetupEnvironment(
+    input: { clienteId: string; nombre: string }
+): Promise<ActionResult<Negocio>> {
+    // Validar los datos de entrada
+    const schema = z.object({
+        clienteId: z.string().min(1, "El clienteId es requerido"),
+        nombre: z.string().min(1, "El nombre es requerido"),
+    });
+    const validation = schema.safeParse(input);
+    if (!validation.success) {
+        return { success: false, error: "Datos de entrada inválidos.", validationErrors: validation.error.flatten().fieldErrors };
+    }
+
+    try {
+        // Generar slug único basado en el nombre
+        const slug = await generarSlugUnico(input.nombre);
+
+        // Crear el negocio
+        const nuevoNegocio = await prisma.negocio.create({
+            data: {
+                clienteId: input.clienteId,
+                nombre: input.nombre,
+                slug,
+                status: 'activo',
+            },
+        });
+
+        revalidatePath(`/admin/clientes/${input.clienteId}`);
+        revalidatePath(`/vd/${slug}`);
+
+        return { success: true, data: { ...nuevoNegocio, status: nuevoNegocio.status as "activo" | "inactivo" | "pendiente" } };
+    } catch (error) {
+        console.error("Error al crear el negocio:", error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            return { success: false, error: "El 'slug' (URL amigable) ya está en uso. Intenta con un nombre diferente." };
+        }
+        return { success: false, error: "No se pudo crear el negocio." };
+    }
+}

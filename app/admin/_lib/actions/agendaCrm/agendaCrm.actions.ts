@@ -145,12 +145,13 @@ export async function crearCitaLeadAction(
                 fecha: datos.fecha, // Zod ya la transformó a Date
                 descripcion: datos.descripcion,
                 tipo: datos.tipo,
-                meetingUrl: datos.meetingUrl,
-                fechaRecordatorio: datos.fechaRecordatorio, // Zod ya la transformó a Date o null
+                // fechaRecordatorio: datos.fechaRecordatorio, // Zod ya la transformó a Date o null
                 status: 'pendiente', // Status por defecto para nuevas citas
                 // negocioId: negocioIdParaAgenda, // Si es requerido y lo obtienes
             },
-            include: { agente: { select: { id: true, nombre: true } } } // Para devolver AgendaCrmItemData
+            include: {
+                agente: { select: { id: true, nombre: true } }
+            } // Para devolver AgendaCrmItemData
         });
 
         // Revalidar la lista de citas para este lead
@@ -160,7 +161,7 @@ export async function crearCitaLeadAction(
             ...nuevaCita,
             tipo: nuevaCita.tipo as AgendaCrmItemData['tipo'],
             status: nuevaCita.status as AgendaCrmItemData['status'],
-            agente: nuevaCita.agente ? { id: nuevaCita.agente.id, nombre: nuevaCita.agente.nombre ?? null } : null,
+            agente: nuevaCita.agenteId ? { id: nuevaCita.agenteId, nombre: null } : null,
         });
         return { success: true, data: returnData };
 
@@ -180,7 +181,6 @@ export async function editarCitaLeadAction(
         return { success: false, error: "Datos inválidos para editar la cita.", errorDetails: validation.error.flatten().fieldErrors, data: null };
     }
     const { citaId, datos } = validation.data;
-
     try {
         const citaActualizada = await prisma.agenda.update({
             where: { id: citaId },
@@ -190,17 +190,15 @@ export async function editarCitaLeadAction(
                 fecha: datos.fecha, // Zod ya la transformó a Date
                 descripcion: datos.descripcion,
                 tipo: datos.tipo,
-                meetingUrl: datos.meetingUrl,
-                fechaRecordatorio: datos.fechaRecordatorio, // Zod ya la transformó a Date o null
+                // meetingUrl: datos.meetingUrl,
+                //  fechaRecordatorio: datos.fechaRecordatorio, // Zod ya la transformó a Date o null
                 status: datos.status,
                 updatedAt: new Date(),
             },
             include: { agente: { select: { id: true, nombre: true } } }
         });
-
         // Revalidar
         // revalidatePath(`/admin/..../crm/leads/${citaActualizada.leadId}`);
-
         const returnData = agendaCrmItemSchema.parse({
             ...citaActualizada,
             tipo: citaActualizada.tipo as AgendaCrmItemData['tipo'],
@@ -208,7 +206,6 @@ export async function editarCitaLeadAction(
             agente: citaActualizada.agente ? { id: citaActualizada.agente.id, nombre: citaActualizada.agente.nombre ?? null } : null,
         });
         return { success: true, data: returnData };
-
     } catch (error) {
         console.error(`Error al editar cita ${citaId}:`, error);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -321,12 +318,6 @@ export async function listarEventosAgendaAction(
                 },
             };
         });
-
-        // Opcional: Validar con Zod antes de devolver
-        // const parseResult = z.array(agendaEventoSchema).safeParse(eventos);
-        // if (!parseResult.success) { /* ... manejo de error ... */ }
-        // return { success: true, data: { crmId, eventos: parseResult.data } };
-
         return { success: true, data: { crmId, eventos } };
 
     } catch (error) {
@@ -334,103 +325,6 @@ export async function listarEventosAgendaAction(
         return { success: false, error: 'No se pudieron cargar los eventos de la agenda.', data: null };
     }
 }
-
-
-
-// export async function listarCitasDelDiaAction(
-//     params: z.infer<typeof listarCitasDelDiaParamsSchema>
-// ): Promise<ActionResult<ListarCitasDelDiaResultData | null>> {
-//     const validation = listarCitasDelDiaParamsSchema.safeParse(params);
-//     if (!validation.success) {
-//         return { success: false, error: "ID de negocio inválido.", errorDetails: validation.error.flatten().fieldErrors, data: null };
-//     }
-//     const { negocioId } = validation.data;
-
-//     try {
-//         // Verificar si el negocio tiene un CRM configurado
-//         const crm = await prisma.cRM.findUnique({
-//             where: { negocioId },
-//             select: { id: true }
-//         });
-
-//         if (!crm) {
-//             // Si no hay CRM, no puede haber citas de leads asociadas a este negocio vía CRM
-//             return { success: true, data: { crmId: null, citas: [] } };
-//         }
-//         const crmId = crm.id;
-
-//         const hoy = new Date();
-//         const inicioDelDia = startOfDay(hoy);
-//         const finDelDia = endOfDay(hoy);
-
-//         const agendaItems = await prisma.agenda.findMany({
-//             where: {
-//                 // Filtrar por citas de leads que pertenecen al CRM del negocio
-//                 // Y también por el negocioId directamente en la Agenda si existe y está poblado
-//                 OR: [
-//                     { lead: { crmId: crmId } }, // Citas de leads del CRM
-//                     { negocioId: negocioId }    // Citas directas del negocio (si aplica este campo)
-//                 ],
-//                 fecha: {
-//                     gte: inicioDelDia,
-//                     lte: finDelDia,
-//                 },
-//                 // Opcional: Filtrar por status activos
-//                 // status: { notIn: ['cancelada', 'completada'] } 
-//             },
-//             include: {
-//                 lead: { select: { id: true, nombre: true } },
-//                 agente: { select: { id: true, nombre: true } },
-//                 // asistenteVirtual: { select: { id: true, nombre: true } }, // Si las citas pueden ser con asistentes
-//                 tipoDeCita: { select: { nombre: true } }, // Del modelo AgendaTipoCita
-//             },
-//             orderBy: { fecha: 'asc' },
-//         });
-
-//         const citasDelDia: CitaDelDiaData[] = agendaItems.map(item => {
-//             let asignadoANombre: string | null = null;
-//             if (item.agente) {
-//                 asignadoANombre = item.agente.nombre ?? `Agente ID: ${item.agente.id.substring(0, 4)}`;
-//             }
-
-//             return {
-//                 id: item.id,
-//                 fecha: item.fecha, // Ya es Date
-//                 asunto: item.asunto,
-//                 // Validar que item.status sea un valor del enum StatusAgenda
-//                 status: statusAgendaEnum.parse(item.status.toLowerCase()) as StatusAgenda, // Asegurar lowercase y parsear
-//                 leadId: item.lead?.id ?? null,
-//                 leadNombre: item.lead?.nombre ?? null,
-//                 tipoOriginal: item.tipo, // El 'tipo' string de la tabla Agenda
-//                 tipoDeCitaNombre: item.tipoDeCita?.nombre ?? null, // Del modelo relacionado
-//                 agenteId: item.agenteId ?? null,
-//                 asignadoANombre: asignadoANombre,
-//                 descripcion: item.descripcion,
-//                 meetingUrl: item.meetingUrl,
-//                 fechaRecordatorio: item.fechaRecordatorio, // Ya es Date o null
-//             };
-//         });
-
-//         // Validar con Zod (opcional aquí, pero buena práctica)
-//         // const parseResult = z.array(citaDelDiaSchema).safeParse(citasDelDia);
-//         // if (!parseResult.success) { /* ... error ... */ }
-//         // return { success: true, data: { crmId, citas: parseResult.data } };
-
-//         return { success: true, data: { crmId, citas: citasDelDia } };
-
-//     } catch (error) {
-//         console.error(`Error en listarCitasDelDiaAction para negocio ${negocioId}:`, error);
-//         // Si el error es por el parseo del enum status:
-//         if (error instanceof z.ZodError && error.issues.some(issue => issue.path.includes('status'))) {
-//             return { success: false, error: 'Se encontraron citas con un estado inválido.', data: null };
-//         }
-//         return { success: false, error: 'No se pudieron cargar las citas de hoy.', data: null };
-//     }
-// }
-
-
-
-
 
 // --- RENOMBRAR Y MODIFICAR listarCitasDelDiaAction ---
 export async function listarCitasAgendaAction( // Antes listarCitasDelDiaAction
@@ -502,9 +396,7 @@ export async function listarCitasAgendaAction( // Antes listarCitasDelDiaAction
                 tipoDeCitaNombre: item.tipoDeCita?.nombre ?? null,
                 agenteId: item.agenteId ?? null,
                 asignadoANombre: asignadoANombre,
-                descripcion: item.descripcion,
-                meetingUrl: item.meetingUrl,
-                fechaRecordatorio: item.fechaRecordatorio,
+                descripcion: item.descripcion
             };
         });
 

@@ -1,11 +1,11 @@
 'use server';
 
 import prisma from '../../../prismaClient';
-import type { FunctionExecutor } from '../../../dispatcher/dispatcher.types';
 import { StatusAgenda, ActionType, ChangedByType } from '@prisma/client';
-import { parseISO } from 'date-fns';
-import { enviarEmailConfirmacionCitaAction } from '../../../actions/email/email.actions';
+import { enviarEmailConfirmacionCita } from '../../../actions/email/email.actions';
+import type { FunctionExecutor } from '../../../dispatcher/dispatcher.types';
 import { ConfirmarCitaArgsSchema } from './confirmarCita.schemas';
+import { parseISO } from 'date-fns';
 
 export const ejecutarConfirmarCitaAction: FunctionExecutor = async (argsFromIA, context) => {
 
@@ -68,8 +68,8 @@ export const ejecutarConfirmarCitaAction: FunctionExecutor = async (argsFromIA, 
             // PASO FINAL: Cerramos la tarea en progreso en nuestro gestor de estado.
             // =========================================================================
             await tx.tareaEnProgreso.updateMany({
-                where: { conversacionId: context.conversacionId, status: 'ACTIVA' },
-                data: { status: 'COMPLETADA' }
+                where: { conversacionId: context.conversacionId },
+                data: { estado: 'COMPLETADA' }
             });
 
             return nuevaAgenda;
@@ -82,16 +82,15 @@ export const ejecutarConfirmarCitaAction: FunctionExecutor = async (argsFromIA, 
                 select: { nombre: true, logo: true, email: true, direccion: true }
             });
             if (negocio?.email) {
-                enviarEmailConfirmacionCitaAction({
+                enviarEmailConfirmacionCita({
                     emailDestinatario: args.email_contacto,
-                    nombreDestinatario: args.nombre_contacto,
+                    nombreDestinatario: args.nombre_contacto ?? '',
                     nombreNegocio: negocio.nombre,
-                    logoNegocioUrl: negocio.logo,
+                    logoNegocioUrl: negocio.logo ?? undefined,
                     emailRespuestaNegocio: negocio.email,
                     nombreServicio: tipoCita.nombre,
                     fechaHoraCita: fechaHora,
                     modalidadCita: tipoCita.esVirtual ? 'virtual' : 'presencial',
-                    direccionNegocio: negocio.direccion,
                 }).catch(err => console.error("[Confirmar Cita] Error al enviar email (no bloqueante):", err));
             }
         }

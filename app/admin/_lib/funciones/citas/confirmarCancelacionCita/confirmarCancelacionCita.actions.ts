@@ -4,7 +4,7 @@ import prisma from '../../../prismaClient';
 import type { FunctionExecutor } from '../../../dispatcher/dispatcher.types';
 import { z } from 'zod';
 import { ActionType, ChangedByType, StatusAgenda, Prisma } from '@prisma/client';
-import { enviarEmailCancelacionCitaAction } from '../../../actions/email/email.actions';
+import { enviarEmailCancelacionCita } from '../../../actions/email/email.actions';
 
 const ConfirmarCancelacionArgsSchema = z.object({
     cita_id: z.string().cuid("ID de cita inválido."),
@@ -16,7 +16,7 @@ async function registrarEnHistorialCancelacion(agendaId: string, actorType: Chan
     });
 }
 
-export const ejecutarConfirmarCancelacionCitaAction: FunctionExecutor = async (argsFromIA, context) => {
+export const ejecutarConfirmarCancelacionCita: FunctionExecutor = async (argsFromIA, context) => {
     const validation = ConfirmarCancelacionArgsSchema.safeParse(argsFromIA);
     if (!validation.success) return { success: false, error: "Faltan datos para confirmar la cancelación." };
 
@@ -36,13 +36,13 @@ export const ejecutarConfirmarCancelacionCitaAction: FunctionExecutor = async (a
     const negocio = await prisma.negocio.findUnique({ where: { id: negocioId }, select: { nombre: true, email: true } });
 
     if (lead?.email && negocio?.email) {
-        await enviarEmailCancelacionCitaAction({
+        await enviarEmailCancelacionCita({
             emailDestinatario: lead.email,
             nombreDestinatario: lead.nombre,
             nombreNegocio: negocio.nombre,
             nombreServicio: cita.asunto,
-            fechaHoraCita: cita.fecha,
             fechaHoraCitaOriginal: cita.fecha.toISOString(),
+            linkAgendarNuevaCita: 'https://promedia.mx/agendar', // Reemplaza con el link correcto si es necesario
             emailRespuestaNegocio: negocio.email,
         });
     }

@@ -29,11 +29,20 @@ export async function manejarEsperandoClarificacionCostos(
     console.log(`[CLARIFICACION] Buscando con texto enriquecido: "${textoEnriquecido}"`);
 
     const umbralDeConfianza = asistente.umbralSimilitud ?? 0.72;
+    // Define a type for items returned by buscarMejoresRespuestas
+    type ResultadoBusquedaSemantica = {
+        descripcion: string;
+        fuente: string;
+        nombre: string;
+        objetivos?: string[];
+        [key: string]: unknown;
+    };
+
     const mejoresCoincidencias = await buscarMejoresRespuestas(textoEnriquecido, asistente.negocio!.id, umbralDeConfianza);
 
     if (mejoresCoincidencias.length > 0) {
         // Tomamos la mejor coincidencia de la nueva búsqueda
-        const itemElegido = mejoresCoincidencias[0];
+        const itemElegido = mejoresCoincidencias[0] as unknown as ResultadoBusquedaSemantica;
 
         // 1. Damos la respuesta específica que el usuario eligió.
         await enviarMensajeAsistente(conversacionId, itemElegido.descripcion, usuarioWaId, negocioPhoneNumberId);
@@ -42,7 +51,7 @@ export async function manejarEsperandoClarificacionCostos(
         await prisma.tareaEnProgreso.delete({ where: { id: tarea.id } });
 
         // 3. ✅ LÓGICA DE SEGUIMIENTO CONTEXTUAL
-        const objetivoCita = itemElegido.objetivos?.find(o => o === 'CITA');
+        const objetivoCita = itemElegido.objetivos?.find((o: string) => o === 'CITA');
         if (itemElegido.fuente === 'Oferta' && objetivoCita) {
             const contextoSeguimiento = {
                 siguienteTarea: 'agendarCita',
