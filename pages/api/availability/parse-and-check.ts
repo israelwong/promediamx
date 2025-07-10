@@ -10,7 +10,7 @@ import { extraerPalabrasClaveDeFecha } from '@/app/admin/_lib/actions/whatsapp/h
 
 /**
  * Helper robusto para construir un objeto Date a partir de texto,
- * respetando la zona horaria especificada.
+ * respetando la zona horaria especificada para evitar errores de UTC.
  */
 function construirFechaEnTimeZone(
     extraccion: { dia_semana?: string; dia_relativo?: string; dia_mes?: number; hora_str?: string },
@@ -18,23 +18,24 @@ function construirFechaEnTimeZone(
 ): Date | null {
     try {
         const ahoraEnZona = toZonedTime(new Date(), timeZone);
-        const fechaTarget = new Date(ahoraEnZona.getFullYear(), ahoraEnZona.getMonth(), ahoraEnZona.getDate());
+        const fechaBase = new Date(ahoraEnZona.getFullYear(), ahoraEnZona.getMonth(), ahoraEnZona.getDate());
 
         // 1. Determinar el día correcto
         if (extraccion.dia_relativo?.toLowerCase() === 'mañana') {
-            fechaTarget.setDate(fechaTarget.getDate() + 1);
+            fechaBase.setDate(fechaBase.getDate() + 1);
         } else if (extraccion.dia_semana) {
             const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
             const diaTargetIndex = diasSemana.indexOf(extraccion.dia_semana.toLowerCase());
             if (diaTargetIndex !== -1) {
-                let diasAAñadir = diaTargetIndex - fechaTarget.getDay();
-                if (diasAAñadir <= 0) { diasAAñadir += 7; }
-                fechaTarget.setDate(fechaTarget.getDate() + diasAAñadir);
+                let diasAAñadir = diaTargetIndex - fechaBase.getDay();
+                if (diasAAñadir < 0) { diasAAñadir += 7; } // Siempre ir al próximo día de la semana
+                fechaBase.setDate(fechaBase.getDate() + diasAAñadir);
             }
         } else if (extraccion.dia_mes) {
-            fechaTarget.setDate(extraccion.dia_mes);
-            if (fechaTarget < ahoraEnZona) { // Si el día del mes ya pasó, asumimos que es del próximo mes
-                fechaTarget.setMonth(fechaTarget.getMonth() + 1);
+            fechaBase.setDate(extraccion.dia_mes);
+            // Si el día del mes ya pasó este año, asumimos que es del próximo mes/año
+            if (fechaBase < toZonedTime(new Date(), timeZone)) {
+                fechaBase.setMonth(fechaBase.getMonth() + 1);
             }
         }
 
@@ -52,16 +53,25 @@ function construirFechaEnTimeZone(
                     hora = 0; // Medianoche
                 }
 
-                // 3. Construir la fecha final en la zona horaria correcta
-                return toZonedTime(new Date(fechaTarget.getFullYear(), fechaTarget.getMonth(), fechaTarget.getDate(), hora, minuto), timeZone);
+                // 3. Construimos un string de fecha local y lo convertimos a la zona horaria correcta
+                const año = fechaBase.getFullYear();
+                const mes = String(fechaBase.getMonth() + 1).padStart(2, '0');
+                const dia = String(fechaBase.getDate()).padStart(2, '0');
+                const horaStr = String(hora).padStart(2, '0');
+                const minStr = String(minuto).padStart(2, '0');
+
+                const fechaLocalString = `${año}-${mes}-${dia}T${horaStr}:${minStr}:00`;
+
+                return toZonedTime(fechaLocalString, timeZone);
             }
         }
-        return null; // No se pudo construir una fecha y hora completas
+        return null;
     } catch (error) {
         console.error("Error construyendo fecha en timezone:", error);
         return null;
     }
 }
+
 
 const ParseAndCheckSchema = z.object({
     textoFecha: z.string().min(3, "El texto de la fecha es requerido."),
@@ -106,7 +116,9 @@ export default async function handler(
 
         const fechaFormateada = format(fecha, "EEEE d 'de' MMMM 'a las' h:mm aa", { locale: es, timeZone });
 
-        if (isBefore(fecha, new Date())) {
+        // ✅ CORRECCIÓN: Comparamos la fecha deseada con la hora actual EN LA MISMA ZONA HORARIA
+        const ahoraEnZona = toZonedTime(new Date(), timeZone);
+        if (isBefore(fecha, ahoraEnZona)) {
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, la fecha que buscas (${fechaFormateada}) ya pasó.` });
         }
 
