@@ -1,60 +1,43 @@
-// app/admin/_lib/actions/whatsapp/tasks/manejarBienvenida.handler.ts
-
+// /app/admin/_lib/actions/whatsapp/tasks/manejarBienvenida.handler.ts
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
-
-// Tipos
-import type { ActionResult } from '../../../types';
-import type { FsmContext, ProcesarMensajeWhatsAppOutput } from '../whatsapp.schemas';
-
-// Helpers
+import { Prisma } from '@prisma/client';
+import type { FsmContext } from '../whatsapp.schemas';
 import { enviarMensajeAsistente } from '../core/orchestrator';
 
-/**
- * Handler para gestionar el primer contacto o preguntas genéricas.
- * Su única responsabilidad es buscar y enviar el mensaje de bienvenida
- * configurado en el modelo de Negocio. No crea ninguna TareaEnProgreso.
- */
-export async function manejarBienvenida(
-    contexto: FsmContext
-): Promise<ActionResult<ProcesarMensajeWhatsAppOutput | null>> {
-    console.log('[BIENVENIDA HANDLER] Iniciando, recuperando mensaje de bienvenida.');
-    const { conversacionId, asistente, usuarioWaId, negocioPhoneNumberId } = contexto;
+export async function manejarBienvenida(contexto: FsmContext) {
+    const { conversacionId, usuarioWaId, negocioPhoneNumberId, asistente } = contexto;
 
-    try {
-        // El contexto ya nos da el asistente, que tiene la relación con el negocio.
-        // No necesitamos volver a consultar al asistente.
-        const negocio = await prisma.negocio.findUnique({
-            where: {
-                id: asistente.negocio!.id,
-            },
-            select: {
-                mensajeBienvenida: true,
-            }
-        });
+    // 1. Buscamos la información del negocio para obtener el mensaje y la web.
+    const negocio = await prisma.negocio.findUnique({
+        where: { id: asistente.negocio!.id },
+        select: { mensajeBienvenida: true, paginaWeb: true }
+    });
 
-        const mensajeAEnviar = negocio?.mensajeBienvenida;
+    // 2. Construimos el mensaje base usando el que está en la base de datos.
+    // Si no hay mensaje de bienvenida, usamos uno genérico.
+    let mensaje = negocio?.mensajeBienvenida || "¡Hola! Gracias por contactarnos.";
 
-        if (mensajeAEnviar && mensajeAEnviar.trim() !== '') {
-            await enviarMensajeAsistente(conversacionId, mensajeAEnviar, usuarioWaId, negocioPhoneNumberId);
-            console.log('[BIENVENIDA HANDLER] Mensaje de bienvenida enviado con éxito.');
-        } else {
-            // Fallback por si el mensaje no está configurado en la base de datos.
-            console.warn(`[BIENVENIDA HANDLER] No se encontró un mensaje de bienvenida para el negocio ID: ${asistente.negocio!.id}`);
-            const mensajeFallback = `¡Hola! Gracias por comunicarte con ${asistente.negocio!.nombre}. ¿En qué puedo ayudarte hoy?`;
-            await enviarMensajeAsistente(conversacionId, mensajeFallback, usuarioWaId, negocioPhoneNumberId);
-        }
-
-        // Este handler no continúa un flujo, solo responde y espera el siguiente
-        // input del usuario, que será procesado de nuevo por el intent-detector.
-        return { success: true, data: null };
-
-    } catch (error) {
-        console.error("[BIENVENIDA HANDLER] Error al procesar el saludo:", error);
-        // Enviamos un saludo genérico para no dejar al usuario sin respuesta.
-        const mensajeError = "¡Hola! Gracias por comunicarte. ¿Cómo puedo ayudarte?";
-        await enviarMensajeAsistente(conversacionId, mensajeError, usuarioWaId, negocioPhoneNumberId);
-        return { success: false, error: "Error interno en el handler de bienvenida." };
+    // 3. Si el negocio tiene una página web, la añadimos al mensaje.
+    if (negocio?.paginaWeb) {
+        mensaje += `\n\nPara más detalles, puedes visitar nuestro sitio web: ${negocio.paginaWeb}`;
     }
+
+    // 4. Añadimos la llamada a la acción final.
+    mensaje += "\n\nMi función principal es ayudarte a agendar una cita. ¿Te gustaría que empecemos?";
+
+    await enviarMensajeAsistente(conversacionId, mensaje, usuarioWaId, negocioPhoneNumberId);
+
+    // Creamos la tarea de seguimiento para que si el usuario dice "sí",
+    // se inicie el flujo de agendamiento.
+    await prisma.tareaEnProgreso.create({
+        data: {
+            conversacionId,
+            nombreTarea: 'seguimientoGenerico',
+            contexto: { siguienteTarea: 'agendarCita' } as Prisma.JsonObject
+        }
+    });
+
+    return { success: true, data: null };
 }

@@ -13,10 +13,10 @@ import { manejarAgendarCita } from '../tasks/agendarCita.handler';
 import { manejarReagendarCita } from '../tasks/reagendarCita.handler';
 import { manejarCancelarCita } from '../tasks/cancelarCita.handler';
 import { manejarBuscarCitas } from '../tasks/buscarCitas.handler';
-import { manejarBienvenida } from '../tasks/manejarBienvenida.handler';
+// import { manejarBienvenida } from '../tasks/manejarBienvenida.handler';
 // import { responderPreguntaGeneral } from '../tasks/responderPreguntaGeneral.handler';
 import { responderPreguntaNoSoportada } from '../tasks/responderPreguntaNoSoportada.handler'; // <-- NUEVO HANDLER
-import { manejarSolicitudDeCostos } from '../tasks/manejarSolicitudDeCostos.handler';
+// import { manejarSolicitudDeCostos } from '../tasks/manejarSolicitudDeCostos.handler';
 
 // import { manejarCostos } from '../tasks/manejarCostos.handler';
 
@@ -79,15 +79,15 @@ export async function manejarConversacionGeneral(
                 parametros: []
             }
         },
-        {
-            id: 'intent-costos',
-            nombre: 'Solicitar Costos',
-            funcionHerramienta: {
-                nombre: 'solicitar_costos',
-                descripcion: "Usar única y exclusivamente para preguntas sobre dinero: costos, precios, colegiaturas, inscripciones, valor o métodos de pago. No usar para preguntas generales sobre qué servicios se ofrecen.",
-                parametros: []
-            }
-        },
+        // {
+        //     id: 'intent-costos',
+        //     nombre: 'Solicitar Costos',
+        //     funcionHerramienta: {
+        //         nombre: 'solicitar_costos',
+        //         descripcion: "Usar única y exclusivamente para preguntas sobre dinero: costos, precios, colegiaturas, inscripciones, valor o métodos de pago. No usar para preguntas generales sobre qué servicios se ofrecen.",
+        //         parametros: []
+        //     }
+        // },
         {
             id: 'intent-saludar',
             nombre: 'Saludar',
@@ -135,17 +135,11 @@ export async function manejarConversacionGeneral(
         case 'ver_citas_agendadas':
             nombreTareaFSM = 'buscarCitas';
             break;
-        case 'saludar':
-            handlerDirecto = manejarBienvenida;
-            break;
-
-        // ✅ NUESTRA REGLA DE EXCEPCIÓN
-        case 'solicitar_costos':
-            handlerDirecto = manejarSolicitudDeCostos;
-            break;
 
         // "Catch-all": Cualquier otra pregunta va a nuestro nuevo handler.
-        case 'pregunta_general':
+        // case 'saludar':
+        // case 'solicitar_costos':
+        // case 'pregunta_general':
         default:
             // ✅ NUEVA VERIFICACIÓN
             handlerDirecto = responderPreguntaNoSoportada; // Si está OFF, usa el Plan B

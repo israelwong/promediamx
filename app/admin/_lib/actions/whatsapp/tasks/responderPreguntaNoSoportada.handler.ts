@@ -3,37 +3,38 @@
 
 import prisma from '@/app/admin/_lib/prismaClient';
 import { Prisma } from '@prisma/client';
+import type { FsmContext } from '../whatsapp.schemas';
 import { enviarMensajeAsistente } from '../core/orchestrator';
 
-interface ResponderPreguntaNoSoportadaContexto {
-    conversacionId: string;
-    usuarioWaId: string;
-    negocioPhoneNumberId: string;
-}
+export async function responderPreguntaNoSoportada(contexto: FsmContext) {
+    const { conversacionId, usuarioWaId, negocioPhoneNumberId, asistente } = contexto;
 
-interface ResponderPreguntaNoSoportadaResult {
-    success: boolean;
-    data: null;
-}
+    // 1. Buscamos la información del negocio para obtener su página web.
+    const negocio = await prisma.negocio.findUnique({
+        where: { id: asistente.negocio!.id },
+        select: { paginaWeb: true }
+    });
 
-export async function responderPreguntaNoSoportada(
-    contexto: ResponderPreguntaNoSoportadaContexto
-): Promise<ResponderPreguntaNoSoportadaResult> {
-    const { conversacionId, usuarioWaId, negocioPhoneNumberId } = contexto;
+    // 2. Construimos el mensaje base.
+    let mensaje = "Entiendo que tienes una pregunta. En este momento mi función principal es ayudarte a agendar una cita.";
 
-    const mensaje = "En este momento, mi función principal es ayudarte a agendar una cita para que un asesor resuelva todas tus dudas. ¿Te gustaría que agendemos una?";
+    // 3. Si el negocio tiene una página web, la añadimos al mensaje.
+    if (negocio?.paginaWeb) {
+        mensaje += `\n\nSi lo prefieres, puedes visitar nuestro sitio web para obtener más información a detalle: ${negocio.paginaWeb}`;
+    }
+
+    // 4. Añadimos la llamada a la acción final.
+    mensaje += "\n\n¿Te gustaría que agendemos una ahora?";
+
     await enviarMensajeAsistente(conversacionId, mensaje, usuarioWaId, negocioPhoneNumberId);
 
-    // Creamos una tarea de seguimiento para que si el usuario dice "sí",
+    // Creamos la tarea de seguimiento para que si el usuario dice "sí",
     // se inicie el flujo de agendamiento.
     await prisma.tareaEnProgreso.create({
         data: {
             conversacionId,
             nombreTarea: 'seguimientoGenerico',
-            contexto: {
-                siguienteTarea: 'agendarCita',
-                preguntaDeCierre: '' // No hay pregunta de cierre, solo esperamos la confirmación.
-            } as Prisma.JsonObject
+            contexto: { siguienteTarea: 'agendarCita' } as Prisma.JsonObject
         }
     });
 

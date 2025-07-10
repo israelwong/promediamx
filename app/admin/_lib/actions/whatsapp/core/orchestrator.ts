@@ -18,7 +18,7 @@ import { manejarReagendarCita } from '../tasks/reagendarCita.handler';
 import { manejarCancelarCita } from '../tasks/cancelarCita.handler';
 import { manejarBuscarCitas } from '../tasks/buscarCitas.handler';
 import { manejarSeguimiento } from '../tasks/manejarSeguimiento.handler';
-import { manejarEsperandoClarificacionCostos } from '../tasks/esperandoClarificacionCostos.handler';
+// import { manejarEsperandoClarificacionCostos } from '../tasks/esperandoClarificacionCostos.handler';
 
 // Detector de Intenciones
 import { manejarConversacionGeneral } from './intent-detector';
@@ -173,8 +173,6 @@ export async function manejarTareaEnProgreso(
         .replace(/[\u0300-\u036f]/g, "");
 
     // --- LÓGICA DE ESCAPE GLOBAL ---
-    // Antes de continuar, revisamos si el usuario quiere hacer algo diferente.
-
     // 1. Escape por negación explícita o cancelación
     const keywordsDeCancelacion = ['no gracias', 'ya no', 'cancelar', 'olvidalo', 'detener'];
     if (keywordsDeCancelacion.some(kw => textoNormalizado.includes(kw))) {
@@ -285,8 +283,8 @@ function enrutarASubGestor(
         case 'seguimientoGenerico':
             return manejarSeguimiento(tarea, mensaje, contexto);
         // --- AÑADIR EL NUEVO CASE ---
-        case 'esperandoClarificacionCostos':
-            return manejarEsperandoClarificacionCostos(tarea, mensaje, contexto);
+        // case 'esperandoClarificacionCostos':
+        //     return manejarEsperandoClarificacionCostos(tarea, mensaje, contexto);
 
         default:
             console.warn(`[FSM ADVERTENCIA] Tarea desconocida: ${tarea.nombreTarea}`);
