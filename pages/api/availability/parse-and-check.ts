@@ -3,85 +3,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { isBefore } from 'date-fns';
-import { toZonedTime, format } from 'date-fns-tz';
+import { format } from 'date-fns-tz'; // Usamos la librería para formatear con zona horaria
 import { es } from 'date-fns/locale';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 import { extraerPalabrasClaveDeFecha } from '@/app/admin/_lib/actions/whatsapp/helpers/ia.helpers';
-
-/**
- * Helper robusto para construir un objeto Date a partir de texto,
- * respetando la zona horaria especificada para evitar errores de UTC.
- */
-function construirFechaEnTimeZone(
-    extraccion: { dia_semana?: string; dia_relativo?: string; dia_mes?: number; hora_str?: string },
-    timeZone: string
-): Date | null {
-    try {
-        const ahoraEnZona = toZonedTime(new Date(), timeZone);
-
-        // Empezamos con los componentes de la fecha actual en la zona correcta
-        let año = ahoraEnZona.getFullYear();
-        let mes = ahoraEnZona.getMonth(); // 0-11
-        let dia = ahoraEnZona.getDate();
-
-        // 1. Determinar el día correcto
-        if (extraccion.dia_relativo?.toLowerCase() === 'mañana') {
-            const mañana = new Date(ahoraEnZona.getTime());
-            mañana.setDate(mañana.getDate() + 1);
-            año = mañana.getFullYear();
-            mes = mañana.getMonth();
-            dia = mañana.getDate();
-        } else if (extraccion.dia_semana) {
-            const tempDate = new Date(ahoraEnZona.getTime());
-            const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-            const diaTargetIndex = diasSemana.indexOf(extraccion.dia_semana.toLowerCase());
-            if (diaTargetIndex !== -1) {
-                let diasAAñadir = diaTargetIndex - tempDate.getDay();
-                if (diasAAñadir < 0) { diasAAñadir += 7; }
-                tempDate.setDate(tempDate.getDate() + diasAAñadir);
-                año = tempDate.getFullYear();
-                mes = tempDate.getMonth();
-                dia = tempDate.getDate();
-            }
-        } else if (extraccion.dia_mes) {
-            const diaUsuario = extraccion.dia_mes;
-            // Si el día ya pasó este mes, asumimos que es del próximo mes
-            if (diaUsuario < dia) {
-                mes += 1;
-                if (mes > 11) {
-                    mes = 0;
-                    año += 1;
-                }
-            }
-            dia = diaUsuario;
-        }
-
-        // 2. Determinar la hora correcta
-        if (extraccion.hora_str) {
-            const matchHora = extraccion.hora_str.match(/(\d{1,2}):?(\d{2})?/);
-            if (matchHora) {
-                let hora = parseInt(matchHora[1], 10);
-                const minuto = matchHora[2] ? parseInt(matchHora[2], 10) : 0;
-
-                if (extraccion.hora_str.toLowerCase().includes('pm') && hora < 12) {
-                    hora += 12;
-                }
-                if (extraccion.hora_str.toLowerCase().includes('am') && hora === 12) {
-                    hora = 0; // Medianoche
-                }
-
-                // 3. Construimos un string de fecha local y lo convertimos a la zona horaria correcta
-                const fechaLocalString = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
-
-                return toZonedTime(fechaLocalString, timeZone);
-            }
-        }
-        return null; // No se pudo construir una fecha y hora completas
-    } catch (error) {
-        console.error("Error construyendo fecha en timezone:", error);
-        return null;
-    }
-}
+// ✅ Usamos el helper que ya teníamos y sabemos que funciona
+import { construirFechaDesdePalabrasClave } from '@/app/admin/_lib/actions/whatsapp/helpers/date.helpers';
 
 
 const ParseAndCheckSchema = z.object({
@@ -112,23 +39,27 @@ export default async function handler(
         }
 
         const { textoFecha, negocioId, tipoDeCitaId } = validation.data;
-        const timeZone = 'America/Mexico_City';
+        const timeZone = 'America/Mexico_City'; // La zona horaria de tu negocio
 
         const extraccion = await extraerPalabrasClaveDeFecha(textoFecha);
         if (!extraccion) {
             return res.status(200).json({ disponible: false, mensaje: "No entendí la fecha que mencionaste. ¿Podrías intentarlo de nuevo?" });
         }
 
-        const fecha = construirFechaEnTimeZone(extraccion, timeZone);
+        // Usamos el helper simple y robusto que ya teníamos
+        const { fecha, hora } = construirFechaDesdePalabrasClave(extraccion, new Date());
 
-        if (!fecha) {
+        if (!fecha || !hora) {
             return res.status(200).json({ disponible: false, mensaje: "No pude construir una fecha y hora completas. ¿Podrías ser más específico?" });
         }
 
+        // Asignamos la hora al objeto de fecha
+        fecha.setHours(hora.hora, hora.minuto, 0, 0);
+
+        // Formateamos la fecha para mostrarla correctamente al usuario
         const fechaFormateada = format(fecha, "EEEE d 'de' MMMM 'a las' h:mm aa", { locale: es, timeZone });
 
-        const ahoraEnZona = toZonedTime(new Date(), timeZone);
-        if (isBefore(fecha, ahoraEnZona)) {
+        if (isBefore(fecha, new Date())) {
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, la fecha que buscas (${fechaFormateada}) ya pasó.` });
         }
 
