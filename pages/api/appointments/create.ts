@@ -7,9 +7,9 @@ import { StatusAgenda, Prisma } from '@prisma/client';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 import { enviarEmailConfirmacionCita } from '@/app/admin/_lib/actions/email/email.actions';
 import { revalidatePath } from 'next/cache';
-import { isBefore } from 'date-fns'; // Importamos el helper para comparar fechas
+import { isBefore } from 'date-fns';
 
-// Schema que valida todos los campos que esperamos recibir desde ManyChat
+// ✅ 1. Actualizamos el schema para aceptar el nuevo campo 'source'
 const CreateAppointmentSchema = z.object({
     nombre: z.string().min(3, "El nombre es requerido."),
     email: z.string().email("El formato del email es inválido."),
@@ -23,6 +23,7 @@ const CreateAppointmentSchema = z.object({
     colegio: z.string().optional(),
     grado: z.string().optional(),
     nivel_educativo: z.string().optional(),
+    source: z.string().optional(), // Origen del lead (ej. "ManyChat")
 });
 
 type ApiResponse = {
@@ -49,7 +50,6 @@ export default async function handler(
         const data = validation.data;
         const fechaDeseadaObj = new Date(data.fechaHoraCita);
 
-        // ✅ VALIDACIÓN CRÍTICA: Añadimos la verificación de fecha pasada aquí también.
         if (isBefore(fechaDeseadaObj, new Date())) {
             return res.status(400).json({
                 message: "Fecha inválida.",
@@ -57,7 +57,6 @@ export default async function handler(
             });
         }
 
-        // Doble verificación de disponibilidad en el servidor
         const disponibilidad = await verificarDisponibilidad({
             negocioId: data.negocioId,
             tipoDeCitaId: data.tipoDeCitaId,
@@ -69,10 +68,12 @@ export default async function handler(
             return res.status(409).json({ message: "Conflicto de horario.", error: "Lo sentimos, este horario acaba de ser ocupado. Por favor, elige otro." });
         }
 
+        // ✅ 2. Construimos el objeto jsonParams incluyendo el nuevo campo 'source'
         const jsonParams = {
             colegio: data.colegio,
             grado: data.grado,
             nivel_educativo: data.nivel_educativo,
+            source: data.source || 'Formulario Web', // Usamos un fallback por si no viene
         };
 
         const primerPipeline = await prisma.pipelineCRM.findFirst({
@@ -80,6 +81,7 @@ export default async function handler(
             orderBy: { orden: 'asc' }
         });
 
+        // 3. Guardamos el objeto completo en el Lead
         const lead = await prisma.lead.upsert({
             where: { email: data.email },
             update: {
@@ -105,7 +107,8 @@ export default async function handler(
             })
         ]);
 
-        const descripcionEnriquecida = `Cita desde ManyChat. Colegio: ${data.colegio || 'N/A'}, Nivel: ${data.nivel_educativo || 'N/A'}, Grado: ${data.grado || 'N/A'}.`;
+        // La descripción enriquecida ahora también puede incluir el origen
+        const descripcionEnriquecida = `Cita desde ${jsonParams.source}. Colegio: ${data.colegio || 'N/A'}, Nivel: ${data.nivel_educativo || 'N/A'}, Grado: ${data.grado || 'N/A'}.`;
 
         const nuevaCita = await prisma.agenda.create({
             data: {
@@ -116,7 +119,7 @@ export default async function handler(
                 descripcion: descripcionEnriquecida,
                 tipoDeCitaId: data.tipoDeCitaId,
                 status: StatusAgenda.PENDIENTE,
-                tipo: 'Cita ManyChat',
+                tipo: `Cita ${jsonParams.source}`,
             }
         });
 
