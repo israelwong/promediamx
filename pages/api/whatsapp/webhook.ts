@@ -8,7 +8,10 @@ const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 
-    // --- MANEJO DE LA VERIFICACIÓN (MÉTODO GET) ---
+    // =================================================================
+    // PARTE 1: LÓGICA DE VERIFICACIÓN (MÉTODO GET)
+    // Tomada de nuestro archivo de prueba que ya sabemos que funciona.
+    // =================================================================
     if (req.method === "GET") {
         console.log("[Webhook GET] Solicitud de verificación recibida.");
 
@@ -16,29 +19,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const token = req.query["hub.verify_token"];
         const challenge = req.query["hub.challenge"];
 
-        // ✅ INICIO DEL DIAGNÓSTICO: Logueamos lo que recibimos y lo que esperamos.
-        console.log(`[Webhook GET] Token recibido de Meta: "${token}"`);
-        console.log(`[Webhook GET] Token esperado de ENV: "${VERIFY_TOKEN}"`);
-        // ✅ FIN DEL DIAGNÓSTICO
+        console.log(`[Webhook GET] Token recibido: ${token} | Token esperado: ${VERIFY_TOKEN}`);
 
         if (mode === "subscribe" && token === VERIFY_TOKEN) {
-            console.log("[Webhook GET] Verificación exitosa. Respondiendo con el challenge.");
+            console.log("[Webhook GET] Verificación exitosa.");
             res.status(200).send(challenge);
         } else {
-            console.error("[Webhook GET] Verificación FALLIDA. Los tokens no coinciden o el modo es incorrecto.");
+            console.error("[Webhook GET] Verificación FALLIDA.");
             res.status(403).send("Token inválido o modo incorrecto.");
         }
         return;
     }
 
-    // --- MANEJO DE MENSAJES ENTRANTES (MÉTODO POST) ---
+    // =================================================================
+    // PARTE 2: LÓGICA DE RECEPCIÓN DE MENSAJES (MÉTODO POST)
+    // Esta es la lógica que procesará las conversaciones reales.
+    // =================================================================
     if (req.method === "POST") {
         const payload = req.body;
         console.log("[Webhook POST] Payload recibido:", JSON.stringify(payload, null, 2));
 
-        // Respondemos 200 OK inmediatamente.
+        // Respondemos 200 OK inmediatamente a Meta.
         res.status(200).json({ status: "Evento recibido." });
 
+        // Procesamos el mensaje en segundo plano.
         const value = payload.entry?.[0]?.changes?.[0]?.value;
 
         if (value) {
@@ -68,17 +72,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         });
                         break;
 
-                    // ... (otros cases para 'interactive', 'image', etc.)
-
                     default:
-                        console.log(`[Webhook] Mensaje de tipo '${messageEntry.type}' no procesado.`);
+                        console.log(`[Webhook] Mensaje de tipo '${messageEntry.type}' no procesado por ahora.`);
                 }
             }
         }
         return;
     }
 
-    // Manejo de otros métodos HTTP
+    // Si llega cualquier otro método, lo rechazamos.
     res.setHeader('Allow', ['GET', 'POST']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
 }
