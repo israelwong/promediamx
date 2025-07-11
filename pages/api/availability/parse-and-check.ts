@@ -11,18 +11,22 @@ import { DiaSemana, StatusAgenda } from '@prisma/client';
 
 /**
  * VERSIÓN FINAL Y FUNCIONAL
- * Reimplementa la construcción de fecha con offset para máxima compatibilidad en el servidor.
+ * Estandariza el texto de entrada para chrono-node y confía en el primer resultado.
  * Incluye logs para depuración.
  */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
     console.log(`[LOG 1] INICIO. Texto original: "${textoFecha}"`);
 
+    // ✅ SOLUCIÓN: Estandarizar el texto para eliminar ambigüedades.
     const textoCorregido = textoFecha
         .toLowerCase()
+        .replace(/\bde la mañana\b/g, 'am')
+        .replace(/\bde la tarde\b/g, 'pm')
+        .replace(/\bde la noche\b/g, 'pm')
         .replace(/\blpm\b/g, '1 pm');
 
     if (textoCorregido !== textoFecha.toLowerCase()) {
-        console.log(`[LOG 1.1] TYPO CORREGIDO. Texto nuevo: "${textoCorregido}"`);
+        console.log(`[LOG 1.1] TEXTO ESTANDARIZADO. Texto nuevo: "${textoCorregido}"`);
     }
 
     const ahoraEnZona = toZonedTime(new Date(), timeZone);
@@ -35,14 +39,10 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
 
     console.log('[LOG 2] chrono-node encontró:', JSON.stringify(resultados, null, 2));
 
-    const componentes: chrono.Component[] = ['year', 'month', 'day', 'hour', 'minute', 'meridiem', 'weekday'];
-    const resultado = resultados.reduce((mejor, actual) => {
-        const scoreMejor = componentes.filter(c => mejor.start.isCertain(c)).length;
-        const scoreActual = componentes.filter(c => actual.start.isCertain(c)).length;
-        return scoreActual > scoreMejor ? actual : mejor;
-    });
+    // ✅ SOLUCIÓN: Tomar el primer resultado, que ahora es el más fiable.
+    const resultado = resultados[0];
 
-    console.log('[LOG 3] Resultado de Chrono SELECCIONADO (el más específico):', JSON.stringify(resultado, null, 2));
+    console.log('[LOG 3] Resultado de Chrono SELECCIONADO (el primero):', JSON.stringify(resultado, null, 2));
 
     const año = resultado.start.get('year');
     const mes = resultado.start.get('month');
@@ -58,7 +58,6 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
     }
 
     try {
-        // ✅ SOLUCIÓN DEFINITIVA: Construir un string ISO 8601 completo con offset.
         const offsetString = format(ahoraEnZona, 'xxx', { timeZone });
         console.log(`[LOG 5] Offset de zona horaria calculado: ${offsetString}`);
 
