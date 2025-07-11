@@ -3,85 +3,60 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { isBefore } from 'date-fns';
-// Usamos una librería robusta para manejar fechas y zonas horarias
 import { toZonedTime, format } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-import { extraerPalabrasClaveDeFecha } from '@/app/admin/_lib/actions/whatsapp/helpers/ia.helpers';
+// ✅ IMPORTANTE: Asumimos que generarRespuestaAsistente está en ia.actions
+import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions';
 
 /**
- * Helper robusto para construir un objeto Date a partir de texto,
- * respetando la zona horaria especificada para evitar errores de UTC.
+ * ✅ NUEVO SUPER-HELPER CON IA
+ * Su única misión es convertir texto en lenguaje natural a una fecha estructurada.
  */
-function construirFechaEnTimeZone(
-    extraccion: { dia_semana?: string; dia_relativo?: string; dia_mes?: number; hora_str?: string },
-    timeZone: string
-): Date | null {
+async function parsearFechaConIA(textoFecha: string, timeZone: string): Promise<Date | null> {
+    const ahoraEnZona = toZonedTime(new Date(), timeZone);
+    const fechaActualParaContexto = format(ahoraEnZona, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es, timeZone });
+
+    const prompt = `
+Tu tarea es ser un experto en interpretar fechas y horas en lenguaje natural.
+La fecha y hora actual para tu referencia es: ${fechaActualParaContexto}.
+Analiza la siguiente frase del usuario: "${textoFecha}"
+
+Responde ÚNICA Y EXCLUSIVAMENTE con un objeto JSON con la estructura: 
+{ "año": AAAA, "mes": MM, "dia": DD, "hora": HH, "minuto": mm }
+- El mes debe ser un número de 1 a 12.
+- La hora debe estar en formato de 24 horas (0-23).
+
+--- EJEMPLOS ---
+- Frase: "mañana a las 2pm" -> { "año": ${ahoraEnZona.getFullYear()}, "mes": ${ahoraEnZona.getMonth() + 1}, "dia": ${ahoraEnZona.getDate() + 1}, "hora": 14, "minuto": 0 }
+- Frase: "el viernes a las 11am" -> (Calcula el próximo viernes y devuelve los componentes)
+- Frase: "hoy a las 8 de la noche" -> { "año": ${ahoraEnZona.getFullYear()}, "mes": ${ahoraEnZona.getMonth() + 1}, "dia": ${ahoraEnZona.getDate()}, "hora": 20, "minuto": 0 }
+
+Si no puedes determinar una fecha y hora completas, responde con 'null'.`;
+
     try {
-        const ahoraEnZona = toZonedTime(new Date(), timeZone);
+        const resultadoIA = await generarRespuestaAsistente({
+            historialConversacion: [],
+            mensajeUsuarioActual: prompt,
+            contextoAsistente: { nombreAsistente: "Asistente", nombreNegocio: "Negocio" },
+            tareasDisponibles: [],
+        });
 
-        // Empezamos con los componentes de la fecha actual en la zona correcta
-        let año = ahoraEnZona.getFullYear();
-        let mes = ahoraEnZona.getMonth(); // 0-11
-        let dia = ahoraEnZona.getDate();
-
-        // 1. Determinar el día correcto
-        if (extraccion.dia_relativo?.toLowerCase() === 'mañana') {
-            const mañana = new Date(ahoraEnZona.getTime());
-            mañana.setDate(mañana.getDate() + 1);
-            año = mañana.getFullYear();
-            mes = mañana.getMonth();
-            dia = mañana.getDate();
-        } else if (extraccion.dia_semana) {
-            const tempDate = new Date(ahoraEnZona.getTime());
-            const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-            const diaTargetIndex = diasSemana.indexOf(extraccion.dia_semana.toLowerCase());
-            if (diaTargetIndex !== -1) {
-                let diasAAñadir = diaTargetIndex - tempDate.getDay();
-                if (diasAAñadir < 0) { diasAAñadir += 7; } // Siempre ir al próximo día de la semana
-                tempDate.setDate(tempDate.getDate() + diasAAñadir);
-                año = tempDate.getFullYear();
-                mes = tempDate.getMonth();
-                dia = tempDate.getDate();
-            }
-        } else if (extraccion.dia_mes) {
-            const diaUsuario = extraccion.dia_mes;
-            // Si el día del mes ya pasó, asumimos que es del próximo mes
-            if (diaUsuario < dia) {
-                mes += 1;
-                if (mes > 11) {
-                    mes = 0;
-                    año += 1;
+        const respuestaJson = resultadoIA.data?.respuestaTextual;
+        if (respuestaJson && respuestaJson.toLowerCase().trim() !== 'null') {
+            const match = respuestaJson.match(/{[\s\S]*}/);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                if (parsed.año && parsed.mes && parsed.dia && parsed.hora !== undefined && parsed.minuto !== undefined) {
+                    const fechaLocalString = `${parsed.año}-${String(parsed.mes).padStart(2, '0')}-${String(parsed.dia).padStart(2, '0')}T${String(parsed.hora).padStart(2, '0')}:${String(parsed.minuto).padStart(2, '0')}:00`;
+                    return toZonedTime(fechaLocalString, timeZone);
                 }
-            }
-            dia = diaUsuario;
-        }
-
-        // 2. Determinar la hora correcta
-        if (extraccion.hora_str) {
-            const matchHora = extraccion.hora_str.match(/(\d{1,2}):?(\d{2})?/);
-            if (matchHora) {
-                let hora = parseInt(matchHora[1], 10);
-                const minuto = matchHora[2] ? parseInt(matchHora[2], 10) : 0;
-
-                if (extraccion.hora_str.toLowerCase().includes('pm') && hora < 12) {
-                    hora += 12;
-                }
-                if (extraccion.hora_str.toLowerCase().includes('am') && hora === 12) {
-                    hora = 0; // Medianoche
-                }
-
-                // 3. Construimos un string de fecha local y lo convertimos a la zona horaria correcta
-                const fechaLocalString = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
-
-                return toZonedTime(fechaLocalString, timeZone);
             }
         }
-        return null; // No se pudo construir una fecha y hora completas
     } catch (error) {
-        console.error("Error construyendo fecha en timezone:", error);
-        return null;
+        console.error("Error en parsearFechaConIA:", error);
     }
+    return null;
 }
 
 
@@ -115,15 +90,11 @@ export default async function handler(
         const { textoFecha, negocioId, tipoDeCitaId } = validation.data;
         const timeZone = 'America/Mexico_City';
 
-        const extraccion = await extraerPalabrasClaveDeFecha(textoFecha);
-        if (!extraccion) {
-            return res.status(200).json({ disponible: false, mensaje: "No entendí la fecha que mencionaste. ¿Podrías intentarlo de nuevo?" });
-        }
-
-        const fecha = construirFechaEnTimeZone(extraccion, timeZone);
+        // ✅ Usamos nuestro nuevo y potente helper de IA
+        const fecha = await parsearFechaConIA(textoFecha, timeZone);
 
         if (!fecha) {
-            return res.status(200).json({ disponible: false, mensaje: "No pude construir una fecha y hora completas. ¿Podrías ser más específico?" });
+            return res.status(200).json({ disponible: false, mensaje: "No pude entender la fecha y hora que mencionaste. ¿Podrías ser más específico? (ej: 'mañana a las 4pm')" });
         }
 
         const fechaFormateada = format(fecha, "EEEE d 'de' MMMM 'a las' h:mm aa", { locale: es, timeZone });
