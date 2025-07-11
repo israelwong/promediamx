@@ -5,42 +5,49 @@ import { z } from 'zod';
 import { isBefore } from 'date-fns';
 import { toZonedTime, format } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
-// ✅ IMPORTANTE: Asumimos que instalarás esta librería: npm install chrono-node
 import * as chrono from 'chrono-node';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 
 /**
- * ✅ NUEVO HELPER "MAESTRO RELOJERO"
- * Usa Chrono para desglosar el texto y date-fns-tz para ensamblar la fecha
- * de forma segura en la zona horaria correcta.
+ * ✅ HELPER "MAESTRO RELOJERO" CON LOGS DE DIAGNÓSTICO
+ * Esta versión incluye logs para depurar el comportamiento en Vercel.
  */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
-    const ahoraEnZona = toZonedTime(new Date(), timeZone);
+    console.log(`[LOG VERCEL] 1. Inicia parseo. textoFecha: "${textoFecha}", timeZone: "${timeZone}"`);
 
-    // 1. Usamos Chrono para extraer los componentes
+    const ahoraEnZona = toZonedTime(new Date(), timeZone);
+    console.log(`[LOG VERCEL] 2. 'Ahora' en la zona horaria del negocio es: ${ahoraEnZona.toISOString()}`);
+
+    // Usamos Chrono para extraer los componentes
     const resultados = chrono.es.parse(textoFecha, ahoraEnZona, { forwardDate: true });
 
+    // 🕵️‍♂️ LOG MÁS IMPORTANTE: Vemos qué extrajo Chrono
+    console.log(`[LOG VERCEL] 3. Resultado completo de Chrono:`, JSON.stringify(resultados, null, 2));
+
     if (resultados.length === 0) {
+        console.log(`[LOG VERCEL] 4. Chrono no encontró ninguna fecha válida.`);
         return null;
     }
 
     const resultado = resultados[0];
 
-    // 2. Extraemos cada pieza del resultado
     const año = resultado.start.get('year') ?? ahoraEnZona.getFullYear();
-    const mes = resultado.start.get('month') ?? ahoraEnZona.getMonth() + 1; // Chrono devuelve 1-12
+    const mes = resultado.start.get('month') ?? ahoraEnZona.getMonth() + 1;
     const dia = resultado.start.get('day') ?? ahoraEnZona.getDate();
     const hora = resultado.start.get('hour') ?? 0;
     const minuto = resultado.start.get('minute') ?? 0;
 
-    // 3. Construimos un string de fecha local y lo convertimos a la zona horaria correcta
-    // Esto asegura que "12:00" se interprete como "12:00 en México", no "12:00 en UTC".
+    console.log(`[LOG VERCEL] 4. Componentes extraídos: Año=${año}, Mes=${mes}, Día=${dia}, Hora=${hora}, Minuto=${minuto}`);
+
     const fechaLocalString = `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
+    console.log(`[LOG VERCEL] 5. String de fecha construido: "${fechaLocalString}"`);
 
     try {
-        return toZonedTime(fechaLocalString, timeZone);
+        const fechaFinal = toZonedTime(fechaLocalString, timeZone);
+        console.log(`[LOG VERCEL] 6. Objeto Date final (en UTC para sistema): ${fechaFinal.toISOString()}`);
+        return fechaFinal;
     } catch (error) {
-        console.error("Error al convertir fecha con timezone:", error);
+        console.error("[LOG VERCEL] Error final al convertir fecha con timezone:", error);
         return null;
     }
 }
@@ -74,9 +81,9 @@ export default async function handler(
         }
 
         const { textoFecha, negocioId, tipoDeCitaId } = validation.data;
+        // Forzamos la zona horaria correcta para asegurar consistencia
         const timeZone = 'America/Mexico_City';
 
-        // ✅ Usamos nuestro nuevo y robusto helper
         const fecha = parsearFechaConPrecision(textoFecha, timeZone);
 
         if (!fecha) {
@@ -90,11 +97,12 @@ export default async function handler(
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, la fecha que buscas (${fechaFormateada}) ya pasó.` });
         }
 
+        // Usamos un ID de lead genérico ya que este flujo no tiene un lead real aún
         const resultado = await verificarDisponibilidad({
             negocioId,
             tipoDeCitaId,
             fechaDeseada: fecha,
-            leadId: 'LEAD_DESDE_MANYCHAT_PARSE',
+            leadId: 'LEAD_FROM_MANYCHAT_PARSE_CHECK',
         });
 
         if (resultado.disponible) {
