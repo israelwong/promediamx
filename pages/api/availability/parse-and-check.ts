@@ -10,14 +10,37 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import { DiaSemana, StatusAgenda } from '@prisma/client';
 
 /**
+ * Aplica un ajuste manual a la fecha para contrarrestar inconsistencias de zona horaria en el servidor.
+ * Este es el "truco sucio" que fuerza el comportamiento correcto.
+ * @param fecha La fecha original creada.
+ * @param timeZone La zona horaria objetivo.
+ * @returns La fecha ajustada.
+ */
+function applyTimezoneHack(fecha: Date, timeZone: string): Date {
+    // Obtenemos el offset del servidor (en Vercel es 0, para UTC)
+    const serverOffset = fecha.getTimezoneOffset() * 60000;
+    // Creamos una fecha temporal para medir el offset de la zona horaria objetivo
+    const tempDate = toZonedTime(fecha, timeZone);
+    const targetOffset = tempDate.getTimezoneOffset() * 60000;
+
+    // Calculamos la diferencia que necesitamos ajustar
+    const diff = serverOffset - targetOffset;
+
+    console.log(`[LOG HACK] Server Offset: ${serverOffset}, Target Offset: ${targetOffset}, Diff: ${diff}`);
+
+    // Devolvemos una nueva fecha con el ajuste aplicado
+    return new Date(fecha.getTime() - diff);
+}
+
+
+/**
  * VERSIÓN FINAL Y FUNCIONAL
- * Estandariza el texto de entrada para chrono-node y confía en el primer resultado.
+ * Implementa un "truco sucio" para forzar la zona horaria correcta en cualquier entorno.
  * Incluye logs para depuración.
  */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
     console.log(`[LOG 1] INICIO. Texto original: "${textoFecha}"`);
 
-    // ✅ SOLUCIÓN: Estandarizar el texto para eliminar ambigüedades.
     const textoCorregido = textoFecha
         .toLowerCase()
         .replace(/\bde la mañana\b/g, 'am')
@@ -39,7 +62,6 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
 
     console.log('[LOG 2] chrono-node encontró:', JSON.stringify(resultados, null, 2));
 
-    // ✅ SOLUCIÓN: Tomar el primer resultado, que ahora es el más fiable.
     const resultado = resultados[0];
 
     console.log('[LOG 3] Resultado de Chrono SELECCIONADO (el primero):', JSON.stringify(resultado, null, 2));
@@ -68,13 +90,17 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
 
         console.log(`[LOG 6] String ISO final para crear la fecha: "${fechaIsoConOffset}"`);
 
-        const fechaFinal = new Date(fechaIsoConOffset);
+        const fechaOriginal = new Date(fechaIsoConOffset);
+        console.log(`[LOG 7] Objeto Date original (en UTC): ${fechaOriginal.toISOString()}`);
 
-        console.log(`[LOG 7] Objeto Date final (en UTC): ${fechaFinal.toISOString()}`);
-        return fechaFinal;
+        // Aplicamos el "truco sucio" para ajustar la fecha
+        const fechaAjustada = applyTimezoneHack(fechaOriginal, timeZone);
+        console.log(`[LOG 8] Objeto Date AJUSTADO (en UTC): ${fechaAjustada.toISOString()}`);
+
+        return fechaAjustada;
 
     } catch (error) {
-        console.error("[LOG 8] ERROR al construir la fecha final:", error);
+        console.error("[LOG 9] ERROR al construir la fecha final:", error);
         return null;
     }
 }
@@ -116,7 +142,7 @@ export default async function handler(
         }
 
         const fechaFormateada = format(fecha, "EEEE d 'de' MMMM 'a las' h:mm aa", { locale: es, timeZone });
-        console.log(`[LOG 9] Mensaje final formateado: "${fechaFormateada}"`);
+        console.log(`[LOG 10] Mensaje final formateado: "${fechaFormateada}"`);
 
         const ahoraEnzona = toZonedTime(new Date(), timeZone);
         if (isBefore(fecha, ahoraEnzona)) {
@@ -125,7 +151,7 @@ export default async function handler(
 
         // --- LÓGICA DE VALIDACIÓN UNIFICADA ---
 
-        console.log('[LOG 10] Iniciando validación de horario laboral...');
+        console.log('[LOG 11] Iniciando validación de horario laboral...');
         const [negocioConHorarios, tipoCita] = await Promise.all([
             prisma.negocio.findUnique({
                 where: { id: negocioId },
@@ -141,17 +167,17 @@ export default async function handler(
 
         // 1. Validar excepciones
         const fechaYYYYMMDD = format(fecha, 'yyyy-MM-dd', { timeZone });
-        console.log(`[LOG 11] Buscando excepciones para la fecha: ${fechaYYYYMMDD}`);
+        console.log(`[LOG 12] Buscando excepciones para la fecha: ${fechaYYYYMMDD}`);
 
         const excepcionDelDia = excepcionesHorario.find(e => {
             const exceptionDateString = e.fecha.toISOString().split('T')[0];
-            console.log(`[LOG 11.1] Comparando (string vs string): ${exceptionDateString} === ${fechaYYYYMMDD}`);
+            console.log(`[LOG 12.1] Comparando (string vs string): ${exceptionDateString} === ${fechaYYYYMMDD}`);
             return exceptionDateString === fechaYYYYMMDD;
         });
 
 
         if (excepcionDelDia?.esDiaNoLaborable) {
-            console.log(`[LOG 12] FALLO: El día ${fechaYYYYMMDD} es una excepción no laborable.`);
+            console.log(`[LOG 13] FALLO: El día ${fechaYYYYMMDD} es una excepción no laborable.`);
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, el día ${format(fecha, 'd MMMM', { locale: es })} no estamos disponibles por un evento especial.` });
         }
 
@@ -161,23 +187,23 @@ export default async function handler(
         const diaSemana = diasSemanaEnum[diaSemanaJS - 1];
 
         const horarioDelDia = horariosAtencion.find(h => h.dia === diaSemana);
-        console.log(`[LOG 13] Buscando horario para el día: ${diaSemana}. Encontrado:`, horarioDelDia);
+        console.log(`[LOG 14] Buscando horario para el día: ${diaSemana}. Encontrado:`, horarioDelDia);
 
         if (!horarioDelDia) {
-            console.log(`[LOG 14] FALLO: No hay horario de atención configurado para ${diaSemana}.`);
+            console.log(`[LOG 15] FALLO: No hay horario de atención configurado para ${diaSemana}.`);
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, no atendemos los días ${diaSemana.toLowerCase()}.` });
         }
 
         const horaSolicitada = format(fecha, 'HH:mm', { timeZone });
         const { horaInicio, horaFin } = horarioDelDia;
-        console.log(`[LOG 15] Comparando hora solicitada (${horaSolicitada}) con horario del negocio (${horaInicio} - ${horaFin}).`);
+        console.log(`[LOG 16] Comparando hora solicitada (${horaSolicitada}) con horario del negocio (${horaInicio} - ${horaFin}).`);
 
         if (horaSolicitada < horaInicio || horaSolicitada >= horaFin) {
-            console.log(`[LOG 16] FALLO: La hora solicitada está fuera del horario laboral.`);
+            console.log(`[LOG 17] FALLO: La hora solicitada está fuera del horario laboral.`);
             return res.status(200).json({ disponible: false, mensaje: `Nuestros horarios para los ${diaSemana.toLowerCase()} son de ${horaInicio} a ${horaFin}. Por favor, elige una hora dentro de ese rango.` });
         }
 
-        console.log('[LOG 17] ÉXITO: La hora está dentro del horario laboral. Procediendo a verificar concurrencia...');
+        console.log('[LOG 18] ÉXITO: La hora está dentro del horario laboral. Procediendo a verificar concurrencia...');
 
         // 3. Validar concurrencia
         const citasDelDia = await prisma.agenda.findMany({
@@ -199,11 +225,11 @@ export default async function handler(
         });
 
         if (citasSolapadas.length >= tipoCita.limiteConcurrencia) {
-            console.log(`[LOG 18] FALLO: Se excede el límite de concurrencia.`);
+            console.log(`[LOG 19] FALLO: Se excede el límite de concurrencia.`);
             return res.status(200).json({ disponible: false, mensaje: "Lo siento, ese horario acaba de ser ocupado. Por favor, elige otro." });
         }
 
-        console.log('[LOG 19] ÉXITO: El horario está disponible y no hay conflicto de concurrencia.');
+        console.log('[LOG 20] ÉXITO: El horario está disponible y no hay conflicto de concurrencia.');
         // --- FIN DE LA LÓGICA DE VALIDACIÓN UNIFICADA ---
 
         return res.status(200).json({
