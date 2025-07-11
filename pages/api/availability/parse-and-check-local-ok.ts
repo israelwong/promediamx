@@ -11,7 +11,7 @@ import { DiaSemana, StatusAgenda } from '@prisma/client';
 
 /**
  * VERSIÓN FINAL CON VALIDACIÓN DE HORARIOS
- * Utiliza un método de creación de fecha más robusto para evitar errores de zona horaria en el servidor.
+ * Añade la lógica para cotejar la hora solicitada con los horarios de atención del negocio.
  * Incluye logs para depuración.
  */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
@@ -58,18 +58,22 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
     }
 
     try {
-        // ✅ SOLUCIÓN: Usar toZonedTime para crear la fecha de forma segura.
-        // Este método es más robusto que construir un string y usar new Date().
-        const fechaLocalString = `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')} ${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
-        console.log(`[LOG 5] String de fecha local construido: "${fechaLocalString}"`);
+        const offsetString = format(ahoraEnZona, 'xxx', { timeZone });
+        console.log(`[LOG 5] Offset de zona horaria calculado: ${offsetString}`);
 
-        const fechaFinal = toZonedTime(fechaLocalString, timeZone);
+        const fechaIsoConOffset =
+            `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}` +
+            `T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00` +
+            `${offsetString}`;
 
-        console.log(`[LOG 6] Objeto Date final (en UTC): ${fechaFinal.toISOString()}`);
+        console.log(`[LOG 6] String ISO final para crear la fecha: "${fechaIsoConOffset}"`);
+
+        const fechaFinal = new Date(fechaIsoConOffset);
+        console.log(`[LOG 7] Objeto Date final (en UTC): ${fechaFinal.toISOString()}`);
         return fechaFinal;
 
     } catch (error) {
-        console.error("[LOG 7] ERROR al construir la fecha final:", error);
+        console.error("[LOG 8] ERROR al construir la fecha final:", error);
         return null;
     }
 }
@@ -111,7 +115,7 @@ export default async function handler(
         }
 
         const fechaFormateada = format(fecha, "EEEE d 'de' MMMM 'a las' h:mm aa", { locale: es, timeZone });
-        console.log(`[LOG 8] Mensaje final formateado: "${fechaFormateada}"`);
+        console.log(`[LOG 9] Mensaje final formateado: "${fechaFormateada}"`);
 
         const ahoraEnzona = toZonedTime(new Date(), timeZone);
         if (isBefore(fecha, ahoraEnzona)) {
@@ -120,7 +124,7 @@ export default async function handler(
 
         // --- LÓGICA DE VALIDACIÓN UNIFICADA ---
 
-        console.log('[LOG 9] Iniciando validación de horario laboral...');
+        console.log('[LOG 10] Iniciando validación de horario laboral...');
         const [negocioConHorarios, tipoCita] = await Promise.all([
             prisma.negocio.findUnique({
                 where: { id: negocioId },
@@ -136,11 +140,15 @@ export default async function handler(
 
         // 1. Validar excepciones
         const fechaYYYYMMDD = format(fecha, 'yyyy-MM-dd', { timeZone });
-        console.log(`[LOG 10] Buscando excepciones para la fecha: ${fechaYYYYMMDD}`);
+        console.log(`[LOG 10.1] Buscando excepciones para la fecha: ${fechaYYYYMMDD}`);
 
+        // ✅ CORRECCIÓN: Comparamos las fechas ignorando la parte de la hora.
         const excepcionDelDia = excepcionesHorario.find(e => {
+            // Convertimos la fecha de la BD (que es UTC) a un string YYYY-MM-DD
             const exceptionDateString = e.fecha.toISOString().split('T')[0];
-            console.log(`[LOG 10.1] Comparando (string vs string): ${exceptionDateString} === ${fechaYYYYMMDD}`);
+
+            console.log(`[LOG 10.2] Comparando (string vs string): ${exceptionDateString} === ${fechaYYYYMMDD}`);
+
             return exceptionDateString === fechaYYYYMMDD;
         });
 
@@ -174,7 +182,7 @@ export default async function handler(
 
         console.log('[LOG 16] ÉXITO: La hora está dentro del horario laboral. Procediendo a verificar concurrencia...');
 
-        // 3. Validar concurrencia
+        // 3. Validar concurrencia (lógica movida desde el helper)
         const citasDelDia = await prisma.agenda.findMany({
             where: {
                 negocioId,
