@@ -3,31 +3,28 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { isBefore } from 'date-fns';
-// Importa las funciones necesarias de la librería actualizada
-import { toZonedTime, format, zonedTimeToUtc } from 'date-fns-tz';
+// Usaremos getTimezoneOffset que es más compatible
+import { toZonedTime, format, getTimezoneOffset } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import * as chrono from 'chrono-node';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 
 /**
- * VERSIÓN FINAL Y CORREGIDA del "MAESTRO RELOJERO"
- * NOTA: Requiere date-fns-tz@^2.0.0 o superior.
+ * PLAN B: Versión a prueba de fallos que no usa zonedTimeToUtc.
+ * Construye un string ISO 8601 completo con offset para evitar ambigüedades.
  */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
-    // La referencia para Chrono debe ser la hora actual en la zona horaria del negocio.
     const ahoraEnZona = toZonedTime(new Date(), timeZone);
-
     const resultados = chrono.es.parse(textoFecha, ahoraEnZona, { forwardDate: true });
 
     if (resultados.length === 0) {
         return null;
     }
 
-    // Tomar el ÚLTIMO resultado de Chrono, que es el más completo.
     const resultado = resultados[resultados.length - 1];
 
     const año = resultado.start.get('year');
-    const mes = resultado.start.get('month'); // Chrono devuelve mes 1-12
+    const mes = resultado.start.get('month');
     const dia = resultado.start.get('day');
     const hora = resultado.start.get('hour');
     const minuto = resultado.start.get('minute');
@@ -37,24 +34,39 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
     }
 
     try {
-        // Usar zonedTimeToUtc para construir la fecha correctamente.
-        const fechaComponentes = { year: año, month: mes, day: dia, hour: hora, minute: minuto };
-        const fechaFinal = zonedTimeToUtc(fechaComponentes, timeZone);
+        // --- LÓGICA ALTERNATIVA ---
+        // 1. Obtenemos el offset de la zona horaria en milisegundos.
+        const offsetMs = getTimezoneOffset(timeZone);
+
+        // 2. Convertimos el offset a formato de string (+HH:mm o -HH:mm).
+        const offsetHours = Math.abs(offsetMs / 3600000);
+        const offsetSign = offsetMs > 0 ? '-' : '+'; // getTimezoneOffset invierte el signo.
+        const offsetString = `${offsetSign}${String(Math.floor(offsetHours)).padStart(2, '0')}:00`;
+
+        // 3. Construimos el string ISO 8601 completo.
+        const fechaIsoConOffset =
+            `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}` +
+            `T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00` +
+            `${offsetString}`;
+
+        // 4. Creamos la fecha a partir de este string. Es el método más robusto.
+        const fechaFinal = new Date(fechaIsoConOffset);
         return fechaFinal;
+
     } catch (error) {
-        console.error("Error al construir la fecha con zona horaria:", error);
+        console.error("Error al construir la fecha con zona horaria (Plan B):", error);
         return null;
     }
 }
 
-// Esquema de validación para el cuerpo de la solicitud.
+// --- EL RESTO DEL ARCHIVO PERMANECE IGUAL ---
+
 const ParseAndCheckSchema = z.object({
     textoFecha: z.string().min(3, "El texto de la fecha es requerido."),
     tipoDeCitaId: z.string().cuid(),
     negocioId: z.string().cuid(),
 });
 
-// Tipo de la respuesta de la API.
 type ApiResponse = {
     disponible: boolean;
     mensaje: string;
@@ -62,7 +74,6 @@ type ApiResponse = {
     error?: string;
 };
 
-// Controlador principal de la API.
 export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse<ApiResponse>
