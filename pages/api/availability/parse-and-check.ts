@@ -20,7 +20,7 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
     // 1. Usamos Chrono para extraer los componentes
     const resultados = chrono.es.parse(textoFecha, ahoraEnZona, { forwardDate: true });
 
-    if (results.length === 0) {
+    if (resultados.length === 0) {
         return null;
     }
 
