@@ -6,9 +6,8 @@ import { isBefore } from 'date-fns';
 import { toZonedTime, format } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import * as chrono from 'chrono-node';
-import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 import prisma from '@/app/admin/_lib/prismaClient';
-import { DiaSemana } from '@prisma/client';
+import { DiaSemana, StatusAgenda } from '@prisma/client';
 
 /**
  * VERSIÓN FINAL CON VALIDACIÓN DE HORARIOS
@@ -36,8 +35,6 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
 
     console.log('[LOG 2] chrono-node encontró:', JSON.stringify(resultados, null, 2));
 
-    // ✅ CORRECCIÓN: Usamos el método oficial 'isCertain' para evitar el error de TypeScript.
-    // Esto nos permite "puntuar" cada resultado para encontrar el más específico.
     const componentes: chrono.Component[] = ['year', 'month', 'day', 'hour', 'minute', 'meridiem', 'weekday'];
     const resultado = resultados.reduce((mejor, actual) => {
         const scoreMejor = componentes.filter(c => mejor.start.isCertain(c)).length;
@@ -125,30 +122,44 @@ export default async function handler(
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, la fecha que buscas (${fechaFormateada}) ya pasó.` });
         }
 
-        // ✅ NUEVA LÓGICA: VALIDACIÓN DE HORARIO LABORAL
-        console.log('[LOG 10] Iniciando validación de horario laboral...');
-        const negocioConHorarios = await prisma.negocio.findUnique({
-            where: { id: negocioId },
-            include: { horariosAtencion: true, excepcionesHorario: true },
-        });
+        // --- LÓGICA DE VALIDACIÓN UNIFICADA ---
 
-        if (!negocioConHorarios) {
-            return res.status(404).json({ disponible: false, mensaje: "Negocio no encontrado." });
-        }
+        console.log('[LOG 10] Iniciando validación de horario laboral...');
+        const [negocioConHorarios, tipoCita] = await Promise.all([
+            prisma.negocio.findUnique({
+                where: { id: negocioId },
+                include: { horariosAtencion: true, excepcionesHorario: true },
+            }),
+            prisma.agendaTipoCita.findUnique({ where: { id: tipoDeCitaId } })
+        ]);
+
+        if (!negocioConHorarios) return res.status(404).json({ disponible: false, mensaje: "Negocio no encontrado." });
+        if (!tipoCita) return res.status(404).json({ disponible: false, mensaje: "Tipo de cita no encontrado." });
 
         const { horariosAtencion, excepcionesHorario } = negocioConHorarios;
 
-        // Validar excepciones
+        // 1. Validar excepciones
         const fechaYYYYMMDD = format(fecha, 'yyyy-MM-dd', { timeZone });
-        const excepcionDelDia = excepcionesHorario.find(e => format(toZonedTime(e.fecha, timeZone), 'yyyy-MM-dd') === fechaYYYYMMDD);
+        console.log(`[LOG 10.1] Buscando excepciones para la fecha: ${fechaYYYYMMDD}`);
+
+        // ✅ CORRECCIÓN: Comparamos las fechas ignorando la parte de la hora.
+        const excepcionDelDia = excepcionesHorario.find(e => {
+            // Convertimos la fecha de la BD (que es UTC) a un string YYYY-MM-DD
+            const exceptionDateString = e.fecha.toISOString().split('T')[0];
+
+            console.log(`[LOG 10.2] Comparando (string vs string): ${exceptionDateString} === ${fechaYYYYMMDD}`);
+
+            return exceptionDateString === fechaYYYYMMDD;
+        });
+
 
         if (excepcionDelDia?.esDiaNoLaborable) {
             console.log(`[LOG 11] FALLO: El día ${fechaYYYYMMDD} es una excepción no laborable.`);
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, el día ${format(fecha, 'd MMMM', { locale: es })} no estamos disponibles por un evento especial.` });
         }
 
-        // Validar día y hora de la semana
-        const diaSemanaJS = parseInt(format(fecha, 'i', { timeZone })); // 1 (Mon) a 7 (Sun)
+        // 2. Validar día y hora de la semana
+        const diaSemanaJS = parseInt(format(fecha, 'i', { timeZone }));
         const diasSemanaEnum: DiaSemana[] = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
         const diaSemana = diasSemanaEnum[diaSemanaJS - 1];
 
@@ -171,27 +182,38 @@ export default async function handler(
 
         console.log('[LOG 16] ÉXITO: La hora está dentro del horario laboral. Procediendo a verificar concurrencia...');
 
-        // FIN DE LA NUEVA LÓGICA
-
-        const resultado = await verificarDisponibilidad({
-            negocioId,
-            tipoDeCitaId,
-            fechaDeseada: fecha,
-            leadId: 'LEAD_FROM_MANYCHAT_PARSE_CHECK',
+        // 3. Validar concurrencia (lógica movida desde el helper)
+        const citasDelDia = await prisma.agenda.findMany({
+            where: {
+                negocioId,
+                status: StatusAgenda.PENDIENTE,
+                fecha: {
+                    gte: toZonedTime(new Date(fecha).setHours(0, 0, 0, 0), timeZone),
+                    lt: toZonedTime(new Date(fecha).setHours(23, 59, 59, 999), timeZone),
+                },
+            }
         });
 
-        if (resultado.disponible) {
-            return res.status(200).json({
-                disponible: true,
-                mensaje: `¡Perfecto! El horario del ${fechaFormateada} está disponible.`,
-                fechaISO: fecha.toISOString()
-            });
-        } else {
-            return res.status(200).json({
-                disponible: false,
-                mensaje: resultado.mensaje || `Lo sentimos, el horario del ${fechaFormateada} ya se encuentra ocupado. Por favor, elige otro.`
-            });
+        const duracionMinutos = tipoCita.duracionMinutos || 30;
+        const finCitaDeseada = new Date(fecha.getTime() + duracionMinutos * 60000);
+        const citasSolapadas = citasDelDia.filter(citaExistente => {
+            const finCitaExistente = new Date(citaExistente.fecha.getTime() + duracionMinutos * 60000);
+            return fecha < finCitaExistente && finCitaDeseada > citaExistente.fecha;
+        });
+
+        if (citasSolapadas.length >= tipoCita.limiteConcurrencia) {
+            console.log(`[LOG 17] FALLO: Se excede el límite de concurrencia.`);
+            return res.status(200).json({ disponible: false, mensaje: "Lo siento, ese horario acaba de ser ocupado. Por favor, elige otro." });
         }
+
+        console.log('[LOG 18] ÉXITO: El horario está disponible y no hay conflicto de concurrencia.');
+        // --- FIN DE LA LÓGICA DE VALIDACIÓN UNIFICADA ---
+
+        return res.status(200).json({
+            disponible: true,
+            mensaje: `¡Perfecto! El horario del ${fechaFormateada} está disponible.`,
+            fechaISO: fecha.toISOString()
+        });
 
     } catch (error) {
         console.error("Error en API de parse-and-check:", error);
