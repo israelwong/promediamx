@@ -14,6 +14,9 @@ import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpe
  * Usa un método manual y robusto para evitar conflictos de entorno/librería.
  */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
+    // ESTA ES LA LÍNEA DE PRUEBA
+    console.log("--- EJECUTANDO CÓDIGO VERSIÓN FINAL (MÉTODO OFFSET MANUAL) ---");
+
     const textoNormalizado = textoFecha
         .toLowerCase()
         .replace(/ de la tarde/g, 'pm')
@@ -39,26 +42,17 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
     }
 
     try {
-        // --- LÓGICA MANUAL Y A PRUEBA DE FALLOS ---
-        // 1. Obtenemos el offset de la zona horaria en milisegundos.
         const offsetMs = getTimezoneOffset(timeZone);
-
-        // 2. Convertimos el offset a formato de string (+HH:mm o -HH:mm).
-        // La librería devuelve un valor positivo para zonas detrás de UTC (ej. Américas),
-        // por lo que el signo debe invertirse para el formato ISO 8601.
         const offsetSign = offsetMs > 0 ? '-' : '+';
         const offsetHours = Math.floor(Math.abs(offsetMs) / 3600000);
         const offsetMinutes = Math.floor((Math.abs(offsetMs) / 60000) % 60);
         const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
 
-        // 3. Construimos el string ISO 8601 completo.
-        // Ejemplo: "2025-07-11T15:00:00-06:00"
         const fechaIsoConOffset =
             `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}` +
             `T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00` +
             `${offsetString}`;
 
-        // 4. Creamos la fecha final a partir de este string inequívoco.
         const fechaFinal = new Date(fechaIsoConOffset);
         return fechaFinal;
 
@@ -67,7 +61,6 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
         return null;
     }
 }
-
 
 // --- EL RESTO DEL ARCHIVO NO CAMBIA ---
 
