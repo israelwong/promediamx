@@ -9,6 +9,43 @@ import { es } from 'date-fns/locale';
 import * as chrono from 'chrono-node';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 
+/**
+ * ✅ NUEVO HELPER "MAESTRO RELOJERO"
+ * Usa Chrono para desglosar el texto y date-fns-tz para ensamblar la fecha
+ * de forma segura en la zona horaria correcta.
+ */
+function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
+    const ahoraEnZona = toZonedTime(new Date(), timeZone);
+
+    // 1. Usamos Chrono para extraer los componentes
+    const resultados = chrono.es.parse(textoFecha, ahoraEnZona, { forwardDate: true });
+
+    if (results.length === 0) {
+        return null;
+    }
+
+    const resultado = resultados[0];
+
+    // 2. Extraemos cada pieza del resultado
+    const año = resultado.start.get('year') ?? ahoraEnZona.getFullYear();
+    const mes = resultado.start.get('month') ?? ahoraEnZona.getMonth() + 1; // Chrono devuelve 1-12
+    const dia = resultado.start.get('day') ?? ahoraEnZona.getDate();
+    const hora = resultado.start.get('hour') ?? 0;
+    const minuto = resultado.start.get('minute') ?? 0;
+
+    // 3. Construimos un string de fecha local y lo convertimos a la zona horaria correcta
+    // Esto asegura que "12:00" se interprete como "12:00 en México", no "12:00 en UTC".
+    const fechaLocalString = `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`;
+
+    try {
+        return toZonedTime(fechaLocalString, timeZone);
+    } catch (error) {
+        console.error("Error al convertir fecha con timezone:", error);
+        return null;
+    }
+}
+
+
 const ParseAndCheckSchema = z.object({
     textoFecha: z.string().min(3, "El texto de la fecha es requerido."),
     tipoDeCitaId: z.string().cuid(),
@@ -38,20 +75,17 @@ export default async function handler(
 
         const { textoFecha, negocioId, tipoDeCitaId } = validation.data;
         const timeZone = 'America/Mexico_City';
-        const ahoraEnZona = toZonedTime(new Date(), timeZone);
 
-        // ✅ Usamos la librería profesional para parsear la fecha
-        const fechaParseada = chrono.es.parseDate(textoFecha, ahoraEnZona);
+        // ✅ Usamos nuestro nuevo y robusto helper
+        const fecha = parsearFechaConPrecision(textoFecha, timeZone);
 
-        if (!fechaParseada) {
+        if (!fecha) {
             return res.status(200).json({ disponible: false, mensaje: "No pude entender la fecha y hora que mencionaste. ¿Podrías ser más específico? (ej: 'mañana a las 4pm')" });
         }
 
-        // El objeto 'fecha' ahora es 100% correcto y consciente de la zona horaria.
-        const fecha = toZonedTime(fechaParseada, timeZone);
-
         const fechaFormateada = format(fecha, "EEEE d 'de' MMMM 'a las' h:mm aa", { locale: es, timeZone });
 
+        const ahoraEnZona = toZonedTime(new Date(), timeZone);
         if (isBefore(fecha, ahoraEnZona)) {
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, la fecha que buscas (${fechaFormateada}) ya pasó.` });
         }
