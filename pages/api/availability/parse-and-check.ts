@@ -3,25 +3,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { isBefore } from 'date-fns';
-// Usaremos las funciones más básicas y compatibles
 import { toZonedTime, format, getTimezoneOffset } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import * as chrono from 'chrono-node';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
 
-/**
- * VERSIÓN FINAL Y DEFINITIVA
- * Usa un método manual y robusto para evitar conflictos de entorno/librería.
- */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
-    // ESTA ES LA LÍNEA DE PRUEBA
-    console.log("--- EJECUTANDO CÓDIGO VERSIÓN FINAL (MÉTODO OFFSET MANUAL) ---");
-
+    // AJUSTE FINAL: Añadimos un espacio antes de 'pm' y 'am'.
     const textoNormalizado = textoFecha
         .toLowerCase()
-        .replace(/ de la tarde/g, 'pm')
-        .replace(/ de la noche/g, 'pm')
-        .replace(/ de la mañana/g, 'am');
+        .replace(/ de la tarde/g, ' pm') // Nota el espacio: ' pm'
+        .replace(/ de la noche/g, ' pm') // Nota el espacio: ' pm'
+        .replace(/ de la mañana/g, ' am'); // Nota el espacio: ' am'
 
     const ahoraEnZona = toZonedTime(new Date(), timeZone);
     const resultados = chrono.es.parse(textoNormalizado, ahoraEnZona, { forwardDate: true });
@@ -61,8 +54,6 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
         return null;
     }
 }
-
-// --- EL RESTO DEL ARCHIVO NO CAMBIA ---
 
 const ParseAndCheckSchema = z.object({
     textoFecha: z.string().min(3, "El texto de la fecha es requerido."),
