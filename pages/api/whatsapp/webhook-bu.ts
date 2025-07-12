@@ -1,7 +1,7 @@
 // /pages/api/whatsapp/webhook.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { procesarMensajeWhatsAppEntranteAction } from '@/app/admin/_lib/actions/whatsapp/whatsapp.actions';
+// import { procesarMensajeWhatsAppEntranteAction } from '@/app/admin/_lib/actions/whatsapp/whatsapp.actions';
 
 // Leemos el token de verificación desde las variables de entorno.
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
@@ -51,25 +51,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const metadata = value.metadata;
 
             if (messageEntry && contactInfo && metadata) {
-                const negocioPhoneNumberId = metadata.phone_number_id;
+                // const negocioPhoneNumberId = metadata.phone_number_id;
                 const usuarioWaId = contactInfo.wa_id;
-                const nombrePerfilUsuario = contactInfo.profile.name;
-                const messageIdOriginal = messageEntry.id;
+                // const nombrePerfilUsuario = contactInfo.profile.name;
+                // const messageIdOriginal = messageEntry.id;
 
                 switch (messageEntry.type) {
                     case 'text':
                         const mensajeUsuario = messageEntry.text.body;
                         console.log(`[Webhook] Procesando mensaje de texto de ${usuarioWaId}: "${mensajeUsuario}"`);
 
-                        procesarMensajeWhatsAppEntranteAction({
-                            negocioPhoneNumberId,
-                            usuarioWaId,
-                            nombrePerfilUsuario,
-                            mensaje: { type: 'text', content: mensajeUsuario },
-                            messageIdOriginal,
-                        }).catch(error => {
-                            console.error("[Webhook] Error en la acción para mensaje de texto:", error);
-                        });
+                        // procesarMensajeWhatsAppEntranteAction({
+                        //     negocioPhoneNumberId,
+                        //     usuarioWaId,
+                        //     nombrePerfilUsuario,
+                        //     mensaje: { type: 'text', content: mensajeUsuario },
+                        //     messageIdOriginal,
+                        // }).catch(error => {
+                        //     console.error("[Webhook] Error en la acción para mensaje de texto:", error);
+                        // });
                         break;
 
                     default:
