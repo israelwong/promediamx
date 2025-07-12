@@ -5,9 +5,11 @@ import { z } from 'zod';
 import prisma from '@/app/admin/_lib/prismaClient';
 import { StatusAgenda, Prisma } from '@prisma/client';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/email.actions';
+import { enviarEmailConfirmacionCita } from '@/app/admin/_lib/actions/email/email.actions';
+// import { revalidatePath } from 'next/cache';
 import { isBefore } from 'date-fns';
 
+// ✅ 1. Actualizamos el schema para aceptar el nuevo campo 'source'
 const CreateAppointmentSchema = z.object({
     nombre: z.string().min(3, "El nombre es requerido."),
     email: z.string().email("El formato del email es inválido."),
@@ -18,11 +20,10 @@ const CreateAppointmentSchema = z.object({
     tipoDeCitaId: z.string().cuid(),
     negocioId: z.string().cuid(),
     crmId: z.string().cuid(),
-    ofertaId: z.string().cuid("El ID de la oferta es requerido."),
     colegio: z.string().optional(),
     grado: z.string().optional(),
     nivel_educativo: z.string().optional(),
-    source: z.string().optional(),
+    source: z.string().optional(), // Origen del lead (ej. "ManyChat")
 });
 
 type ApiResponse = {
@@ -36,27 +37,16 @@ export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse<ApiResponse>
 ) {
-    // LOG DE DIAGNÓSTICO #0: ¿Se está alcanzando el handler?
-    console.log(`\n--- [DEBUG] API /api/appointments/create HIT ---`);
-    console.log(`[DEBUG] Method: ${req.method}`);
-
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ message: `Método ${req.method} no permitido` });
     }
 
     try {
-        // LOG DE DIAGNÓSTICO #0.1: ¿Cuál es el cuerpo de la solicitud?
-        console.log("[DEBUG] Raw Request Body:", req.body);
-
         const validation = CreateAppointmentSchema.safeParse(req.body);
         if (!validation.success) {
-            // LOG DE DIAGNÓSTICO #0.2: Si la validación falla, lo sabremos.
-            console.error("[DEBUG] Zod validation FAILED:", validation.error.flatten());
             return res.status(400).json({ message: "Datos inválidos.", error: "La información enviada no es correcta.", details: validation.error.flatten() });
         }
-
-        console.log("[DEBUG] Zod validation PASSED.");
         const data = validation.data;
         const fechaDeseadaObj = new Date(data.fechaHoraCita);
 
@@ -78,11 +68,12 @@ export default async function handler(
             return res.status(409).json({ message: "Conflicto de horario.", error: "Lo sentimos, este horario acaba de ser ocupado. Por favor, elige otro." });
         }
 
+        // ✅ 2. Construimos el objeto jsonParams incluyendo el nuevo campo 'source'
         const jsonParams = {
             colegio: data.colegio,
             grado: data.grado,
             nivel_educativo: data.nivel_educativo,
-            source: data.source || 'Formulario Web',
+            source: data.source || 'Formulario Web', // Usamos un fallback por si no viene
         };
 
         const primerPipeline = await prisma.pipelineCRM.findFirst({
@@ -90,6 +81,7 @@ export default async function handler(
             orderBy: { orden: 'asc' }
         });
 
+        // 3. Guardamos el objeto completo en el Lead
         const lead = await prisma.lead.upsert({
             where: { email: data.email },
             update: {
@@ -107,21 +99,15 @@ export default async function handler(
             },
         });
 
-        const [tipoCita, negocio, oferta] = await Promise.all([
+        const [tipoCita, negocio] = await Promise.all([
             prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: data.tipoDeCitaId } }),
             prisma.negocio.findUniqueOrThrow({
                 where: { id: data.negocioId },
                 include: { AsistenteVirtual: true }
-            }),
-            prisma.oferta.findUnique({ where: { id: data.ofertaId } })
+            })
         ]);
 
-        if (!oferta) {
-            return res.status(404).json({ message: "Oferta no encontrada." });
-        }
-
-        console.log("DEBUG: Objeto 'oferta' recuperado de la BD:", oferta);
-
+        // La descripción enriquecida ahora también puede incluir el origen
         const descripcionEnriquecida = `Cita desde ${jsonParams.source}. Colegio: ${data.colegio || 'N/A'}, Nivel: ${data.nivel_educativo || 'N/A'}, Grado: ${data.grado || 'N/A'}.`;
 
         const nuevaCita = await prisma.agenda.create({
@@ -143,44 +129,42 @@ export default async function handler(
             if (data.nivel_educativo) detallesAdicionales += `<p><b>Nivel:</b> ${data.nivel_educativo}</p>`;
             if (data.grado) detallesAdicionales += `<p><b>Grado:</b> ${data.grado}</p>`;
 
+            let linkCancelarWhatsApp: string | undefined;
+            let linkReagendarWhatsApp: string | undefined;
+
             const asistenteActivo = negocio.AsistenteVirtual;
             const numeroWhatsappAsistente = asistenteActivo?.whatsappBusiness?.replace(/\D/g, '');
-            let linkCancelarWhatsApp: string | undefined, linkReagendarWhatsApp: string | undefined;
 
             if (numeroWhatsappAsistente) {
-                const fechaFormateadaParaLink = new Date(nuevaCita.fecha).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' });
+                const fechaFormateadaParaLink = new Date(nuevaCita.fecha).toLocaleString('es-MX', {
+                    dateStyle: 'long',
+                    timeStyle: 'short',
+                    timeZone: 'America/Mexico_City'
+                });
                 const textoCancelar = `Quiero "cancelar" mi cita de "${tipoCita.nombre}" del ${fechaFormateadaParaLink}.`;
                 const textoReagendar = `Quiero "reagendar" mi cita de "${tipoCita.nombre}" del ${fechaFormateadaParaLink}.`;
+
                 linkCancelarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoCancelar)}`;
                 linkReagendarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoReagendar)}`;
             }
 
-            const emailProps = {
+            await enviarEmailConfirmacionCita({
                 emailDestinatario: lead.email,
                 nombreDestinatario: lead.nombre,
                 nombreNegocio: negocio.nombre,
                 nombreServicio: tipoCita.nombre,
-                // ✅ Se añade el nombre de la oferta
-                nombreOferta: oferta.nombre,
                 fechaHoraCita: nuevaCita.fecha,
                 detallesAdicionales: detallesAdicionales,
                 emailRespuestaNegocio: negocio.email || 'contacto@promedia.mx',
                 linkCancelar: linkCancelarWhatsApp,
                 linkReagendar: linkReagendarWhatsApp,
-                emailCopia: oferta.emailCopiaConfirmacion,
-                nombrePersonaContacto: oferta.nombrePersonaContacto,
-                telefonoContacto: oferta.telefonoContacto,
-                modalidadCita: oferta.googleMapsUrl ? 'presencial' as const : (oferta.linkReunionVirtual ? 'virtual' as const : undefined),
-                ubicacionCita: oferta.direccionUbicacion,
-                googleMapsUrl: oferta.googleMapsUrl,
-                linkReunionVirtual: oferta.linkReunionVirtual,
-                duracionCitaMinutos: tipoCita.duracionMinutos,
-            };
-
-            console.log("DEBUG: Props enviadas a la acción de email:", emailProps);
-
-            await enviarEmailConfirmacionCita_v2(emailProps);
+            });
         }
+
+        // if (negocio.clienteId) {
+        //     const pathToRevalidate = `/admin/clientes/${negocio.clienteId}/negocios/${data.negocioId}/citas`;
+        //     revalidatePath(pathToRevalidate);
+        // }
 
         return res.status(201).json({ message: 'Cita creada exitosamente.', data: { citaId: nuevaCita.id } });
 

@@ -49,6 +49,13 @@ export const CrearOfertaDetalleBasicoInputSchema = z.object({
 });
 export type CrearOfertaDetalleBasicoInputType = z.infer<typeof CrearOfertaDetalleBasicoInputSchema>;
 
+
+
+
+
+
+
+
 // --- Schema para ACTUALIZAR un OfertaDetalle (usado por OfertaDetalleForm.tsx en modo edición) ---
 // Este schema define los campos que SÍ se editan a través de este formulario.
 export const UpdateOfertaDetalleInputSchema = z.object({
@@ -98,12 +105,3 @@ export const OfertaDetalleCompletoSchema = UpdateOfertaDetalleInputSchema.extend
     documentosDetalle: z.array(DetalleDocumentoItemSchema).optional().default([]),
 });
 export type OfertaDetalleCompletoType = z.infer<typeof OfertaDetalleCompletoSchema>;
-
-
-
-
-
-
-
-
-

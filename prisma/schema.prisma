@@ -644,6 +644,7 @@ model Oferta {
   negocioId                      String
   nombre                         String
   descripcion                    String?
+  tieneVigencia                Boolean                      @default(false)
   fechaInicio                    DateTime
   fechaFin                       DateTime
   createdAt                      DateTime                     @default(now())
@@ -660,9 +661,17 @@ model Oferta {
   objetivoCitaLimiteConcurrencia Int?
   objetivoCitaTipo               ObjetivoCitaTipoEnum?
   objetivoCitaUbicacion          String?
-  status                         EstadoOferta                 @default(BORRADOR)
-  direccionUbicacion             String?
-  googleMapsUrl                  String?
+  status                         EstadoOferta                 @default(ACTIVO) // El enum ahora es más simple
+
+  
+  nombrePersonaContacto         String?
+  telefonoContacto               String?
+  emailCopiaConfirmacion         String?
+
+  direccionUbicacion             String? // Dirección física del negocio
+  googleMapsUrl                  String? 
+  linkReunionVirtual             String?
+
   embedding                      Unsupported("vector")?
   ItemCatalogoOferta             ItemCatalogoOferta[]
   negocio                        Negocio                      @relation(fields: [negocioId], references: [id], onDelete: Cascade)

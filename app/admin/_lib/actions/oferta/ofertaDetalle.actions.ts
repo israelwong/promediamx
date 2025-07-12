@@ -12,11 +12,11 @@ import {
     OfertaDetalleListItemSchema,
     type OfertaDetalleListItemType,
     CrearOfertaDetalleBasicoInputSchema, // Nuevo schema
-    type CrearOfertaDetalleBasicoInputType,
+    type CrearOfertaDetalleBasicoInputType
 } from './ofertaDetalle.schemas';
 
-import { eliminarImagenStorage as eliminarArchivoStorage } from '@/app/admin/_lib/imageHandler.actions';
-import { getEmbeddingForText } from '@/app/admin/_lib/ia/ia.actions'; // Asegúrate de que esta función esté implementada
+// import { eliminarImagenStorage as eliminarArchivoStorage } from '@/app/admin/_lib/imageHandler.actions';
+// import { getEmbeddingForText } from '@/app/admin/_lib/ia/ia.actions'; // Asegúrate de que esta función esté implementada
 
 
 import { revalidatePath } from 'next/cache';
@@ -121,88 +121,6 @@ export async function obtenerDetallesDeOfertaAction(
     }
 }
 
-export async function eliminarOfertaDetalleAction(
-    ofertaDetalleId: string,
-    negocioId: string,
-    clienteId: string,
-    ofertaId: string
-): Promise<ActionResult<null>> {
-    if (!ofertaDetalleId || !negocioId || !clienteId || !ofertaId) {
-        return { success: false, error: "Faltan parámetros requeridos para eliminar el detalle." };
-    }
-
-    try {
-        const resultInTransaction = await prisma.$transaction(async (tx) => {
-            const detalle = await tx.ofertaDetalle.findFirst({
-                where: {
-                    id: ofertaDetalleId,
-                    ofertaId: ofertaId,
-                    oferta: { negocioId: negocioId }
-                },
-                include: {
-                    galeriaDetalle: { select: { id: true, imageUrl: true, tamañoBytes: true } },
-                    videoDetalle: { select: { id: true, videoUrl: true, tipoVideo: true, tamañoBytes: true } },
-                    documentosDetalle: { select: { id: true, documentoUrl: true, documentoTamanoBytes: true } },
-                }
-            });
-
-            if (!detalle) {
-                throw new Error("NOT_FOUND_OR_FORBIDDEN"); // Error específico para la transacción
-            }
-
-            let bytesDecrementados = BigInt(0);
-
-            for (const item of detalle.galeriaDetalle) {
-                if (item.imageUrl) await eliminarArchivoStorage(item.imageUrl);
-                bytesDecrementados += BigInt(item.tamañoBytes || 0);
-            }
-            if (detalle.videoDetalle && detalle.videoDetalle.videoUrl && detalle.videoDetalle.tipoVideo === 'SUBIDO') {
-                await eliminarArchivoStorage(detalle.videoDetalle.videoUrl);
-                bytesDecrementados += BigInt(detalle.videoDetalle.tamañoBytes || 0);
-            }
-            for (const item of detalle.documentosDetalle) {
-                if (item.documentoUrl) await eliminarArchivoStorage(item.documentoUrl);
-                bytesDecrementados += BigInt(item.documentoTamanoBytes || 0);
-            }
-
-            // Las eliminaciones de relaciones multimedia se pueden hacer aquí explícitamente si no hay onDelete: Cascade
-            // o confiar en la cascada si está configurada al eliminar OfertaDetalle.
-            // Por seguridad, si no estás seguro de la cascada:
-            await tx.ofertaDetalleGaleria.deleteMany({ where: { ofertaDetalleId } });
-            if (detalle.videoDetalle) {
-                await tx.ofertaDetalleVideo.deleteMany({ where: { ofertaDetalleId: ofertaDetalleId } }); // Usar deleteMany por si acaso, o delete con el ID del videoDetalle si lo tienes
-            }
-            await tx.ofertaDetalleDocumento.deleteMany({ where: { ofertaDetalleId } });
-
-            await tx.ofertaDetalle.delete({ where: { id: ofertaDetalleId } });
-
-            if (bytesDecrementados > BigInt(0)) {
-                await tx.negocio.update({
-                    where: { id: negocioId },
-                    data: { almacenamientoUsadoBytes: { decrement: Number(bytesDecrementados) } },
-                });
-            }
-            return { success: true, data: null };
-        });
-
-        if (resultInTransaction.success) {
-            revalidatePath(getPathToOfertaEdicionPage(clienteId, negocioId, ofertaId));
-        }
-        return resultInTransaction;
-
-    } catch (error: unknown) {
-        console.error("Error en eliminarOfertaDetalleAction:", error);
-        if (error instanceof Error && error.message === "NOT_FOUND_OR_FORBIDDEN") {
-            return { success: false, error: "Detalle de oferta no encontrado o no pertenece al contexto." };
-        }
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-            revalidatePath(getPathToOfertaEdicionPage(clienteId, negocioId, ofertaId));
-            return { success: true, data: null, error: "El detalle ya había sido eliminado (P2025)." }; // Considerar esto un éxito si el objetivo es que no exista
-        }
-        return { success: false, error: "No se pudo eliminar el detalle de la oferta." };
-    }
-}
-
 // --- NUEVA ACTION para creación básica ---
 export async function crearOfertaDetalleBasicoAction(
     input: CrearOfertaDetalleBasicoInputType,
@@ -265,6 +183,41 @@ export async function crearOfertaDetalleBasicoAction(
     }
 }
 
+
+// obtenerOfertaDetallePorIdAction (para cargar datos para el form de edición)
+export async function obtenerOfertaDetallePorIdAction(
+    ofertaDetalleId: string,
+    ofertaIdVerificar: string
+): Promise<ActionResult<OfertaDetalleCompletoType>> {
+    // ... (sin cambios respecto a la versión anterior que ya te pasé, que usa OfertaDetalleCompletoSchema)
+    if (!ofertaDetalleId || !ofertaIdVerificar) return { success: false, error: "IDs requeridos faltantes." };
+    try {
+        const detalle = await prisma.ofertaDetalle.findUnique({
+            where: { id: ofertaDetalleId, ofertaId: ofertaIdVerificar },
+            include: { galeriaDetalle: true, videoDetalle: true, documentosDetalle: true }
+        });
+        if (!detalle) return { success: false, error: "Detalle de oferta no encontrado." };
+        const validationResult = OfertaDetalleCompletoSchema.safeParse(detalle);
+        if (!validationResult.success) {
+            console.error("Error Zod en obtenerOfertaDetallePorIdAction:", validationResult.error.flatten());
+            return { success: false, error: "Formato de datos de detalle inválido." };
+        }
+        return { success: true, data: validationResult.data };
+    } catch { /* ... */ }
+    return { success: false, error: "Error desconocido" } // Fallback
+}
+
+
+
+
+// --- Dummy implementations for completeness ---
+// En tu proyecto real, estos helpers vendrían de tus propios archivos.
+// type ActionResult<T> = { success: boolean; data?: T; error?: string, errorDetails?: unknown };
+const getEmbeddingForText = async (text: string): Promise<number[] | null> => { console.log(`Generating embedding for: ${text}`); return [0.1, 0.2, 0.3]; };
+const eliminarArchivoStorage = async (url: string): Promise<void> => { console.log(`Deleting file from storage: ${url}`); };
+// --- End of Dummy implementations ---
+
+
 // Esta acción es para el formulario de EDICIÓN COMPLETO (OfertaDetalleForm.tsx)
 export async function updateOfertaDetalleAction(
     ofertaDetalleId: string,
@@ -316,25 +269,82 @@ export async function updateOfertaDetalleAction(
     }
 }
 
-// obtenerOfertaDetallePorIdAction (para cargar datos para el form de edición)
-export async function obtenerOfertaDetallePorIdAction(
+
+export async function eliminarOfertaDetalleAction(
     ofertaDetalleId: string,
-    ofertaIdVerificar: string
-): Promise<ActionResult<OfertaDetalleCompletoType>> {
-    // ... (sin cambios respecto a la versión anterior que ya te pasé, que usa OfertaDetalleCompletoSchema)
-    if (!ofertaDetalleId || !ofertaIdVerificar) return { success: false, error: "IDs requeridos faltantes." };
+    negocioId: string,
+    clienteId: string,
+    ofertaId: string
+): Promise<ActionResult<null>> {
+    if (!ofertaDetalleId || !negocioId || !clienteId || !ofertaId) {
+        return { success: false, error: "Faltan parámetros requeridos para eliminar el detalle." };
+    }
+
     try {
-        const detalle = await prisma.ofertaDetalle.findUnique({
-            where: { id: ofertaDetalleId, ofertaId: ofertaIdVerificar },
-            include: { galeriaDetalle: true, videoDetalle: true, documentosDetalle: true }
+        const resultInTransaction = await prisma.$transaction(async (tx) => {
+            const detalle = await tx.ofertaDetalle.findFirst({
+                where: {
+                    id: ofertaDetalleId,
+                    ofertaId: ofertaId,
+                    oferta: { negocioId: negocioId }
+                },
+                include: {
+                    galeriaDetalle: { select: { id: true, imageUrl: true, tamañoBytes: true } },
+                    videoDetalle: { select: { id: true, videoUrl: true, tipoVideo: true, tamañoBytes: true } },
+                    documentosDetalle: { select: { id: true, documentoUrl: true, documentoTamanoBytes: true } },
+                }
+            });
+
+            if (!detalle) {
+                throw new Error("NOT_FOUND_OR_FORBIDDEN"); // Error específico para la transacción
+            }
+
+            let bytesDecrementados = BigInt(0);
+
+            for (const item of detalle.galeriaDetalle) {
+                if (item.imageUrl) await eliminarArchivoStorage(item.imageUrl);
+                bytesDecrementados += BigInt(item.tamañoBytes || 0);
+            }
+            if (detalle.videoDetalle && detalle.videoDetalle.videoUrl && detalle.videoDetalle.tipoVideo === 'SUBIDO') {
+                await eliminarArchivoStorage(detalle.videoDetalle.videoUrl);
+                bytesDecrementados += BigInt(detalle.videoDetalle.tamañoBytes || 0);
+            }
+            for (const item of detalle.documentosDetalle) {
+                if (item.documentoUrl) await eliminarArchivoStorage(item.documentoUrl);
+                bytesDecrementados += BigInt(item.documentoTamanoBytes || 0);
+            }
+
+            await tx.ofertaDetalleGaleria.deleteMany({ where: { ofertaDetalleId } });
+            if (detalle.videoDetalle) {
+                await tx.ofertaDetalleVideo.deleteMany({ where: { ofertaDetalleId: ofertaDetalleId } });
+            }
+            await tx.ofertaDetalleDocumento.deleteMany({ where: { ofertaDetalleId } });
+
+            await tx.ofertaDetalle.delete({ where: { id: ofertaDetalleId } });
+
+            if (bytesDecrementados > BigInt(0)) {
+                await tx.negocio.update({
+                    where: { id: negocioId },
+                    data: { almacenamientoUsadoBytes: { decrement: Number(bytesDecrementados) } },
+                });
+            }
+            return { success: true, data: null };
         });
-        if (!detalle) return { success: false, error: "Detalle de oferta no encontrado." };
-        const validationResult = OfertaDetalleCompletoSchema.safeParse(detalle);
-        if (!validationResult.success) {
-            console.error("Error Zod en obtenerOfertaDetallePorIdAction:", validationResult.error.flatten());
-            return { success: false, error: "Formato de datos de detalle inválido." };
+
+        if (resultInTransaction.success) {
+            revalidatePath(getPathToOfertaEdicionPage(clienteId, negocioId, ofertaId));
         }
-        return { success: true, data: validationResult.data };
-    } catch { /* ... */ }
-    return { success: false, error: "Error desconocido" } // Fallback
+        return resultInTransaction;
+
+    } catch (error: unknown) {
+        console.error("Error en eliminarOfertaDetalleAction:", error);
+        if (error instanceof Error && error.message === "NOT_FOUND_OR_FORBIDDEN") {
+            return { success: false, error: "Detalle de oferta no encontrado o no pertenece al contexto." };
+        }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            revalidatePath(getPathToOfertaEdicionPage(clienteId, negocioId, ofertaId));
+            return { success: true, data: null, error: "El detalle ya había sido eliminado (P2025)." };
+        }
+        return { success: false, error: "No se pudo eliminar el detalle de la oferta." };
+    }
 }

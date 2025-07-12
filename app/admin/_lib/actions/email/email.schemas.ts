@@ -17,12 +17,6 @@ export const EnviarConfirmacionPagoInputSchema = z.object({
     montoPagado: z.number().positive("El monto pagado debe ser positivo."),
     moneda: z.string().min(3, "La moneda es requerida (ej. MXN, USD).").max(3),
     idTransaccionStripe: z.string().optional(), // Referencia de Stripe
-
-    // Datos de ProMedia (para el footer o personalización)
-    // nombrePlataforma: z.string().default("ProMedia"),
-    // urlPlataforma: z.string().url().optional(),
-
-    // Opcional: Link directo a la vitrina o página de "mis pedidos" del negocio
     linkDetallesPedidoEnVitrina: z.string().url().nullable().optional(),
 });
 export type EnviarConfirmacionPagoInput = z.infer<typeof EnviarConfirmacionPagoInputSchema>;
