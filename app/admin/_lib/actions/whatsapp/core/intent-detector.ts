@@ -7,7 +7,7 @@ import { EstadoTareaConversacional } from '@prisma/client';
 import type { ActionResult } from '../../../types';
 import type { FsmContext, WhatsAppMessageInput } from '../whatsapp.schemas';
 import { generarRespuestaAsistente } from '@/app/admin/_lib/ia/ia.actions';
-import { enviarMensajeAsistente } from './orchestrator';
+// import { enviarMensajeAsistente } from './orchestrator';
 
 // Handlers de Tareas
 import { manejarAgendarCita } from '../tasks/agendarCita.handler';
@@ -66,7 +66,7 @@ export async function manejarConversacionGeneral(
         }
     } catch (error) {
         console.error("[INTENT-DETECTOR] Error al llamar a la IA o procesar la intención:", error);
-        await enviarMensajeAsistente(contexto.conversacionId, "Lo siento, estoy teniendo problemas para procesar tu solicitud. Por favor, intenta de nuevo en un momento.", contexto.usuarioWaId, contexto.negocioPhoneNumberId);
+        // await enviarMensajeAsistente(contexto.conversacionId, "Lo siento, estoy teniendo problemas para procesar tu solicitud. Por favor, intenta de nuevo en un momento.", contexto.usuarioWaId, contexto.negocioPhoneNumberId);
         return { success: false, error: "Error en la detección de intención." };
     }
 }
