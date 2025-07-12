@@ -12,6 +12,7 @@ interface ConfirmacionCitaEmail_v2_Props {
     nombreNegocio: string;
     logoNegocioUrl?: string;
     nombreServicio: string;
+    nombreOferta: string;
     fechaHoraCita: Date;
     detallesAdicionales?: string;
     modalidadCita?: 'presencial' | 'virtual';
@@ -26,12 +27,30 @@ interface ConfirmacionCitaEmail_v2_Props {
     emailCopia?: string | null;
 }
 
+// ✅ NUEVO HELPER: Función para formatear el número de teléfono
+const formatPhoneNumber = (phone: string | null | undefined): string | null => {
+    if (!phone) return null;
+    // Limpia cualquier caracter que no sea un dígito
+    const cleaned = ('' + phone).replace(/\D/g, '');
+    // Si tenemos 10 dígitos, aplicamos el formato de México
+    if (cleaned.length === 10) {
+        const match = cleaned.match(/^(\d{2})(\d{4})(\d{4})$/);
+        if (match) {
+            return `(${match[1]}) ${match[2]}-${match[3]}`;
+        }
+    }
+    // Si no, devolvemos el número original
+    return phone;
+};
+
+
 export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> = (props) => {
     const {
         nombreDestinatario,
         nombreNegocio,
         logoNegocioUrl,
         nombreServicio,
+        nombreOferta,
         fechaHoraCita,
         detallesAdicionales,
         modalidadCita,
@@ -51,7 +70,10 @@ export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> 
         timeZone: 'America/Mexico_City',
     });
 
-    const previewText = `Confirmación de tu cita para ${nombreServicio} en ${nombreNegocio}`;
+    // ✅ Se formatea el teléfono antes de mostrarlo
+    const telefonoFormateado = formatPhoneNumber(telefonoContacto);
+
+    const previewText = `Cita confirmada para ${nombreDestinatario} en ${nombreOferta}`;
 
     return (
         <Html>
@@ -75,7 +97,7 @@ export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> 
                             Hola, {nombreDestinatario},
                         </Text>
                         <Text className="text-gray-700 text-base leading-relaxed">
-                            Te confirmamos que tu cita para **{nombreServicio}** en **{nombreNegocio}** ha sido agendada con éxito.
+                            Te confirmamos que tu cita para **{nombreServicio}** (parte de la oferta **{nombreOferta}**) en **{nombreNegocio}** ha sido agendada con éxito.
                         </Text>
 
                         <Section className="bg-gray-50 my-6 p-6 rounded-md border border-gray-200">
@@ -100,8 +122,9 @@ export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> 
                                 <><Hr className="border-gray-200 my-3" /><Text className="text-gray-800 m-0"><strong>Te atenderá:</strong> {nombrePersonaContacto}</Text></>
                             )}
 
-                            {telefonoContacto && (
-                                <><Hr className="border-gray-200 my-3" /><Text className="text-gray-800 m-0"><strong>Teléfono de Contacto:</strong> {telefonoContacto}</Text></>
+                            {/* ✅ Se muestra el teléfono ya formateado */}
+                            {telefonoFormateado && (
+                                <><Hr className="border-gray-200 my-3" /><Text className="text-gray-800 m-0"><strong>Teléfono de Contacto:</strong> {telefonoFormateado}</Text></>
                             )}
 
                             {modalidadCita === 'presencial' && ubicacionCita && (
