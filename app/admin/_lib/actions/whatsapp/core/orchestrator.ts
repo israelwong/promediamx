@@ -7,18 +7,30 @@ import { InteraccionParteTipo } from '@prisma/client';
 import type { ActionResult } from '../../../types';
 import { type ProcesarMensajeWhatsAppInput, type FsmContext, type AsistenteContext } from '../whatsapp.schemas';
 
-// Por ahora, las importaciones de los handlers de tareas no son necesarias
-// import { manejarAgendarCita } from '../tasks/agendarCita.handler';
-
 /**
  * Esta es la función que configura la conversación.
- * La reintroducimos para ver si es la fuente del error.
+ * Ahora incluye una prueba de conexión a la BD.
  */
 async function setupConversacion(
     input: ProcesarMensajeWhatsAppInput
 ): Promise<ActionResult<FsmContext>> {
     console.log("[ORCHESTRATOR - SETUP] Iniciando configuración de conversación...");
     const { negocioPhoneNumberId, usuarioWaId, nombrePerfilUsuario, mensaje, messageIdOriginal } = input;
+
+    // ✅ PASO DE PRUEBA: Intentamos una consulta simple a la BD primero.
+    try {
+        console.log("[ORCHESTRATOR - SETUP] Probando conexión a la base de datos...");
+        const negocioTest = await prisma.negocio.findFirst({ select: { id: true } });
+        if (negocioTest) {
+            console.log(`[ORCHESTRATOR - SETUP] ¡ÉXITO! Conexión a la BD establecida. Encontrado negocio con ID: ${negocioTest.id}`);
+        } else {
+            console.warn("[ORCHESTRATOR - SETUP] Conexión a la BD exitosa, pero no se encontraron negocios.");
+        }
+    } catch (dbError) {
+        console.error("[ORCHESTRATOR - SETUP] ¡FALLO CRÍTICO! No se pudo conectar a la base de datos.", dbError);
+        // Devolvemos un error claro para saber que este es el problema.
+        return { success: false, error: "Error de conexión con la base de datos." };
+    }
 
     try {
         const result = await prisma.$transaction(async (tx) => {
@@ -82,29 +94,24 @@ async function setupConversacion(
 
 
 /**
- * VERSIÓN DE PRUEBA DE ORQUESTADOR (PASO 2)
+ * VERSIÓN DE PRUEBA DE ORQUESTADOR (PASO 3)
  * Llama a setupConversacion para probar la conexión con la BD.
  */
 export async function procesarMensajeWhatsAppEntranteAction(
     input: ProcesarMensajeWhatsAppInput
 ): Promise<ActionResult<null>> {
 
-    console.log("--- [ORCHESTRATOR - PASO 2] Intentando ejecutar setupConversacion... ---");
+    console.log("--- [ORCHESTRATOR - PASO 3] Intentando ejecutar setupConversacion... ---");
 
     const setupResult = await setupConversacion(input);
 
     if (!setupResult.success) {
-        console.error("[ORCHESTRATOR - PASO 2] FALLO en setupConversacion. El problema está en la conexión a la BD o en la lógica de la transacción.");
+        console.error("[ORCHESTRATOR - PASO 3] FALLO en setupConversacion. El problema está en la conexión a la BD o en la lógica de la transacción.");
         return { success: false, error: setupResult.error };
     }
 
-    console.log("[ORCHESTRATOR - PASO 2] ¡ÉXITO! setupConversacion se ejecutó correctamente.");
+    console.log("[ORCHESTRATOR - PASO 3] ¡ÉXITO! setupConversacion se ejecutó correctamente.");
     // Por ahora, no hacemos nada más.
 
     return { success: true, data: null };
 }
-
-
-// RUTA: /actions/whatsapp/core/intent-detector.ts
-// (Este archivo se mantiene vacío para esta prueba)
-
