@@ -5,7 +5,7 @@ import { z } from 'zod';
 import prisma from '@/app/admin/_lib/prismaClient';
 import { StatusAgenda, Prisma } from '@prisma/client';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/email.actions';
+import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
 import { isBefore } from 'date-fns';
 
 const CreateAppointmentSchema = z.object({
