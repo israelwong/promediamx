@@ -51,9 +51,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 if (messageEntry && contactInfo && metadata) {
                     console.log("[WHATSAPP WEBHOOK] Información de mensaje, contacto y metadata completa. Extrayendo datos...");
-                    // const negocioPhoneNumberId = metadata.phone_number_id;
+                    const negocioPhoneNumberId = metadata.phone_number_id;
                     const usuarioWaId = contactInfo.wa_id;
-                    // const nombrePerfilUsuario = contactInfo.profile.name;
+                    const nombrePerfilUsuario = contactInfo.profile.name;
                     const messageIdOriginal = messageEntry.id;
                     const messageType = messageEntry.type;
 
@@ -67,7 +67,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                         // ✅ NUEVO BLOQUE TRY...CATCH PARA ATRAPAR EL ERROR
                         try {
-                            await procesarMensajeWhatsAppEntranteAction();
+                            await procesarMensajeWhatsAppEntranteAction({
+                                negocioPhoneNumberId,
+                                usuarioWaId,
+                                nombrePerfilUsuario,
+                                mensaje: { type: 'text', content: mensajeUsuario },
+                                messageIdOriginal,
+                            });
                             console.log("[WHATSAPP WEBHOOK] 'procesarMensajeWhatsAppEntranteAction' completado sin errores.");
                         } catch (actionError) {
                             console.error("[WHATSAPP WEBHOOK - ERROR EN ACCIÓN] La acción falló:", actionError);
