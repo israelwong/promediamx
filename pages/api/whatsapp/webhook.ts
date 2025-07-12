@@ -35,13 +35,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === "POST") {
         console.log("--- [WHATSAPP WEBHOOK] Solicitud POST recibida ---");
         const payload = req.body;
-        // Logueamos el cuerpo completo para una depuración exhaustiva.
         console.log("[WHATSAPP WEBHOOK] Payload completo:", JSON.stringify(payload, null, 2));
 
         // Respondemos 200 OK inmediatamente a Meta para evitar timeouts.
         res.status(200).json({ status: "Evento recibido por el webhook." });
 
-        // Procesamos el mensaje en segundo plano.
         try {
             const value = payload.entry?.[0]?.changes?.[0]?.value;
 
@@ -66,15 +64,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         console.log(`[WHATSAPP WEBHOOK] Mensaje de texto de ${usuarioWaId}: "${mensajeUsuario}"`);
 
                         console.log("[WHATSAPP WEBHOOK] Llamando a 'procesarMensajeWhatsAppEntranteAction'...");
-                        // Usamos un await para poder capturar errores específicos de esta llamada.
-                        await procesarMensajeWhatsAppEntranteAction({
-                            negocioPhoneNumberId,
-                            usuarioWaId,
-                            nombrePerfilUsuario,
-                            mensaje: { type: 'text', content: mensajeUsuario },
-                            messageIdOriginal,
-                        });
-                        console.log("[WHATSAPP WEBHOOK] 'procesarMensajeWhatsAppEntranteAction' completado.");
+
+                        // ✅ NUEVO BLOQUE TRY...CATCH PARA ATRAPAR EL ERROR
+                        try {
+                            await procesarMensajeWhatsAppEntranteAction({
+                                negocioPhoneNumberId,
+                                usuarioWaId,
+                                nombrePerfilUsuario,
+                                mensaje: { type: 'text', content: mensajeUsuario },
+                                messageIdOriginal,
+                            });
+                            console.log("[WHATSAPP WEBHOOK] 'procesarMensajeWhatsAppEntranteAction' completado sin errores.");
+                        } catch (actionError) {
+                            console.error("[WHATSAPP WEBHOOK - ERROR EN ACCIÓN] La acción falló:", actionError);
+                        }
 
                     } else {
                         console.log(`[WHATSAPP WEBHOOK] Mensaje de tipo '${messageType}' recibido pero no se procesará por ahora.`);
@@ -86,14 +89,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 console.warn("[WHATSAPP WEBHOOK] No se encontró el objeto 'value' en el payload.");
             }
         } catch (error) {
-            // Capturamos cualquier error que ocurra durante el procesamiento del payload.
             console.error("[WHATSAPP WEBHOOK] Error CRÍTICO al procesar el payload POST:", error);
         }
 
         return;
     }
 
-    // Si llega cualquier otro método, lo rechazamos.
     res.setHeader('Allow', ['GET', 'POST']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
 }
