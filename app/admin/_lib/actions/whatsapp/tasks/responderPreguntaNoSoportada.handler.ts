@@ -4,7 +4,7 @@
 import prisma from '@/app/admin/_lib/prismaClient';
 import { Prisma } from '@prisma/client';
 import type { FsmContext } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator';
+import { enviarMensajeAsistente } from '../core/orchestrator-original';
 
 export async function responderPreguntaNoSoportada(contexto: FsmContext) {
     const { conversacionId, usuarioWaId, negocioPhoneNumberId, asistente } = contexto;

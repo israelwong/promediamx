@@ -22,7 +22,7 @@ import type { TareaEnProgreso } from '@prisma/client';
 import { StatusAgenda } from '@prisma/client';
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator';
+import { enviarMensajeAsistente } from '../core/orchestrator-original';
 
 export async function manejarBuscarCitas(
     tarea: TareaEnProgreso,

@@ -21,7 +21,6 @@ import type { TareaEnProgreso, Prisma } from '@prisma/client';
 import { EstadoTareaConversacional, StatusAgenda } from '@prisma/client';
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ReagendarCitaContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator';
 import { findBestMatchingAppointment, verificarDisponibilidad } from '../helpers/availability.helpers';
 import { extraerPalabrasClaveDeFecha } from '../helpers/ia.helpers';
 import { construirFechaDesdePalabrasClave } from '../helpers/date.helpers';
@@ -29,6 +28,7 @@ import { ejecutarReagendamientoFinalAction } from '../helpers/actions.helpers';
 import { enviarEmailReagendamientoAction } from '../../email/email.actions';
 import { sonElMismoDia } from '../helpers/date.helpers';
 import { verificarYmanejarEscape } from '../helpers/fsm.helpers'; // Importa el nuevo helper
+import { enviarMensajeAsistente } from '../core/orchestrator-original';
 
 
 type CitaParaSeleccion = {

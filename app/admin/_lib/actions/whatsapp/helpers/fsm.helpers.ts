@@ -2,9 +2,9 @@
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
-import { enviarMensajeAsistente } from '../core/orchestrator';
 import type { TareaEnProgreso } from '@prisma/client';
 import type { FsmContext, WhatsAppMessageInput } from '../whatsapp.schemas';
+import { enviarMensajeAsistente } from '../core/orchestrator-original';
 
 export async function verificarYmanejarEscape(
     tarea: TareaEnProgreso,

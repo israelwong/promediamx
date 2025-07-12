@@ -25,7 +25,7 @@ import { construirFechaDesdePalabrasClave } from '../helpers/date.helpers';
 import { extraerPalabrasClaveDeFecha, construirPromptDeExtraccionDinamico } from '../helpers/ia.helpers';
 import { construirPreguntaDinamica, ejecutarConfirmacionFinalCitaAction } from '../helpers/actions.helpers';
 import { findBestMatchingService, verificarDisponibilidad, findBestMatchingServiceWithIA } from '../helpers/availability.helpers';
-import { enviarMensajeAsistente } from '../core/orchestrator';
+import { enviarMensajeAsistente } from '../core/orchestrator-original';
 import { enviarEmailConfirmacionCita } from '../../email/email.actions';
 import { generarRespuestaAsistente } from '../../../ia/ia.actions';
 import { validarConfirmacionConIA } from '../helpers/ia.helpers';

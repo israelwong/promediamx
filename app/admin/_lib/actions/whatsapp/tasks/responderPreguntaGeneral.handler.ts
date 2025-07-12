@@ -9,8 +9,8 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import { Prisma } from '@prisma/client';
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator';
 import { getEmbeddingForText } from '@/app/admin/_lib/ia/ia.actions';
+import { enviarMensajeAsistente } from '../core/orchestrator-original';
 
 type ResultadoBusquedaSemantica = {
     id: string;
