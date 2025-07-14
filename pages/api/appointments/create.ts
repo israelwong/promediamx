@@ -4,8 +4,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import prisma from '@/app/admin/_lib/prismaClient';
 import { StatusAgenda, Prisma } from '@prisma/client';
+// ✅ Se vuelve a utilizar el helper de disponibilidad que ya funcionaba.
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
+import { enviarEmailConfirmacionCita_v3 } from '@/app/admin/_lib/actions/email/emailv3.actions';
 import { isBefore } from 'date-fns';
 
 const CreateAppointmentSchema = z.object({
@@ -36,27 +37,17 @@ export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse<ApiResponse>
 ) {
-    // LOG DE DIAGNÓSTICO #0: ¿Se está alcanzando el handler?
-    console.log(`\n--- [DEBUG] API /api/appointments/create HIT ---`);
-    console.log(`[DEBUG] Method: ${req.method}`);
-
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ message: `Método ${req.method} no permitido` });
     }
 
     try {
-        // LOG DE DIAGNÓSTICO #0.1: ¿Cuál es el cuerpo de la solicitud?
-        console.log("[DEBUG] Raw Request Body:", req.body);
-
         const validation = CreateAppointmentSchema.safeParse(req.body);
         if (!validation.success) {
-            // LOG DE DIAGNÓSTICO #0.2: Si la validación falla, lo sabremos.
-            console.error("[DEBUG] Zod validation FAILED:", validation.error.flatten());
             return res.status(400).json({ message: "Datos inválidos.", error: "La información enviada no es correcta.", details: validation.error.flatten() });
         }
 
-        console.log("[DEBUG] Zod validation PASSED.");
         const data = validation.data;
         const fechaDeseadaObj = new Date(data.fechaHoraCita);
 
@@ -67,6 +58,7 @@ export default async function handler(
             });
         }
 
+        // Se mantiene la llamada al helper original
         const disponibilidad = await verificarDisponibilidad({
             negocioId: data.negocioId,
             tipoDeCitaId: data.tipoDeCitaId,
@@ -78,6 +70,9 @@ export default async function handler(
             return res.status(409).json({ message: "Conflicto de horario.", error: "Lo sentimos, este horario acaba de ser ocupado. Por favor, elige otro." });
         }
 
+        // ✅ REFACTOR 1: Limpiar el número de teléfono para obtener los últimos 10 dígitos.
+        const telefonoLimpio = data.telefono.replace(/\D/g, '').slice(-10);
+
         const jsonParams = {
             colegio: data.colegio,
             grado: data.grado,
@@ -85,33 +80,25 @@ export default async function handler(
             source: data.source || 'Formulario Web',
         };
 
-        const primerPipeline = await prisma.pipelineCRM.findFirst({
+        const pipelineAgendado = await prisma.pipelineCRM.findFirst({
+            where: { crmId: data.crmId, nombre: 'Agendado' }
+        });
+        const primerPipeline = pipelineAgendado ? null : await prisma.pipelineCRM.findFirst({
             where: { crmId: data.crmId },
             orderBy: { orden: 'asc' }
         });
+        const pipelineIdFinal = pipelineAgendado?.id || primerPipeline?.id;
 
         const lead = await prisma.lead.upsert({
             where: { email: data.email },
-            update: {
-                nombre: data.nombre,
-                telefono: data.telefono,
-                jsonParams: jsonParams as Prisma.JsonObject,
-            },
-            create: {
-                nombre: data.nombre,
-                email: data.email,
-                telefono: data.telefono,
-                crmId: data.crmId,
-                jsonParams: jsonParams as Prisma.JsonObject,
-                pipelineId: primerPipeline?.id,
-            },
+            update: { nombre: data.nombre, telefono: telefonoLimpio, jsonParams: jsonParams as Prisma.JsonObject, pipelineId: pipelineIdFinal },
+            create: { nombre: data.nombre, email: data.email, telefono: telefonoLimpio, crmId: data.crmId, jsonParams: jsonParams as Prisma.JsonObject, pipelineId: pipelineIdFinal },
         });
 
         const [tipoCita, negocio, oferta] = await Promise.all([
             prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: data.tipoDeCitaId } }),
             prisma.negocio.findUniqueOrThrow({
                 where: { id: data.negocioId },
-                include: { AsistenteVirtual: true }
             }),
             prisma.oferta.findUnique({ where: { id: data.ofertaId } })
         ]);
@@ -119,8 +106,6 @@ export default async function handler(
         if (!oferta) {
             return res.status(404).json({ message: "Oferta no encontrada." });
         }
-
-        console.log("DEBUG: Objeto 'oferta' recuperado de la BD:", oferta);
 
         const descripcionEnriquecida = `Cita desde ${jsonParams.source}. Colegio: ${data.colegio || 'N/A'}, Nivel: ${data.nivel_educativo || 'N/A'}, Grado: ${data.grado || 'N/A'}.`;
 
@@ -143,30 +128,18 @@ export default async function handler(
             if (data.nivel_educativo) detallesAdicionales += `<p><b>Nivel:</b> ${data.nivel_educativo}</p>`;
             if (data.grado) detallesAdicionales += `<p><b>Grado:</b> ${data.grado}</p>`;
 
-            const asistenteActivo = negocio.AsistenteVirtual;
-            const numeroWhatsappAsistente = asistenteActivo?.whatsappBusiness?.replace(/\D/g, '');
-            let linkCancelarWhatsApp: string | undefined, linkReagendarWhatsApp: string | undefined;
-
-            if (numeroWhatsappAsistente) {
-                const fechaFormateadaParaLink = new Date(nuevaCita.fecha).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' });
-                const textoCancelar = `Quiero "cancelar" mi cita de "${tipoCita.nombre}" del ${fechaFormateadaParaLink}.`;
-                const textoReagendar = `Quiero "reagendar" mi cita de "${tipoCita.nombre}" del ${fechaFormateadaParaLink}.`;
-                linkCancelarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoCancelar)}`;
-                linkReagendarWhatsApp = `https://wa.me/${numeroWhatsappAsistente}?text=${encodeURIComponent(textoReagendar)}`;
-            }
-
             const emailProps = {
                 emailDestinatario: lead.email,
                 nombreDestinatario: lead.nombre,
                 nombreNegocio: negocio.nombre,
                 nombreServicio: tipoCita.nombre,
-                // ✅ Se añade el nombre de la oferta
                 nombreOferta: oferta.nombre,
                 fechaHoraCita: nuevaCita.fecha,
                 detallesAdicionales: detallesAdicionales,
                 emailRespuestaNegocio: negocio.email || 'contacto@promedia.mx',
-                linkCancelar: linkCancelarWhatsApp,
-                linkReagendar: linkReagendarWhatsApp,
+                // ✅ REFACTOR 2: Se omiten los links de Cancelar y Reagendar
+                // linkCancelar: undefined,
+                // linkReagendar: undefined,
                 emailCopia: oferta.emailCopiaConfirmacion,
                 nombrePersonaContacto: oferta.nombrePersonaContacto,
                 telefonoContacto: oferta.telefonoContacto,
@@ -177,9 +150,7 @@ export default async function handler(
                 duracionCitaMinutos: tipoCita.duracionMinutos,
             };
 
-            console.log("DEBUG: Props enviadas a la acción de email:", emailProps);
-
-            await enviarEmailConfirmacionCita_v2(emailProps);
+            await enviarEmailConfirmacionCita_v3(emailProps);
         }
 
         return res.status(201).json({ message: 'Cita creada exitosamente.', data: { citaId: nuevaCita.id } });
