@@ -6,7 +6,6 @@ import { PrismaClient } from '@prisma/client';
 // Esto es necesario porque en desarrollo, con el hot-reloading de Next.js,
 // se pueden crear múltiples instancias de PrismaClient, agotando las conexiones.
 declare global {
-    // eslint-disable-next-line no-var
     var prisma: PrismaClient | undefined;
 }
 
