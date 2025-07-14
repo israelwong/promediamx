@@ -1,3 +1,6 @@
+/**
+ * Ruta actual: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/RealtimeLeadsView.tsx
+ */
 "use client";
 
 import React, { useState, useEffect } from 'react';

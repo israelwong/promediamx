@@ -48,8 +48,6 @@ import { revalidatePath } from 'next/cache';
 import { type ListarLeadsResult } from './lead.schemas';
 
 
-
-
 export async function listarLeadsAction(
     params: z.infer<typeof listarLeadsParamsSchema>
 ): Promise<ActionResult<ListarLeadsResult>> {
@@ -63,8 +61,24 @@ export async function listarLeadsAction(
     const skip = (page - 1) * pageSize;
 
     try {
+        // ✅ PASO 1: Encontrar el CRM asociado a este negocio de forma explícita.
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId: negocioId },
+            select: { id: true }
+        });
+
+        // Si no hay un CRM para este negocio, no puede haber leads.
+        if (!crm) {
+            console.warn(`[listarLeadsAction] No se encontró un CRM para el negocioId: ${negocioId}`);
+            return { success: true, data: { leads: [], totalCount: 0, page, pageSize } };
+        }
+
+        const crmId = crm.id;
+        console.log(`[listarLeadsAction] CRM encontrado con ID: ${crmId}. Buscando leads...`);
+
+        // ✅ PASO 2: Usar el crmId para filtrar los leads directamente.
         const whereClause: Prisma.LeadWhereInput = {
-            crm: { negocioId },
+            crmId: crmId, // <-- Filtro directo y robusto
             ...(searchTerm && {
                 OR: [
                     { nombre: { contains: searchTerm, mode: 'insensitive' } },
@@ -93,6 +107,8 @@ export async function listarLeadsAction(
             prisma.lead.count({ where: whereClause }),
         ]);
 
+        console.log(`[listarLeadsAction] Consulta finalizada. Se encontraron ${totalCount} leads.`);
+
         const result: ListarLeadsResult = {
             leads: leads.map(lead => ({
                 id: lead.id,
@@ -115,6 +131,73 @@ export async function listarLeadsAction(
         return { success: false, error: "No se pudieron cargar los leads." };
     }
 }
+
+
+// export async function listarLeadsAction(
+//     params: z.infer<typeof listarLeadsParamsSchema>
+// ): Promise<ActionResult<ListarLeadsResult>> {
+
+//     const validation = listarLeadsParamsSchema.safeParse(params);
+//     if (!validation.success) {
+//         return { success: false, error: "Parámetros inválidos." };
+//     }
+
+//     const { negocioId, page, pageSize, searchTerm } = validation.data;
+//     const skip = (page - 1) * pageSize;
+
+//     try {
+//         const whereClause: Prisma.LeadWhereInput = {
+//             crm: { negocioId },
+//             ...(searchTerm && {
+//                 OR: [
+//                     { nombre: { contains: searchTerm, mode: 'insensitive' } },
+//                     { email: { contains: searchTerm, mode: 'insensitive' } },
+//                     { telefono: { contains: searchTerm, mode: 'insensitive' } },
+//                 ],
+//             }),
+//         };
+
+//         const [leads, totalCount] = await prisma.$transaction([
+//             prisma.lead.findMany({
+//                 where: whereClause,
+//                 select: {
+//                     id: true,
+//                     nombre: true,
+//                     email: true,
+//                     telefono: true,
+//                     createdAt: true,
+//                     Pipeline: { select: { id: true, nombre: true } },
+//                     agente: { select: { id: true, nombre: true } },
+//                 },
+//                 orderBy: { createdAt: 'desc' },
+//                 skip,
+//                 take: pageSize,
+//             }),
+//             prisma.lead.count({ where: whereClause }),
+//         ]);
+
+//         const result: ListarLeadsResult = {
+//             leads: leads.map(lead => ({
+//                 id: lead.id,
+//                 nombre: lead.nombre,
+//                 email: lead.email,
+//                 telefono: lead.telefono,
+//                 createdAt: lead.createdAt,
+//                 etapaPipeline: lead.Pipeline,
+//                 agenteAsignado: lead.agente,
+//             })),
+//             totalCount,
+//             page,
+//             pageSize,
+//         };
+
+//         return { success: true, data: result };
+
+//     } catch (error) {
+//         console.error("Error en listarLeadsAction:", error);
+//         return { success: false, error: "No se pudieron cargar los leads." };
+//     }
+// }
 
 
 export async function obtenerDatosFiltrosLeadAction(

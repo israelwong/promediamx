@@ -5,10 +5,11 @@ import { z } from 'zod';
 import prisma from '@/app/admin/_lib/prismaClient';
 import { StatusAgenda, Prisma } from '@prisma/client';
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
+// ✅ Se importa la versión correcta de la acción de email que maneja el contenido enriquecido
 import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
 import { isBefore } from 'date-fns';
 
-// ✅ SOLUCIÓN: Se elimina 'crmId' del schema. Ya no se acepta desde el cliente.
+// ✅ Se vuelve a incluir ofertaId, que es crucial para la lógica
 const CreateAppointmentSchema = z.object({
     nombre: z.string().min(3, "El nombre es requerido."),
     email: z.string().email("El formato del email es inválido."),
@@ -18,7 +19,8 @@ const CreateAppointmentSchema = z.object({
     }),
     tipoDeCitaId: z.string().cuid(),
     negocioId: z.string().cuid(),
-    ofertaId: z.string().cuid("El ID de la oferta es requerido."),
+    crmId: z.string().cuid(),
+    ofertaId: z.string().cuid("El ID de la oferta es requerido."), // Requerido para obtener los detalles
     colegio: z.string().optional(),
     grado: z.string().optional(),
     nivel_educativo: z.string().optional(),
@@ -46,7 +48,6 @@ export default async function handler(
         if (!validation.success) {
             return res.status(400).json({ message: "Datos inválidos.", error: "La información enviada no es correcta.", details: validation.error.flatten() });
         }
-
         const data = validation.data;
         const fechaDeseadaObj = new Date(data.fechaHoraCita);
 
@@ -68,19 +69,6 @@ export default async function handler(
             return res.status(409).json({ message: "Conflicto de horario.", error: "Lo sentimos, este horario acaba de ser ocupado. Por favor, elige otro." });
         }
 
-        // ✅ PASO 1: Obtener el CRM ID de forma segura a partir del negocioId.
-        const crm = await prisma.cRM.findUnique({
-            where: { negocioId: data.negocioId },
-            select: { id: true }
-        });
-
-        if (!crm) {
-            return res.status(404).json({ message: "Configuración de CRM no encontrada para este negocio." });
-        }
-        const crmId = crm.id;
-
-
-        const telefonoLimpio = data.telefono.replace(/\D/g, '').slice(-10);
         const jsonParams = {
             colegio: data.colegio,
             grado: data.grado,
@@ -88,43 +76,29 @@ export default async function handler(
             source: data.source || 'Formulario Web',
         };
 
-        const pipelineAgendado = await prisma.pipelineCRM.findFirst({
-            where: {
-                crmId: crmId, // Se usa el crmId seguro
-                nombre: { equals: 'Agendado', mode: 'insensitive' }
-            }
+        const primerPipeline = await prisma.pipelineCRM.findFirst({
+            where: { crmId: data.crmId },
+            orderBy: { orden: 'asc' }
         });
-
-        let pipelineFinal: { id: string; nombre: string; } | null = null;
-        if (pipelineAgendado) {
-            pipelineFinal = pipelineAgendado;
-        } else {
-            pipelineFinal = await prisma.pipelineCRM.findFirst({
-                where: { crmId: crmId }, // Se usa el crmId seguro
-                orderBy: { orden: 'asc' }
-            });
-        }
-
-        const leadPayload = {
-            nombre: data.nombre,
-            telefono: telefonoLimpio,
-            jsonParams: jsonParams as Prisma.JsonObject,
-            ...(pipelineFinal && {
-                pipelineId: pipelineFinal.id,
-                status: pipelineFinal.nombre.toLowerCase(),
-            })
-        };
 
         const lead = await prisma.lead.upsert({
             where: { email: data.email },
-            update: leadPayload,
+            update: {
+                nombre: data.nombre,
+                telefono: data.telefono,
+                jsonParams: jsonParams as Prisma.JsonObject,
+            },
             create: {
-                ...leadPayload,
+                nombre: data.nombre,
                 email: data.email,
-                crmId: crmId, // Se usa el crmId seguro
+                telefono: data.telefono,
+                crmId: data.crmId,
+                jsonParams: jsonParams as Prisma.JsonObject,
+                pipelineId: primerPipeline?.id,
             },
         });
 
+        // ✅ Se vuelve a obtener la oferta para usar sus datos enriquecidos
         const [tipoCita, negocio, oferta] = await Promise.all([
             prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: data.tipoDeCitaId } }),
             prisma.negocio.findUniqueOrThrow({
@@ -158,6 +132,7 @@ export default async function handler(
             if (data.nivel_educativo) detallesAdicionales += `<p><b>Nivel:</b> ${data.nivel_educativo}</p>`;
             if (data.grado) detallesAdicionales += `<p><b>Grado:</b> ${data.grado}</p>`;
 
+            // ✅ Se llama a la versión 2 de la acción de email
             await enviarEmailConfirmacionCita_v2({
                 emailDestinatario: lead.email,
                 nombreDestinatario: lead.nombre,
@@ -167,6 +142,10 @@ export default async function handler(
                 fechaHoraCita: nuevaCita.fecha,
                 detallesAdicionales: detallesAdicionales,
                 emailRespuestaNegocio: negocio.email || 'contacto@promedia.mx',
+
+                // ✅ Los links de reagendar/cancelar se omiten
+
+                // ✅ Se pasan los datos enriquecidos desde la oferta
                 emailCopia: oferta.emailCopiaConfirmacion,
                 nombrePersonaContacto: oferta.nombrePersonaContacto,
                 telefonoContacto: oferta.telefonoContacto,

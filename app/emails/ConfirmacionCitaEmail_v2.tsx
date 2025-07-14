@@ -57,8 +57,8 @@ export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> 
         ubicacionCita,
         googleMapsUrl,
         linkReunionVirtual,
-        linkCancelar,
-        linkReagendar,
+        // linkCancelar,
+        // linkReagendar,
         duracionCitaMinutos,
         nombrePersonaContacto,
         telefonoContacto,
@@ -148,7 +148,7 @@ export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> 
                             )}
                         </Section>
 
-                        <Text className="text-gray-600 text-base leading-relaxed text-center">
+                        {/* <Text className="text-gray-600 text-base leading-relaxed text-center">
                             ¿Necesitas hacer cambios?
                         </Text>
 
@@ -163,7 +163,7 @@ export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> 
                                     Cancelar Cita
                                 </Button>
                             )}
-                        </Section>
+                        </Section> */}
 
                         <Hr className="border-gray-200 my-8" />
 
