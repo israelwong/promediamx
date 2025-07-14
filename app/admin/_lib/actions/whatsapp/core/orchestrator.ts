@@ -2,30 +2,48 @@
 
 'use server';
 
-// ❌ SE HAN ELIMINADO TODAS LAS IMPORTACIONES PROBLEMÁTICAS (PRISMA, HANDLERS, ETC.)
-
+// ✅ PASO 1: Reintroducimos la importación de Prisma.
+import prisma from '@/app/admin/_lib/prismaClient';
 import type { ActionResult } from '../../../types';
-// Solo importamos los tipos y el schema, que no ejecutan código.
 import { ProcesarMensajeWhatsAppInputSchema, type ProcesarMensajeWhatsAppInput } from '../whatsapp.schemas';
 
 /**
- * VERSIÓN DE DIAGNÓSTICO FINAL: "PRUEBA DE AISLAMIENTO"
- * Esta función no hace NADA excepto validar que puede ser llamada.
- * Si esto funciona, el problema es la importación de Prisma.
+ * VERSIÓN DE DIAGNÓSTICO: "PRUEBA DE CONEXIÓN A PRISMA"
+ * Esta función valida si la importación y una consulta simple a Prisma funcionan.
  */
 export async function procesarMensajeWhatsAppEntranteAction(
     input: ProcesarMensajeWhatsAppInput
 ): Promise<ActionResult<null>> {
 
-    console.log("--- [DIAGNÓSTICO FINAL] ¡ÉXITO! La acción del orquestador fue invocada. ---");
+    console.log("--- [DIAGNÓSTICO PRISMA] Inicio del procesamiento ---");
 
     const validation = ProcesarMensajeWhatsAppInputSchema.safeParse(input);
     if (!validation.success) {
-        console.error('[DIAGNÓSTICO FINAL] La validación de Zod falló, lo cual es inesperado.');
+        console.error('[DIAGNÓSTICO PRISMA] La validación de Zod falló.');
         return { success: false, error: "Datos de entrada inválidos." };
     }
+    console.log("[DIAGNÓSTICO PRISMA] Validación de Zod EXITOSA.");
 
-    console.log("[DIAGNÓSTICO FINAL] La validación de Zod funcionó. El problema está en una de las importaciones eliminadas (probablemente Prisma).");
+    // ✅ PASO 2: Intentamos una consulta simple para probar la conexión.
+    try {
+        console.log("[DIAGNÓSTICO PRISMA] Intentando consultar la base de datos con Prisma...");
+        const { messageIdOriginal } = validation.data;
+
+        const interaccionExistente = await prisma.interaccion.findFirst({
+            where: { messageId: messageIdOriginal },
+            select: { id: true } // Solo seleccionamos el ID para una consulta rápida
+        });
+
+        if (interaccionExistente) {
+            console.log(`[DIAGNÓSTICO PRISMA] ¡ÉXITO! Conexión a BD y consulta de idempotencia correctas. Mensaje ya existe.`);
+        } else {
+            console.log(`[DIAGNÓSTICO PRISMA] ¡ÉXITO! Conexión a BD y consulta de idempotencia correctas. Mensaje es nuevo.`);
+        }
+
+    } catch (error) {
+        console.error("[DIAGNÓSTICO PRISMA] ¡FALLO CRÍTICO! Error al consultar la base de datos:", error);
+        return { success: false, error: "Error de conexión con la base de datos." };
+    }
 
     return { success: true, data: null };
 }
