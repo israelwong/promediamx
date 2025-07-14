@@ -21,7 +21,7 @@ import { manejarSeguimiento } from '../tasks/manejarSeguimiento.handler';
 // import { manejarEsperandoClarificacionCostos } from '../tasks/esperandoClarificacionCostos.handler';
 
 // Detector de Intenciones
-import { manejarConversacionGeneral } from './intent-detector-original';
+import { manejarConversacionGeneral } from './intent-detector';
 
 // Helpers de Acciones
 import { enviarMensajeInternoYWhatsAppAction } from '../helpers/actions.helpers';

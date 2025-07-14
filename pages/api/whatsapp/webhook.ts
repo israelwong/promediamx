@@ -1,100 +1,176 @@
-// /pages/api/whatsapp/webhook.ts
+// /pages/api/appointments/create.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { procesarMensajeWhatsAppEntranteAction } from '@/app/admin/_lib/actions/whatsapp/whatsapp.actions';
+import { z } from 'zod';
+import prisma from '@/app/admin/_lib/prismaClient';
+import { StatusAgenda, Prisma } from '@prisma/client';
+import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
+import { enviarEmailConfirmacionCita_v3 } from '@/app/admin/_lib/actions/email/emailv3.actions';
+import { isBefore } from 'date-fns';
 
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+const CreateAppointmentSchema = z.object({
+    nombre: z.string().min(3, "El nombre es requerido."),
+    email: z.string().email("El formato del email es inválido."),
+    telefono: z.string().min(10, "El teléfono debe tener al menos 10 dígitos."),
+    fechaHoraCita: z.string().refine((val) => !isNaN(Date.parse(val)), {
+        message: "La fecha debe ser un string de fecha válido.",
+    }),
+    tipoDeCitaId: z.string().cuid(),
+    negocioId: z.string().cuid(),
+    crmId: z.string().cuid(),
+    ofertaId: z.string().cuid("El ID de la oferta es requerido."),
+    colegio: z.string().optional(),
+    grado: z.string().optional(),
+    nivel_educativo: z.string().optional(),
+    source: z.string().optional(),
+});
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+type ApiResponse = {
+    message: string;
+    data?: { citaId: string };
+    error?: string;
+    details?: unknown;
+};
 
-    // =================================================================
-    // PARTE 1: LÓGICA DE VERIFICACIÓN (MÉTODO GET)
-    // =================================================================
-    if (req.method === "GET") {
-        console.log("--- [WHATSAPP WEBHOOK] Solicitud GET de verificación iniciada ---");
-
-        const mode = req.query["hub.mode"];
-        const token = req.query["hub.verify_token"];
-        const challenge = req.query["hub.challenge"];
-
-        console.log(`[WHATSAPP WEBHOOK] Modo: ${mode}, Token Recibido: ${token}`);
-
-        if (mode === "subscribe" && token === VERIFY_TOKEN) {
-            console.log("[WHATSAPP WEBHOOK] Verificación EXITOSA. Devolviendo challenge.");
-            res.status(200).send(challenge);
-        } else {
-            console.error(`[WHATSAPP WEBHOOK] Verificación FALLIDA. Token esperado: ${VERIFY_TOKEN}`);
-            res.status(403).send("Token de verificación inválido.");
-        }
-        return;
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse<ApiResponse>
+) {
+    if (req.method !== 'POST') {
+        res.setHeader('Allow', ['POST']);
+        return res.status(405).json({ message: `Método ${req.method} no permitido` });
     }
 
-    // =================================================================
-    // PARTE 2: LÓGICA DE RECEPCIÓN DE MENSAJES (MÉTODO POST)
-    // =================================================================
-    if (req.method === "POST") {
-        console.log("--- [WHATSAPP WEBHOOK] Solicitud POST recibida ---");
-        const payload = req.body;
-        console.log("[WHATSAPP WEBHOOK] Payload completo:", JSON.stringify(payload, null, 2));
+    try {
+        const validation = CreateAppointmentSchema.safeParse(req.body);
+        if (!validation.success) {
+            return res.status(400).json({ message: "Datos inválidos.", error: "La información enviada no es correcta.", details: validation.error.flatten() });
+        }
 
-        // Respondemos 200 OK inmediatamente a Meta para evitar timeouts.
-        res.status(200).json({ status: "Evento recibido por el webhook." });
+        const data = validation.data;
+        const fechaDeseadaObj = new Date(data.fechaHoraCita);
 
-        try {
-            const value = payload.entry?.[0]?.changes?.[0]?.value;
+        if (isBefore(fechaDeseadaObj, new Date())) {
+            return res.status(400).json({
+                message: "Fecha inválida.",
+                error: "No se puede agendar una cita en una fecha que ya pasó."
+            });
+        }
 
-            if (value) {
-                console.log("[WHATSAPP WEBHOOK] Objeto 'value' encontrado. Procesando...");
-                const contactInfo = value.contacts?.[0];
-                const messageEntry = value.messages?.[0];
-                const metadata = value.metadata;
+        const disponibilidad = await verificarDisponibilidad({
+            negocioId: data.negocioId,
+            tipoDeCitaId: data.tipoDeCitaId,
+            fechaDeseada: fechaDeseadaObj,
+            leadId: 'LEAD_DESDE_MANYCHAT_CONFIRMACION',
+        });
 
-                if (messageEntry && contactInfo && metadata) {
-                    console.log("[WHATSAPP WEBHOOK] Información de mensaje, contacto y metadata completa. Extrayendo datos...");
-                    const negocioPhoneNumberId = metadata.phone_number_id;
-                    const usuarioWaId = contactInfo.wa_id;
-                    const nombrePerfilUsuario = contactInfo.profile.name;
-                    const messageIdOriginal = messageEntry.id;
-                    const messageType = messageEntry.type;
+        if (!disponibilidad.disponible) {
+            return res.status(409).json({ message: "Conflicto de horario.", error: "Lo sentimos, este horario acaba de ser ocupado. Por favor, elige otro." });
+        }
 
-                    console.log(`[WHATSAPP WEBHOOK] Tipo de mensaje: ${messageType}. ID de Mensaje Original: ${messageIdOriginal}`);
+        // ✅ REFACTOR 1: Limpiar el número de teléfono para obtener los últimos 10 dígitos.
+        const telefonoLimpio = data.telefono.replace(/\D/g, '').slice(-10);
 
-                    if (messageType === 'text') {
-                        const mensajeUsuario = messageEntry.text.body;
-                        console.log(`[WHATSAPP WEBHOOK] Mensaje de texto de ${usuarioWaId}: "${mensajeUsuario}"`);
+        const jsonParams = {
+            colegio: data.colegio,
+            grado: data.grado,
+            nivel_educativo: data.nivel_educativo,
+            source: data.source || 'Formulario Web',
+        };
 
-                        console.log("[WHATSAPP WEBHOOK] Llamando a 'procesarMensajeWhatsAppEntranteAction'...");
+        // ✅ REFACTOR 2: Buscar el pipeline "Agendado" y tener un fallback.
+        const pipelineAgendado = await prisma.pipelineCRM.findFirst({
+            where: { crmId: data.crmId, nombre: 'Agendado' }
+        });
 
-                        // ✅ NUEVO BLOQUE TRY...CATCH PARA ATRAPAR EL ERROR
-                        try {
-                            await procesarMensajeWhatsAppEntranteAction({
-                                negocioPhoneNumberId,
-                                usuarioWaId,
-                                nombrePerfilUsuario,
-                                mensaje: { type: 'text', content: mensajeUsuario },
-                                messageIdOriginal,
-                            });
-                            console.log("[WHATSAPP WEBHOOK] 'procesarMensajeWhatsAppEntranteAction' completado sin errores.");
-                        } catch (actionError) {
-                            console.error("[WHATSAPP WEBHOOK - ERROR EN ACCIÓN] La acción falló:", actionError);
-                        }
+        const primerPipeline = pipelineAgendado ? null : await prisma.pipelineCRM.findFirst({
+            where: { crmId: data.crmId },
+            orderBy: { orden: 'asc' }
+        });
 
-                    } else {
-                        console.log(`[WHATSAPP WEBHOOK] Mensaje de tipo '${messageType}' recibido pero no se procesará por ahora.`);
-                    }
-                } else {
-                    console.warn("[WHATSAPP WEBHOOK] Faltan datos esenciales (message, contact, o metadata) en el payload.");
-                }
-            } else {
-                console.warn("[WHATSAPP WEBHOOK] No se encontró el objeto 'value' en el payload.");
+        const pipelineIdFinal = pipelineAgendado?.id || primerPipeline?.id;
+
+        const lead = await prisma.lead.upsert({
+            where: { email: data.email },
+            update: {
+                nombre: data.nombre,
+                telefono: telefonoLimpio, // Usamos el teléfono limpio
+                jsonParams: jsonParams as Prisma.JsonObject,
+                pipelineId: pipelineIdFinal, // Se actualiza al pipeline correcto
+            },
+            create: {
+                nombre: data.nombre,
+                email: data.email,
+                telefono: telefonoLimpio, // Usamos el teléfono limpio
+                crmId: data.crmId,
+                jsonParams: jsonParams as Prisma.JsonObject,
+                pipelineId: pipelineIdFinal, // Se asigna al pipeline correcto
+            },
+        });
+
+        const [tipoCita, negocio, oferta] = await Promise.all([
+            prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: data.tipoDeCitaId } }),
+            prisma.negocio.findUniqueOrThrow({
+                where: { id: data.negocioId },
+                include: { AsistenteVirtual: true }
+            }),
+            prisma.oferta.findUnique({ where: { id: data.ofertaId } })
+        ]);
+
+        if (!oferta) {
+            return res.status(404).json({ message: "Oferta no encontrada." });
+        }
+
+        const descripcionEnriquecida = `Cita desde ${jsonParams.source}. Colegio: ${data.colegio || 'N/A'}, Nivel: ${data.nivel_educativo || 'N/A'}, Grado: ${data.grado || 'N/A'}.`;
+
+        const nuevaCita = await prisma.agenda.create({
+            data: {
+                negocioId: data.negocioId,
+                leadId: lead.id,
+                fecha: fechaDeseadaObj,
+                asunto: `Cita para: ${tipoCita.nombre}`,
+                descripcion: descripcionEnriquecida,
+                tipoDeCitaId: data.tipoDeCitaId,
+                status: StatusAgenda.PENDIENTE,
+                tipo: `Cita ${jsonParams.source}`,
             }
-        } catch (error) {
-            console.error("[WHATSAPP WEBHOOK] Error CRÍTICO al procesar el payload POST:", error);
+        });
+
+        if (lead.email) {
+            let detallesAdicionales = '';
+            if (data.colegio) detallesAdicionales += `<p><b>Colegio:</b> ${data.colegio}</p>`;
+            if (data.nivel_educativo) detallesAdicionales += `<p><b>Nivel:</b> ${data.nivel_educativo}</p>`;
+            if (data.grado) detallesAdicionales += `<p><b>Grado:</b> ${data.grado}</p>`;
+
+            const emailProps = {
+                emailDestinatario: lead.email,
+                nombreDestinatario: lead.nombre,
+                nombreNegocio: negocio.nombre,
+                nombreServicio: tipoCita.nombre,
+                nombreOferta: oferta.nombre,
+                fechaHoraCita: nuevaCita.fecha,
+                detallesAdicionales: detallesAdicionales,
+                emailRespuestaNegocio: negocio.email || 'contacto@promedia.mx',
+                // ✅ REFACTOR 3: Se omiten los links de Cancelar y Reagendar
+                // linkCancelar: undefined,
+                // linkReagendar: undefined,
+                emailCopia: oferta.emailCopiaConfirmacion,
+                nombrePersonaContacto: oferta.nombrePersonaContacto,
+                telefonoContacto: oferta.telefonoContacto,
+                modalidadCita: oferta.googleMapsUrl ? 'presencial' as const : (oferta.linkReunionVirtual ? 'virtual' as const : undefined),
+                ubicacionCita: oferta.direccionUbicacion,
+                googleMapsUrl: oferta.googleMapsUrl,
+                linkReunionVirtual: oferta.linkReunionVirtual,
+                duracionCitaMinutos: tipoCita.duracionMinutos,
+            };
+
+            await enviarEmailConfirmacionCita_v3(emailProps);
         }
 
-        return;
-    }
+        return res.status(201).json({ message: 'Cita creada exitosamente.', data: { citaId: nuevaCita.id } });
 
-    res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    } catch (error) {
+        console.error("Error en API de creación de citas:", error);
+        return res.status(500).json({ message: "Error interno del servidor.", error: 'No se pudo procesar la solicitud.' });
+    }
 }

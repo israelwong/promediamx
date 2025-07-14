@@ -8,9 +8,9 @@ import type { TareaEnProgreso, Prisma } from '@prisma/client';
 import { EstadoTareaConversacional } from '@prisma/client';
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator-original';
+import { enviarMensajeAsistente } from '../core/orchestrator';
 import { manejarAgendarCita } from './agendarCita.handler';
-import { manejarConversacionGeneral } from '../core/intent-detector-original';
+import { manejarConversacionGeneral } from '../core/intent-detector';
 
 export async function manejarSeguimiento(
     tarea: TareaEnProgreso,

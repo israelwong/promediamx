@@ -28,7 +28,7 @@ import { ejecutarReagendamientoFinalAction } from '../helpers/actions.helpers';
 import { enviarEmailReagendamientoAction } from '../../email/email.actions';
 import { sonElMismoDia } from '../helpers/date.helpers';
 import { verificarYmanejarEscape } from '../helpers/fsm.helpers'; // Importa el nuevo helper
-import { enviarMensajeAsistente } from '../core/orchestrator-original';
+import { enviarMensajeAsistente } from '../core/orchestrator';
 
 
 type CitaParaSeleccion = {

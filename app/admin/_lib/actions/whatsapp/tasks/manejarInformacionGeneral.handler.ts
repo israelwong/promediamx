@@ -9,7 +9,7 @@ import { EstadoTareaConversacional } from '@prisma/client';
 // Tipos y Helpers
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator-original';
+import { enviarMensajeAsistente } from '../core/orchestrator';
 import { getEmbeddingForText } from '../../../ia/ia.actions';
 
 /**

@@ -7,7 +7,7 @@ import type { TareaEnProgreso, Prisma } from '@prisma/client';
 // import { ObjetivoOferta } from '@prisma/client';
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput, WhatsAppMessageInput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator-original';
+import { enviarMensajeAsistente } from '../core/orchestrator';
 import { buscarMejoresRespuestas } from './responderPreguntaGeneral.handler'; // Asumimos que el helper vive aquí
 import { manejarSeguimiento } from './manejarSeguimiento.handler';
 

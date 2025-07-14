@@ -4,7 +4,7 @@
 import prisma from '@/app/admin/_lib/prismaClient';
 import type { TareaEnProgreso } from '@prisma/client';
 import type { FsmContext, WhatsAppMessageInput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator-original';
+import { enviarMensajeAsistente } from '../core/orchestrator';
 
 export async function verificarYmanejarEscape(
     tarea: TareaEnProgreso,

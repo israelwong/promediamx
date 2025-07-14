@@ -7,7 +7,7 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import { Prisma, ObjetivoOferta } from '@prisma/client'; // ✅ CORRECCIÓN: Importamos el enum 'ObjetivoOferta'
 import type { ActionResult } from '../../../types';
 import type { FsmContext, ProcesarMensajeWhatsAppOutput } from '../whatsapp.schemas';
-import { enviarMensajeAsistente } from '../core/orchestrator-original';
+import { enviarMensajeAsistente } from '../core/orchestrator';
 import { findBestMatchingOffer } from '../helpers/availability.helpers';
 import { manejarInformacionGeneral } from './manejarInformacionGeneral.handler';
 
