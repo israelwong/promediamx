@@ -11,20 +11,39 @@ import { DiaSemana, StatusAgenda } from '@prisma/client';
 
 /**
  * VERSIÓN FINAL Y FUNCIONAL
- * Esta versión está validada y es la definitiva. Incluye logs.
+ * Añade un pre-procesamiento para convertir números escritos a dígitos.
  */
 function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | null {
     console.log(`[LOG 1] INICIO. Texto original: "${textoFecha}"`);
 
-    const textoCorregido = textoFecha
-        .toLowerCase()
+    let textoProcesado = textoFecha.toLowerCase();
+
+    // ✅ SOLUCIÓN: Convertir números escritos a dígitos antes de analizar.
+    const numberWords: { [key: string]: string } = {
+        'una': '1', 'dos': '2', 'tres': '3', 'cuatro': '4', 'cinco': '5',
+        'seis': '6', 'siete': '7', 'ocho': '8', 'nueve': '9', 'diez': '10',
+        'once': '11', 'doce': '12'
+    };
+
+    for (const word in numberWords) {
+        // Usamos una expresión regular con \b para reemplazar solo la palabra completa.
+        const regex = new RegExp(`\\b${word}\\b`, 'g');
+        textoProcesado = textoProcesado.replace(regex, numberWords[word]);
+    }
+
+    if (textoProcesado !== textoFecha.toLowerCase()) {
+        console.log(`[LOG 1.1] REEMPLAZO DE NÚMEROS. Texto nuevo: "${textoProcesado}"`);
+    }
+
+    // Se realizan los otros reemplazos sobre el texto ya procesado.
+    const textoCorregido = textoProcesado
         .replace(/\bde la mañana\b/g, 'am')
         .replace(/\bde la tarde\b/g, 'pm')
         .replace(/\bde la noche\b/g, 'pm')
         .replace(/\blpm\b/g, '1 pm');
 
-    if (textoCorregido !== textoFecha.toLowerCase()) {
-        console.log(`[LOG 1.1] TEXTO ESTANDARIZADO. Texto nuevo: "${textoCorregido}"`);
+    if (textoCorregido !== textoProcesado) {
+        console.log(`[LOG 1.2] TEXTO ESTANDARIZADO. Texto final: "${textoCorregido}"`);
     }
 
     const ahoraEnZona = toZonedTime(new Date(), timeZone);
@@ -167,7 +186,6 @@ export default async function handler(
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, no atendemos los días ${diaSemana.toLowerCase()}.` });
         }
 
-        // ✅ SOLUCIÓN: Usar Intl.DateTimeFormat para obtener la hora de forma segura.
         const timeFormatter = new Intl.DateTimeFormat('es-MX', {
             hour: '2-digit',
             minute: '2-digit',
@@ -209,7 +227,6 @@ export default async function handler(
         }
 
         console.log('[LOG 19] ÉXITO: El horario está disponible y no hay conflicto de concurrencia.');
-        // --- FIN DE LA LÓGICA DE VALIDACIÓN UNIFICADA ---
 
         return res.status(200).json({
             disponible: true,
