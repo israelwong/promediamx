@@ -18,7 +18,7 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
 
     let textoProcesado = textoFecha.toLowerCase();
 
-    // ✅ SOLUCIÓN: Convertir números escritos a dígitos antes de analizar.
+    // Convertir números escritos a dígitos antes de analizar.
     const numberWords: { [key: string]: string } = {
         'una': '1', 'dos': '2', 'tres': '3', 'cuatro': '4', 'cinco': '5',
         'seis': '6', 'siete': '7', 'ocho': '8', 'nueve': '9', 'diez': '10',
@@ -26,7 +26,6 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
     };
 
     for (const word in numberWords) {
-        // Usamos una expresión regular con \b para reemplazar solo la palabra completa.
         const regex = new RegExp(`\\b${word}\\b`, 'g');
         textoProcesado = textoProcesado.replace(regex, numberWords[word]);
     }
@@ -35,7 +34,6 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
         console.log(`[LOG 1.1] REEMPLAZO DE NÚMEROS. Texto nuevo: "${textoProcesado}"`);
     }
 
-    // Se realizan los otros reemplazos sobre el texto ya procesado.
     const textoCorregido = textoProcesado
         .replace(/\bde la mañana\b/g, 'am')
         .replace(/\bde la tarde\b/g, 'pm')
@@ -150,7 +148,6 @@ export default async function handler(
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, la fecha que buscas (${fechaFormateada}) ya pasó.` });
         }
 
-        // --- LÓGICA DE VALIDACIÓN UNIFICADA ---
         console.log('[LOG 10] Iniciando validación de horario laboral...');
         const [negocioConHorarios, tipoCita] = await Promise.all([
             prisma.negocio.findUnique({
@@ -203,13 +200,21 @@ export default async function handler(
 
         console.log('[LOG 17] ÉXITO: La hora está dentro del horario laboral. Procediendo a verificar concurrencia...');
 
+        // ✅ SOLUCIÓN: Se crea el rango de búsqueda de forma explícita y robusta.
+        const startOfDayStr = formatDateFns(fecha, 'yyyy-MM-dd') + 'T00:00:00';
+        const endOfDayStr = formatDateFns(fecha, 'yyyy-MM-dd') + 'T23:59:59';
+        const startOfDay = toZonedTime(startOfDayStr, timeZone);
+        const endOfDay = toZonedTime(endOfDayStr, timeZone);
+
+        console.log(`[LOG 17.1] Rango de búsqueda de citas: de ${startOfDay.toISOString()} a ${endOfDay.toISOString()}`);
+
         const citasDelDia = await prisma.agenda.findMany({
             where: {
                 negocioId,
                 status: StatusAgenda.PENDIENTE,
                 fecha: {
-                    gte: toZonedTime(new Date(fecha).setHours(0, 0, 0, 0), timeZone),
-                    lt: toZonedTime(new Date(fecha).setHours(23, 59, 59, 999), timeZone),
+                    gte: startOfDay,
+                    lte: endOfDay,
                 },
             }
         });
@@ -222,7 +227,7 @@ export default async function handler(
         });
 
         if (citasSolapadas.length >= tipoCita.limiteConcurrencia) {
-            console.log(`[LOG 18] FALLO: Se excede el límite de concurrencia.`);
+            console.log(`[LOG 18] FALLO: Se excede el límite de concurrencia. Citas solapadas: ${citasSolapadas.length}. Límite: ${tipoCita.limiteConcurrencia}`);
             return res.status(200).json({ disponible: false, mensaje: "Lo siento, ese horario acaba de ser ocupado. Por favor, elige otro." });
         }
 
