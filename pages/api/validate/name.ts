@@ -16,14 +16,36 @@ type ApiResponse = {
 };
 
 /**
- * Limpia un string de caracteres no deseados como emojis.
+ * Limpia un string de frases conversacionales y caracteres no deseados.
  * @param name El nombre original del usuario.
- * @returns El nombre limpio.
+ * @returns El nombre limpio y extraído.
  */
-function cleanName(name: string): string {
-    // Elimina emojis y la mayoría de los símbolos, conservando letras, acentos y espacios.
-    const cleaned = name.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
-    // Reemplaza múltiples espacios con uno solo y recorta los extremos.
+function extractAndCleanName(name: string): string {
+    let processedName = name;
+
+    // ✅ SOLUCIÓN: Lista de frases introductorias a eliminar.
+    const fillerPhrases = [
+        'claro mi nombre es',
+        'mi nombre es',
+        'me llamo',
+        'soy',
+        'claro es',
+        'es',
+    ];
+
+    // Se busca y reemplaza cada frase introductoria (insensible a mayúsculas/minúsculas)
+    for (const phrase of fillerPhrases) {
+        const regex = new RegExp(`^\\s*${phrase}\\s+`, 'i');
+        if (regex.test(processedName)) {
+            processedName = processedName.replace(regex, '');
+            break; // Se detiene después de encontrar la primera coincidencia
+        }
+    }
+
+    // Se aplica la limpieza de emojis y caracteres especiales
+    const cleaned = processedName.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+
+    // Se reemplazan múltiples espacios con uno solo y se recortan los extremos.
     return cleaned.replace(/\s+/g, ' ').trim();
 }
 
@@ -41,19 +63,20 @@ export default async function handler(
     }
 
     const nombreOriginal = validation.data.nombre;
-    const nombreLimpio = cleanName(nombreOriginal);
+    // Se usa la nueva función de extracción y limpieza
+    const nombreLimpio = extractAndCleanName(nombreOriginal);
 
     // Validación 1: El nombre limpio no puede estar vacío.
     if (nombreLimpio.length === 0) {
-        return res.status(200).json({ valid: false, message: "Por favor ingresa tu nombre completo, no son permitidos caracteres especiales o emojis." });
+        return res.status(200).json({ valid: false, message: "No pude identificar un nombre en tu respuesta. Por favor, inténtalo de nuevo." });
     }
 
     // Validación 2: El nombre debe tener al menos 3 caracteres.
     if (nombreLimpio.length < 3) {
-        return res.status(200).json({ valid: false, message: "Por favor, ingresa tu nombre y por lo menos un apellido para poder continuar con tu agendamiento." });
+        return res.status(200).json({ valid: false, message: "Por favor, ingresa un nombre y al menos un apellido para continuar con tu agendamiento." });
     }
 
-    // ✅ NUEVA VALIDACIÓN: Contar las palabras del nombre.
+    // Validación 3: Contar las palabras del nombre.
     const nameParts = nombreLimpio.split(' ');
     if (nameParts.length < 2) {
         return res.status(200).json({
@@ -61,7 +84,6 @@ export default async function handler(
             message: "Por favor, ingresa tu nombre y al menos un apellido para continuar con tu agendamiento."
         });
     }
-
 
     // Si todas las validaciones pasan, el nombre es válido.
     return res.status(200).json({
