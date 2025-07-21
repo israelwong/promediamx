@@ -18,7 +18,7 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
 
     let textoProcesado = textoFecha.toLowerCase();
 
-    // Convertir números escritos a dígitos antes de analizar.
+    // ✅ SOLUCIÓN: Convertir números escritos a dígitos antes de analizar.
     const numberWords: { [key: string]: string } = {
         'una': '1', 'dos': '2', 'tres': '3', 'cuatro': '4', 'cinco': '5',
         'seis': '6', 'siete': '7', 'ocho': '8', 'nueve': '9', 'diez': '10',
@@ -26,6 +26,7 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
     };
 
     for (const word in numberWords) {
+        // Usamos una expresión regular con \b para reemplazar solo la palabra completa.
         const regex = new RegExp(`\\b${word}\\b`, 'g');
         textoProcesado = textoProcesado.replace(regex, numberWords[word]);
     }
@@ -34,6 +35,7 @@ function parsearFechaConPrecision(textoFecha: string, timeZone: string): Date | 
         console.log(`[LOG 1.1] REEMPLAZO DE NÚMEROS. Texto nuevo: "${textoProcesado}"`);
     }
 
+    // Se realizan los otros reemplazos sobre el texto ya procesado.
     const textoCorregido = textoProcesado
         .replace(/\bde la mañana\b/g, 'am')
         .replace(/\bde la tarde\b/g, 'pm')
@@ -127,19 +129,14 @@ export default async function handler(
             return res.status(200).json({ disponible: false, mensaje: "No pude entender la fecha y hora que mencionaste. ¿Podrías ser más específico?" });
         }
 
-        const displayFormatter = new Intl.DateTimeFormat('es-MX', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true,
-            timeZone: timeZone,
+        // ✅ SOLUCIÓN: Se reconstruye el string de fecha para un formato más natural.
+        const dateFormatter = new Intl.DateTimeFormat('es-MX', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: timeZone,
         });
-        const fechaFormateada = displayFormatter.format(fecha)
-            .replace(/ de /g, ' ')
-            .replace(/,/, ' a las');
+        const timeFormatter = new Intl.DateTimeFormat('es-MX', {
+            hour: 'numeric', minute: 'numeric', hour12: true, timeZone: timeZone,
+        });
+        const fechaFormateada = `${dateFormatter.format(fecha).replace(',', '')} a las ${timeFormatter.format(fecha)}`;
 
         console.log(`[LOG 9] Mensaje final formateado: "${fechaFormateada}"`);
 
@@ -183,13 +180,9 @@ export default async function handler(
             return res.status(200).json({ disponible: false, mensaje: `Lo sentimos, no atendemos los días ${diaSemana.toLowerCase()}.` });
         }
 
-        const timeFormatter = new Intl.DateTimeFormat('es-MX', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone: timeZone,
-        });
-        const horaSolicitada = timeFormatter.format(fecha);
+        const horaSolicitada = new Intl.DateTimeFormat('es-MX', {
+            hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timeZone,
+        }).format(fecha);
         const { horaInicio, horaFin } = horarioDelDia;
         console.log(`[LOG 15] Comparando hora solicitada (${horaSolicitada}) con horario del negocio (${horaInicio} - ${horaFin}).`);
 
@@ -200,7 +193,6 @@ export default async function handler(
 
         console.log('[LOG 17] ÉXITO: La hora está dentro del horario laboral. Procediendo a verificar concurrencia...');
 
-        // ✅ SOLUCIÓN: Se crea el rango de búsqueda de forma explícita y robusta.
         const startOfDayStr = formatDateFns(fecha, 'yyyy-MM-dd') + 'T00:00:00';
         const endOfDayStr = formatDateFns(fecha, 'yyyy-MM-dd') + 'T23:59:59';
         const startOfDay = toZonedTime(startOfDayStr, timeZone);
