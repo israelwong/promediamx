@@ -26,7 +26,9 @@ function extractAndCleanName(name: string): string {
     // ✅ SOLUCIÓN: Lista de frases introductorias a eliminar, ahora más robusta.
     const fillerPhrases = [
         // Variaciones con "mi nombre es"
+        'si, claro, mi nombre es',
         'si claro, mi nombre es',
+        'si, claro mi nombre es',
         'si claro mi nombre es',
         'claro, mi nombre es',
         'claro mi nombre es',
@@ -35,16 +37,20 @@ function extractAndCleanName(name: string): string {
         'mi nombre es',
 
         // Variaciones con "me llamo"
+        'si, claro, yo me llamo',
         'si claro, yo me llamo',
-        'si claro yo me llamo',
+        'si, claro me llamo',
+        'si claro me llamo',
         'claro, me llamo',
         'claro me llamo',
         'ok me llamo',
         'me llamo',
 
         // Variaciones con "soy"
+        'si, claro, yo soy',
         'si claro, yo soy',
-        'si claro yo soy',
+        'si, claro soy',
+        'si claro soy',
         'claro, soy',
         'claro soy',
         'ok soy',
