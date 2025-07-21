@@ -23,13 +23,37 @@ type ApiResponse = {
 function extractAndCleanName(name: string): string {
     let processedName = name;
 
-    // ✅ SOLUCIÓN: Lista de frases introductorias a eliminar.
+    // ✅ SOLUCIÓN: Lista de frases introductorias a eliminar, ahora más robusta.
     const fillerPhrases = [
+        // Variaciones con "mi nombre es"
+        'si claro, mi nombre es',
+        'si claro mi nombre es',
+        'claro, mi nombre es',
         'claro mi nombre es',
+        'ok mi nombre es',
+        'bueno mi nombre es',
         'mi nombre es',
+
+        // Variaciones con "me llamo"
+        'si claro, yo me llamo',
+        'si claro yo me llamo',
+        'claro, me llamo',
+        'claro me llamo',
+        'ok me llamo',
         'me llamo',
+
+        // Variaciones con "soy"
+        'si claro, yo soy',
+        'si claro yo soy',
+        'claro, soy',
+        'claro soy',
+        'ok soy',
         'soy',
+
+        // Variaciones con "es"
+        'claro, es',
         'claro es',
+        'ok es',
         'es',
     ];
 
