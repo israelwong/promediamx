@@ -1,3 +1,4 @@
+//app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/LeadList.tsx
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import LeadDataTable from './LeadDataTable';
@@ -12,7 +13,7 @@ interface LeadListProps {
 }
 
 // CORRECCIÓN: El componente ahora es síncrono y solo muestra los datos que recibe.
-export default function LeadList({ data, negocioId }: LeadListProps) {
+export default function LeadList({ data, negocioId, clienteId }: LeadListProps) {
     return (
         <Card className="h-full border-zinc-700 bg-zinc-800/50 flex flex-col">
             <CardHeader>
@@ -25,6 +26,7 @@ export default function LeadList({ data, negocioId }: LeadListProps) {
                     initialData={data.leads}
                     totalCount={data.totalCount}
                     negocioId={negocioId}
+                    clienteId={clienteId}
                 />
             </CardContent>
         </Card>

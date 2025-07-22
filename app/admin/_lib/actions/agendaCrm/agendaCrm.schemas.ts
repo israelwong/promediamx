@@ -1,6 +1,12 @@
 import { z } from 'zod';
 // import { agenteSimpleSchema } from '@/app/admin/_lib/actions/lead/lead.schemas';
 import { isValid as isValidDate } from 'date-fns'; // Importar isValid de date-fns
+// import type { LeadBitacora } from '@prisma/client';
+// import { revalidatePath } from 'next/cache';
+// import prisma from '@/app/admin/_lib/prismaClient';
+// import type { ActionResult } from '@/app/admin/_lib/types';
+
+
 
 // Tipos de Cita/Tarea permitidos en el formulario
 const tipoCitaEnum = z.enum(["Llamada", "Reunion", "Email", "Tarea", "Otro"]);
@@ -240,3 +246,40 @@ export const listarCitasAgendaResultSchema = z.object({ // Antes listarCitasDelD
     citas: z.array(citaDelDiaSchema),
 });
 export type ListarCitasAgendaResultData = z.infer<typeof listarCitasAgendaResultSchema>;
+
+
+
+
+// ✅ Esquema para el NUEVO formulario simplificado
+export const nuevaCitaSimpleFormSchema = z.object({
+    modalidad: z.enum(['PRESENCIAL', 'VIRTUAL']),
+    fecha: z.date({ required_error: "La fecha y hora son requeridas." }),
+    linkReunionVirtual: z.string().optional(), // El campo base es un string opcional
+}).superRefine((data, ctx) => {
+    // Esta lógica solo se ejecuta si la modalidad es VIRTUAL
+    if (data.modalidad === 'VIRTUAL') {
+        // 1. Validar que el campo no esté vacío
+        if (!data.linkReunionVirtual || data.linkReunionVirtual.trim() === '') {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El link de la reunión es requerido para citas virtuales.",
+                path: ['linkReunionVirtual'],
+            });
+        } else {
+            // 2. Validar que sea una URL válida
+            const urlValidation = z.string().url("Debe ser una URL válida.").safeParse(data.linkReunionVirtual);
+            if (!urlValidation.success) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: urlValidation.error.issues[0].message,
+                    path: ['linkReunionVirtual'],
+                });
+            }
+        }
+    }
+});
+
+export type NuevaCitaSimpleFormData = z.infer<typeof nuevaCitaSimpleFormSchema>;
+
+
+

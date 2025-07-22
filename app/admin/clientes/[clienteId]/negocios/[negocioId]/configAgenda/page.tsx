@@ -1,6 +1,6 @@
 import React from 'react'
 import { Metadata } from 'next'
-import AgendaConfguraxion from './components/AgendaConfguracion';
+import AgendaConfiguracion from './components/AgendaConfguracion';
 
 export const metadata: Metadata = {
     title: 'Agenda',
@@ -13,5 +13,5 @@ interface Props {
 }
 export default async function page({ params }: { params: Promise<Props> }) {
     const { clienteId, negocioId } = await params
-    return <AgendaConfguraxion clienteId={clienteId} negocioId={negocioId} />
+    return <AgendaConfiguracion clienteId={clienteId} negocioId={negocioId} />
 }

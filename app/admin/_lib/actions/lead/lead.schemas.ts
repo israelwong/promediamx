@@ -1,35 +1,63 @@
 // app/admin/_lib/actions/lead/lead.schemas.ts
 import { z } from 'zod';
 
-// Esquema para los datos de un pipeline simple (ya definido, lo reusamos)
-export const pipelineSimpleSchema = z.object({
-    id: z.string().cuid(),
-    nombre: z.string(),
-    color: z.string().nullable().optional(),
-});
-export type PipelineSimpleData = z.infer<typeof pipelineSimpleSchema>;
 
-// Esquema para los datos de un agente simple (ya definido, lo reusamos)
-export const agenteSimpleSchema = z.object({
-    id: z.string().cuid(),
-    nombre: z.string().nullable(),
-});
-export type AgenteSimpleData = z.infer<typeof agenteSimpleSchema>;
+// Asumiendo que estos schemas simples existen en alguna parte para la validación
+const pipelineSimpleSchema = z.object({ id: z.string(), nombre: z.string() });
+const canalSimpleSchema = z.object({ id: z.string(), nombre: z.string() });
+const etiquetaSimpleSchema = z.object({ id: z.string(), nombre: z.string(), color: z.string().nullable() });
+const agenteSimpleSchema = z.object({ id: z.string(), nombre: z.string().nullable() });
 
-// Esquema para los datos de una etiqueta simple (ya definido, lo reusamos)
-export const etiquetaSimpleSchema = z.object({
-    id: z.string().cuid(),
-    nombre: z.string(),
-    color: z.string().nullable().optional(),
+// Schema para los parámetros de entrada de la acción
+export const obtenerDatosFormularioLeadParamsSchema = z.object({
+    negocioId: z.string().cuid(),
 });
-export type EtiquetaSimpleData = z.infer<typeof etiquetaSimpleSchema>;
 
-// Esquema para los datos de un canal simple (ya definido, lo reusamos)
-export const canalSimpleSchema = z.object({
-    id: z.string().cuid(),
+// ✅ Se añade un schema para los campos personalizados
+const campoPersonalizadoSchema = z.object({
+    id: z.string(),
     nombre: z.string(),
+    tipo: z.string(), // ej. 'TEXTO', 'NUMERO', 'FECHA', 'SELECT'
+    nombreCampo: z.string(), // ej. 'colegio', 'nivel_educativo'
+    metadata: z.any().nullable(), // Para opciones de select, etc.
 });
-export type CanalSimpleData = z.infer<typeof canalSimpleSchema>;
+
+// Se actualiza el schema de datos del formulario para incluir los campos personalizados
+export const datosFormularioLeadSchema = z.object({
+    crmId: z.string().cuid().nullable(),
+    pipelines: z.array(pipelineSimpleSchema),
+    canales: z.array(canalSimpleSchema),
+    etiquetas: z.array(etiquetaSimpleSchema),
+    agentes: z.array(agenteSimpleSchema),
+    camposPersonalizados: z.array(campoPersonalizadoSchema), // ✅ Se añade el nuevo campo
+});
+export type DatosFormularioLeadData = z.infer<typeof datosFormularioLeadSchema>;
+
+// Se actualiza el schema de actualización para aceptar un jsonParams dinámico
+const actualizarLeadFormValidationSchema = z.object({
+    nombre: z.string().min(1, "El nombre es requerido."),
+    email: z.string().email("Debe ser un email válido.").nullable().optional().or(z.literal('')),
+    telefono: z.string().nullable().optional(),
+    // Se usa preprocess para manejar el caso de un input numérico vacío
+    valorEstimado: z.preprocess(
+        (val) => (val === "" || val === null || (typeof val === 'number' && isNaN(val)) ? null : Number(val)),
+        z.number().positive("El valor estimado debe ser un número positivo.").nullable().optional()
+    ),
+    status: z.string().nullable().optional(),
+    pipelineId: z.string().cuid().nullable().optional(),
+    canalId: z.string().cuid().nullable().optional(),
+    agenteId: z.string().cuid().nullable().optional(),
+    etiquetaIds: z.array(z.string().cuid()).optional(),
+    jsonParams: z.record(z.string()).optional(),
+});
+export type ActualizarLeadFormData = z.infer<typeof actualizarLeadFormValidationSchema>;
+
+export const actualizarLeadParamsSchema = z.object({
+    leadId: z.string().cuid(),
+    datos: actualizarLeadFormValidationSchema,
+});
+export type ActualizarLeadParams = z.infer<typeof actualizarLeadParamsSchema>;
+
 
 
 // Esquema para cada Lead en la lista (basado en tu LeadListaItem)
@@ -99,10 +127,8 @@ export const leadDetailsForPanelSchema = z.object({
 });
 export type LeadDetailsForPanelData = z.infer<typeof leadDetailsForPanelSchema>;
 
-// export const obtenerLeadDetallesParamsSchema = z.object({
-//     leadId: z.string().cuid(),
-// });
-// export type ObtenerLeadDetallesParams = z.infer<typeof obtenerLeadDetallesParamsSchema>;
+
+
 
 export const obtenerEtiquetasAsignadasLeadParamsSchema = z.object({
     leadId: z.string().cuid(),
@@ -130,76 +156,18 @@ export const leadDetalleSchema = z.object({
     canalId: z.string().nullable(),
     valorEstimado: z.number().nullable(),
     etiquetaIds: z.array(z.string()),
+    // ✅ Se añade jsonParams para que el frontend reciba los datos
+    jsonParams: z.any().nullable(),
     createdAt: z.date(),
-    // CORRECCIÓN DEFINITIVA: Hacemos que el esquema espere SIEMPRE una fecha. No permitimos null.
     updatedAt: z.date(),
 });
 export type LeadDetalleData = z.infer<typeof leadDetalleSchema>;
 
-// Esquema para los datos necesarios para poblar los selects del formulario de Lead
-// Similar a DatosParaFiltrosLeadData, pero podría divergir.
-export const datosFormularioLeadSchema = z.object({
-    crmId: z.string().cuid().nullable(), // CRM ID al que pertenece el negocio
-    pipelines: z.array(pipelineSimpleSchema),
-    canales: z.array(canalSimpleSchema),
-    etiquetas: z.array(etiquetaSimpleSchema), // Todas las etiquetas disponibles del CRM
-    agentes: z.array(agenteSimpleSchema),   // Todos los agentes disponibles del CRM
-});
-export type DatosFormularioLeadData = z.infer<typeof datosFormularioLeadSchema>;
 
-// Esquema para los parámetros de entrada de obtenerLeadDetallesAction (ya lo teníamos, solo confirmar)
 export const obtenerLeadDetallesParamsSchema = z.object({ // Ya definido, solo para referencia
     leadId: z.string().cuid(),
 });
 export type ObtenerLeadDetallesParams = z.infer<typeof obtenerLeadDetallesParamsSchema>;
-
-// Esquema para los parámetros de entrada de obtenerDatosParaFormularioLeadAction
-export const obtenerDatosFormularioLeadParamsSchema = z.object({
-    negocioId: z.string().cuid(),
-});
-export type ObtenerDatosFormularioLeadParams = z.infer<typeof obtenerDatosFormularioLeadParamsSchema>;
-
-
-// Esquema para los datos del formulario al EDITAR un Lead.
-// Basado en LeadDetalleData, pero solo con los campos editables.
-export const actualizarLeadFormValidationSchema = z.object({
-    nombre: z.string().min(1, "El nombre es requerido.").max(150, "El nombre es muy largo."),
-    telefono: z.string().nullable().optional()
-        .transform(val => (val === "" ? null : val)),
-    valorEstimado: z.preprocess(
-        (val) => {
-            // `val` viene de react-hook-form con valueAsNumber: true,
-            // por lo que `val` será un `number` o `NaN`.
-            if (typeof val === 'number' && isNaN(val)) {
-                return undefined; // Convertir NaN (de un input numérico vacío) a undefined
-            }
-            return val; // Pasar números tal cual
-        },
-        z.number({ invalid_type_error: "El valor estimado debe ser un número." })
-            .positive("El valor estimado debe ser un número positivo.")
-            .nullable() // Para permitir que el valor sea explícitamente null
-            .optional() // Para permitir que el valor sea undefined (y por ende opcional)
-    ),
-    status: z.string() // El <select> nativo siempre enviará un string
-        .transform(val => val.trim() === "" ? null : val) // Transforma "" a null
-        .nullable() // El resultado después de la transformación puede ser null
-        .optional(), // El campo puede no estar presente en el objeto inicial antes de la validación
-    pipelineId: z.string().cuid("ID de pipeline inválido.").nullable().optional()
-        .transform(val => (val === "null" || val === "" ? null : val)),
-    canalId: z.string().cuid("ID de canal inválido.").nullable().optional()
-        .transform(val => (val === "null" || val === "" ? null : val)),
-    agenteId: z.string().cuid("ID de agente inválido.").nullable().optional()
-        .transform(val => (val === "null" || val === "" ? null : val)),
-    etiquetaIds: z.array(z.string().cuid()).optional(),
-
-});
-export type ActualizarLeadFormData = z.infer<typeof actualizarLeadFormValidationSchema>;
-
-export const actualizarLeadParamsSchema = z.object({
-    leadId: z.string().cuid(),
-    datos: actualizarLeadFormValidationSchema, // Usa el schema actualizado
-});
-export type ActualizarLeadParams = z.infer<typeof actualizarLeadParamsSchema>;
 
 
 // Esquema para los parámetros de entrada de la acción eliminarLeadAction
@@ -229,18 +197,15 @@ export const crearLeadParamsSchema = z.object({
 export type CrearLeadParams = z.infer<typeof crearLeadParamsSchema>;
 
 
-
-
-
 // Esquema para la entrada de la acción de listar leads
 export const listarLeadsParamsSchema = z.object({
     negocioId: z.string().cuid(),
     page: z.number().int().positive().default(1),
     pageSize: z.number().int().positive().default(10),
     searchTerm: z.string().optional(),
-    // Podríamos añadir más filtros aquí en el futuro (por pipelineId, tagId, etc.)
+    // ✅ Se añade el nuevo filtro por colegio
+    colegio: z.string().optional(),
 });
-
 // Esquema para un único lead en la lista
 export const leadListItemSchema = z.object({
     id: z.string().cuid(),
@@ -248,6 +213,8 @@ export const leadListItemSchema = z.object({
     email: z.string().email().nullable(),
     telefono: z.string().nullable(),
     createdAt: z.date(),
+    // ✅ Se añade jsonParams para pasar los datos del colegio, grado, etc.
+    jsonParams: z.any().nullable(),
     etapaPipeline: z.object({
         id: z.string().cuid(),
         nombre: z.string(),
@@ -257,7 +224,6 @@ export const leadListItemSchema = z.object({
         nombre: z.string().nullable(),
     }).nullable(),
 });
-
 // Esquema para la respuesta completa de la acción
 export const listarLeadsResultSchema = z.object({
     leads: z.array(leadListItemSchema),
@@ -270,9 +236,9 @@ export type ListarLeadsParams = z.infer<typeof listarLeadsParamsSchema>;
 export type LeadListItem = z.infer<typeof leadListItemSchema>;
 export type ListarLeadsResult = z.infer<typeof listarLeadsResultSchema>;
 
-export const obtenerDetallesLeadParamsSchema = z.object({
-    leadId: z.string().cuid(),
-});
+// export const obtenerDetallesLeadParamsSchema = z.object({
+//     leadId: z.string().cuid(),
+// });
 
 export const asignarEtiquetaLeadParamsSchema = z.object({
     leadId: z.string().cuid(),
@@ -291,28 +257,28 @@ export const etiquetarYReubicarLeadParamsSchema = z.object({
 
 
 
-// Esquema para una etiqueta individual
-const etiquetaSchema = z.object({
-    id: z.string(),
-    nombre: z.string(),
-    color: z.string().nullable(),
-});
+// // Esquema para una etiqueta individual
+// const etiquetaSchema = z.object({
+//     id: z.string(),
+//     nombre: z.string(),
+//     color: z.string().nullable(),
+// });
 
-// Actualizamos el esquema principal de los detalles del lead
-export const leadDetailsSchema = z.object({
-    id: z.string(),
-    nombre: z.string(),
-    email: z.string().nullable(),
-    telefono: z.string().nullable(),
-    // CORRECCIÓN: Nos aseguramos que la definición aquí requiera el crmId.
-    etapaPipeline: z.object({
-        id: z.string(),
-        nombre: z.string(),
-        crmId: z.string(),
-    }).nullable(),
-    etiquetas: z.array(etiquetaSchema).optional(),
-});
-export type LeadDetails = z.infer<typeof leadDetailsSchema>;
+// // Actualizamos el esquema principal de los detalles del lead
+// export const leadDetailsSchema = z.object({
+//     id: z.string(),
+//     nombre: z.string(),
+//     email: z.string().nullable(),
+//     telefono: z.string().nullable(),
+//     // CORRECCIÓN: Nos aseguramos que la definición aquí requiera el crmId.
+//     etapaPipeline: z.object({
+//         id: z.string(),
+//         nombre: z.string(),
+//         crmId: z.string(),
+//     }).nullable(),
+//     etiquetas: z.array(etiquetaSchema).optional(),
+// });
+// export type LeadDetails = z.infer<typeof leadDetailsSchema>;
 
 export const marcarLeadComoGanadoParamsSchema = z.object({
     leadId: z.string().cuid(),
@@ -324,4 +290,56 @@ export const cambiarEtapaLeadParamsSchema = z.object({
     leadId: z.string().cuid(),
     negocioId: z.string().cuid(),
     nombreEtapaDestino: z.string().min(1),
+});
+
+
+// Esquema para la validación del formulario de NUEVO Lead
+export const nuevoLeadBasicoFormSchema = z.object({
+    nombre: z.string().min(3, "El nombre es requerido y debe tener al menos 3 caracteres."),
+    email: z.string().email("Debe ser un email válido.").optional().or(z.literal('')),
+    telefono: z.string().min(10, "El teléfono debe tener al menos 10 dígitos.").optional().or(z.literal('')),
+}).refine(data => data.email || data.telefono, {
+    message: "Se requiere al menos un email o un teléfono.",
+    path: ["email"],
+});
+
+export type NuevoLeadBasicoFormData = z.infer<typeof nuevoLeadBasicoFormSchema>;
+
+// ✅ CORRECCIÓN: La acción ahora espera 'negocioId' en lugar de 'crmId'.
+export const crearLeadBasicoParamsSchema = z.object({
+    negocioId: z.string().cuid("ID de Negocio inválido."),
+    datos: nuevoLeadBasicoFormSchema,
+});
+
+export type CrearLeadBasicoParams = z.infer<typeof crearLeadBasicoParamsSchema>;
+
+
+
+
+
+export const etiquetaSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    color: z.string().nullable(),
+});
+
+// Esquema para los detalles del Lead, usado en el modal y la página de detalles
+export const leadDetailsSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    email: z.string().nullable(),
+    telefono: z.string().nullable(),
+    jsonParams: z.any().nullable(),
+    etapaPipeline: z.object({
+        id: z.string(),
+        nombre: z.string(),
+        crmId: z.string(),
+    }).nullable(),
+    etiquetas: z.array(etiquetaSchema).optional(),
+});
+export type LeadDetails = z.infer<typeof leadDetailsSchema>;
+
+// Esquema para los parámetros de la acción obtenerDetallesLeadAction
+export const obtenerDetallesLeadParamsSchema = z.object({
+    leadId: z.string().cuid(),
 });

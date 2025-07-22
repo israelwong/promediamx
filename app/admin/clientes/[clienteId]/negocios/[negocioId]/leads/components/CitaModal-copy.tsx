@@ -8,7 +8,7 @@ import { obtenerDetallesLeadAction } from '@/app/admin/_lib/actions/lead/lead.ac
 import { obtenerNotasLeadAction } from '@/app/admin/_lib/actions/bitacora/bitacora.actions';
 import type { LeadDetails } from '@/app/admin/_lib/actions/lead/lead.schemas';
 import type { NotaBitacora } from '@/app/admin/_lib/actions/bitacora/bitacora.schemas';
-import CitaModalContent from './CitaModalContent'; // Importamos el nuevo contenido
+import CitaModalContent from './CitaModalContent';
 import { Loader2 } from 'lucide-react';
 
 interface CitaModalProps {
@@ -17,7 +17,7 @@ interface CitaModalProps {
 }
 
 export default function CitaModal({ negocioId, clienteId }: CitaModalProps) {
-    const { isOpen, onClose, leadId } = useCitaModalStore();
+    const { isOpen, onClose, leadId, agendaId } = useCitaModalStore();
     const [leadData, setLeadData] = useState<LeadDetails | null>(null);
     const [notas, setNotas] = useState<NotaBitacora[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +33,23 @@ export default function CitaModal({ negocioId, clienteId }: CitaModalProps) {
                 obtenerNotasLeadAction({ leadId }),
             ]).then(([leadResult, notasResult]) => {
                 if (leadResult.success && leadResult.data) {
-                    setLeadData(leadResult.data);
+                    // Ensure etapaPipeline has crmId
+                    type EtapaPipelineWithCrmId = {
+                        id: string;
+                        nombre: string;
+                        crmId?: string;
+                    };
+                    const etapaPipeline = leadResult.data.etapaPipeline
+                        ? {
+                            id: leadResult.data.etapaPipeline.id,
+                            nombre: leadResult.data.etapaPipeline.nombre,
+                            crmId: (leadResult.data.etapaPipeline as EtapaPipelineWithCrmId).crmId ?? ""
+                        }
+                        : null;
+                    setLeadData({
+                        ...leadResult.data,
+                        etapaPipeline
+                    });
                 } else {
                     setError(leadResult.error || 'Error al cargar los datos del lead.');
                     setLeadData(null);
@@ -45,7 +61,7 @@ export default function CitaModal({ negocioId, clienteId }: CitaModalProps) {
                     setNotas([]);
                 }
             }).catch((err) => {
-                setError(`Ocurrió un error inesperado: ${err.message}`);
+                setError(`Ocurrió un error inesperado. ${err}}`);
             }).finally(() => {
                 setIsLoading(false);
             });
@@ -61,24 +77,21 @@ export default function CitaModal({ negocioId, clienteId }: CitaModalProps) {
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="bg-zinc-900 border-zinc-700 text-zinc-100 max-w-lg">
+            <DialogContent className="bg-zinc-900 border-zinc-700 text-zinc-100 max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-xl">
-                        {isLoading ? "Cargando..." : (leadData?.nombre || "Lead")}
-                    </DialogTitle>
-                    <DialogDescription>
-                        Resumen de la información principal del prospecto.
-                    </DialogDescription>
+                    <DialogTitle className="text-xl">Ficha de Lead: {isLoading ? "Cargando..." : (leadData?.nombre || "Lead")}</DialogTitle>
+                    <DialogDescription>Consulta el historial de notas y gestiona el lead.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
                     {isLoading && <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>}
-                    {error && <p className="text-center text-red-500 p-4">{error}</p>}
+                    {error && <p className="text-center text-red-500">{error}</p>}
                     {!isLoading && !error && leadData && (
                         <CitaModalContent
                             lead={leadData}
                             initialNotes={notas}
                             negocioId={negocioId}
                             clienteId={clienteId}
+                            agendaId={agendaId}
                         />
                     )}
                 </div>

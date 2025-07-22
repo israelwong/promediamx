@@ -1,35 +1,35 @@
 // app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/page.tsx
+
 import React from 'react';
 import { Metadata } from 'next';
 import { Users } from 'lucide-react';
+import { headers } from 'next/headers';
 
 import { listarLeadsAction } from '@/app/admin/_lib/actions/lead/lead.actions';
-import { obtenerDatosPipelineKanbanAction } from '@/app/admin/_lib/actions/pipelineCrm/pipelineCrm.actions';
-import RealtimeLeadsView from './components/RealtimeLeadsView';
+// ✅ Se importa el nuevo componente de cliente, más específico.
+import RealtimeLeadList from './components/RealtimeLeadList';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: 'Gestión de Leads',
+    title: 'Lista de Leads',
 };
 
-// CORRECCIÓN 1: Definimos la interfaz para la promesa de parámetros
 interface LeadsPageParams {
     clienteId: string;
     negocioId: string;
 }
 
-// CORRECCIÓN 2: La firma de la función ahora espera un objeto que contiene una promesa
 export default async function LeadsPage({ params }: { params: Promise<LeadsPageParams> }) {
+    const resolvedParams = await params;
+    headers();
+    const { clienteId, negocioId } = resolvedParams;
 
-    // CORRECCIÓN 3: Usamos 'await' para obtener los IDs antes de usarlos
-    const { clienteId, negocioId } = await params;
+    // ✅ La página ahora solo obtiene los datos para la lista de leads.
+    const leadsResult = await listarLeadsAction({ negocioId, page: 1, pageSize: 20 });
 
-    const [leadsResult, kanbanResult] = await Promise.all([
-        listarLeadsAction({ negocioId, page: 1, pageSize: 20 }),
-        obtenerDatosPipelineKanbanAction({ negocioId }),
-    ]);
-
-    if (!leadsResult.success || !kanbanResult.success || !leadsResult.data || !kanbanResult.data) {
-        return <p className="p-6">Error al cargar los datos iniciales de los leads.</p>;
+    if (!leadsResult.success || !leadsResult.data) {
+        return <p className="p-6">Error al cargar la lista de leads.</p>;
     }
 
     return (
@@ -37,16 +37,16 @@ export default async function LeadsPage({ params }: { params: Promise<LeadsPageP
             <header>
                 <h1 className="text-2xl font-semibold text-zinc-100 flex items-center gap-3">
                     <Users />
-                    Leads y Pipeline
+                    Lista de Leads
                 </h1>
                 <p className="text-sm text-zinc-400 mt-1">
-                    Gestiona todos tus contactos y visualiza el flujo de ventas.
+                    Busca, filtra y gestiona todos tus contactos.
                 </p>
             </header>
 
-            <RealtimeLeadsView
+            {/* ✅ El componente de vista ahora es más simple y solo maneja la lista. */}
+            <RealtimeLeadList
                 initialLeadsData={leadsResult.data}
-                initialKanbanData={kanbanResult.data}
                 clienteId={clienteId}
                 negocioId={negocioId}
             />

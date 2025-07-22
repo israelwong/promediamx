@@ -148,23 +148,6 @@ export const ConfirmacionCitaEmail_v2: React.FC<ConfirmacionCitaEmail_v2_Props> 
                             )}
                         </Section>
 
-                        {/* <Text className="text-gray-600 text-base leading-relaxed text-center">
-                            ¿Necesitas hacer cambios?
-                        </Text>
-
-                        <Section className="text-center">
-                            {linkReagendar && (
-                                <Button href={linkReagendar} className="bg-gray-500 text-white font-semibold px-5 py-2 rounded-md mr-2">
-                                    Reagendar
-                                </Button>
-                            )}
-                            {linkCancelar && (
-                                <Button href={linkCancelar} className="bg-red-600 text-white font-semibold px-5 py-2 rounded-md">
-                                    Cancelar Cita
-                                </Button>
-                            )}
-                        </Section> */}
-
                         <Hr className="border-gray-200 my-8" />
 
                         <Text className="text-xs text-gray-400 text-center">

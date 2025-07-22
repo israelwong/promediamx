@@ -1,3 +1,4 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/citas/components/RealtimeCitasView.tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';

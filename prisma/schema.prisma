@@ -955,6 +955,7 @@ model ItemCatalogoEtiqueta {
 model CRM {
   id                 String                  @id @default(cuid())
   negocioId          String                  @unique
+  manychatApiKey     String?
   status             String                  @default("activo")
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
@@ -1044,6 +1045,9 @@ model Lead {
   updatedAt     DateTime       @updatedAt
   pipelineId    String?
   valorEstimado Float?
+
+   manychatSubscriberId String? @unique
+
   Agenda        Agenda[]
   Bitacora      Bitacora[]
   Conversacion  Conversacion[]
@@ -1052,6 +1056,7 @@ model Lead {
   crm           CRM?           @relation(fields: [crmId], references: [id], onDelete: Cascade)
   Pipeline      PipelineCRM?   @relation(fields: [pipelineId], references: [id])
   Etiquetas     LeadEtiqueta[]
+  BitacoraNotas LeadBitacora[]
 
   @@index([crmId])
   @@index([agenteId])
@@ -1059,6 +1064,19 @@ model Lead {
   @@index([pipelineId])
   @@index([email])
   @@index([telefono])
+}
+
+// ✅ NUEVO MODELO: Para la bitácora de notas del Lead
+model LeadBitacora {
+  id          String   @id @default(cuid())
+  leadId      String
+  nota        String
+  createdAt   DateTime @default(now())
+  // No nos importa quién la creó en este momento
+  // creadoPorId String? 
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
 }
 
 model LeadEtiqueta {
@@ -1116,7 +1134,7 @@ model Agenda {
   leadId             String
   fecha              DateTime
   asunto             String
-  descripcion        String?
+  descripcion        String? //! quitar
   status             String            @default("pendiente")
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
@@ -1127,6 +1145,7 @@ model Agenda {
   modalidad          String?
   googleMapsUrl      String?
   linkReunionVirtual String?
+  nombrePersonaAtiende String?         // ✅ Nuevo campo para la persona de contacto
   agente             Agente?           @relation(fields: [agenteId], references: [id], onDelete: Cascade)
   asistente          AsistenteVirtual? @relation(fields: [asistenteId], references: [id])
   lead               Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -1145,15 +1164,15 @@ model AgendaConfiguracion {
   negocioId                String               @unique
   aceptaCitasPresenciales  Boolean              @default(false)
   aceptaCitasVirtuales     Boolean              @default(false)
-  requiereTelefonoParaCita Boolean              @default(false)
-  requiereEmailParaCita    Boolean              @default(false)
-  requiereNombreParaCita   Boolean              @default(true)
+  requiereTelefonoParaCita Boolean              @default(false) //! quitar
+  requiereEmailParaCita    Boolean              @default(false)//! quitar
+  requiereNombreParaCita   Boolean              @default(true)//! quitar
   bufferMinutos            Int?
   createdAt                DateTime             @default(now())
   updatedAt                DateTime             @updatedAt
-  metodosPagoTexto         String?
-  recomendacionesParaCita  String?
-  recordatorioMinutosAntes Int?                 @default(1440)
+  metodosPagoTexto         String? //! quitar
+  recomendacionesParaCita  String? //! quitar
+  recordatorioMinutosAntes Int?                 @default(1440)//! quitar
   negocio                  Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   agendaRecordatorios      agendaRecordatorio[]
 }

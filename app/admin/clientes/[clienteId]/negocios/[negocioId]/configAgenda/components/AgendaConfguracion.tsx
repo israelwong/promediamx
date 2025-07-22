@@ -37,11 +37,11 @@ const SECCIONES_AGENDA = {
 const initialPreferenciasFormState: UpsertAgendaConfiguracionFormInput = {
     aceptaCitasPresenciales: false,
     aceptaCitasVirtuales: false,
-    requiereTelefonoParaCita: false,
-    requiereEmailParaCita: false,
-    requiereNombreParaCita: true,
+    // requiereTelefonoParaCita: false,
+    // requiereEmailParaCita: false,
+    // requiereNombreParaCita: true,
     bufferMinutos: null,
-    metodosPagoTexto: null,
+    // metodosPagoTexto: null,
 };
 
 export default function AgendaConfiguracion({ clienteId, negocioId }: AgendaConfigurarProps) {
@@ -72,11 +72,11 @@ export default function AgendaConfiguracion({ clienteId, negocioId }: AgendaConf
                 setPreferenciasForm({
                     aceptaCitasPresenciales: result.data.aceptaCitasPresenciales,
                     aceptaCitasVirtuales: result.data.aceptaCitasVirtuales,
-                    requiereTelefonoParaCita: result.data.requiereTelefonoParaCita,
-                    requiereEmailParaCita: result.data.requiereEmailParaCita,
-                    requiereNombreParaCita: result.data.requiereNombreParaCita,
+                    // requiereTelefonoParaCita: result.data.requiereTelefonoParaCita,
+                    // requiereEmailParaCita: result.data.requiereEmailParaCita,
+                    // requiereNombreParaCita: result.data.requiereNombreParaCita,
                     bufferMinutos: result.data.bufferMinutos,
-                    metodosPagoTexto: result.data.metodosPagoTexto,
+                    // metodosPagoTexto: result.data.metodosPagoTexto,
                 });
             } else {
                 setPreferenciasForm(initialPreferenciasFormState); // No hay config, usar defaults
@@ -209,7 +209,7 @@ export default function AgendaConfiguracion({ clienteId, negocioId }: AgendaConf
                     {/* Columna Derecha */}
                     <div className="space-y-6"> {/* Espacio entre grupos dentro de esta columna */}
                         {/* Grupo: Información Requerida del Cliente */}
-                        <div className="space-y-3">
+                        {/* <div className="space-y-3">
                             <h3 className="text-md font-semibold text-zinc-100">Información Requerida del Cliente</h3>
                             <SwitchControl
                                 id="requiereNombreParaCita"
@@ -235,10 +235,10 @@ export default function AgendaConfiguracion({ clienteId, negocioId }: AgendaConf
                                 label="Requerir email del contacto"
                                 disabled={savingPreferencias}
                             />
-                        </div>
+                        </div> */}
 
                         {/* Grupo: Métodos de Pago Aceptados */}
-                        <div>
+                        {/* <div>
                             <label htmlFor="metodosPagoTextos" className="block text-sm font-medium text-zinc-300 mb-1.5">
                                 Métodos de Pago Aceptados (Texto)
                             </label>
@@ -253,7 +253,7 @@ export default function AgendaConfiguracion({ clienteId, negocioId }: AgendaConf
                                 placeholder="Ej: Efectivo, Tarjeta de Crédito/Débito..."
                             />
                             <p className="text-xs text-zinc-500 mt-1.5">Este texto se puede mostrar a los clientes al agendar.</p>
-                        </div>
+                        </div> */}
                     </div>
                 </div>
 

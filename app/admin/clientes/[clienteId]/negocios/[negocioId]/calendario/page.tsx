@@ -1,30 +1,30 @@
-// app/admin/clientes/[clienteId]/negocios/[negocioId]/citas/page.tsx
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/calendario/page.tsx
 
 import React from 'react';
 import { Metadata } from 'next';
-import { List } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { headers } from 'next/headers';
 
 import { listarCitasAction } from '@/app/admin/_lib/actions/citas/citas.actions';
-// ✅ Se importará un nuevo componente de cliente específico para la Lista
-import RealtimeCitasList from './components/RealtimeCitasList';
+import RealtimeCalendarioView from './components/RealtimeCalendarioView';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: 'Lista de Citas',
+    title: 'Calendario de Citas',
 };
 
-interface CitasPageProps {
+interface CalendarioPageParams {
     clienteId: string;
     negocioId: string;
 }
 
-export default async function CitasPage({ params }: { params: Promise<CitasPageProps> }) {
+export default async function CalendarioPage({ params }: { params: Promise<CalendarioPageParams> }) {
+    const resolvedParams = await params;
     headers();
-    const { negocioId, clienteId } = await params;
+    const { negocioId, clienteId } = resolvedParams;
 
-    // Esta página solo obtiene los datos iniciales para la lista
+    // Esta página solo obtiene los datos iniciales para el calendario
     const initialCitasResult = await listarCitasAction({ negocioId });
 
     if (!initialCitasResult.success) {
@@ -35,15 +35,16 @@ export default async function CitasPage({ params }: { params: Promise<CitasPageP
         <div className="space-y-6 h-full flex flex-col">
             <header>
                 <h1 className="text-2xl font-semibold text-zinc-100 flex items-center gap-3">
-                    <List />
-                    Lista de Citas
+                    <Calendar />
+                    Calendario de Citas
                 </h1>
                 <p className="text-sm text-zinc-400 mt-1">
-                    Gestiona todas las citas de tu negocio en una vista de lista.
+                    Visualiza todas las citas de tu negocio en una vista de calendario.
                 </p>
             </header>
 
-            <RealtimeCitasList
+            {/* Se renderiza el nuevo componente de cliente para el Calendario */}
+            <RealtimeCalendarioView
                 initialData={initialCitasResult.data || []}
                 negocioId={negocioId}
                 clienteId={clienteId}

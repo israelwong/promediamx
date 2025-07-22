@@ -12,15 +12,12 @@ import {
     editarEtapaPipelineCrmParamsSchema,
     eliminarEtapaPipelineCrmParamsSchema,
     reordenarEtapasPipelineCrmParamsSchema,
-
     obtenerDatosPipelineKanbanParamsSchema,
     KanbanBoardData, // Usaremos este como tipo de retorno para el data
-    actualizarEtapaLeadEnPipelineParamsSchema,
-    PipelineSimple
+    actualizarEtapaLeadParamsSchema,
 } from './pipelineCrm.schemas';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-
 
 
 // Acción para obtener etapas y el crmId a partir del negocioId
@@ -188,185 +185,147 @@ export async function reordenarEtapasPipelineCrmAction(
 
 
 
-// --- REFACTORIZACIÓN de obtenerDatosPipelineKanban ---
 export async function obtenerDatosPipelineKanbanAction(
     params: z.infer<typeof obtenerDatosPipelineKanbanParamsSchema>
-): Promise<ActionResult<KanbanBoardData | null>> {
+): Promise<ActionResult<KanbanBoardData>> {
+
     const validation = obtenerDatosPipelineKanbanParamsSchema.safeParse(params);
     if (!validation.success) {
-        return { success: false, error: "ID de negocio inválido.", errorDetails: validation.error.flatten().fieldErrors, data: null };
+        return { success: false, error: "Parámetros inválidos." };
     }
     const { negocioId } = validation.data;
 
     try {
-        const negocioConCRM = await prisma.negocio.findUnique({
-            where: { id: negocioId },
-            select: {
-                CRM: {
-                    select: {
-                        id: true, // crmId
-                        Pipeline: { // Etapas del pipeline
-                            where: { status: 'activo' }, // Solo etapas activas
-                            orderBy: { orden: 'asc' },
-                            select: {
-                                id: true,
-                                nombre: true,
-                                orden: true,
-                                // color: true, // Si tus etapas tienen color
-                                Lead: { // Leads asociados a esta etapa
-                                    where: {
-                                        // Podrías añadir filtros adicionales para los leads si es necesario
-                                        // ej. status del lead !='perdido' o !='descartado'
-                                    },
-                                    orderBy: { updatedAt: 'desc' }, // O por un campo 'ordenEnEtapa' si lo tuvieras
-                                    select: {
-                                        id: true,
-                                        nombre: true,
-                                        createdAt: true,
-                                        updatedAt: true,
-                                        pipelineId: true,
-                                        valorEstimado: true,
-                                        agente: { select: { id: true, nombre: true } },
-                                        Etiquetas: {
-                                            select: { etiqueta: { select: { id: true, nombre: true, color: true } } },
-                                            take: 3 // Limitar número de etiquetas para la tarjeta
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        if (!negocioConCRM?.CRM) {
-            return { success: true, data: { crmId: null, columns: [] } }; // CRM no existe o no está configurado
-        }
-
-        const crmId = negocioConCRM.CRM.id;
-        const columnsData: KanbanBoardData['columns'] = negocioConCRM.CRM.Pipeline.map(etapa => ({
-            id: etapa.id,
-            nombre: etapa.nombre,
-            orden: etapa.orden ?? 0, // Asegurar que orden tenga un valor
-            // color: etapa.color ?? null, // Si aplica
-            leads: etapa.Lead.map(lead => ({
-                id: lead.id,
-                nombre: lead.nombre,
-                createdAt: lead.createdAt,
-                updatedAt: lead.updatedAt,
-                pipelineId: lead.pipelineId,
-                valorEstimado: lead.valorEstimado,
-                agente: lead.agente ? { id: lead.agente.id, nombre: lead.agente.nombre ?? null } : null,
-                Etiquetas: lead.Etiquetas.map(le => ({ etiqueta: { id: le.etiqueta.id, nombre: le.etiqueta.nombre, color: le.etiqueta.color ?? null } })),
-            })),
-        }));
-
-        // Opcional: Validar con Zod antes de devolver
-        // const parseResult = kanbanBoardDataSchema.safeParse({ crmId, columns: columnsData });
-        // if (!parseResult.success) { /* ... manejo de error ... */ }
-        // return { success: true, data: parseResult.data };
-
-        return { success: true, data: { crmId, columns: columnsData } };
-
-    } catch (error) {
-        console.error(`Error en obtenerDatosPipelineKanbanAction para negocio ${negocioId}:`, error);
-        return { success: false, error: 'No se pudieron obtener los datos del pipeline.', data: null };
-    }
-}
-
-
-// --- REFACTORIZACIÓN de actualizarEtapaLead ---
-export async function actualizarEtapaLeadEnPipelineAction(
-    params: z.infer<typeof actualizarEtapaLeadEnPipelineParamsSchema>
-): Promise<ActionResult<{ leadId: string; nuevoPipelineId: string } | null>> {
-    const validation = actualizarEtapaLeadEnPipelineParamsSchema.safeParse(params);
-    if (!validation.success) {
-        return { success: false, error: "Datos inválidos para actualizar." };
-    }
-    // CORRECCIÓN: Obtenemos los nuevos IDs
-    const { leadId, nuevoPipelineId, clienteId, negocioId } = validation.data;
-
-    try {
-        const updatedLead = await prisma.lead.update({
-            where: { id: leadId },
-            data: {
-                pipelineId: nuevoPipelineId,
-                updatedAt: new Date(),
-            },
-            select: { id: true, pipelineId: true }
-        });
-
-        // CORRECCIÓN: Invalidamos el caché de la página de leads
-        const path = `/admin/clientes/${clienteId}/negocios/${negocioId}/leads`;
-        revalidatePath(path);
-        console.log(`Ruta revalidada: ${path}`);
-
-        return { success: true, data: { leadId: updatedLead.id, nuevoPipelineId: updatedLead.pipelineId! } };
-    } catch (error) {
-        console.error(`Error al actualizar etapa para lead ${leadId}:`, error);
-        return { success: false, error: 'No se pudo actualizar la etapa del Lead.' };
-    }
-}
-
-// export async function obtenerPipelinesCrmAction(negocioId: string): Promise<ActionResult<PipelineSimple[]>> {
-//     if (!negocioId) return { success: false, error: "ID de negocio requerido." };
-//     try {
-//         // Buscar el CRM asociado al negocio
-//         const crm = await prisma.cRM.findUnique({
-//             where: { negocioId: negocioId },
-//             select: { id: true }
-//         });
-
-//         // Si no hay CRM, devolver lista vacía
-//         if (!crm) return { success: true, data: [] };
-
-//         // Obtener pipelines activos de ese CRM
-//         const pipelines = await prisma.pipelineCRM.findMany({
-//             where: {
-//                 crmId: crm.id,
-//                 status: 'activo' // Solo mostrar pipelines activos en el filtro
-//             },
-//             select: { id: true, nombre: true },
-//             orderBy: { orden: 'asc' } // Ordenar por el campo 'orden'
-//         });
-
-//         return { success: true, data: pipelines };
-//     } catch (error) {
-//         console.error("Error obteniendo pipelines:", error);
-//         return { success: false, error: "Error al obtener etapas del pipeline." };
-//     }
-// }
-
-
-
-export async function obtenerPipelinesCrmAction(negocioId: string): Promise<ActionResult<PipelineSimple[]>> {
-    if (!negocioId) {
-        return { success: false, error: "ID de negocio requerido." };
-    }
-    try {
         const crm = await prisma.cRM.findUnique({
-            where: { negocioId: negocioId },
+            where: { negocioId },
             select: { id: true }
         });
 
         if (!crm) {
-            return { success: true, data: [] };
+            return { success: false, error: "CRM no encontrado para este negocio." };
         }
 
         const pipelines = await prisma.pipelineCRM.findMany({
-            where: {
-                crmId: crm.id,
-                status: 'activo'
-            },
-            select: { id: true, nombre: true },
-            orderBy: { orden: 'asc' }
+            where: { crmId: crm.id, status: 'activo' },
+            orderBy: { orden: 'asc' },
+            include: {
+                Lead: {
+                    orderBy: { updatedAt: 'desc' },
+                    select: {
+                        id: true, nombre: true, createdAt: true, updatedAt: true, valorEstimado: true, jsonParams: true,
+                        agente: { select: { id: true, nombre: true } },
+                        Etiquetas: { select: { etiqueta: { select: { id: true, nombre: true, color: true } } } },
+                        Agenda: {
+                            where: { status: 'PENDIENTE' },
+                            orderBy: { fecha: 'asc' },
+                            take: 1,
+                            select: { fecha: true }
+                        }
+                    }
+                }
+            }
         });
 
-        return { success: true, data: pipelines };
+        const kanbanData: KanbanBoardData = {
+            columns: pipelines.map(pipeline => {
+                const leadsConCita = pipeline.Lead.map(lead => ({
+                    ...lead,
+                    Etiquetas: lead.Etiquetas.map(e => e.etiqueta),
+                    fechaProximaCita: lead.Agenda[0]?.fecha || null,
+                }));
+
+                // Ordena los leads por la fecha de la próxima cita
+                leadsConCita.sort((a, b) => {
+                    if (a.fechaProximaCita && b.fechaProximaCita) {
+                        return new Date(a.fechaProximaCita).getTime() - new Date(b.fechaProximaCita).getTime();
+                    }
+                    if (a.fechaProximaCita) return -1;
+                    if (b.fechaProximaCita) return 1;
+                    return 0;
+                });
+
+                return {
+                    id: pipeline.id,
+                    nombre: pipeline.nombre,
+                    leads: leadsConCita,
+                };
+            }),
+        };
+
+        return { success: true, data: kanbanData };
     } catch (error) {
-        console.error("Error obteniendo pipelines:", error);
-        return { success: false, error: "Error al obtener etapas del pipeline." };
+        console.error("Error en obtenerDatosPipelineKanbanAction:", error);
+        return { success: false, error: "No se pudieron cargar los datos del pipeline." };
     }
 }
-// La función revalidatePath ya está importada de 'next/cache' y puede usarse directamente.
+
+/**
+ * Actualiza la etapa (pipeline) de un lead.
+ */
+export async function actualizarEtapaLeadEnPipelineAction(
+    params: z.infer<typeof actualizarEtapaLeadParamsSchema>
+): Promise<ActionResult<{ success: boolean }>> {
+    const validation = actualizarEtapaLeadParamsSchema.safeParse(params);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
+    }
+
+    const { leadId, nuevoPipelineId, negocioId, clienteId } = validation.data;
+
+    try {
+        // Usamos una transacción para asegurar que todas las operaciones sean atómicas.
+        // Si algo falla, se revierte todo automáticamente.
+        await prisma.$transaction(async (tx) => {
+            // 1. Obtenemos el CRM del negocio para usar su ID en las verificaciones.
+            const crm = await tx.cRM.findUnique({
+                where: { negocioId },
+                select: { id: true },
+            });
+
+            if (!crm) {
+                throw new Error("El CRM para este negocio no fue encontrado.");
+            }
+
+            // 2. Verificamos que la etapa de destino exista Y pertenezca al CRM correcto.
+            const pipelineDestino = await tx.pipelineCRM.findFirst({
+                where: {
+                    id: nuevoPipelineId,
+                    crmId: crm.id, // <-- Verificación de seguridad
+                },
+                select: { nombre: true },
+            });
+
+            if (!pipelineDestino) {
+                throw new Error("La etapa de destino no existe o no pertenece a este negocio.");
+            }
+
+            // 3. Actualizamos el lead, asegurándonos de que también pertenezca al CRM correcto.
+            const updateResult = await tx.lead.updateMany({
+                where: {
+                    id: leadId,
+                    crmId: crm.id, // <-- Verificación de seguridad
+                },
+                data: {
+                    pipelineId: nuevoPipelineId,
+                    status: pipelineDestino.nombre.toLowerCase(), // Usamos el nombre de la etapa como status
+                },
+            });
+
+            // Si no se actualizó ninguna fila, significa que el lead no fue encontrado o no pertenece al CRM.
+            if (updateResult.count === 0) {
+                throw new Error("El lead no pudo ser actualizado. Es posible que no pertenezca a este negocio.");
+            }
+        });
+
+        // 4. Corregimos la revalidación de la ruta para usar correctamente las variables.
+        // La ruta anterior tenía '[clienteId]' como texto literal.
+        revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/kanban`);
+
+        return { success: true, data: { success: true } };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "No se pudo mover el lead.";
+        console.error(`Error al actualizar etapa para lead ${leadId}:`, errorMessage);
+        return { success: false, error: errorMessage };
+    }
+}

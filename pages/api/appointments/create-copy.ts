@@ -8,7 +8,7 @@ import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpe
 import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
 import { isBefore } from 'date-fns';
 
-// Se añade ofertaId al schema, ya que es necesario para la lógica.
+// ✅ SOLUCIÓN: Se elimina 'crmId' del schema. Ya no se acepta desde el cliente.
 const CreateAppointmentSchema = z.object({
     nombre: z.string().min(3, "El nombre es requerido."),
     email: z.string().email("El formato del email es inválido."),
@@ -32,32 +32,6 @@ type ApiResponse = {
     details?: unknown;
 };
 
-// Helper para calcular el valor estimado del lead
-function calculateEstimatedValue(colegio?: string | null, nivel?: string | null): number | null {
-    if (!colegio || !nivel) return null;
-
-    const colegioNormalizado = colegio.toLowerCase();
-    const nivelNormalizado = nivel.toLowerCase();
-
-    if (colegioNormalizado.includes('albatros')) {
-        // Para Albatros, el valor es la comisión fija.
-        return 1500;
-    }
-
-    if (colegioNormalizado.includes('tecno')) {
-        // Para Tecno, el valor es la colegiatura anual.
-        const annualTuition: { [key: string]: number } = {
-            'kinder': 2516 * 12,
-            'primaria': 3005 * 12,
-            'secundaria': 3278 * 12
-        };
-        return annualTuition[nivelNormalizado] || null;
-    }
-
-    return null;
-}
-
-
 export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse<ApiResponse>
@@ -77,7 +51,10 @@ export default async function handler(
         const fechaDeseadaObj = new Date(data.fechaHoraCita);
 
         if (isBefore(fechaDeseadaObj, new Date())) {
-            return res.status(400).json({ message: "Fecha inválida.", error: "No se puede agendar una cita en una fecha que ya pasó." });
+            return res.status(400).json({
+                message: "Fecha inválida.",
+                error: "No se puede agendar una cita en una fecha que ya pasó."
+            });
         }
 
         const disponibilidad = await verificarDisponibilidad({
@@ -91,11 +68,17 @@ export default async function handler(
             return res.status(409).json({ message: "Conflicto de horario.", error: "Lo sentimos, este horario acaba de ser ocupado. Por favor, elige otro." });
         }
 
-        const crm = await prisma.cRM.findUnique({ where: { negocioId: data.negocioId }, select: { id: true } });
+        // ✅ PASO 1: Obtener el CRM ID de forma segura a partir del negocioId.
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId: data.negocioId },
+            select: { id: true }
+        });
+
         if (!crm) {
             return res.status(404).json({ message: "Configuración de CRM no encontrada para este negocio." });
         }
         const crmId = crm.id;
+
 
         const telefonoLimpio = data.telefono.replace(/\D/g, '').slice(-10);
         const jsonParams = {
@@ -106,18 +89,26 @@ export default async function handler(
         };
 
         const pipelineAgendado = await prisma.pipelineCRM.findFirst({
-            where: { crmId: crmId, nombre: { equals: 'Agendado', mode: 'insensitive' } }
+            where: {
+                crmId: crmId, // Se usa el crmId seguro
+                nombre: { equals: 'Agendado', mode: 'insensitive' }
+            }
         });
-        const pipelineFinal = pipelineAgendado || await prisma.pipelineCRM.findFirst({ where: { crmId }, orderBy: { orden: 'asc' } });
 
-        // Se calcula el valor estimado antes de guardar el lead
-        const valorEstimado = calculateEstimatedValue(data.colegio, data.nivel_educativo);
+        let pipelineFinal: { id: string; nombre: string; } | null = null;
+        if (pipelineAgendado) {
+            pipelineFinal = pipelineAgendado;
+        } else {
+            pipelineFinal = await prisma.pipelineCRM.findFirst({
+                where: { crmId: crmId }, // Se usa el crmId seguro
+                orderBy: { orden: 'asc' }
+            });
+        }
 
         const leadPayload = {
             nombre: data.nombre,
             telefono: telefonoLimpio,
             jsonParams: jsonParams as Prisma.JsonObject,
-            valorEstimado: valorEstimado, // Se añade el valor calculado
             ...(pipelineFinal && {
                 pipelineId: pipelineFinal.id,
                 status: pipelineFinal.nombre.toLowerCase(),
@@ -130,13 +121,15 @@ export default async function handler(
             create: {
                 ...leadPayload,
                 email: data.email,
-                crmId: crmId,
+                crmId: crmId, // Se usa el crmId seguro
             },
         });
 
         const [tipoCita, negocio, oferta] = await Promise.all([
             prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: data.tipoDeCitaId } }),
-            prisma.negocio.findUniqueOrThrow({ where: { id: data.negocioId } }),
+            prisma.negocio.findUniqueOrThrow({
+                where: { id: data.negocioId },
+            }),
             prisma.oferta.findUnique({ where: { id: data.ofertaId } })
         ]);
 

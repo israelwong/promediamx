@@ -1,3 +1,4 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/citas/components/CitasCalendario.tsx
 "use client";
 
 import React from 'react';

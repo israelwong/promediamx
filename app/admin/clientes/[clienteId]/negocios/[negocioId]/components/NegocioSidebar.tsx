@@ -8,19 +8,22 @@ import { usePathname } from 'next/navigation';
 // --- Iconos para la nueva estructura (actualizados) ---
 import {
     LayoutDashboard,
-    MessageSquare,
+    // MessageSquare,
     Users, // Para Leads
     Calendar,
     Tag,
     Briefcase,
-    LibraryBig,
+    // LibraryBig,
     SlidersHorizontal,
-    Bot,
-    CreditCard,
-    UserCog, // Para Agentes
+    // Bot,
+    // CreditCard,
+    Kanban,
     Columns, // Para Pipeline
     Tags,
     VariableIcon, // Para Etiquetas
+    ListCheck,
+    Settings
+
 } from 'lucide-react';
 
 // --- Interfaces (sin cambios) ---
@@ -39,35 +42,38 @@ interface NavSection {
 // Aquí aplicamos la nueva arquitectura de información que acordamos.
 const navSections: NavSection[] = [
     {
-        title: 'Gestión Diaria',
+        title: 'CRM',
         links: [
             // CAMBIO: La ruta de Conversaciones ahora es más específica.
-            { hrefSuffix: '/crm/conversaciones', icon: MessageSquare, label: 'Conversaciones' },
+            // { hrefSuffix: '/crm/conversaciones', icon: MessageSquare, label: 'Conversaciones' },
             // NUEVO: Añadido enlace a la nueva sección de Leads.
+            { hrefSuffix: '/kanban', icon: Kanban, label: 'Kanban' },
+            { hrefSuffix: '/calendario', icon: Calendar, label: 'Calendario' },
+            { hrefSuffix: '/citas', icon: ListCheck, label: 'Citas Agendadas' },
             { hrefSuffix: '/leads', icon: Users, label: 'Leads' },
-            { hrefSuffix: '/citas', icon: Calendar, label: 'Citas Agendadas' },
         ]
     },
-    {
-        title: 'Campañas',
-        links: [
-            { hrefSuffix: '/mensajeInicial', icon: Tag, label: 'Mensaje de bienvenida' },
-            { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
-        ]
-    },
+    // {
+    //     title: 'Campañas',
+    //     links: [
+    //         // { hrefSuffix: '/mensajeInicial', icon: Tag, label: 'Mensaje de bienvenida' },
+    //     ]
+    // },
     {
         title: 'Configuración',
         links: [
+            { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
             { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil del Negocio' },
-            { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
+            // { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
             { hrefSuffix: '/agenda', icon: SlidersHorizontal, label: 'Agendamiento' },
-            { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente Virtual' },
-            { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' },
+            // { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente Virtual' },
+            // { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' },
             // NUEVO: Enlaces para la configuración específica del CRM.
-            { hrefSuffix: '/agentes', icon: UserCog, label: 'Agentes' },
-            { hrefSuffix: '/pipeline', icon: Columns, label: 'Ajustes de Pipeline' },
-            { hrefSuffix: '/etiquetas', icon: Tags, label: 'Etiquetas' },
-            { hrefSuffix: '/parametrosPersonalizados', icon: VariableIcon, label: 'Parametros' },
+            // { hrefSuffix: '/agentes', icon: UserCog, label: 'Agentes' },
+            { hrefSuffix: '/configPipeline', icon: Columns, label: 'Ajustes de Pipeline' },
+            { hrefSuffix: '/configEtiquetas', icon: Tags, label: 'Etiquetas' },
+            { hrefSuffix: '/configParametrosPersonalizados', icon: VariableIcon, label: 'Parametros' },
+            { hrefSuffix: '/configuracion', icon: Settings, label: 'Configuración' },
         ]
     },
 ];

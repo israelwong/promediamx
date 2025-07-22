@@ -4,11 +4,11 @@ import { z } from 'zod';
 export const upsertAgendaConfiguracionFormSchema = z.object({
     aceptaCitasPresenciales: z.boolean().default(false),
     aceptaCitasVirtuales: z.boolean().default(false),
-    requiereTelefonoParaCita: z.boolean().default(false),
-    requiereEmailParaCita: z.boolean().default(false),
-    requiereNombreParaCita: z.boolean().default(true), // Default que tenías en Negocio
+    // requiereTelefonoParaCita: z.boolean().default(false),
+    // requiereEmailParaCita: z.boolean().default(false),
+    // requiereNombreParaCita: z.boolean().default(true), // Default que tenías en Negocio
     bufferMinutos: z.number().int().positive().nullish().transform(val => val ?? null), // nullish para aceptar undefined o null
-    metodosPagoTexto: z.string().trim().optional().nullable().transform(val => val === '' ? null : val), // Si está vacío, lo transformamos a null
+    // metodosPagoTexto: z.string().trim().optional().nullable().transform(val => val === '' ? null : val), // Si está vacío, lo transformamos a null
 });
 // Tipo TypeScript inferido para los datos del formulario
 export type UpsertAgendaConfiguracionFormInput = z.infer<typeof upsertAgendaConfiguracionFormSchema>;
@@ -20,11 +20,11 @@ export const agendaConfiguracionDataSchema = z.object({
     negocioId: z.string().cuid(),
     aceptaCitasPresenciales: z.boolean(),
     aceptaCitasVirtuales: z.boolean(),
-    requiereTelefonoParaCita: z.boolean(),
-    requiereEmailParaCita: z.boolean(),
-    requiereNombreParaCita: z.boolean(),
+    // requiereTelefonoParaCita: z.boolean(),
+    // requiereEmailParaCita: z.boolean(),
+    // requiereNombreParaCita: z.boolean(),
     bufferMinutos: z.number().int().positive().nullable(),
-    metodosPagoTexto: z.string().nullable(),
+    // metodosPagoTexto: z.string().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
 });

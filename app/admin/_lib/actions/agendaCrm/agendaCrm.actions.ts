@@ -5,16 +5,19 @@ import { Prisma } from '@prisma/client';
 import prisma from '@/app/admin/_lib/prismaClient';
 import type { ActionResult } from '@/app/admin/_lib/types';
 import { startOfDay, endOfDay } from 'date-fns'; // Para el rango de "hoy"
+import type { Agenda, LeadBitacora } from '@prisma/client';
+import { revalidatePath } from 'next/cache';
+import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
 
 import {
-    listarCitasLeadParamsSchema,
+    // listarCitasLeadParamsSchema,
     AgendaCrmItemData,
     agendaCrmItemSchema, // Para validar salida de listarCitas
     obtenerDatosFormularioCitaParamsSchema,
     DatosFormularioCitaData,
     crearCitaLeadParamsSchema,
     editarCitaLeadParamsSchema,
-    eliminarCitaLeadParamsSchema,
+    // eliminarCitaLeadParamsSchema,
     listarEventosAgendaParamsSchema,
     ObtenerEventosAgendaResultData,
     AgendaEventoData, // Para el tipo de retorno
@@ -24,54 +27,56 @@ import {
     ListarCitasAgendaResultData, // Nuevo nombre
     CitaDelDiaData,
     statusAgendaEnum,
+    NuevaCitaSimpleFormData,
+    nuevaCitaSimpleFormSchema,
 } from './agendaCrm.schemas';
 import { z } from 'zod';
 import { startOfMonth, endOfMonth } from 'date-fns';
 // import { revalidatePath } from 'next/cache'; // Si necesitas revalidar
 
 // Acción para listar citas de un Lead
-export async function listarCitasLeadAction(
-    params: z.infer<typeof listarCitasLeadParamsSchema>
-): Promise<ActionResult<AgendaCrmItemData[]>> {
-    const validation = listarCitasLeadParamsSchema.safeParse(params);
-    if (!validation.success) {
-        return { success: false, error: "ID de Lead inválido.", errorDetails: validation.error.flatten().fieldErrors };
-    }
-    const { leadId } = validation.data;
+// export async function listarCitasLeadAction(
+//     params: z.infer<typeof listarCitasLeadParamsSchema>
+// ): Promise<ActionResult<AgendaCrmItemData[]>> {
+//     const validation = listarCitasLeadParamsSchema.safeParse(params);
+//     if (!validation.success) {
+//         return { success: false, error: "ID de Lead inválido.", errorDetails: validation.error.flatten().fieldErrors };
+//     }
+//     const { leadId } = validation.data;
 
-    try {
-        const citasPrisma = await prisma.agenda.findMany({
-            where: { leadId: leadId },
-            include: {
-                agente: { select: { id: true, nombre: true } }, // Incluir datos del agente
-                // negocio: { select: { id: true, nombre: true } } // Si necesitas datos del negocio
-            },
-            orderBy: { fecha: 'desc' }, // O 'asc' según preferencia
-        });
+//     try {
+//         const citasPrisma = await prisma.agenda.findMany({
+//             where: { leadId: leadId },
+//             include: {
+//                 agente: { select: { id: true, nombre: true } }, // Incluir datos del agente
+//                 // negocio: { select: { id: true, nombre: true } } // Si necesitas datos del negocio
+//             },
+//             orderBy: { fecha: 'desc' }, // O 'asc' según preferencia
+//         });
 
-        // Mapear y validar con Zod
-        const mappedData = citasPrisma.map(cita => ({
-            ...cita, // Incluye todos los campos de Agenda
-            tipo: cita.tipo as AgendaCrmItemData['tipo'], // Cast al enum, asume que los datos son válidos
-            status: cita.status as AgendaCrmItemData['status'], // Cast al enum
-            agente: cita.agente ? { id: cita.agente.id, nombre: cita.agente.nombre ?? null } : null,
-            negocioId: cita.negocioId, // Asegurar que el schema lo tiene si es necesario
-            // fecha y fechaRecordatorio ya son Date de Prisma
-        }));
+//         // Mapear y validar con Zod
+//         const mappedData = citasPrisma.map(cita => ({
+//             ...cita, // Incluye todos los campos de Agenda
+//             tipo: cita.tipo as AgendaCrmItemData['tipo'], // Cast al enum, asume que los datos son válidos
+//             status: cita.status as AgendaCrmItemData['status'], // Cast al enum
+//             agente: cita.agente ? { id: cita.agente.id, nombre: cita.agente.nombre ?? null } : null,
+//             negocioId: cita.negocioId, // Asegurar que el schema lo tiene si es necesario
+//             // fecha y fechaRecordatorio ya son Date de Prisma
+//         }));
 
-        const parsedData = z.array(agendaCrmItemSchema).safeParse(mappedData);
-        if (!parsedData.success) {
-            console.error("Error Zod en salida de listarCitasLeadAction:", parsedData.error.flatten());
-            // console.log("Datos que fallaron validación (listarCitasLeadAction):", mappedData);
-            return { success: false, error: "Error al procesar datos de citas." };
-        }
-        return { success: true, data: parsedData.data };
+//         const parsedData = z.array(agendaCrmItemSchema).safeParse(mappedData);
+//         if (!parsedData.success) {
+//             console.error("Error Zod en salida de listarCitasLeadAction:", parsedData.error.flatten());
+//             // console.log("Datos que fallaron validación (listarCitasLeadAction):", mappedData);
+//             return { success: false, error: "Error al procesar datos de citas." };
+//         }
+//         return { success: true, data: parsedData.data };
 
-    } catch (error) {
-        console.error(`Error en listarCitasLeadAction para lead ${leadId}:`, error);
-        return { success: false, error: 'No se pudieron cargar las citas del lead.' };
-    }
-}
+//     } catch (error) {
+//         console.error(`Error en listarCitasLeadAction para lead ${leadId}:`, error);
+//         return { success: false, error: 'No se pudieron cargar las citas del lead.' };
+//     }
+// }
 
 // Acción para obtener datos para el formulario de cita
 export async function obtenerDatosParaFormularioCitaAction(
@@ -214,39 +219,6 @@ export async function editarCitaLeadAction(
         return { success: false, error: 'No se pudo actualizar la cita.', data: null };
     }
 }
-
-
-// Acción para ELIMINAR una cita/tarea
-export async function eliminarCitaLeadAction(
-    params: z.infer<typeof eliminarCitaLeadParamsSchema>
-): Promise<ActionResult<{ id: string } | null>> { // Devuelve el ID de la cita eliminada
-    const validation = eliminarCitaLeadParamsSchema.safeParse(params);
-    if (!validation.success) {
-        return { success: false, error: "ID de cita inválido.", errorDetails: validation.error.flatten().fieldErrors };
-    }
-    const { citaId } = validation.data;
-
-    try {
-        const citaEliminada = await prisma.agenda.delete({
-            where: { id: citaId },
-            select: { id: true, leadId: true } // Seleccionar leadId para revalidar path
-        });
-
-        // Revalidar
-        // if (citaEliminada.leadId) {
-        //   revalidatePath(`/admin/..../crm/leads/${citaEliminada.leadId}`);
-        // }
-
-        return { success: true, data: { id: citaEliminada.id } };
-    } catch (error) {
-        console.error(`Error al eliminar cita ${citaId}:`, error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-            return { success: false, error: "La cita que intentas eliminar no fue encontrada." };
-        }
-        return { success: false, error: 'No se pudo eliminar la cita.' };
-    }
-}
-
 
 // --- REFACTORIZACIÓN de obtenerEventosAgenda ---
 export async function listarEventosAgendaAction(
@@ -408,5 +380,236 @@ export async function listarCitasAgendaAction( // Antes listarCitasDelDiaAction
             return { success: false, error: 'Se encontraron citas con un estado o tipo inválido.', data: null };
         }
         return { success: false, error: `No se pudieron cargar las citas para ${tipoRango}.`, data: null };
+    }
+}
+
+
+
+
+
+export async function crearCitaSimpleLeadAction(
+    params: {
+        leadId: string;
+        negocioId: string;
+        datos: NuevaCitaSimpleFormData;
+        enviarNotificacion: boolean;
+    }
+): Promise<ActionResult<Agenda>> {
+    const validation = nuevaCitaSimpleFormSchema.safeParse(params.datos);
+    if (!validation.success) {
+        const firstError = validation.error.flatten().fieldErrors;
+        const errorMessage = Object.values(firstError)[0]?.[0] || "Datos inválidos.";
+        return { success: false, error: errorMessage };
+    }
+
+    try {
+        const citaExistente = await prisma.agenda.findFirst({
+            where: { leadId: params.leadId, status: 'PENDIENTE' }
+        });
+        if (citaExistente) {
+            return { success: false, error: "Este lead ya tiene una cita pendiente." };
+        }
+
+        const nuevaCita = await prisma.agenda.create({
+            data: {
+                leadId: params.leadId,
+                negocioId: params.negocioId,
+                asunto: 'Informes',
+                fecha: params.datos.fecha,
+                modalidad: params.datos.modalidad,
+                linkReunionVirtual: params.datos.modalidad === 'VIRTUAL' ? params.datos.linkReunionVirtual : null,
+                tipo: 'Cita',
+                status: 'PENDIENTE',
+            }
+        });
+
+        // --- ✅ Lógica de Notificación Actualizada ---
+        if (params.enviarNotificacion) {
+            // 1. Obtener datos del Lead y del Negocio
+            const leadYNegocio = await prisma.lead.findUnique({
+                where: { id: params.leadId },
+                select: {
+                    nombre: true,
+                    email: true,
+                    crm: {
+                        select: {
+                            negocio: {
+                                select: {
+                                    nombre: true,
+                                    logo: true,
+                                    email: true,
+                                    direccion: true,
+                                    googleMaps: true,
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (!leadYNegocio || !leadYNegocio.email || !leadYNegocio.crm?.negocio) {
+                console.warn(`Cita ${nuevaCita.id} creada, pero no se pudo notificar por falta de datos del lead/negocio.`);
+                return { success: true, data: nuevaCita };
+            }
+
+            const negocio = leadYNegocio.crm.negocio;
+
+            // 2. ✅ ¡NUEVO! Obtener la oferta activa del negocio para sacar el email de copia.
+            const ofertaActiva = await prisma.oferta.findFirst({
+                where: {
+                    negocioId: params.negocioId,
+                    status: 'ACTIVO'
+                },
+                select: {
+                    nombre: true,
+                    emailCopiaConfirmacion: true,
+                }
+            });
+
+            // 3. Enviar el correo
+            await enviarEmailConfirmacionCita_v2({
+                emailDestinatario: leadYNegocio.email,
+                nombreDestinatario: leadYNegocio.nombre,
+                nombreNegocio: negocio.nombre,
+                logoNegocioUrl: negocio.logo || undefined,
+                nombreServicio: "Demostración de producto",
+                // Usamos el nombre de la oferta si existe, si no, un texto genérico.
+                nombreOferta: ofertaActiva?.nombre || "Seguimiento personalizado",
+                fechaHoraCita: nuevaCita.fecha,
+                emailRespuestaNegocio: negocio.email || 'no-reply@promedia.mx',
+                modalidadCita: nuevaCita.modalidad === 'VIRTUAL' ? 'virtual' : 'presencial',
+                ubicacionCita: negocio.direccion,
+                googleMapsUrl: negocio.googleMaps,
+                linkReunionVirtual: nuevaCita.linkReunionVirtual,
+                // ✅ Se pasa el email de copia obtenido de la oferta.
+                // Si no se encuentra oferta o el campo es nulo, no se enviará copia.
+                emailCopia: ofertaActiva?.emailCopiaConfirmacion,
+            });
+        }
+
+        return { success: true, data: nuevaCita };
+
+    } catch (error) {
+        console.error("Error en crearCitaSimpleLeadAction:", error);
+        return { success: false, error: "No se pudo crear la cita." };
+    }
+}
+
+
+export async function listarCitasLeadAction(params: { leadId: string }): Promise<ActionResult<Agenda[]>> {
+    try {
+        const citas = await prisma.agenda.findMany({
+            where: { leadId: params.leadId },
+            orderBy: { fecha: 'desc' },
+        });
+        return { success: true, data: citas };
+    } catch (error) {
+        console.error(`Error en listarCitasLeadAction para lead ${params.leadId}:`, error);
+        return { success: false, error: 'No se pudieron cargar las citas del lead.' };
+    }
+}
+
+export async function eliminarCitaLeadAction(params: { citaId: string }): Promise<ActionResult<{ id: string }>> {
+    try {
+        const citaEliminada = await prisma.agenda.delete({
+            where: { id: params.citaId },
+            select: { id: true }
+        });
+        return { success: true, data: citaEliminada };
+    } catch (error) {
+        console.error(`Error al eliminar cita ${params.citaId}:`, error);
+        return { success: false, error: 'No se pudo eliminar la cita.' };
+    }
+}
+
+
+// Schema para agregar una nueva nota
+const agregarNotaSchema = z.object({
+    leadId: z.string().cuid(),
+    nota: z.string().min(3, "La nota debe tener al menos 3 caracteres."),
+});
+
+// Schema para editar una nota existente
+const editarNotaSchema = z.object({
+    notaId: z.string().cuid(),
+    nota: z.string().min(3, "La nota debe tener al menos 3 caracteres."),
+});
+
+// Schema para eliminar una nota
+const eliminarNotaSchema = z.object({
+    notaId: z.string().cuid(),
+});
+
+
+export async function agregarNotaLeadAction(params: z.infer<typeof agregarNotaSchema>): Promise<ActionResult<LeadBitacora>> {
+    const validation = agregarNotaSchema.safeParse(params);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos." };
+    }
+    const { leadId, nota } = validation.data;
+
+    try {
+        const nuevaNota = await prisma.leadBitacora.create({
+            data: { leadId, nota }
+        });
+        // Revalidar la página del lead para que la nueva nota aparezca
+        revalidatePath(`/admin/clientes/.*/negocios/.*/leads/${leadId}`);
+        return { success: true, data: nuevaNota };
+    } catch (error) {
+        console.error("Error en agregarNotaLeadAction:", error);
+        return { success: false, error: "No se pudo agregar la nota." };
+    }
+}
+
+export async function listarNotasLeadAction(params: { leadId: string }): Promise<ActionResult<LeadBitacora[]>> {
+    try {
+        const notas = await prisma.leadBitacora.findMany({
+            where: { leadId: params.leadId },
+            orderBy: { createdAt: 'desc' },
+        });
+        return { success: true, data: notas };
+    } catch (error) {
+        console.error("Error en listarNotasLeadAction:", error);
+        return { success: false, error: "No se pudieron cargar las notas." };
+    }
+}
+
+export async function editarNotaLeadAction(params: z.infer<typeof editarNotaSchema>): Promise<ActionResult<LeadBitacora>> {
+    const validation = editarNotaSchema.safeParse(params);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos." };
+    }
+    const { notaId, nota } = validation.data;
+
+    try {
+        const notaActualizada = await prisma.leadBitacora.update({
+            where: { id: notaId },
+            data: { nota }
+        });
+        revalidatePath(`/admin/clientes/.*/negocios/.*/leads/${notaActualizada.leadId}`);
+        return { success: true, data: notaActualizada };
+    } catch (error) {
+        console.error("Error en editarNotaLeadAction:", error);
+        return { success: false, error: "No se pudo actualizar la nota." };
+    }
+}
+
+export async function eliminarNotaLeadAction(params: z.infer<typeof eliminarNotaSchema>): Promise<ActionResult<{ id: string }>> {
+    const validation = eliminarNotaSchema.safeParse(params);
+    if (!validation.success) {
+        return { success: false, error: "ID de nota inválido." };
+    }
+    const { notaId } = validation.data;
+
+    try {
+        const notaEliminada = await prisma.leadBitacora.delete({
+            where: { id: notaId },
+            select: { id: true, leadId: true }
+        });
+        revalidatePath(`/admin/clientes/.*/negocios/.*/leads/${notaEliminada.leadId}`);
+        return { success: true, data: { id: notaEliminada.id } };
+    } catch (error) {
+        console.error("Error en eliminarNotaLeadAction:", error);
+        return { success: false, error: "No se pudo eliminar la nota." };
     }
 }

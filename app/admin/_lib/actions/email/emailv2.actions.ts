@@ -1,4 +1,4 @@
-// app/admin/_lib/actions/email/email.actions.ts
+// app/admin/_lib/actions/email/emailv2.actions.ts
 
 import { Resend } from 'resend';
 import { render } from '@react-email/render';

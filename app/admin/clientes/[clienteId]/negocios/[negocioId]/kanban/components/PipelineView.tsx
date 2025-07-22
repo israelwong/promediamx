@@ -1,3 +1,4 @@
+// app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/PipelineView.tsx
 "use client";
 
 import React from 'react';
@@ -21,11 +22,11 @@ const PipelineKanbanBoard = dynamic(
 interface PipelineViewProps {
     data: KanbanBoardData;
     onBoardChange: (newData: KanbanBoardData) => void;
-    clienteId: string;
     negocioId: string;
+    clienteId: string;
 }
 
-export default function PipelineView({ data, onBoardChange, clienteId, negocioId }: PipelineViewProps) {
+export default function PipelineView({ data, onBoardChange, negocioId, clienteId }: PipelineViewProps) {
     return (
         <Card className="h-full border-zinc-700 bg-zinc-800/50 flex flex-col">
             <CardHeader>

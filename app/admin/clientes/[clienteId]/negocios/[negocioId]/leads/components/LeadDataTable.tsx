@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     ColumnDef,
     flexRender,
     getCoreRowModel,
     useReactTable,
     getPaginationRowModel,
-    //   SortingState,
-    //   getSortedRowModel,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -20,45 +18,58 @@ import {
 } from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { useDebounce } from '@/app/admin/_lib/hooks/useDebounce';
 import { listarLeadsAction } from '@/app/admin/_lib/actions/lead/lead.actions';
 import type { LeadListItem } from '@/app/admin/_lib/actions/lead/lead.schemas';
+import { PlusCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface LeadDataTableProps {
     columns: ColumnDef<LeadListItem>[];
     initialData: LeadListItem[];
     totalCount: number;
     negocioId: string;
+    clienteId: string;
 }
+
+// ✅ SOLUCIÓN: Se define un tipo específico para la estructura de jsonParams.
+type LeadJsonParams = {
+    colegio?: string | null;
+    grado?: string | null;
+    nivel_educativo?: string | null;
+    source?: string | null;
+};
 
 export default function LeadDataTable({
     columns,
     initialData,
     totalCount,
     negocioId,
+    clienteId
 }: LeadDataTableProps) {
+
+    const router = useRouter();
 
     const [data, setData] = useState(initialData);
     const [page, setPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState("");
+    const [colegioFilter, setColegioFilter] = useState<string>("");
+
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
     const [isLoading, setIsLoading] = useState(false);
-
-    // Mantenemos el total de leads en el estado para actualizarlo
     const [currentTotalCount, setCurrentTotalCount] = useState(totalCount);
 
     const pageSize = 10;
     const pageCount = Math.ceil(currentTotalCount / pageSize);
 
-    // Efecto para buscar y paginar
-    useEffect(() => {
-        // No ejecutar en la carga inicial si no hay búsqueda
-        if (debouncedSearchTerm === "" && page === 1) {
-            setData(initialData);
-            setCurrentTotalCount(totalCount);
-            return;
-        }
+    const colegioOptions = useMemo(() => {
+        // ✅ SOLUCIÓN: Se utiliza el tipo específico en lugar de 'any'.
+        const colegios = new Set(initialData.map(lead => (lead.jsonParams as LeadJsonParams)?.colegio).filter(Boolean));
+        return Array.from(colegios) as string[];
+    }, [initialData]);
 
+    useEffect(() => {
         async function fetchData() {
             setIsLoading(true);
             const result = await listarLeadsAction({
@@ -66,20 +77,20 @@ export default function LeadDataTable({
                 page,
                 pageSize,
                 searchTerm: debouncedSearchTerm,
+                colegio: colegioFilter === 'todos' ? undefined : colegioFilter,
             });
 
             if (result.success && result.data) {
                 setData(result.data.leads);
                 setCurrentTotalCount(result.data.totalCount);
             } else {
-                // Manejar error, quizás con un toast
                 console.error(result.error);
             }
             setIsLoading(false);
         }
 
         fetchData();
-    }, [debouncedSearchTerm, page, negocioId, initialData, totalCount]);
+    }, [debouncedSearchTerm, page, colegioFilter, negocioId]);
 
     const table = useReactTable({
         data,
@@ -92,13 +103,32 @@ export default function LeadDataTable({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
                 <Input
                     placeholder="Buscar por nombre, email o teléfono..."
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     className="max-w-sm bg-zinc-900 border-zinc-700"
                 />
+                <Select value={colegioFilter} onValueChange={setColegioFilter}>
+                    <SelectTrigger className="w-full sm:w-[200px] bg-zinc-900 border-zinc-700">
+                        <SelectValue placeholder="Filtrar por colegio..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="todos">Todos los colegios</SelectItem>
+                        {colegioOptions.map(colegio => (
+                            <SelectItem key={colegio} value={colegio}>{colegio}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <div className="sm:ml-auto">
+                    <Button
+                        onClick={() => router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/leads/nuevo`)}
+                    >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Agregar Lead
+                    </Button>
+                </div>
             </div>
             <div className="rounded-md border border-zinc-700">
                 <Table>
@@ -125,7 +155,8 @@ export default function LeadDataTable({
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="border-zinc-800 hover:bg-zinc-800"
+                                    className="border-zinc-800 hover:bg-zinc-800 cursor-pointer"
+                                    onClick={() => router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/leads/${row.original.id}`)} // Lógica para ir al detalle
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>

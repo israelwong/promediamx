@@ -1,3 +1,4 @@
+// Ruta actual: app/admin/clientes/[clienteId]/negocios/[negocioId]/citas/components/CitasLista.tsx
 'use client';
 
 import React from 'react';
