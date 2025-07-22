@@ -22,7 +22,7 @@ if (typeof window !== 'undefined') {
     if (supabaseUrl && supabaseAnonKey) supabase = createClient(supabaseUrl, supabaseAnonKey);
 }
 
-export default function RealtimeCalendarioView({ initialData, negocioId, clienteId }: RealtimeCalendarioViewProps) {
+export default function RealtimeCalendarioView({ initialData, negocioId }: RealtimeCalendarioViewProps) {
     const [citas, setCitas] = useState(initialData);
 
     useEffect(() => {
