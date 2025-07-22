@@ -65,7 +65,7 @@ const navSections: NavSection[] = [
             { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
             { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil del Negocio' },
             // { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
-            { hrefSuffix: '/agenda', icon: SlidersHorizontal, label: 'Agendamiento' },
+            { hrefSuffix: '/configAgenda', icon: SlidersHorizontal, label: 'Agendamiento' },
             // { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente Virtual' },
             // { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' },
             // NUEVO: Enlaces para la configuración específica del CRM.
