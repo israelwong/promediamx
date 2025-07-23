@@ -21,7 +21,8 @@ const LoginForm = () => {
                 try {
                     const response = await verifyToken(token);
                     if (response.payload) {
-                        router.push('/admin/dashboard');
+                        // router.push('/admin/dashboard');
+                        router.push('/admin/clientes/cmc9sw9jr0000gucnlskxn06n/negocios/cmcb10kno000mgulq4ilqe9ug/');
                     } else {
                         Cookies.remove('token');
                     }
