@@ -1048,6 +1048,10 @@ model Lead {
 
    manychatSubscriberId String? @unique
 
+ // ✅ NUEVA RELACIÓN: Se añade la clave foránea a la campaña
+  campanaId     String?
+  campana       CampanaPublicitaria? @relation(fields: [campanaId], references: [id])
+
   Agenda        Agenda[]
   Bitacora      Bitacora[]
   Conversacion  Conversacion[]
@@ -1058,12 +1062,21 @@ model Lead {
   Etiquetas     LeadEtiqueta[]
   BitacoraNotas LeadBitacora[]
 
+ @@index([campanaId])
   @@index([crmId])
   @@index([agenteId])
   @@index([canalId])
   @@index([pipelineId])
   @@index([email])
   @@index([telefono])
+}
+
+model CampanaPublicitaria {
+  id        String   @id // Usaremos el ad_id de ManyChat como PK
+  nombre    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  leads     Lead[]   // Relación inversa hacia los leads
 }
 
 // ✅ NUEVO MODELO: Para la bitácora de notas del Lead

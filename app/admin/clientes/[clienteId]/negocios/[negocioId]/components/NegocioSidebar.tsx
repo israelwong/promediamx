@@ -51,6 +51,7 @@ const navSections: NavSection[] = [
             { hrefSuffix: '/calendario', icon: Calendar, label: 'Calendario' },
             { hrefSuffix: '/citas', icon: ListCheck, label: 'Citas Agendadas' },
             { hrefSuffix: '/leads', icon: Users, label: 'Leads' },
+            { hrefSuffix: '/campanas', icon: Users, label: 'Campañas' },
         ]
     },
     // {

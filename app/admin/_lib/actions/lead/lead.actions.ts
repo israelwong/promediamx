@@ -304,7 +304,7 @@ export async function actualizarLeadAction(
 
 export async function eliminarLeadAction(
     params: z.infer<typeof eliminarLeadParamsSchema>
-): Promise<ActionResult<{ id: string } | null>> { // Devuelve el ID del lead eliminado
+): Promise<ActionResult<{ id: string } | null>> {
     const validation = eliminarLeadParamsSchema.safeParse(params);
     if (!validation.success) {
         return { success: false, error: "ID de Lead inválido.", errorDetails: validation.error.flatten().fieldErrors };
@@ -312,6 +312,14 @@ export async function eliminarLeadAction(
     const { leadId } = validation.data;
 
     try {
+        // Verificar si el lead tiene citas agendadas
+        const citasAgendadas = await prisma.agenda.findMany({
+            where: { leadId: leadId }
+        });
+        if (citasAgendadas.length > 0) {
+            return { success: false, error: "El lead tiene una cita agendada. Debes eliminar la cita antes de eliminar el lead." };
+        }
+
         await prisma.lead.delete({
             where: { id: leadId },
         });
@@ -319,11 +327,11 @@ export async function eliminarLeadAction(
     } catch (error) {
         console.error(`Error al eliminar lead ${leadId}:`, error);
         if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            if (error.code === 'P2025') { // Error: Record to delete does not exist.
+            if (error.code === 'P2025') {
                 return { success: false, error: "El lead que intentas eliminar no fue encontrado." };
             }
-            if (error.code === 'P2003') { // Foreign key constraint failed
-                return { success: false, error: "No se puede eliminar el lead porque tiene registros asociados (ej. conversaciones, citas). Debes eliminarlos o desasociarlos primero." };
+            if (error.code === 'P2003') {
+                return { success: false, error: "No se puede eliminar el lead porque tiene registros asociados. Debes eliminarlos o desasociarlos primero." };
             }
         }
         return { success: false, error: 'No se pudo eliminar el lead.' };

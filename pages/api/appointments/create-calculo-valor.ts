@@ -35,20 +35,25 @@ type ApiResponse = {
 // Helper para calcular el valor estimado del lead
 function calculateEstimatedValue(colegio?: string | null, nivel?: string | null): number | null {
     if (!colegio || !nivel) return null;
+
     const colegioNormalizado = colegio.toLowerCase();
     const nivelNormalizado = nivel.toLowerCase();
 
+    if (colegioNormalizado.includes('albatros')) {
+        // Para Albatros, el valor es la comisión fija.
+        return 1500;
+    }
+
     if (colegioNormalizado.includes('tecno')) {
+        // Para Tecno, el valor es la colegiatura anual.
         const annualTuition: { [key: string]: number } = {
             'kinder': 2516 * 12,
             'primaria': 3005 * 12,
             'secundaria': 3278 * 12
         };
-        const baseAnual = annualTuition[nivelNormalizado];
-        // Solo regresa la comisión del 7% si es Tecno
-        return baseAnual ? Math.round(baseAnual * 0.07) : null;
+        return annualTuition[nivelNormalizado] || null;
     }
-    // Para otros colegios no se calcula valor estimado
+
     return null;
 }
 
@@ -116,8 +121,7 @@ export default async function handler(
             ...(pipelineFinal && {
                 pipelineId: pipelineFinal.id,
                 status: pipelineFinal.nombre.toLowerCase(),
-            }),
-            status: 'activo'
+            })
         };
 
         const lead = await prisma.lead.upsert({
@@ -141,7 +145,6 @@ export default async function handler(
         }
 
         const descripcionEnriquecida = `Cita desde ${jsonParams.source}. Colegio: ${data.colegio || 'N/A'}, Nivel: ${data.nivel_educativo || 'N/A'}, Grado: ${data.grado || 'N/A'}.`;
-
 
         const nuevaCita = await prisma.agenda.create({
             data: {

@@ -9,6 +9,7 @@ import { z } from 'zod';
 // --- Lógica del Servidor ---
 import {
     actualizarLeadAction,
+    eliminarLeadAction
 } from '@/app/admin/_lib/actions/lead/lead.actions';
 import {
     type LeadDetalleData,
@@ -21,7 +22,7 @@ import { Button } from "@/app/components/ui/button";
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
-import { Loader2, Save, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, ArrowLeft, Trash } from 'lucide-react';
 
 // ✅ El schema de Zod se mantiene como la fuente de verdad para la validación manual.
 const leadEditFormSchema = z.object({
@@ -108,6 +109,12 @@ export default function LeadFormEditar({ leadInicial, datosFormulario, negocioId
 
 
     useEffect(() => {
+        // Si ya hay un valor estimado, no recalcular
+        const currentValorEstimado = watch('valorEstimado');
+        if (currentValorEstimado !== undefined && currentValorEstimado !== null) {
+            return;
+        }
+
         const colegio = watchedJsonParams?.colegio?.toLowerCase();
         const nivel = watchedJsonParams?.nivel_educativo?.toLowerCase();
         let calculatedValue: number | null = null;
@@ -123,7 +130,7 @@ export default function LeadFormEditar({ leadInicial, datosFormulario, negocioId
             }
         }
         setValue('valorEstimado', calculatedValue, { shouldValidate: true, shouldDirty: true });
-    }, [watchedJsonParams, setValue]);
+    }, [watchedJsonParams, setValue, watch]);
 
 
     useEffect(() => {
@@ -175,11 +182,45 @@ export default function LeadFormEditar({ leadInicial, datosFormulario, negocioId
         }
     };
 
+    const handleDelete = async (leadId: string) => {
+        const confirmed = window.confirm("¿Estás seguro de que deseas eliminar este lead?");
+        if (!confirmed) return;
+
+        setIsSubmitting(true);
+        try {
+            const result = await eliminarLeadAction({ leadId });
+            if (result.success) {
+                toast.success("Lead eliminado exitosamente.");
+                router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/leads`);
+                router.refresh();
+            } else {
+                throw new Error(result.error || "Error desconocido al eliminar el lead.");
+            }
+        } catch (err) {
+            setSubmitError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Editar Lead</CardTitle>
-                <CardDescription>Actualiza la información y asignaciones de este lead.</CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                    <CardTitle>Editar Lead</CardTitle>
+                    <CardDescription>Actualiza la información y asignaciones de este lead.</CardDescription>
+                </div>
+                <Button
+                    type="button"
+                    variant="destructiveOutline"
+                    size="sm"
+                    onClick={() => handleDelete(leadInicial.id)}
+                    disabled={isSubmitting}
+                    className="text-red-500 border-red-500 hover:bg-red-500 hover:text-white"
+                >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Eliminar Lead
+                </Button>
             </CardHeader>
             <form onSubmit={handleSubmit(onSubmit)}>
                 <CardContent className="space-y-6">
