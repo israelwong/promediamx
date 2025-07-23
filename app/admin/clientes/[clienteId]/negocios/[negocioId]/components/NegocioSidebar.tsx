@@ -7,12 +7,12 @@ import { usePathname } from 'next/navigation';
 
 // --- Iconos para la nueva estructura (actualizados) ---
 import {
-    LayoutDashboard,
+    // LayoutDashboard,
     // MessageSquare,
     Users, // Para Leads
     Calendar,
-    Tag,
-    Briefcase,
+    // Tag,
+    // Briefcase,
     // LibraryBig,
     SlidersHorizontal,
     // Bot,
@@ -20,9 +20,10 @@ import {
     Kanban,
     Columns, // Para Pipeline
     Tags,
-    VariableIcon, // Para Etiquetas
+    // VariableIcon, // Para Etiquetas
     ListCheck,
-    Settings
+    // Settings,
+    // ChartAreaIcon
 
 } from 'lucide-react';
 
@@ -51,30 +52,25 @@ const navSections: NavSection[] = [
             { hrefSuffix: '/calendario', icon: Calendar, label: 'Calendario' },
             { hrefSuffix: '/citas', icon: ListCheck, label: 'Citas Agendadas' },
             { hrefSuffix: '/leads', icon: Users, label: 'Leads' },
-            { hrefSuffix: '/campanas', icon: Users, label: 'Campañas' },
+            // { hrefSuffix: '/campanas', icon: Users, label: 'Campañas' },
+            // { hrefSuffix: '/estadisticas', icon: ChartAreaIcon, label: 'Estadísticas' },
         ]
     },
-    // {
-    //     title: 'Campañas',
-    //     links: [
-    //         // { hrefSuffix: '/mensajeInicial', icon: Tag, label: 'Mensaje de bienvenida' },
-    //     ]
-    // },
     {
         title: 'Configuración',
         links: [
-            { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
-            { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil del Negocio' },
-            // { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
+            // { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
+            // { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil del Negocio' },
             { hrefSuffix: '/configAgenda', icon: SlidersHorizontal, label: 'Agendamiento' },
+            { hrefSuffix: '/configPipeline', icon: Columns, label: 'Ajustes de Pipeline' },
+            { hrefSuffix: '/configEtiquetas', icon: Tags, label: 'Etiquetas' },
+            // { hrefSuffix: '/configParametrosPersonalizados', icon: VariableIcon, label: 'Parametros' },
+            // { hrefSuffix: '/configuracion', icon: Settings, label: 'Configuración' },
+            // { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
             // { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente Virtual' },
             // { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' },
             // NUEVO: Enlaces para la configuración específica del CRM.
             // { hrefSuffix: '/agentes', icon: UserCog, label: 'Agentes' },
-            { hrefSuffix: '/configPipeline', icon: Columns, label: 'Ajustes de Pipeline' },
-            { hrefSuffix: '/configEtiquetas', icon: Tags, label: 'Etiquetas' },
-            { hrefSuffix: '/configParametrosPersonalizados', icon: VariableIcon, label: 'Parametros' },
-            { hrefSuffix: '/configuracion', icon: Settings, label: 'Configuración' },
         ]
     },
 ];
@@ -99,15 +95,9 @@ export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarP
         if (!pathname) return false;
 
         const expectedPath = `${basePathForSidebar}${hrefSuffix}`;
-
-        // CORRECCIÓN: Para la ruta raíz ('/'), necesitamos una coincidencia exacta.
-        // La lógica anterior de startsWith() hacía que siempre estuviera activo.
         if (hrefSuffix === '/') {
             return pathname === basePathForSidebar;
         }
-
-        // Para las demás rutas, la lógica de startsWith() es correcta para que las
-        // sub-rutas (ej: /leads/123) también activen el enlace principal (/leads).
         return pathname.startsWith(expectedPath);
     };
 
@@ -124,7 +114,7 @@ export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarP
         <nav className={navContainerClasses}>
             <div className="flex-grow">
                 <ul className="space-y-2">
-                    <li>
+                    {/* <li>
                         <Link
                             href={buildHref('/')}
                             className={`${navLinkBaseClasses} ${isActive('/') ? navLinkActiveClasses : navLinkInactiveClasses}`}
@@ -132,7 +122,7 @@ export default function NegocioSidebar({ clienteId, negocioId }: NegocioSidebarP
                             <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
                             <span>Panel de Control</span>
                         </Link>
-                    </li>
+                    </li> */}
 
                     {navSections.map((section) => (
                         <li key={section.title}>

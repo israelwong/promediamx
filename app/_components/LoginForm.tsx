@@ -69,7 +69,8 @@ const LoginForm = () => {
                 if (response.status) {
                     //redirect to dashboard
                     Cookies.set('token', response.token, { expires: 7 }); // La cookie expira en 7 días
-                    router.push('/admin/dashboard');
+                    // router.push('/admin/dashboard');
+                    router.push('/admin/clientes/cmc9sw9jr0000gucnlskxn06n/negocios/cmcb10kno000mgulq4ilqe9ug/');
                 }
                 else {
                     setSessionError('Credenciales incorrectas');

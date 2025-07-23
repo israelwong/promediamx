@@ -1,16 +1,18 @@
-import React from 'react'
-import { Metadata } from 'next'
-import DashboardView from './components/DashboardView';
+import { redirect } from 'next/navigation';
 
-
-export const metadata: Metadata = {
+export const metadata = {
     title: 'Negocio',
     description: 'Editar negocio',
+};
+
+interface PageProps {
+    negocioId: string;
+    clienteId: string;
 }
 
-export default async function page({ params }: { params: Promise<{ negocioId: string, clienteId: string }> }) {
-    const { negocioId, clienteId } = await params
-    console.log(negocioId, clienteId);
-    return <DashboardView negocioId={negocioId} />;
-
+export default async function Page({ params }: { params: Promise<PageProps> }) {
+    const { negocioId, clienteId } = await params;
+    // Redirect to the Kanban page
+    redirect(`/admin/clientes/${clienteId}/negocios/${negocioId}/kanban`);
+    return null;
 }

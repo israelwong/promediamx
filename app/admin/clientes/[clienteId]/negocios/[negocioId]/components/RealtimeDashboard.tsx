@@ -8,10 +8,10 @@ import { type DashboardData } from '@/app/admin/_lib/actions/dashboard/dashboard
 import KpiCard from './KpiCard';
 import PipelineStatusChart from './PipelineStatusChart';
 import AppointmentStatusChart from './AppointmentStatusChart';
-import ActionItemsWidget from './ActionItemsWidget';
+// import ActionItemsWidget from './ActionItemsWidget';
 
 // Iconos
-import { MessageSquare, UserPlus, CalendarCheck } from 'lucide-react';
+import { UserPlus, CalendarCheck } from 'lucide-react';
 
 interface RealtimeDashboardProps {
     initialData: DashboardData;
@@ -112,8 +112,8 @@ export default function RealtimeDashboard({ initialData, negocioId }: RealtimeDa
     // El JSX es el mismo que el de DashboardView, pero ahora usa el estado local 'data'.
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <KpiCard title="Conversaciones Activas" value={data.kpis.conversacionesActivas} icon={MessageSquare} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                {/* <KpiCard title="Conversaciones Activas" value={data.kpis.conversacionesActivas} icon={MessageSquare} /> */}
                 <KpiCard title="Leads Nuevos (Hoy)" value={data.kpis.leadsNuevosHoy} icon={UserPlus} />
                 <KpiCard title="Citas Agendadas (Hoy)" value={data.kpis.citasAgendadasHoy} icon={CalendarCheck} />
             </div>
@@ -123,7 +123,7 @@ export default function RealtimeDashboard({ initialData, negocioId }: RealtimeDa
                 <AppointmentStatusChart data={data.appointmentStatus} />
             </div>
 
-            <ActionItemsWidget data={data.actionItems} negocioId={negocioId} />
+            {/* <ActionItemsWidget data={data.actionItems} negocioId={negocioId} /> */}
         </div>
     );
 }
