@@ -321,7 +321,6 @@ export const obtenerDetallesLeadParamsSchema = z.object({
 });
 
 
-
 export const LeadUnificadoFormSchema = z.object({
     // --- Datos del Lead ---
     id: z.string().cuid().optional(),
@@ -330,8 +329,6 @@ export const LeadUnificadoFormSchema = z.object({
     telefono: z.string().optional(),
     status: z.string(),
     pipelineId: z.string().cuid("Debes seleccionar una etapa del pipeline."),
-
-    // ✅ CORREGIDO: Se elimina el 'preprocess'. La conversión de string vacío a null se hará en el cliente.
     valorEstimado: z.number().positive("El valor estimado debe ser un número positivo.").nullable().optional(),
 
     jsonParams: z.object({
@@ -339,6 +336,9 @@ export const LeadUnificadoFormSchema = z.object({
         nivel_educativo: z.string().optional(),
         grado: z.string().optional(),
     }).optional(),
+
+    // ✅ Se añade el campo para los IDs de las etiquetas seleccionadas
+    etiquetaIds: z.array(z.string().cuid()).optional(),
 
     // --- Datos de la Cita (Opcionales) ---
     fechaCita: z.date().optional().nullable(),

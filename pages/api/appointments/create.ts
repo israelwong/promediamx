@@ -101,7 +101,7 @@ export default async function handler(
         };
 
         const pipelineAgendado = await prisma.pipelineCRM.findFirst({
-            where: { crmId: crmId, nombre: { equals: 'Agendado', mode: 'insensitive' } }
+            where: { crmId: crmId, nombre: { equals: 'Nuevo', mode: 'insensitive' } }
         });
         const pipelineFinal = pipelineAgendado || await prisma.pipelineCRM.findFirst({ where: { crmId }, orderBy: { orden: 'asc' } });
 

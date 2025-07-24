@@ -921,19 +921,35 @@ export async function guardarLeadYAsignarCitaAction(
     }
 
     const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
-        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams } = validation.data;
-
+        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = validation.data
     try {
         const result = await prisma.$transaction(async (tx) => {
             const leadData = {
                 nombre, email: email || null, telefono: telefono || null,
                 status, pipelineId, valorEstimado, crmId,
                 jsonParams: jsonParams as Prisma.JsonObject || {},
+                // ✅ Se prepara la actualización de las etiquetas
+                Etiquetas: {
+                    set: etiquetaIds?.map(id => ({
+                        leadId_etiquetaId: {
+                            leadId: leadId || '',
+                            etiquetaId: id
+                        }
+                    })) || []
+                }
             };
 
             const lead = leadId
                 ? await tx.lead.update({ where: { id: leadId }, data: leadData })
-                : await tx.lead.create({ data: leadData });
+                : await tx.lead.create({
+                    data: {
+                        ...leadData,
+                        Etiquetas: {
+                            create: etiquetaIds?.map(id => ({ etiquetaId: id })) || []
+                        }
+                    }
+                });
+
 
             let citaGuardada = null;
 

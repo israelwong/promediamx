@@ -13,8 +13,7 @@ import { format } from 'date-fns';
 
 import { LeadUnificadoFormSchema, type LeadUnificadoFormData } from '@/app/admin/_lib/actions/lead/lead.schemas';
 import { guardarLeadYAsignarCitaAction, eliminarLeadAction } from '@/app/admin/_lib/actions/lead/lead.actions';
-import type { Lead, Agenda, PipelineCRM, AgendaTipoCita } from '@prisma/client';
-
+import type { Lead, Agenda, PipelineCRM, AgendaTipoCita, EtiquetaCRM } from '@prisma/client';
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
@@ -50,16 +49,18 @@ type LeadJsonParams = {
     grado?: string;
 };
 
+
 interface LeadFormProps {
     clienteId: string;
     negocioId: string;
     crmId: string;
-    initialLeadData?: (Lead & { Agenda: Agenda[] }) | null;
+    initialLeadData?: (Lead & { Agenda: Agenda[], Etiquetas: { etiquetaId: string }[] }) | null;
     etapasPipeline: PipelineCRM[];
+    etiquetasDisponibles: EtiquetaCRM[];
     tiposDeCita: AgendaTipoCita[];
 }
 
-export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData, etapasPipeline, tiposDeCita }: LeadFormProps) {
+export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData, etapasPipeline, etiquetasDisponibles, tiposDeCita }: LeadFormProps) {
     const router = useRouter();
     const [isSaving, startSaveTransition] = useTransition();
     const [isNotifying, startNotifyTransition] = useTransition();
@@ -69,17 +70,18 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
     const citaInicial = initialLeadData?.Agenda[0];
 
     const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<LeadUnificadoFormData>({
-
         resolver: zodResolver(LeadUnificadoFormSchema),
         defaultValues: {
             id: initialLeadData?.id,
             nombre: initialLeadData?.nombre || '',
             email: initialLeadData?.email || '',
             telefono: initialLeadData?.telefono || '',
-            status: initialLeadData?.status || 'activo',
+            status: 'activo',
             pipelineId: initialLeadData?.pipelineId || etapasPipeline[0]?.id || '',
             valorEstimado: initialLeadData?.valorEstimado,
             jsonParams: (initialLeadData?.jsonParams as LeadJsonParams) || {},
+            // ✅ Se inicializan las etiquetas seleccionadas
+            etiquetaIds: initialLeadData?.Etiquetas.map(e => e.etiquetaId) || [],
             fechaCita: citaInicial ? new Date(citaInicial.fecha) : undefined,
             horaCita: citaInicial ? format(new Date(citaInicial.fecha), 'HH:mm') : undefined,
             tipoDeCitaId: citaInicial?.tipoDeCitaId,
@@ -229,10 +231,10 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                     </Select>
                                 )} />
                             </div>
-                            <div>
+                            {/* <div>
                                 <Label htmlFor="valorEstimado">Comisión Estimada (MXN)</Label>
                                 <Input id="valorEstimado" type="number" step="0.01" {...register("valorEstimado")} />
-                            </div>
+                            </div> */}
                         </CardContent>
                     </Card>
                     <Card className="bg-zinc-800/50 border-zinc-700">
@@ -267,10 +269,14 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                             </div>
                         </CardContent>
                     </Card>
+
+
                 </div>
 
                 {/* --- Columna 2: Agendamiento --- */}
                 <div className="space-y-6">
+
+
                     <Card className="bg-zinc-800/50 border-zinc-700">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Agendar Cita</CardTitle>
@@ -335,7 +341,45 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                 </div>
 
                 {/* --- Columna 3: Notas --- */}
-                {initialLeadData && <div className="space-y-6"><NotasSection leadId={initialLeadData.id} /></div>}
+                <div>
+                    <Card className="bg-zinc-800/50 border-zinc-700 mb-5">
+                        <CardHeader><CardTitle>Etiquetas</CardTitle></CardHeader>
+                        <CardContent>
+                            <Controller
+                                name="etiquetaIds"
+                                control={control}
+                                render={({ field }) => (
+                                    <div className="flex flex-wrap gap-2">
+                                        {etiquetasDisponibles.map(etiqueta => {
+                                            const isSelected = field.value?.includes(etiqueta.id);
+                                            return (
+                                                <button
+                                                    key={etiqueta.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const current = field.value || [];
+                                                        const newEtiquetas = isSelected
+                                                            ? current.filter(id => id !== etiqueta.id)
+                                                            : [...current, etiqueta.id];
+                                                        field.onChange(newEtiquetas);
+                                                    }}
+                                                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${isSelected
+                                                        ? 'bg-blue-600 text-white border-transparent'
+                                                        : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                                                        }`}
+                                                >
+                                                    {etiqueta.nombre}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            />
+                        </CardContent>
+                    </Card>
+
+                    {initialLeadData && <div className="space-y-6"><NotasSection leadId={initialLeadData.id} /></div>}
+                </div>
             </div>
         </form>
     );

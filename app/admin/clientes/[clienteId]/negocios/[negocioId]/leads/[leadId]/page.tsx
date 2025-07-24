@@ -34,6 +34,7 @@ export default async function LeadPage({ params }: { params: Promise<LeadPagePro
         select: {
             id: true,
             Pipeline: { orderBy: { orden: 'asc' } },
+            Etiqueta: { orderBy: { orden: 'asc' } }, // Se obtienen las etiquetas
             negocio: {
                 select: {
                     agendaTipoCita: { where: { activo: true }, orderBy: { orden: 'asc' } }
@@ -46,11 +47,15 @@ export default async function LeadPage({ params }: { params: Promise<LeadPagePro
         return notFound();
     }
 
-    let lead: (Lead & { Agenda: Agenda[] }) | null = null;
+    let lead: (Lead & { Agenda: Agenda[], Etiquetas: { etiquetaId: string }[] }) | null = null;
     if (!isNewLead) {
         lead = await prisma.lead.findUnique({
             where: { id: leadId },
-            include: { Agenda: { where: { status: 'PENDIENTE' } } }
+            // ✅ Se incluyen las etiquetas ya asignadas al lead
+            include: {
+                Agenda: { where: { status: 'PENDIENTE' } },
+                Etiquetas: { select: { etiquetaId: true } }
+            }
         });
         if (!lead) {
             return notFound();
@@ -64,6 +69,7 @@ export default async function LeadPage({ params }: { params: Promise<LeadPagePro
             crmId={crmData.id}
             initialLeadData={lead || undefined}
             etapasPipeline={crmData.Pipeline}
+            etiquetasDisponibles={crmData.Etiqueta} // Se pasan las etiquetas al formulario
             tiposDeCita={crmData.negocio.agendaTipoCita}
         />
     );
