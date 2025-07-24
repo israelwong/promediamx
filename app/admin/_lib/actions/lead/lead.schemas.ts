@@ -326,16 +326,14 @@ export const LeadUnificadoFormSchema = z.object({
     // --- Datos del Lead ---
     id: z.string().cuid().optional(),
     nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-    email: z.string().email("Por favor, introduce un email válido.").optional().or(z.literal('')),
+    email: z.string().email("Por favor, introduce un email válido.").nullable().optional(),
     telefono: z.string().optional(),
     status: z.string(),
     pipelineId: z.string().cuid("Debes seleccionar una etapa del pipeline."),
-    valorEstimado: z.preprocess(
-        (val) => (val === '' || val === null || (typeof val === 'number' && isNaN(val)) ? null : Number(val)),
-        z.number().positive("El valor estimado debe ser un número positivo.").nullable().optional()
-    ),
 
-    // ✅ Se añaden los campos de jsonParams para validación
+    // ✅ CORREGIDO: Se elimina el 'preprocess'. La conversión de string vacío a null se hará en el cliente.
+    valorEstimado: z.number().positive("El valor estimado debe ser un número positivo.").nullable().optional(),
+
     jsonParams: z.object({
         colegio: z.string().optional(),
         nivel_educativo: z.string().optional(),
@@ -353,11 +351,11 @@ export const LeadUnificadoFormSchema = z.object({
     crmId: z.string().cuid(),
 }).refine(data => {
     if (data.fechaCita) {
-        return !!data.horaCita && !!data.tipoDeCitaId;
+        return !!data.horaCita && !!data.tipoDeCitaId && !!data.modalidadCita;
     }
     return true;
 }, {
-    message: "Si agendas una cita, debes especificar la hora y el tipo de cita.",
+    message: "Si agendas una cita, debes especificar todos sus detalles.",
     path: ["fechaCita"],
 });
 
