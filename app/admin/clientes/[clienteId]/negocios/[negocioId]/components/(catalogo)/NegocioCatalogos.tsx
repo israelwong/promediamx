@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 // --- IMPORTACIONES ACTUALIZADAS ---
-import { obtenerCatalogosPorNegocioId } from '@/app/admin/_lib/catalogo.actions';
-import { CatalogoParaLista } from '@/app/admin/_lib/catalogo.actions'; // Usar el nuevo tipo
+import { obtenerCatalogosPorNegocioId } from '@/app/admin/_lib/unused/catalogo.actions';
+import { CatalogoParaLista } from '@/app/admin/_lib/unused/catalogo.actions'; // Usar el nuevo tipo
 // ---------------------------------
 import { Loader2, ListX, PlusIcon, ChevronRight, ShoppingBasket, LayoutGrid } from 'lucide-react'; // Iconos
 

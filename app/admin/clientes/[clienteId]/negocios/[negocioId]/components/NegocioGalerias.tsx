@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 // --- Actions and Types ---
-import { obtenerGaleriasNegocioConPortada } from '@/app/admin/_lib/galeriaNegocio.actions'; // Ajusta la ruta
-import { GaleriaNegocioParaLista } from '@/app/admin/_lib/galeriaNegocio.actions'; // Ajusta la ruta
+import { obtenerGaleriasNegocioConPortada } from '@/app/admin/_lib/unused/galeriaNegocio.actions'; // Ajusta la ruta
+import { GaleriaNegocioParaLista } from '@/app/admin/_lib/unused/galeriaNegocio.actions'; // Ajusta la ruta
 // --- Icons ---
 import { Loader2, ListX, Info, PlusIcon, ChevronRight, Image as ImageIcon, BadgeCheck, BadgeX, AlertTriangle, LayoutGrid } from 'lucide-react';
 

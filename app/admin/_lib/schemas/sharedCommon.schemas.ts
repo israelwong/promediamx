@@ -13,7 +13,7 @@ export const AgenteBasicoPlaceholderSchema = z.object({
 export const SharedTipoVideoEnumSchema = z.enum(['SUBIDO', 'YOUTUBE', 'VIMEO', 'OTRO_URL']);
 export type SharedTipoVideoType = z.infer<typeof SharedTipoVideoEnumSchema>;
 
-import type { AgenteBasico } from '@/app/admin/_lib/agente.types';
+import type { AgenteBasico } from '@/app/admin/_lib/unused/agente.types';
 import { InteraccionParteTipo } from '@prisma/client'; // Importar el enum de Prisma
 
 // Esquema para un ChatMessageItem (lo que el frontend renderiza)

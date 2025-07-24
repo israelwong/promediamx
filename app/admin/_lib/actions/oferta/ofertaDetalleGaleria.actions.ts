@@ -4,7 +4,7 @@ import prisma from '@/app/admin/_lib/prismaClient'; // Ajusta tu ruta
 import { ActionResult } from '@/app/admin/_lib/types';
 import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { subirImagenStorage as subirArchivoStorage, eliminarImagenStorage as eliminarArchivoStorage } from '@/app/admin/_lib/imageHandler.actions'; // Reutilizando
+import { subirImagenStorage as subirArchivoStorage, eliminarImagenStorage as eliminarArchivoStorage } from '@/app/admin/_lib/unused/imageHandler.actions'; // Reutilizando
 // import { z } from 'zod';
 
 import {

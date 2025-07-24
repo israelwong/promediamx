@@ -9,7 +9,7 @@ import {
     actualizarNegocioEtiqueta,
     eliminarNegocioEtiqueta,
     actualizarOrdenNegocioEtiquetas // <-- Asegúrate que esta acción exista
-} from '@/app/admin/_lib/negocioEtiqueta.actions'; // Asegúrate que las acciones estén aquí
+} from '@/app/admin/_lib/unused/negocioEtiqueta.actions'; // Asegúrate que las acciones estén aquí
 
 import { NegocioEtiqueta } from '@/app/admin/_lib/types'; // Asegúrate que incluya 'orden'
 import { Loader2, ListX, ListChecks, PlusIcon, PencilIcon, Trash2, Save, XIcon, GripVertical } from 'lucide-react'; // Iconos

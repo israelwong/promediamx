@@ -9,7 +9,7 @@ import {
     actualizarUsuario,
     eliminarUsuario
 } from '@/app/admin/_lib/usuario.actions';
-import { obtenerRoles } from '@/app/admin/_lib/rol.actions';
+import { obtenerRoles } from '@/app/admin/_lib/unused/rol.actions';
 import { Usuario, Rol } from '@/app/admin/_lib/types'; // Importar tipos
 import { Loader2, AlertTriangle, ListChecks, PlusIcon, PencilIcon, Trash2, Save, XIcon, Users, ShieldAlert, BadgeCheck, BadgeX } from 'lucide-react'; // Iconos
 

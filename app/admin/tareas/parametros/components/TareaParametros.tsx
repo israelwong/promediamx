@@ -18,13 +18,13 @@ import {
     editarParametroRequerido,
     eliminarParametroRequerido,
     actualizarOrdenParametros
-} from '@/app/admin/_lib/tareaParametro.actions'; // Asumo que la ruta es correcta, antes era parametrosTareas.actions
+} from '@/app/admin/_lib/unused/tareaParametro.actions'; // Asumo que la ruta es correcta, antes era parametrosTareas.actions
 
 import {
     ParametroConDetalles,
     ParametroFormData
     // Asegúrate que ParametroRequeridoInput también se importe si lo usas para dataToSend
-} from '@/app/admin/_lib/tareaParametro.type'; // Asumo que la ruta es correcta, antes era parametrosTareas.type
+} from '@/app/admin/_lib/unused/tareaParametro.type'; // Asumo que la ruta es correcta, antes era parametrosTareas.type
 
 import {
     Loader2, ListChecks, PlusIcon, Trash2, Save, XIcon, Variable, GripVertical, InfoIcon,

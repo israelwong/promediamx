@@ -20,7 +20,7 @@ import {
 import { ActionResult } from '@/app/admin/_lib/types';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client'; // Importar tipos de Prisma para errores
-import { eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions'; // Asumiendo que tienes esta función para eliminar imágenes de Supabase Storage
+import { eliminarImagenStorage } from '@/app/admin/_lib/unused/imageHandler.actions'; // Asumiendo que tienes esta función para eliminar imágenes de Supabase Storage
 
 
 const getPathToPaqueteEdicion = (clienteId: string, negocioId: string, paqueteId: string) =>

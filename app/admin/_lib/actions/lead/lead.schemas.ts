@@ -203,9 +203,11 @@ export const listarLeadsParamsSchema = z.object({
     page: z.number().int().positive().default(1),
     pageSize: z.number().int().positive().default(10),
     searchTerm: z.string().optional(),
-    // ✅ Se añade el nuevo filtro por colegio
     colegio: z.string().optional(),
+    etapa: z.string().optional(),
 });
+
+
 // Esquema para un único lead en la lista
 export const leadListItemSchema = z.object({
     id: z.string().cuid(),
@@ -234,7 +236,7 @@ export const listarLeadsResultSchema = z.object({
 
 export type ListarLeadsParams = z.infer<typeof listarLeadsParamsSchema>;
 export type LeadListItem = z.infer<typeof leadListItemSchema>;
-export type ListarLeadsResult = z.infer<typeof listarLeadsResultSchema>;
+
 
 // export const obtenerDetallesLeadParamsSchema = z.object({
 //     leadId: z.string().cuid(),
@@ -255,30 +257,6 @@ export const etiquetarYReubicarLeadParamsSchema = z.object({
     nombreEtapaDestino: z.string().min(1), // El nombre de la columna del pipeline a la que se moverá
 });
 
-
-
-// // Esquema para una etiqueta individual
-// const etiquetaSchema = z.object({
-//     id: z.string(),
-//     nombre: z.string(),
-//     color: z.string().nullable(),
-// });
-
-// // Actualizamos el esquema principal de los detalles del lead
-// export const leadDetailsSchema = z.object({
-//     id: z.string(),
-//     nombre: z.string(),
-//     email: z.string().nullable(),
-//     telefono: z.string().nullable(),
-//     // CORRECCIÓN: Nos aseguramos que la definición aquí requiera el crmId.
-//     etapaPipeline: z.object({
-//         id: z.string(),
-//         nombre: z.string(),
-//         crmId: z.string(),
-//     }).nullable(),
-//     etiquetas: z.array(etiquetaSchema).optional(),
-// });
-// export type LeadDetails = z.infer<typeof leadDetailsSchema>;
 
 export const marcarLeadComoGanadoParamsSchema = z.object({
     leadId: z.string().cuid(),
@@ -315,8 +293,6 @@ export type CrearLeadBasicoParams = z.infer<typeof crearLeadBasicoParamsSchema>;
 
 
 
-
-
 export const etiquetaSchema = z.object({
     id: z.string(),
     nombre: z.string(),
@@ -343,3 +319,84 @@ export type LeadDetails = z.infer<typeof leadDetailsSchema>;
 export const obtenerDetallesLeadParamsSchema = z.object({
     leadId: z.string().cuid(),
 });
+
+
+
+export const LeadUnificadoFormSchema = z.object({
+    // --- Datos del Lead ---
+    id: z.string().cuid().optional(),
+    nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
+    email: z.string().email("Por favor, introduce un email válido.").optional().or(z.literal('')),
+    telefono: z.string().optional(),
+    status: z.string(),
+    pipelineId: z.string().cuid("Debes seleccionar una etapa del pipeline."),
+    valorEstimado: z.preprocess(
+        (val) => (val === '' || val === null || (typeof val === 'number' && isNaN(val)) ? null : Number(val)),
+        z.number().positive("El valor estimado debe ser un número positivo.").nullable().optional()
+    ),
+
+    // ✅ Se añaden los campos de jsonParams para validación
+    jsonParams: z.object({
+        colegio: z.string().optional(),
+        nivel_educativo: z.string().optional(),
+        grado: z.string().optional(),
+    }).optional(),
+
+    // --- Datos de la Cita (Opcionales) ---
+    fechaCita: z.date().optional().nullable(),
+    horaCita: z.string().optional().nullable(),
+    tipoDeCitaId: z.string().cuid().optional().nullable(),
+    modalidadCita: z.string().optional().nullable(),
+
+    // --- IDs de contexto ---
+    negocioId: z.string().cuid(),
+    crmId: z.string().cuid(),
+}).refine(data => {
+    if (data.fechaCita) {
+        return !!data.horaCita && !!data.tipoDeCitaId;
+    }
+    return true;
+}, {
+    message: "Si agendas una cita, debes especificar la hora y el tipo de cita.",
+    path: ["fechaCita"],
+});
+
+export type LeadUnificadoFormData = z.infer<typeof LeadUnificadoFormSchema>;
+
+
+export const LeadParaTablaSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    email: z.string().nullable(),
+    telefono: z.string().nullable(),
+    createdAt: z.date(),
+    pipelineNombre: z.string().nullable(),
+    colegio: z.string().nullable(),
+});
+export type LeadParaTabla = z.infer<typeof LeadParaTablaSchema>;
+
+export const ListarLeadsResultSchema = z.object({
+    leads: z.array(LeadParaTablaSchema),
+    totalCount: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+    startIndex: z.number(),
+});
+export type ListarLeadsResult = z.infer<typeof ListarLeadsResultSchema>;
+
+export const DatosFiltrosLeadSchema = z.object({
+    pipelines: z.array(z.object({ id: z.string(), nombre: z.string() })),
+    colegios: z.array(z.string()),
+});
+export type DatosFiltrosLead = z.infer<typeof DatosFiltrosLeadSchema>;
+
+export const ConteoPorEtapaSchema = z.object({
+    totalLeads: z.number(),
+    etapas: z.array(z.object({
+        nombre: z.string(),
+        _count: z.object({
+            leads: z.number(),
+        }),
+    })),
+});
+export type ConteoPorEtapa = z.infer<typeof ConteoPorEtapaSchema>;

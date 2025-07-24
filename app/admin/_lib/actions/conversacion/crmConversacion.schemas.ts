@@ -1,6 +1,6 @@
 //ruta actual app/admin/_lib/actions/negocio/negocioImagenLogo.actions.ts
 
-import { AgenteBasico } from '@/app/admin/_lib/agente.types';
+import { AgenteBasico } from '@/app/admin/_lib/unused/agente.types';
 
 
 export interface ParametroParaIA { // Como lo consume construirHerramientasParaGemini

@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     obtenerEstadisticasResumenCRM,
     crearCRMyPoblarDatos // Acción para configurar/crear
-} from '@/app/admin/_lib/crm.actions'; // Ajusta la ruta
+} from '@/app/admin/_lib/unused/crm.actions'; // Ajusta la ruta
 import type { EstadisticasCRMResumen } from '@/app/admin/_lib/types'; // Ajusta la ruta
 // --- Icons ---
 import { Loader2, AlertTriangle, LineChart, Settings, ArrowRight, DatabaseZap } from 'lucide-react'; // Icons

@@ -1,53 +1,60 @@
-// app/admin/clientes/[clienteId]/negocios/[negocioId]/citas/page.tsx
-
+/*
+  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/citas/page.tsx
+*/
 import React from 'react';
 import { Metadata } from 'next';
-import { List } from 'lucide-react';
-import { headers } from 'next/headers';
-
+import { CalendarClock } from 'lucide-react';
 import { listarCitasAction } from '@/app/admin/_lib/actions/citas/citas.actions';
-// ✅ Se importará un nuevo componente de cliente específico para la Lista
-import RealtimeCitasList from './components/RealtimeCitasList';
-
-export const dynamic = 'force-dynamic';
+import { CitasDataTable } from './components/data-table';
+import { columns } from './components/columns';
 
 export const metadata: Metadata = {
-    title: 'Lista de Citas',
+    title: 'Citas Agendadas',
 };
 
 interface CitasPageProps {
-    clienteId: string;
-    negocioId: string;
+    params: {
+        negocioId: string;
+    };
+    searchParams: {
+        page?: string;
+    }
 }
 
-export default async function CitasPage({ params }: { params: Promise<CitasPageProps> }) {
-    headers();
-    const { negocioId, clienteId } = await params;
+// ✅ CORREGIDO: Se ajusta la firma para manejar los params y searchParams como una promesa.
+export default async function CitasPage({ params: paramsPromise, searchParams: searchParamsPromise }: {
+    params: Promise<CitasPageProps['params']>,
+    searchParams: Promise<CitasPageProps['searchParams']>
+}) {
+    const params = await paramsPromise;
+    const searchParams = await searchParamsPromise;
+    const { negocioId } = params;
+    const page = Number(searchParams.page) || 1;
 
-    // Esta página solo obtiene los datos iniciales para la lista
-    const initialCitasResult = await listarCitasAction({ negocioId });
-
-    if (!initialCitasResult.success) {
-        return <p className="p-6">Error al cargar las citas.</p>;
-    }
+    const citasResult = await listarCitasAction({ negocioId, page, pageSize: 15 });
+    const citasData = citasResult.data || { citas: [], totalCount: 0, startIndex: 0 };
 
     return (
+        // Se mantiene el layout flex para habilitar el scroll vertical
         <div className="space-y-6 h-full flex flex-col">
             <header>
                 <h1 className="text-2xl font-semibold text-zinc-100 flex items-center gap-3">
-                    <List />
-                    Lista de Citas
+                    <CalendarClock />
+                    Citas Agendadas
                 </h1>
                 <p className="text-sm text-zinc-400 mt-1">
-                    Gestiona todas las citas de tu negocio en una vista de lista.
+                    Consulta todas las citas programadas y el estado de cada prospecto.
                 </p>
             </header>
 
-            <RealtimeCitasList
-                initialData={initialCitasResult.data || []}
-                negocioId={negocioId}
-                clienteId={clienteId}
-            />
+            <main className="flex-grow overflow-hidden">
+                <CitasDataTable
+                    columns={columns}
+                    data={citasData.citas}
+                    totalCount={citasData.totalCount}
+                    startIndex={citasData.startIndex}
+                />
+            </main>
         </div>
     );
 }

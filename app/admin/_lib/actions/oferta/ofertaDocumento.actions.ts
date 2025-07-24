@@ -5,7 +5,7 @@ import { ActionResult } from '@/app/admin/_lib/types'; // Asumo que tienes este 
 import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 // Asumimos que estas funciones existen y son genéricas para cualquier archivo
-import { subirImagenStorage as subirArchivoStorage, eliminarImagenStorage as eliminarArchivoStorage } from '@/app/admin/_lib/imageHandler.actions'; // Reutilizando/adaptando imageHandler
+import { subirImagenStorage as subirArchivoStorage, eliminarImagenStorage as eliminarArchivoStorage } from '@/app/admin/_lib/unused/imageHandler.actions'; // Reutilizando/adaptando imageHandler
 // import { z } from 'zod';
 
 import {

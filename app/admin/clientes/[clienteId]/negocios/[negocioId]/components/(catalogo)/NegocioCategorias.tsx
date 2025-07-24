@@ -9,7 +9,7 @@ import {
     actualizarNegocioCategoria,
     eliminarNegocioCategoria,
     actualizarOrdenNegocioCategorias // <-- Asegúrate que esta acción exista
-} from '@/app/admin/_lib/negocioCategoria.actions'; // Asegúrate que las acciones estén aquí
+} from '@/app/admin/_lib/unused/negocioCategoria.actions'; // Asegúrate que las acciones estén aquí
 
 import { NegocioCategoria } from '@/app/admin/_lib/types'; // Asegúrate que incluya 'orden'
 import { Loader2, ListX, ListChecks, PlusIcon, PencilIcon, Trash2, Save, XIcon, GripVertical } from 'lucide-react'; // Iconos

@@ -5,7 +5,7 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import { ActionResult } from '@/app/admin/_lib/types';
 import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions';
+import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/unused/imageHandler.actions';
 import { z } from 'zod';
 
 import {

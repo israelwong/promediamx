@@ -8,12 +8,11 @@ import {
     obtenerEtiquetasAsignadasLeadParamsSchema,
     actualizarEtiquetasLeadParamsSchema,
     listarLeadsParamsSchema,
-    obtenerDatosParaFiltrosLeadParamsSchema,
-    DatosParaFiltrosLeadData,
+    // obtenerDatosParaFiltrosLeadParamsSchema,
+    // DatosParaFiltrosLeadData,
+    DatosFiltrosLead,
     obtenerDatosFormularioLeadParamsSchema,
     DatosFormularioLeadData,
-
-    // actualizarLeadParamsSchema,
     eliminarLeadParamsSchema,
     crearLeadParamsSchema,
     leadDetalleSchema,
@@ -24,10 +23,20 @@ import {
     crearLeadBasicoParamsSchema,
     ActualizarLeadParams,
     actualizarLeadParamsSchema,
-
     obtenerDetallesLeadParamsSchema,
-    type LeadDetails
+    type LeadDetails,
+    LeadUnificadoFormSchema,
+    LeadUnificadoFormData,
+    ConteoPorEtapa,
 } from './lead.schemas'; // Asumiendo que los schemas están aquí
+
+import { actualizarEstadoCitaParamsSchema } from '../citas/citas.schemas'; // Asegúrate de que este schema esté definido correctamente
+import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
+import { crearInteraccionSistemaAction } from '../conversacion/conversacion.actions'; // Necesitaremos esta acción refactorizada
+import { revalidatePath } from 'next/cache';
+import { type ListarLeadsResult } from './lead.schemas';
+import { setHours, setMinutes, setSeconds } from 'date-fns';
+import { z } from 'zod';
 
 // Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
 type LeadDetalleData = {
@@ -44,67 +53,37 @@ type LeadDetalleData = {
     createdAt: Date;
     updatedAt: Date;
 };
-import { z } from 'zod';
-import { crearInteraccionSistemaAction } from '../conversacion/conversacion.actions'; // Necesitaremos esta acción refactorizada
-import { revalidatePath } from 'next/cache';
-import { type ListarLeadsResult } from './lead.schemas';
-
 
 
 export async function listarLeadsAction(
     params: z.infer<typeof listarLeadsParamsSchema>
 ): Promise<ActionResult<ListarLeadsResult>> {
-
     const validation = listarLeadsParamsSchema.safeParse(params);
     if (!validation.success) {
         return { success: false, error: "Parámetros inválidos." };
     }
 
-    const { negocioId, page, pageSize, searchTerm, colegio } = validation.data;
+    const { negocioId, page, pageSize, searchTerm, colegio, etapa } = validation.data;
     const skip = (page - 1) * pageSize;
 
     try {
-        const crm = await prisma.cRM.findUnique({
-            where: { negocioId: negocioId },
-            select: { id: true }
-        });
-
+        const crm = await prisma.cRM.findUnique({ where: { negocioId: negocioId }, select: { id: true } });
         if (!crm) {
-            return { success: true, data: { leads: [], totalCount: 0, page, pageSize } };
+            return { success: true, data: { leads: [], totalCount: 0, page, pageSize, startIndex: 0 } };
         }
         const crmId = crm.id;
 
         const whereClause: Prisma.LeadWhereInput = {
             crmId: crmId,
-            ...(searchTerm && {
-                OR: [
-                    { nombre: { contains: searchTerm, mode: 'insensitive' } },
-                    { email: { contains: searchTerm, mode: 'insensitive' } },
-                    { telefono: { contains: searchTerm, mode: 'insensitive' } },
-                ],
-            }),
-            // ✅ Se añade el filtro por colegio en los jsonParams
-            ...(colegio && {
-                jsonParams: {
-                    path: ['colegio'],
-                    equals: colegio,
-                }
-            }),
+            ...(searchTerm && { OR: [{ nombre: { contains: searchTerm, mode: 'insensitive' } }, { email: { contains: searchTerm, mode: 'insensitive' } }] }),
+            ...(colegio && { jsonParams: { path: ['colegio'], equals: colegio } }),
+            ...(etapa && { Pipeline: { nombre: { equals: etapa, mode: 'insensitive' } } }),
         };
 
         const [leads, totalCount] = await prisma.$transaction([
             prisma.lead.findMany({
                 where: whereClause,
-                select: {
-                    id: true,
-                    nombre: true,
-                    email: true,
-                    telefono: true,
-                    createdAt: true,
-                    jsonParams: true, // ✅ Se seleccionan los jsonParams
-                    Pipeline: { select: { id: true, nombre: true } },
-                    agente: { select: { id: true, nombre: true } },
-                },
+                select: { id: true, nombre: true, email: true, telefono: true, createdAt: true, Pipeline: { select: { nombre: true } }, jsonParams: true },
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: pageSize,
@@ -119,73 +98,101 @@ export async function listarLeadsAction(
                 email: lead.email,
                 telefono: lead.telefono,
                 createdAt: lead.createdAt,
-                jsonParams: lead.jsonParams, // ✅ Se pasan los jsonParams
-                etapaPipeline: lead.Pipeline,
-                agenteAsignado: lead.agente,
+                pipelineNombre: lead.Pipeline?.nombre || 'Sin Etapa',
+                colegio: (lead.jsonParams as Record<string, unknown>)?.colegio as string ?? null,
             })),
             totalCount,
             page,
             pageSize,
+            startIndex: skip, // Se añade el índice inicial
         };
 
         return { success: true, data: result };
-
     } catch (error) {
         console.error("Error en listarLeadsAction:", error);
         return { success: false, error: "No se pudieron cargar los leads." };
     }
 }
-export async function obtenerDatosFiltrosLeadAction(
-    params: z.infer<typeof obtenerDatosParaFiltrosLeadParamsSchema>
-): Promise<ActionResult<DatosParaFiltrosLeadData>> {
-    const validation = obtenerDatosParaFiltrosLeadParamsSchema.safeParse(params);
-    if (!validation.success) {
-        return { success: false, error: "ID de negocio inválido.", errorDetails: validation.error.flatten().fieldErrors };
-    }
-    const { negocioId } = validation.data;
 
+/**
+ * ✅ NUEVA ACCIÓN: Obtiene el conteo de leads agrupados por cada etapa del pipeline.
+ */
+export async function obtenerConteoLeadsPorEtapaAction(
+    negocioId: string
+): Promise<ActionResult<ConteoPorEtapa>> {
     try {
-        const crmData = await prisma.cRM.findUnique({
-            where: { negocioId },
-            select: {
-                id: true,
-                Pipeline: { where: { status: 'activo' }, select: { id: true, nombre: true }, orderBy: { orden: 'asc' } },
-                Canal: { where: { status: 'activo' }, select: { id: true, nombre: true }, orderBy: { orden: 'asc' } },
-                Etiqueta: { where: { status: 'activo' }, select: { id: true, nombre: true, color: true }, orderBy: { orden: 'asc' } },
-                Agente: { where: { status: 'activo' }, select: { id: true, nombre: true }, orderBy: { nombre: 'asc' } },
+        const crm = await prisma.cRM.findUnique({ where: { negocioId }, select: { id: true } });
+        if (!crm) return { success: true, data: { totalLeads: 0, etapas: [] } };
+
+        const [conteoPorEtapa, totalLeads] = await prisma.$transaction([
+            prisma.pipelineCRM.findMany({
+                where: { crmId: crm.id },
+                select: {
+                    nombre: true,
+                    _count: { select: { Lead: true } }
+                },
+                orderBy: { orden: 'asc' }
+            }),
+            prisma.lead.count({ where: { crmId: crm.id } })
+        ]);
+
+        return {
+            success: true,
+            data: {
+                totalLeads: totalLeads,
+                etapas: conteoPorEtapa.map(etapa => ({
+                    nombre: etapa.nombre,
+                    _count: { leads: etapa._count.Lead }
+                }))
             }
-        });
-
-        if (!crmData) {
-            // Si no hay CRM, devolver éxito con crmId null y arrays vacíos para filtros.
-            return {
-                success: true,
-                data: {
-                    crmId: null,
-                    pipelines: [],
-                    canales: [],
-                    etiquetas: [],
-                    agentes: []
-                }
-            };
-        }
-
-        const data: DatosParaFiltrosLeadData = {
-            crmId: crmData.id,
-            pipelines: crmData.Pipeline.map(p => ({ id: p.id, nombre: p.nombre, color: undefined /* Añadir si lo tienes */ })), // Color es opcional
-            canales: crmData.Canal.map(c => ({ id: c.id, nombre: c.nombre })),
-            etiquetas: crmData.Etiqueta.map(e => ({ id: e.id, nombre: e.nombre, color: e.color })),
-            agentes: crmData.Agente.map(a => ({ id: a.id, nombre: a.nombre ?? null })),
         };
-        return { success: true, data };
-
     } catch (error) {
-        console.error('Error en obtenerDatosFiltrosLeadAction:', error);
-        return { success: false, error: 'No se pudieron cargar los datos para los filtros.' };
+        console.error("Error en obtenerConteoLeadsPorEtapaAction:", error);
+        return { success: false, error: "No se pudo obtener el conteo por etapa." };
     }
 }
 
+export async function obtenerDatosFiltrosLeadAction(
+    negocioId: string
+): Promise<ActionResult<DatosFiltrosLead>> {
+    // console.log(`\n--- SERVER ACTION: obtenerDatosFiltrosLeadAction ---`);
+    // console.log(`1. Buscando filtros para negocioId: ${negocioId}`);
+    try {
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId },
+            select: { id: true, Pipeline: { select: { id: true, nombre: true }, orderBy: { orden: 'asc' } } }
+        });
 
+        if (!crm) {
+            // console.log("2. No se encontró CRM para este negocio. Devolviendo listas vacías.");
+            return { success: true, data: { pipelines: [], colegios: [] } };
+        }
+        // console.log(`2. CRM encontrado con ID: ${crm.id}`);
+
+        // Se ejecuta una consulta nativa para obtener los valores distintos de la propiedad 'colegio'
+        const colegiosResult: { colegio: string }[] = await prisma.$queryRaw`
+            SELECT DISTINCT jsonb_extract_path_text("jsonParams", 'colegio') as colegio
+            FROM "Lead"
+            WHERE "crmId" = ${crm.id} AND jsonb_extract_path_text("jsonParams", 'colegio') IS NOT NULL;
+        `;
+        console.log("3. Resultado crudo de la consulta a la base de datos:", colegiosResult);
+
+        // Se extraen los nombres de los colegios del resultado de la consulta
+        const colegios = colegiosResult.map(item => item.colegio).filter(Boolean);
+        console.log("4. Colegios extraídos y filtrados:", colegios);
+
+        return {
+            success: true,
+            data: {
+                pipelines: crm.Pipeline || [],
+                colegios: colegios.sort(),
+            }
+        };
+    } catch (error) {
+        console.error("Error en obtenerDatosFiltrosLeadAction:", error);
+        return { success: false, error: "No se pudieron cargar los datos para los filtros." };
+    }
+}
 
 export async function obtenerEtiquetasAsignadasLeadAction(
     params: z.infer<typeof obtenerEtiquetasAsignadasLeadParamsSchema>
@@ -525,7 +532,7 @@ export async function marcarLeadComoGanadoAction(
     }
 }
 
-import { actualizarEstadoCitaParamsSchema } from '../citas/citas.schemas'; // Asegúrate de que este schema esté definido correctamente
+
 
 export async function actualizarEstadoCitaAction(
     params: z.infer<typeof actualizarEstadoCitaParamsSchema>
@@ -893,5 +900,111 @@ export async function obtenerLeadDetallesAction(
         }
         console.error(`Error en obtenerLeadDetallesAction para leadId ${leadId}:`, error);
         return { success: false, error: 'No se pudieron cargar los detalles del lead.', data: null };
+    }
+}
+
+
+/**
+ * ✅ NUEVA ACCIÓN: Crea o actualiza un Lead y su cita agendada en una sola transacción.
+ */
+export async function guardarLeadYAsignarCitaAction(
+    params: {
+        data: LeadUnificadoFormData;
+        enviarNotificacion: boolean;
+        citaInicialId?: string | null; // ID de la cita que existía al cargar el formulario
+    }
+): Promise<ActionResult<{ leadId: string }>> {
+    const { data, enviarNotificacion, citaInicialId } = params;
+    const validation = LeadUnificadoFormSchema.safeParse(data);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
+    }
+
+    const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
+        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams } = validation.data;
+
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            const leadData = {
+                nombre, email: email || null, telefono: telefono || null,
+                status, pipelineId, valorEstimado, crmId,
+                jsonParams: jsonParams as Prisma.JsonObject || {},
+            };
+
+            const lead = leadId
+                ? await tx.lead.update({ where: { id: leadId }, data: leadData })
+                : await tx.lead.create({ data: leadData });
+
+            let citaGuardada = null;
+
+            // Escenario 1: Se borraron los datos de la cita que existía.
+            if (citaInicialId && !fechaCita) {
+                await tx.agenda.delete({ where: { id: citaInicialId } });
+            }
+            // Escenario 2: Se proporcionaron datos de cita (para crear o actualizar).
+            else if (fechaCita && horaCita && tipoDeCitaId && modalidadCita) {
+                const [hours, minutes] = horaCita.split(':').map(Number);
+                const fechaHoraFinal = setSeconds(setMinutes(setHours(fechaCita, hours), minutes), 0);
+
+                citaGuardada = await tx.agenda.upsert({
+                    where: { id: citaInicialId || '' },
+                    update: { fecha: fechaHoraFinal, tipoDeCitaId, modalidad: modalidadCita },
+                    create: {
+                        leadId: lead.id, negocioId, fecha: fechaHoraFinal,
+                        tipoDeCitaId, asunto: 'Cita agendada desde CRM',
+                        status: 'PENDIENTE', tipo: 'Cita CRM', modalidad: modalidadCita,
+                    }
+                });
+            }
+
+            // Lógica de envío de correo electrónico condicional
+            if (enviarNotificacion && citaGuardada && lead.email && tipoDeCitaId) {
+                const [tipoCita, negocio, oferta] = await Promise.all([
+                    prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: tipoDeCitaId } }),
+                    prisma.negocio.findUniqueOrThrow({ where: { id: negocioId } }),
+                    // ✅ CORREGIDO: Se busca la oferta que coincida con el colegio del lead.
+                    prisma.oferta.findFirst({
+                        where: {
+                            negocioId,
+                            status: 'ACTIVO',
+                            nombre: {
+                                contains: jsonParams?.colegio,
+                                mode: 'insensitive'
+                            }
+                        }
+                    })
+                ]);
+
+                if (oferta) {
+                    await enviarEmailConfirmacionCita_v2({
+                        emailDestinatario: lead.email,
+                        nombreDestinatario: lead.nombre,
+                        nombreNegocio: negocio.nombre,
+                        nombreServicio: tipoCita.nombre,
+                        nombreOferta: oferta.nombre,
+                        fechaHoraCita: citaGuardada.fecha,
+                        emailRespuestaNegocio: negocio.email || 'contacto@promedia.mx',
+                        emailCopia: oferta.emailCopiaConfirmacion,
+                        nombrePersonaContacto: oferta.nombrePersonaContacto,
+                        telefonoContacto: oferta.telefonoContacto,
+                        modalidadCita: citaGuardada.modalidad?.toLowerCase() === 'virtual' ? 'virtual' : 'presencial',
+                        ubicacionCita: oferta.direccionUbicacion,
+                        googleMapsUrl: oferta.googleMapsUrl,
+                        linkReunionVirtual: oferta.linkReunionVirtual,
+                        duracionCitaMinutos: tipoCita.duracionMinutos,
+                    });
+                }
+            }
+
+            return { leadId: lead.id };
+        });
+
+        revalidatePath(`/admin/clientes/.*/negocios/${negocioId}/leads`, 'layout');
+        return { success: true, data: result };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Error desconocido.";
+        console.error("Error en guardarLeadYAsignarCitaAction:", errorMessage);
+        return { success: false, error: errorMessage };
     }
 }

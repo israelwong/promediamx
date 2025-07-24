@@ -7,7 +7,7 @@ import {
     crearRol,
     actualizarRol,
     eliminarRol
-} from '@/app/admin/_lib/rol.actions'; // Asegúrate que las acciones estén aquí
+} from '@/app/admin/_lib/unused/rol.actions'; // Asegúrate que las acciones estén aquí
 import { Rol } from '@/app/admin/_lib/types'; // Importar tipo Rol
 import { Loader2, ListChecks, PlusIcon, PencilIcon, Trash2, Save, XIcon, ShieldCheck } from 'lucide-react'; // Iconos
 

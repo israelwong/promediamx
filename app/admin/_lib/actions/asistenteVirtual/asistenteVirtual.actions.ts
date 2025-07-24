@@ -23,7 +23,7 @@ import {
 // import type { AsistenteVirtual as AsistenteVirtualPrisma } from '@prisma/client'; // Para casteos si es necesario
 
 // ... (imports existentes: prisma, revalidatePath, Prisma, ActionResult, otros schemas) ...
-import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions'; // Importante
+import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/unused/imageHandler.actions'; // Importante
 import { ActualizarAvatarResultData, actualizarAvatarResultSchema } from './asistenteVirtual.schemas';
 
 

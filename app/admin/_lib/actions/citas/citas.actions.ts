@@ -2,9 +2,23 @@
 
 import prisma from '@/app/admin/_lib/prismaClient';
 import { ActionResult } from '@/app/admin/_lib/types';
+import {
+    CitaSchema,
+    actualizarEstadoCitaParamsSchema,
+    CitaParaCalendario
+} from './citas.schemas';
+
+import type {
+    CitaType,
+    EtapaPipelineSimple
+} from './citas.schemas';
+import { type ListarCitasResult, listarCitasParamsSchema } from './citas.schemas';
+import { Prisma } from '@prisma/client';
+
+
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { CitaSchema } from './citas.schemas';
-import type { CitaType } from './citas.schemas';
+
 
 /**
  * Obtiene todas las citas de un negocio, ordenadas por fecha.
@@ -55,16 +69,6 @@ export async function getCitasPorNegocioAction(negocioId: string): Promise<Actio
 }
 
 
-/**
- * Actualiza el estado de una cita.
- * @param citaId - El ID de la cita a actualizar.
- * @param nuevoEstado - El nuevo estado de la cita.
- * @returns Un ActionResult con la cita actualizada o un error.
- */
-import { actualizarEstadoCitaParamsSchema, listarCitasParamsSchema, type CitaListItem } from './citas.schemas';
-import { addMinutes } from 'date-fns';
-import { revalidatePath } from 'next/cache';
-
 export async function actualizarEstadoCitaAction(
     params: z.infer<typeof actualizarEstadoCitaParamsSchema>
 ): Promise<ActionResult<boolean>> {
@@ -100,49 +104,133 @@ export async function actualizarEstadoCitaAction(
 }
 
 
-import { StatusAgenda } from './citas.schemas';
-
-
 export async function listarCitasAction(
     params: z.infer<typeof listarCitasParamsSchema>
-): Promise<ActionResult<CitaListItem[]>> {
+): Promise<ActionResult<ListarCitasResult>> {
     const validation = listarCitasParamsSchema.safeParse(params);
-    if (!validation.success) return { success: false, error: "Parámetros inválidos." };
-
-    const { negocioId } = validation.data;
+    if (!validation.success) {
+        return { success: false, error: "Parámetros inválidos." };
+    }
+    const { negocioId, page, pageSize } = validation.data;
+    const skip = (page - 1) * pageSize;
 
     try {
-        const citas = await prisma.agenda.findMany({
-            where: {
-                negocioId,
-                // Por ahora traemos las del último mes y las del próximo mes
-                fecha: {
-                    gte: new Date(new Date().setMonth(new Date().getMonth() - 1)),
-                    lte: new Date(new Date().setMonth(new Date().getMonth() + 1)),
-                }
-            },
-            include: {
-                lead: { select: { id: true, nombre: true, telefono: true } },
-                tipoDeCita: { select: { nombre: true, duracionMinutos: true } },
-            },
-            orderBy: { fecha: 'asc' },
-        });
+        const whereClause: Prisma.AgendaWhereInput = {
+            negocioId: negocioId,
+            status: 'PENDIENTE',
+        };
 
-        // Mapeamos los datos al formato que espera react-big-calendar y nuestra UI
-        const formattedCitas: CitaListItem[] = citas.map(cita => ({
-            id: cita.id,
-            asunto: cita.asunto,
-            start: cita.fecha,
-            end: addMinutes(cita.fecha, cita.tipoDeCita?.duracionMinutos || 60), // Calcula la hora de fin
-            status: cita.status as StatusAgenda,
-            lead: cita.lead,
-            tipoDeCita: cita.tipoDeCita ? { nombre: cita.tipoDeCita.nombre } : null,
-        }));
+        const [citas, totalCount] = await prisma.$transaction([
+            prisma.agenda.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    fecha: true,
+                    lead: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            telefono: true,
+                            Pipeline: { select: { nombre: true } },
+                        },
+                    },
+                },
+                orderBy: { fecha: 'asc' },
+                skip,
+                take: pageSize,
+            }),
+            prisma.agenda.count({ where: whereClause }),
+        ]);
 
-        return { success: true, data: formattedCitas };
+        const citasAplanadas = citas
+            .filter(c => c.lead)
+            .map((cita) => ({
+                id: cita.id,
+                fecha: cita.fecha,
+                leadId: cita.lead!.id,
+                leadNombre: cita.lead!.nombre,
+                leadTelefono: cita.lead!.telefono,
+                pipelineNombre: cita.lead!.Pipeline?.nombre || 'Sin Etapa',
+            }));
+
+        return {
+            success: true,
+            data: {
+                citas: citasAplanadas,
+                totalCount,
+                startIndex: skip,
+            }
+        };
 
     } catch (error) {
         console.error("Error en listarCitasAction:", error);
         return { success: false, error: "No se pudieron cargar las citas." };
+    }
+}
+
+
+
+
+// Dedicada exclusivamente a obtener los datos para el calendario.
+export async function listarCitasParaCalendarioAction(
+    params: { negocioId: string }
+): Promise<ActionResult<CitaParaCalendario[]>> {
+    try {
+        const citas = await prisma.agenda.findMany({
+            where: {
+                negocioId: params.negocioId,
+                status: 'PENDIENTE',
+            },
+            select: {
+                id: true,
+                asunto: true,
+                fecha: true, // Se obtiene como 'fecha'
+                lead: {
+                    select: { id: true, nombre: true },
+                },
+                tipoDeCita: {
+                    select: { nombre: true, duracionMinutos: true }, // Se obtiene la duración
+                },
+            },
+        });
+
+        // Mapeamos los datos al esquema que el calendario necesita
+        const citasParaCalendario: CitaParaCalendario[] = citas
+            .filter(c => c.lead)
+            .map(cita => ({
+                id: cita.id,
+                asunto: cita.asunto,
+                start: cita.fecha, // Se renombra 'fecha' a 'start'
+                lead: cita.lead!,
+                tipoDeCita: cita.tipoDeCita,
+            }));
+
+        return { success: true, data: citasParaCalendario };
+
+    } catch (error) {
+        console.error("Error en listarCitasParaCalendarioAction:", error);
+        return { success: false, error: "No se pudieron cargar los datos del calendario." };
+    }
+}
+
+
+// ✅ Para poblar el dropdown de filtro de etapas
+export async function obtenerEtapasPipelineParaFiltroAction(
+    negocioId: string
+): Promise<ActionResult<EtapaPipelineSimple[]>> {
+    try {
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId },
+            select: { Pipeline: { select: { id: true, nombre: true }, orderBy: { orden: 'asc' } } }
+        });
+
+        if (!crm) {
+            return { success: true, data: [] };
+        }
+
+        return { success: true, data: crm.Pipeline };
+    } catch (error) {
+        console.error("Error en obtenerEtapasPipelineParaFiltroAction:", error);
+        return { success: false, error: "No se pudieron cargar las etapas del pipeline." };
     }
 }

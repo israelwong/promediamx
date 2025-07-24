@@ -6,7 +6,7 @@ import { ActionResult } from '@/app/admin/_lib/types'; // Tu tipo global
 import {
     subirImagenStorage,
     eliminarImagenStorage
-} from '@/app/admin/_lib/imageHandler.actions'; // Asumiendo que este es tu manejador genérico
+} from '@/app/admin/_lib/unused/imageHandler.actions'; // Asumiendo que este es tu manejador genérico
 import {
     TareaIconoActualizadoOutputSchema,
     type TareaIconoActualizadoOutput

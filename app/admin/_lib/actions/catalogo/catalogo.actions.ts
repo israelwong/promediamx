@@ -5,7 +5,7 @@ import prisma from '@/app/admin/_lib/prismaClient';
 import { ActionResult } from '@/app/admin/_lib/types';
 import { Prisma, Catalogo as PrismaCatalogo } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions'; // Asumiendo que está aquí
+import { eliminarImagenStorage } from '@/app/admin/_lib/unused/imageHandler.actions'; // Asumiendo que está aquí
 
 import {
     CatalogoParaListaSchema,

@@ -5,7 +5,7 @@
 import prisma from '@/app/admin/_lib/prismaClient';
 import { ActionResult } from '@/app/admin/_lib/types'; // Tu tipo global
 import { revalidatePath } from 'next/cache';
-import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions';
+import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/unused/imageHandler.actions';
 import {
     ActualizarImagenLogoData,
     ActualizarImagenLogoDataSchema,

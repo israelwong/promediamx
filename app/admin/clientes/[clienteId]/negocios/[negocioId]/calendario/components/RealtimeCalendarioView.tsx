@@ -1,20 +1,22 @@
-// app/admin/clientes/[clienteId]/negocios/[negocioId]/calendario/components/RealtimeCalendarioView.tsx
+/*
+  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/calendario/components/RealtimeCalendarioView.tsx
+*/
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { type CitaListItem } from '@/app/admin/_lib/actions/citas/citas.schemas';
-
-// Asumimos que el componente CitasCalendario se puede reutilizar desde la carpeta de citas
-import CitasCalendario from '../../citas/components/CitasCalendario';
+// ✅ Se importa el nuevo tipo de datos para el calendario
+import { type CitaParaCalendario } from '@/app/admin/_lib/actions/citas/citas.schemas';
+import CitasCalendario from './CitasCalendario';
+// ✅ Se importa la nueva acción
+import { listarCitasParaCalendarioAction } from '@/app/admin/_lib/actions/citas/citas.actions';
 
 interface RealtimeCalendarioViewProps {
-    initialData: CitaListItem[];
+    initialData: CitaParaCalendario[];
     negocioId: string;
     clienteId: string;
 }
 
-// La inicialización de Supabase se mantiene igual
 let supabase: SupabaseClient | null = null;
 if (typeof window !== 'undefined') {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,31 +27,22 @@ if (typeof window !== 'undefined') {
 export default function RealtimeCalendarioView({ initialData, negocioId }: RealtimeCalendarioViewProps) {
     const [citas, setCitas] = useState(initialData);
 
-    useEffect(() => {
-        setCitas(initialData);
-    }, [initialData]);
+    useEffect(() => { setCitas(initialData); }, [initialData]);
 
     useEffect(() => {
         if (!supabase) return;
-
         const channel = supabase.channel(`citas-calendario-updates-${negocioId}`);
-
         channel.on(
             'postgres_changes',
-            // Escucha cualquier cambio en la tabla de Agenda para este negocio
             { event: '*', schema: 'public', table: 'Agenda', filter: `negocioId=eq.${negocioId}` },
-            // Cuando hay un cambio, vuelve a pedir la lista completa de citas
-            () => {
-                import('@/app/admin/_lib/actions/citas/citas.actions').then(actions => {
-                    actions.listarCitasAction({ negocioId }).then(result => {
-                        if (result.success && result.data) {
-                            setCitas(result.data);
-                        }
-                    });
-                });
+            async () => {
+                // ✅ Se llama a la nueva acción y se actualiza el estado directamente, sin mapeos complejos.
+                const result = await listarCitasParaCalendarioAction({ negocioId });
+                if (result.success && result.data) {
+                    setCitas(result.data);
+                }
             }
         ).subscribe();
-
         return () => { if (supabase) supabase.removeChannel(channel); };
     }, [negocioId]);
 

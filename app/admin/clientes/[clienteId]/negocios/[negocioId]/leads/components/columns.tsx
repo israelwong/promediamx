@@ -1,106 +1,58 @@
-// RUTA: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/columns.tsx
-'use client';
+/*
+  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/columns.tsx
+*/
+"use client"
 
-import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
-import { Button } from "@/app/components/ui/button";
-import { Checkbox } from "@/app/components/ui/checkbox";
+import { ColumnDef } from "@tanstack/react-table"
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { type LeadParaTabla } from "@/app/admin/_lib/actions/lead/lead.schemas";
 import { Badge } from "@/app/components/ui/badge";
-import type { LeadListItem } from "@/app/admin/_lib/actions/lead/lead.schemas";
 
-// Helper para formatear fechas
-const formatDate = (date: Date) => new Intl.DateTimeFormat('es-MX', {
-    year: 'numeric', month: '2-digit', day: '2-digit'
-}).format(date);
+type TableMeta = {
+    startIndex?: number;
+};
 
-export const columns: ColumnDef<LeadListItem>[] = [
+export const columns: ColumnDef<LeadParaTabla, TableMeta>[] = [
+    // ✅ CORREGIDO: La lógica de enumeración ahora se apoya en el 'meta' de la tabla.
     {
-        id: "select",
-        header: ({ table }) => (
-            <Checkbox
-                checked={table.getIsAllPageRowsSelected()}
-                onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-                aria-label="Seleccionar todo"
-            />
-        ),
-        cell: ({ row }) => (
-            <Checkbox
-                checked={row.getIsSelected()}
-                onCheckedChange={(value) => row.toggleSelected(!!value)}
-                aria-label="Seleccionar fila"
-            />
-        ),
-        enableSorting: false,
-        enableHiding: false,
+        id: 'enumeracion',
+        header: '#',
+        cell: ({ row, table }) => {
+            const startIndex = (table.options.meta as TableMeta)?.startIndex || 0;
+            return <span className="text-zinc-400">{startIndex + row.index + 1}</span>;
+        }
     },
     {
         accessorKey: "nombre",
         header: "Nombre",
-        cell: ({ row }) => <div className="font-medium text-zinc-200">{row.getValue("nombre")}</div>,
-    },
-    {
-        accessorKey: "email",
-        header: "Email",
+        cell: ({ row }) => (
+            <div className="flex flex-col">
+                <span className="font-medium text-zinc-100">{row.original.nombre}</span>
+                <span className="text-xs text-zinc-400">{row.original.email}</span>
+            </div>
+        )
     },
     {
         accessorKey: "telefono",
         header: "Teléfono",
     },
-    // ✅ Nueva columna para el Colegio
     {
-        id: "colegio",
-        accessorFn: row => (row.jsonParams as { colegio?: string } | undefined)?.colegio || 'N/A',
-        header: "Colegio",
-        cell: ({ row }) => {
-            const colegio = (row.original.jsonParams as { colegio?: string } | undefined)?.colegio;
-            return colegio ? <Badge variant="outline">{colegio}</Badge> : <span className="text-zinc-500">N/A</span>;
-        }
-    },
-    // ✅ Nueva columna para el Nivel Educativo
-    {
-        id: "nivel",
-        accessorFn: row => (row.jsonParams as { nivel_educativo?: string } | undefined)?.nivel_educativo || 'N/A',
-        header: "Nivel",
-    },
-    // ✅ Nueva columna para el Grado
-    {
-        id: "grado",
-        accessorFn: row => (row.jsonParams as { grado?: string } | undefined)?.grado || 'N/A',
-        header: "Grado",
-    },
-    {
-        accessorKey: "etapaPipeline",
+        accessorKey: "pipelineNombre",
         header: "Etapa",
         cell: ({ row }) => {
-            const etapa = row.original.etapaPipeline;
-            return etapa ? <Badge>{etapa.nombre}</Badge> : <span className="text-zinc-500">Sin etapa</span>;
+            const pipeline = row.original.pipelineNombre;
+            return pipeline ? <Badge variant="outline">{pipeline}</Badge> : null;
         }
+    },
+    {
+        accessorKey: "colegio",
+        header: "Colegio",
     },
     {
         accessorKey: "createdAt",
-        header: ({ column }) => {
-            return (
-                <Button
-                    variant="ghost"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                >
-                    Fecha de Creación
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            )
-        },
-        cell: ({ row }) => <div>{formatDate(row.getValue("createdAt"))}</div>,
+        header: "Fecha de Registro",
+        cell: ({ row }) => format(new Date(row.original.createdAt), "d MMM, yyyy", { locale: es })
     },
-    {
-        id: "actions",
-        cell: () => {
-            // Aquí puedes añadir un DropdownMenu para acciones como "Editar", "Eliminar", etc.
-            return (
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                    <span className="sr-only">Abrir menú</span>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
-            )
-        },
-    },
-];
+]
+

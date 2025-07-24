@@ -5,7 +5,7 @@ import { ActionResult } from '@/app/admin/_lib/types';
 import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions'; // Tu manejador
+import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/unused/imageHandler.actions'; // Tu manejador
 
 import {
     TareaGaleriaItemSchema,

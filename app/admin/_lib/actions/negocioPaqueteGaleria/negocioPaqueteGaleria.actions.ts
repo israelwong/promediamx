@@ -2,7 +2,7 @@
 'use server';
 
 import prisma from '@/app/admin/_lib/prismaClient';
-import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/imageHandler.actions'; // Ajusta ruta si es diferente
+import { subirImagenStorage, eliminarImagenStorage } from '@/app/admin/_lib/unused/imageHandler.actions'; // Ajusta ruta si es diferente
 import {
     NegocioPaqueteGaleriaItem,
     // CrearNegocioPaqueteGaleriaItemMetadataSchema,
