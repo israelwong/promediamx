@@ -322,7 +322,6 @@ export const obtenerDetallesLeadParamsSchema = z.object({
 
 
 export const LeadUnificadoFormSchema = z.object({
-    // --- Datos del Lead ---
     id: z.string().cuid().optional(),
     nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
     email: z.string().email("Por favor, introduce un email válido.").nullable().optional(),
@@ -330,23 +329,16 @@ export const LeadUnificadoFormSchema = z.object({
     status: z.string(),
     pipelineId: z.string().cuid("Debes seleccionar una etapa del pipeline."),
     valorEstimado: z.number().positive("El valor estimado debe ser un número positivo.").nullable().optional(),
-
     jsonParams: z.object({
         colegio: z.string().optional(),
         nivel_educativo: z.string().optional(),
         grado: z.string().optional(),
     }).optional(),
-
-    // ✅ Se añade el campo para los IDs de las etiquetas seleccionadas
     etiquetaIds: z.array(z.string().cuid()).optional(),
-
-    // --- Datos de la Cita (Opcionales) ---
     fechaCita: z.date().optional().nullable(),
     horaCita: z.string().optional().nullable(),
     tipoDeCitaId: z.string().cuid().optional().nullable(),
     modalidadCita: z.string().optional().nullable(),
-
-    // --- IDs de contexto ---
     negocioId: z.string().cuid(),
     crmId: z.string().cuid(),
 }).refine(data => {
@@ -355,8 +347,8 @@ export const LeadUnificadoFormSchema = z.object({
     }
     return true;
 }, {
-    message: "Si agendas una cita, debes especificar todos sus detalles.",
-    path: ["fechaCita"],
+    message: "Si agendas una cita, debes completar todos sus detalles.",
+    path: ["fechaCita"], // El error se asociará a este campo
 });
 
 export type LeadUnificadoFormData = z.infer<typeof LeadUnificadoFormSchema>;

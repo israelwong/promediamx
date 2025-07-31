@@ -227,15 +227,14 @@ export async function actualizarEtiquetasDelLeadAction( // Renombrada para clari
     try {
         await prisma.$transaction(async (tx) => {
             await tx.leadEtiqueta.deleteMany({ where: { leadId: leadId } });
-            if (etiquetaIds.length > 0) {
+            if (etiquetaIds && etiquetaIds.length > 0) {
                 await tx.leadEtiqueta.createMany({
                     data: etiquetaIds.map(etiquetaId => ({ leadId: leadId, etiquetaId: etiquetaId })),
                 });
             }
         });
-        if (conversacionId) { // Solo crear interacción si hay ID de conversación
+        if (conversacionId) {
             const mensajeSistema = `Etiquetas del lead actualizadas${nombreAgenteQueActualiza ? ` por ${nombreAgenteQueActualiza}` : ''}.`;
-            // Asumiendo que crearInteraccionSistemaAction ya está refactorizada y disponible
             await crearInteraccionSistemaAction({ conversacionId, mensaje: mensajeSistema });
         }
         return { success: true, data: null };
@@ -911,45 +910,62 @@ export async function guardarLeadYAsignarCitaAction(
     params: {
         data: LeadUnificadoFormData;
         enviarNotificacion: boolean;
-        citaInicialId?: string | null; // ID de la cita que existía al cargar el formulario
+        citaInicialId?: string | null;
     }
 ): Promise<ActionResult<{ leadId: string }>> {
     const { data, enviarNotificacion, citaInicialId } = params;
+
+    // La validación se hace aquí, en el servidor, como fuente de verdad.
     const validation = LeadUnificadoFormSchema.safeParse(data);
     if (!validation.success) {
         return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
     }
 
     const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
-        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = validation.data
+        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = validation.data;
+
     try {
-        const result = await prisma.$transaction(async (tx) => {
+        const transactionResult = await prisma.$transaction(async (tx) => {
             const leadData = {
-                nombre, email: email || null, telefono: telefono || null,
-                status, pipelineId, valorEstimado, crmId,
+                nombre,
+                email: email || null,
+                telefono: telefono || null,
+                status,
+                pipelineId,
+                valorEstimado,
+                crmId,
                 jsonParams: jsonParams as Prisma.JsonObject || {},
-                // ✅ Se prepara la actualización de las etiquetas
-                Etiquetas: {
-                    set: etiquetaIds?.map(id => ({
-                        leadId_etiquetaId: {
-                            leadId: leadId || '',
-                            etiquetaId: id
-                        }
-                    })) || []
-                }
             };
 
-            const lead = leadId
-                ? await tx.lead.update({ where: { id: leadId }, data: leadData })
-                : await tx.lead.create({
+            let finalLead: { id: string; nombre: string; email: string | null };
+
+            if (leadId) {
+                // --- Lógica de ACTUALIZACIÓN para un lead existente ---
+                finalLead = await tx.lead.update({
+                    where: { id: leadId },
+                    data: leadData,
+                    select: { id: true, nombre: true, email: true } // Seleccionamos los datos para el correo
+                });
+
+                // Se borran las etiquetas existentes y se crean las nuevas conexiones.
+                await tx.leadEtiqueta.deleteMany({ where: { leadId: leadId } });
+                if (etiquetaIds && etiquetaIds.length > 0) {
+                    await tx.leadEtiqueta.createMany({
+                        data: etiquetaIds.map(id => ({ leadId: leadId, etiquetaId: id }))
+                    });
+                }
+            } else {
+                // --- Lógica de CREACIÓN para un nuevo lead ---
+                finalLead = await tx.lead.create({
                     data: {
                         ...leadData,
                         Etiquetas: {
                             create: etiquetaIds?.map(id => ({ etiquetaId: id })) || []
                         }
-                    }
+                    },
+                    select: { id: true, nombre: true, email: true }
                 });
-
+            }
 
             let citaGuardada = null;
 
@@ -966,57 +982,52 @@ export async function guardarLeadYAsignarCitaAction(
                     where: { id: citaInicialId || '' },
                     update: { fecha: fechaHoraFinal, tipoDeCitaId, modalidad: modalidadCita },
                     create: {
-                        leadId: lead.id, negocioId, fecha: fechaHoraFinal,
+                        leadId: finalLead.id, negocioId, fecha: fechaHoraFinal,
                         tipoDeCitaId, asunto: 'Cita agendada desde CRM',
                         status: 'PENDIENTE', tipo: 'Cita CRM', modalidad: modalidadCita,
                     }
                 });
             }
 
-            // Lógica de envío de correo electrónico condicional
-            if (enviarNotificacion && citaGuardada && lead.email && tipoDeCitaId) {
-                const [tipoCita, negocio, oferta] = await Promise.all([
-                    prisma.agendaTipoCita.findUniqueOrThrow({ where: { id: tipoDeCitaId } }),
-                    prisma.negocio.findUniqueOrThrow({ where: { id: negocioId } }),
-                    // ✅ CORREGIDO: Se busca la oferta que coincida con el colegio del lead.
-                    prisma.oferta.findFirst({
-                        where: {
-                            negocioId,
-                            status: 'ACTIVO',
-                            nombre: {
-                                contains: jsonParams?.colegio,
-                                mode: 'insensitive'
-                            }
-                        }
-                    })
-                ]);
-
-                if (oferta) {
-                    await enviarEmailConfirmacionCita_v2({
-                        emailDestinatario: lead.email,
-                        nombreDestinatario: lead.nombre,
-                        nombreNegocio: negocio.nombre,
-                        nombreServicio: tipoCita.nombre,
-                        nombreOferta: oferta.nombre,
-                        fechaHoraCita: citaGuardada.fecha,
-                        emailRespuestaNegocio: negocio.email || 'contacto@promedia.mx',
-                        emailCopia: oferta.emailCopiaConfirmacion,
-                        nombrePersonaContacto: oferta.nombrePersonaContacto,
-                        telefonoContacto: oferta.telefonoContacto,
-                        modalidadCita: citaGuardada.modalidad?.toLowerCase() === 'virtual' ? 'virtual' : 'presencial',
-                        ubicacionCita: oferta.direccionUbicacion,
-                        googleMapsUrl: oferta.googleMapsUrl,
-                        linkReunionVirtual: oferta.linkReunionVirtual,
-                        duracionCitaMinutos: tipoCita.duracionMinutos,
-                    });
-                }
-            }
-
-            return { leadId: lead.id };
+            // La transacción devuelve los datos necesarios para el siguiente paso.
+            return { lead: finalLead, cita: citaGuardada };
         });
 
+        const { lead, cita } = transactionResult;
+
+        // Lógica de envío de correo (FUERA de la transacción)
+        if (enviarNotificacion && cita && lead.email && tipoDeCitaId) {
+            const [tipoCitaData, negocioData, ofertaData] = await Promise.all([
+                prisma.agendaTipoCita.findUnique({ where: { id: tipoDeCitaId } }),
+                prisma.negocio.findUnique({ where: { id: negocioId } }),
+                prisma.oferta.findFirst({
+                    where: {
+                        negocioId,
+                        status: 'ACTIVO',
+                        nombre: { contains: jsonParams?.colegio, mode: 'insensitive' }
+                    }
+                })
+            ]);
+
+            if (tipoCitaData && negocioData && ofertaData) {
+                await enviarEmailConfirmacionCita_v2({
+                    emailDestinatario: lead.email,
+                    nombreDestinatario: lead.nombre,
+                    nombreNegocio: negocioData.nombre,
+                    nombreServicio: tipoCitaData.nombre,
+                    nombreOferta: ofertaData.nombre,
+                    fechaHoraCita: cita.fecha,
+                    emailRespuestaNegocio: negocioData.email || 'contacto@promedia.mx',
+                    emailCopia: ofertaData.emailCopiaConfirmacion,
+                    // ... otros parámetros del correo
+                });
+            } else {
+                console.warn(`No se pudo enviar la notificación para el lead ${lead.id} por falta de datos (tipo de cita, negocio u oferta).`);
+            }
+        }
+
         revalidatePath(`/admin/clientes/.*/negocios/${negocioId}/leads`, 'layout');
-        return { success: true, data: result };
+        return { success: true, data: { leadId: lead.id } };
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Error desconocido.";

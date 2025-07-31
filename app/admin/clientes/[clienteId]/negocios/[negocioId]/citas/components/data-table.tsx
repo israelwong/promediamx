@@ -20,10 +20,12 @@ interface DataTableProps<TData, TValue> {
     data: TData[]
     totalCount: number
     startIndex: number;
+    clienteId?: string;
+    negocioId?: string;
 }
 
 export function CitasDataTable<TData extends CitaParaTabla, TValue>({
-    columns, data, totalCount, startIndex
+    columns, data, totalCount, startIndex, clienteId, negocioId
 }: DataTableProps<TData, TValue>) {
     const router = useRouter();
     const pathname = usePathname();
@@ -71,7 +73,12 @@ export function CitasDataTable<TData extends CitaParaTabla, TValue>({
                                 <TableRow
                                     key={(row.original as CitaParaTabla).id}
                                     className="border-zinc-800 hover:bg-zinc-700/50 cursor-pointer"
-                                    onClick={() => router.push(`../leads/${(row.original as CitaParaTabla).leadId}`)}
+                                    onClick={() => {
+                                        const leadId = (row.original as CitaParaTabla).leadId;
+                                        router.push(
+                                            `/admin/clientes/${clienteId}/negocios/${negocioId}/leads/${leadId}`
+                                        );
+                                    }}
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>

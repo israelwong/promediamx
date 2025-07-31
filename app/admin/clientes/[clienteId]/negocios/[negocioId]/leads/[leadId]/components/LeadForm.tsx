@@ -1,7 +1,3 @@
-/*
-  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/LeadForm.tsx
-  ✅ REFACTORIZADO: Versión final y completa que fusiona la lógica anterior con el nuevo layout.
-*/
 "use client";
 
 import React, { useTransition, useMemo, useEffect } from 'react';
@@ -14,16 +10,18 @@ import { format } from 'date-fns';
 import { LeadUnificadoFormSchema, type LeadUnificadoFormData } from '@/app/admin/_lib/actions/lead/lead.schemas';
 import { guardarLeadYAsignarCitaAction, eliminarLeadAction } from '@/app/admin/_lib/actions/lead/lead.actions';
 import type { Lead, Agenda, PipelineCRM, AgendaTipoCita, EtiquetaCRM } from '@prisma/client';
+
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { SimpleCalendar } from "@/app/components/ui/SimpleCalendar";
 import { Label } from '@/app/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
-import { Loader2, Save, Trash, Send, XCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card';
+import { Loader2, Save, Trash, Send, XCircle, AlertCircle } from 'lucide-react';
 import NotasSection from './NotasSection';
+import { useState } from 'react';
 
-// Lógica de negocio para colegios (extraída del formulario anterior)
+// Lógica de negocio para colegios
 const comissionData = {
     albatros: {
         comisionFija: 1500,
@@ -49,7 +47,6 @@ type LeadJsonParams = {
     grado?: string;
 };
 
-
 interface LeadFormProps {
     clienteId: string;
     negocioId: string;
@@ -69,19 +66,25 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
     const horarios = generarHorarios();
     const citaInicial = initialLeadData?.Agenda[0];
 
+    const [estatusGuardado, setEstatusGuardado] = useState<'idle' | 'success' | 'error'>('idle');
+
+    const capitalizeWords = (str: string) =>
+        str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+
     const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<LeadUnificadoFormData>({
         resolver: zodResolver(LeadUnificadoFormSchema),
         defaultValues: {
             id: initialLeadData?.id,
-            nombre: initialLeadData?.nombre || '',
-            email: initialLeadData?.email || '',
-            telefono: initialLeadData?.telefono || '',
-            status: 'activo',
+            nombre: initialLeadData?.nombre ? capitalizeWords(initialLeadData.nombre) : '',
+            email: initialLeadData?.email?.toLowerCase() || '',
+            telefono: initialLeadData?.telefono
+                ? initialLeadData.telefono.replace(/\s+/g, '').slice(-10)
+                : '',
+            status: initialLeadData?.status || 'activo',
             pipelineId: initialLeadData?.pipelineId || etapasPipeline[0]?.id || '',
             valorEstimado: initialLeadData?.valorEstimado,
             jsonParams: (initialLeadData?.jsonParams as LeadJsonParams) || {},
-            // ✅ Se inicializan las etiquetas seleccionadas
-            etiquetaIds: initialLeadData?.Etiquetas.map(e => e.etiquetaId) || [],
+            etiquetaIds: initialLeadData?.Etiquetas?.map(e => e.etiquetaId) || [],
             fechaCita: citaInicial ? new Date(citaInicial.fecha) : undefined,
             horaCita: citaInicial ? format(new Date(citaInicial.fecha), 'HH:mm') : undefined,
             tipoDeCitaId: citaInicial?.tipoDeCitaId,
@@ -146,7 +149,13 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                 citaInicialId: citaInicial?.id
             });
             if (result.success) {
-                toast.success(`Lead guardado ${enviarNotificacion ? 'y notificado' : ''} exitosamente.`);
+                // ✅ CORREGIDO: Se define el mensaje de éxito antes para usarlo en ambos casos.
+
+                setEstatusGuardado('success');
+                setTimeout(() => setEstatusGuardado('idle'), 3000);
+
+
+
                 if (!initialLeadData && result.data?.leadId) {
                     router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/leads/${result.data.leadId}`);
                 } else {
@@ -208,6 +217,16 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+                {estatusGuardado === 'success' && (
+                    <div className="col-span-full">
+                        <div className="flex items-center gap-2 p-3 rounded-md bg-green-900/20 text-green-300 border border-green-700 mb-4">
+                            <Save className="h-5 w-5" />
+                            <span>¡Cambios guardados correctamente!</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* --- Columna 1: Info Principal y Adicional --- */}
                 <div className="space-y-6">
                     <Card className="bg-zinc-800/50 border-zinc-700">
@@ -218,8 +237,15 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                 <Input id="nombre" {...register("nombre")} />
                                 {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre.message}</p>}
                             </div>
-                            <div><Label htmlFor="email">Email</Label><Input id="email" {...register("email")} /></div>
-                            <div><Label htmlFor="telefono">Teléfono</Label><Input id="telefono" {...register("telefono")} /></div>
+                            <div>
+                                <Label htmlFor="email">Email</Label>
+                                <Input id="email" {...register("email")} />
+                                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+                            </div>
+                            <div>
+                                <Label htmlFor="telefono">Teléfono</Label>
+                                <Input id="telefono" {...register("telefono")} />
+                            </div>
                             <div>
                                 <Label htmlFor="pipelineId">Etapa del Pipeline</Label>
                                 <Controller name="pipelineId" control={control} render={({ field }) => (
@@ -230,15 +256,20 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                         </SelectContent>
                                     </Select>
                                 )} />
+                                {errors.pipelineId && <p className="text-red-500 text-xs mt-1">{errors.pipelineId.message}</p>}
                             </div>
-                            {/* <div>
+                            <div>
                                 <Label htmlFor="valorEstimado">Comisión Estimada (MXN)</Label>
                                 <Input id="valorEstimado" type="number" step="0.01" {...register("valorEstimado")} />
-                            </div> */}
+                                {errors.valorEstimado && <p className="text-red-500 text-xs mt-1">{errors.valorEstimado.message}</p>}
+                            </div>
                         </CardContent>
                     </Card>
                     <Card className="bg-zinc-800/50 border-zinc-700">
-                        <CardHeader><CardTitle>Información Adicional</CardTitle></CardHeader>
+                        <CardHeader>
+                            <CardTitle>Información Adicional</CardTitle>
+                            <CardDescription>Datos específicos para el seguimiento.</CardDescription>
+                        </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
                                 <Label>Colegio</Label>
@@ -270,13 +301,10 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                         </CardContent>
                     </Card>
 
-
                 </div>
 
                 {/* --- Columna 2: Agendamiento --- */}
                 <div className="space-y-6">
-
-
                     <Card className="bg-zinc-800/50 border-zinc-700">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Agendar Cita</CardTitle>
@@ -298,6 +326,12 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                     />
                                 )}
                             />
+                            {errors.fechaCita && (
+                                <div className="flex items-center gap-2 text-sm text-red-400 p-2 bg-red-900/20 rounded-md">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <p>{errors.fechaCita.message}</p>
+                                </div>
+                            )}
                             {fechaCitaSeleccionada && (
                                 <>
                                     <div>

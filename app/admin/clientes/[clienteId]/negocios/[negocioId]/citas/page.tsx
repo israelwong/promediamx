@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 interface CitasPageProps {
     params: {
         negocioId: string;
+        clienteId: string;
     };
     searchParams: {
         page?: string;
@@ -28,7 +29,7 @@ export default async function CitasPage({ params: paramsPromise, searchParams: s
 }) {
     const params = await paramsPromise;
     const searchParams = await searchParamsPromise;
-    const { negocioId } = params;
+    const { negocioId, clienteId } = params;
     const page = Number(searchParams.page) || 1;
 
     const citasResult = await listarCitasAction({ negocioId, page, pageSize: 15 });
@@ -49,6 +50,8 @@ export default async function CitasPage({ params: paramsPromise, searchParams: s
 
             <main className="flex-grow overflow-hidden">
                 <CitasDataTable
+                    clienteId={clienteId}
+                    negocioId={negocioId}
                     columns={columns}
                     data={citasData.citas}
                     totalCount={citasData.totalCount}
