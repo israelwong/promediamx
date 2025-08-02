@@ -22,6 +22,13 @@ export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse<AvailabilityApiResponse>
 ) {
+
+    // --- AÑADE ESTE BLOQUE PARA HABILITAR CORS ---
+    // En producción, es mejor reemplazar '*' con el dominio real de tu sitio web.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
     // Se maneja la petición pre-vuelo (preflight) de CORS.
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
