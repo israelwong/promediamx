@@ -57,6 +57,13 @@ export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse<ApiResponse>
 ) {
+
+    // --- AÑADE ESTE BLOQUE PARA HABILITAR CORS ---
+    // En producción, es mejor reemplazar '*' con el dominio real de tu sitio web.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ message: `Método ${req.method} no permitido` });
