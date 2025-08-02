@@ -8,8 +8,6 @@ import {
     obtenerEtiquetasAsignadasLeadParamsSchema,
     actualizarEtiquetasLeadParamsSchema,
     listarLeadsParamsSchema,
-    // obtenerDatosParaFiltrosLeadParamsSchema,
-    // DatosParaFiltrosLeadData,
     DatosFiltrosLead,
     obtenerDatosFormularioLeadParamsSchema,
     DatosFormularioLeadData,
@@ -28,8 +26,7 @@ import {
     LeadUnificadoFormSchema,
     LeadUnificadoFormData,
     ConteoPorEtapa,
-} from './lead.schemas'; // Asumiendo que los schemas están aquí
-
+} from './lead.schemas';
 import { actualizarEstadoCitaParamsSchema } from '../citas/citas.schemas'; // Asegúrate de que este schema esté definido correctamente
 import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
 import { crearInteraccionSistemaAction } from '../conversacion/conversacion.actions'; // Necesitaremos esta acción refactorizada
@@ -37,6 +34,8 @@ import { revalidatePath } from 'next/cache';
 import { type ListarLeadsResult } from './lead.schemas';
 import { setHours, setMinutes, setSeconds } from 'date-fns';
 import { z } from 'zod';
+
+
 
 // Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
 type LeadDetalleData = {

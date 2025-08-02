@@ -4,24 +4,21 @@
 import { Prisma } from '@prisma/client';
 import prisma from '@/app/admin/_lib/prismaClient';
 import type { ActionResult } from '@/app/admin/_lib/types';
-import { startOfDay, endOfDay } from 'date-fns'; // Para el rango de "hoy"
+import { startOfDay, endOfDay, setMinutes, setHours } from 'date-fns'; // Para el rango de "hoy"
 import type { Agenda, LeadBitacora } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
 
 import {
-    // listarCitasLeadParamsSchema,
     AgendaCrmItemData,
-    agendaCrmItemSchema, // Para validar salida de listarCitas
+    agendaCrmItemSchema,
     obtenerDatosFormularioCitaParamsSchema,
     DatosFormularioCitaData,
     crearCitaLeadParamsSchema,
     editarCitaLeadParamsSchema,
-    // eliminarCitaLeadParamsSchema,
     listarEventosAgendaParamsSchema,
     ObtenerEventosAgendaResultData,
-    AgendaEventoData, // Para el tipo de retorno
-
+    AgendaEventoData,
     StatusAgenda,
     listarCitasAgendaParamsSchema, // Nuevo nombre
     ListarCitasAgendaResultData, // Nuevo nombre
@@ -32,51 +29,9 @@ import {
 } from './agendaCrm.schemas';
 import { z } from 'zod';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { setSeconds as dateFnsSetSeconds } from 'date-fns';
 // import { revalidatePath } from 'next/cache'; // Si necesitas revalidar
 
-// Acción para listar citas de un Lead
-// export async function listarCitasLeadAction(
-//     params: z.infer<typeof listarCitasLeadParamsSchema>
-// ): Promise<ActionResult<AgendaCrmItemData[]>> {
-//     const validation = listarCitasLeadParamsSchema.safeParse(params);
-//     if (!validation.success) {
-//         return { success: false, error: "ID de Lead inválido.", errorDetails: validation.error.flatten().fieldErrors };
-//     }
-//     const { leadId } = validation.data;
-
-//     try {
-//         const citasPrisma = await prisma.agenda.findMany({
-//             where: { leadId: leadId },
-//             include: {
-//                 agente: { select: { id: true, nombre: true } }, // Incluir datos del agente
-//                 // negocio: { select: { id: true, nombre: true } } // Si necesitas datos del negocio
-//             },
-//             orderBy: { fecha: 'desc' }, // O 'asc' según preferencia
-//         });
-
-//         // Mapear y validar con Zod
-//         const mappedData = citasPrisma.map(cita => ({
-//             ...cita, // Incluye todos los campos de Agenda
-//             tipo: cita.tipo as AgendaCrmItemData['tipo'], // Cast al enum, asume que los datos son válidos
-//             status: cita.status as AgendaCrmItemData['status'], // Cast al enum
-//             agente: cita.agente ? { id: cita.agente.id, nombre: cita.agente.nombre ?? null } : null,
-//             negocioId: cita.negocioId, // Asegurar que el schema lo tiene si es necesario
-//             // fecha y fechaRecordatorio ya son Date de Prisma
-//         }));
-
-//         const parsedData = z.array(agendaCrmItemSchema).safeParse(mappedData);
-//         if (!parsedData.success) {
-//             console.error("Error Zod en salida de listarCitasLeadAction:", parsedData.error.flatten());
-//             // console.log("Datos que fallaron validación (listarCitasLeadAction):", mappedData);
-//             return { success: false, error: "Error al procesar datos de citas." };
-//         }
-//         return { success: true, data: parsedData.data };
-
-//     } catch (error) {
-//         console.error(`Error en listarCitasLeadAction para lead ${leadId}:`, error);
-//         return { success: false, error: 'No se pudieron cargar las citas del lead.' };
-//     }
-// }
 
 // Acción para obtener datos para el formulario de cita
 export async function obtenerDatosParaFormularioCitaAction(
@@ -127,21 +82,7 @@ export async function crearCitaLeadAction(
         return { success: false, error: "Datos inválidos para crear la cita.", errorDetails: validation.error.flatten().fieldErrors, data: null };
     }
     const { leadId, datos } = validation.data;
-    // negocioId no se usa directamente para crear Agenda si leadId y crmId son suficientes,
-    // pero el schema lo pide para obtener el primer pipeline/canal en crearLeadAction,
-    // para crearCitaLeadAction, se asume que el lead ya existe y está asociado a un negocio.
-
     try {
-        // Encontrar el negocioId a través del CRM o Lead si es necesario para Agenda.negocioId
-        // o si la validación lo requiere.
-        // Por ahora, el modelo Agenda tiene negocioId opcional.
-        // Si tu lógica requiere que Agenda.negocioId esté poblado, necesitarías obtenerlo.
-        // const leadInfo = await prisma.lead.findUnique({ where: { id: leadId }, select: { crm: { select: { negocioId: true } } } });
-        // if (!leadInfo?.crm?.negocioId) {
-        //    return { success: false, error: "No se pudo determinar el negocio para la cita.", data: null };
-        // }
-        // const negocioIdParaAgenda = leadInfo.crm.negocioId;
-
         const nuevaCita = await prisma.agenda.create({
             data: {
                 leadId: leadId,
@@ -410,18 +351,25 @@ export async function crearCitaSimpleLeadAction(
             return { success: false, error: "Este lead ya tiene una cita pendiente." };
         }
 
+        const { fecha, hora, ...restOfData } = params.datos;
+
+        // Se combina la fecha y la hora de forma segura en el servidor
+        const [hours, minutes] = hora.split(':').map(Number);
+        const fechaHoraFinal = setSeconds(setMinutes(setHours(fecha, hours), minutes), 0);
+
         const nuevaCita = await prisma.agenda.create({
             data: {
                 leadId: params.leadId,
                 negocioId: params.negocioId,
                 asunto: 'Informes',
-                fecha: params.datos.fecha,
-                modalidad: params.datos.modalidad,
-                linkReunionVirtual: params.datos.modalidad === 'VIRTUAL' ? params.datos.linkReunionVirtual : null,
+                fecha: fechaHoraFinal, // Se guarda la fecha combinada
+                modalidad: restOfData.modalidad,
+                linkReunionVirtual: restOfData.modalidad === 'VIRTUAL' ? restOfData.linkReunionVirtual : null,
                 tipo: 'Cita',
                 status: 'PENDIENTE',
             }
         });
+
 
         // --- ✅ Lógica de Notificación Actualizada ---
         if (params.enviarNotificacion) {
@@ -613,3 +561,7 @@ export async function eliminarNotaLeadAction(params: z.infer<typeof eliminarNota
         return { success: false, error: "No se pudo eliminar la nota." };
     }
 }
+function setSeconds(date: Date, seconds: number): Date {
+    return dateFnsSetSeconds(date, seconds);
+}
+

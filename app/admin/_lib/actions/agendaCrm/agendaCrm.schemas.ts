@@ -250,36 +250,25 @@ export type ListarCitasAgendaResultData = z.infer<typeof listarCitasAgendaResult
 
 
 
-// ✅ Esquema para el NUEVO formulario simplificado
+// ✅ ESQUEMA REFACTORIZADO: Ahora valida la fecha y la hora por separado.
 export const nuevaCitaSimpleFormSchema = z.object({
     modalidad: z.enum(['PRESENCIAL', 'VIRTUAL']),
-    fecha: z.date({ required_error: "La fecha y hora son requeridas." }),
-    linkReunionVirtual: z.string().optional(), // El campo base es un string opcional
+    fecha: z.date({ required_error: "La fecha es requerida." }),
+    hora: z.string({ required_error: "La hora es requerida." }).regex(/^([01]\d|2[0-3]):00$/, "Formato de hora inválido."),
+    linkReunionVirtual: z.string().optional(),
 }).superRefine((data, ctx) => {
-    // Esta lógica solo se ejecuta si la modalidad es VIRTUAL
     if (data.modalidad === 'VIRTUAL') {
-        // 1. Validar que el campo no esté vacío
         if (!data.linkReunionVirtual || data.linkReunionVirtual.trim() === '') {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "El link de la reunión es requerido para citas virtuales.",
-                path: ['linkReunionVirtual'],
-            });
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El link es requerido para citas virtuales.", path: ['linkReunionVirtual'] });
         } else {
-            // 2. Validar que sea una URL válida
             const urlValidation = z.string().url("Debe ser una URL válida.").safeParse(data.linkReunionVirtual);
             if (!urlValidation.success) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: urlValidation.error.issues[0].message,
-                    path: ['linkReunionVirtual'],
-                });
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: urlValidation.error.issues[0].message, path: ['linkReunionVirtual'] });
             }
         }
     }
 });
 
 export type NuevaCitaSimpleFormData = z.infer<typeof nuevaCitaSimpleFormSchema>;
-
 
 
