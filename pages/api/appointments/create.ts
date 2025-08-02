@@ -58,11 +58,17 @@ export default async function handler(
     res: NextApiResponse<ApiResponse>
 ) {
 
-    // --- AÑADE ESTE BLOQUE PARA HABILITAR CORS ---
-    // En producción, es mejor reemplazar '*' con el dominio real de tu sitio web.
+    // --- ESTE BLOQUE ES CRUCIAL ---
+    // En producción, es mejor reemplazar '*' con el dominio de tu frontend
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    // Si la petición es de tipo OPTIONS (preflight), respondemos OK y terminamos.
+    // Esto es lo que le da "luz verde" al navegador para enviar el POST.
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
 
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
