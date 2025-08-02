@@ -84,6 +84,11 @@ export default async function handler(
         const data = validation.data;
         const fechaDeseadaObj = new Date(data.fechaHoraCita);
 
+        //***** */
+        //***** */
+        console.log("Datos recibidos:", data);
+        console.log("Fecha deseada:", fechaDeseadaObj);
+
         if (isBefore(fechaDeseadaObj, new Date())) {
             return res.status(400).json({ message: "Fecha inválida.", error: "No se puede agendar una cita en una fecha que ya pasó." });
         }
@@ -94,6 +99,7 @@ export default async function handler(
             fechaDeseada: fechaDeseadaObj,
             leadId: 'LEAD_DESDE_MANYCHAT_CONFIRMACION',
         });
+
 
         if (!disponibilidad.disponible) {
             return res.status(409).json({ message: "Conflicto de horario.", error: "Lo sentimos, este horario acaba de ser ocupado. Por favor, elige otro." });
