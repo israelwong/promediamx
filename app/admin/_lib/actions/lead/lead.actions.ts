@@ -345,26 +345,7 @@ export async function actualizarLeadAction(
 //     }
 // }
 
-export async function eliminarLeadAction(params: { leadId: string }): Promise<ActionResult<boolean>> {
-    try {
-        const citasAsociadas = await prisma.agenda.count({
-            where: { leadId: params.leadId }
-        });
 
-        if (citasAsociadas > 0) {
-            return { success: false, error: "Este lead tiene citas asociadas. Por favor, elimínalas primero antes de borrar el lead." };
-        }
-
-        await prisma.lead.delete({
-            where: { id: params.leadId }
-        });
-
-        return { success: true, data: true };
-    } catch (error) {
-        console.error("Error en eliminarLeadAction:", error);
-        return { success: false, error: "No se pudo eliminar el lead." };
-    }
-}
 
 export async function crearLeadAction(
     params: z.infer<typeof crearLeadParamsSchema>
@@ -945,7 +926,9 @@ export async function guardarLeadYAsignarCitaAction(
         fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = validation.data;
 
     try {
-        if (!leadId) {
+        // --- INICIO DE VALIDACIONES PREVIAS ---
+
+        if (!leadId) { // 1. VERIFICACIÓN DE DUPLICADOS (Solo al crear un nuevo lead)
             const orConditions = [];
             if (email) orConditions.push({ email });
             if (telefono) orConditions.push({ telefono });
@@ -961,13 +944,11 @@ export async function guardarLeadYAsignarCitaAction(
         }
 
         let fechaHoraFinal: Date | null = null;
-        if (fechaCita && horaCita && tipoDeCitaId) {
+        if (fechaCita && horaCita && tipoDeCitaId) { // 2. VERIFICACIÓN DE DISPONIBILIDAD
             const [hours, minutes] = horaCita.split(':').map(Number);
+            // ✅ CORREGIDO: Se construye la fecha de forma segura para evitar problemas de zona horaria.
             fechaHoraFinal = set(fechaCita, { hours, minutes, seconds: 0, milliseconds: 0 });
 
-            if (!fechaHoraFinal) {
-                return { success: false, error: "La fecha y hora de la cita no pueden ser nulas." };
-            }
             const disponibilidad = await verificarDisponibilidad({
                 negocioId,
                 tipoDeCitaId,
@@ -980,6 +961,8 @@ export async function guardarLeadYAsignarCitaAction(
                 return { success: false, error: disponibilidad.mensaje || "El horario seleccionado ya no está disponible." };
             }
         }
+
+        // --- FIN DE VALIDACIONES PREVIAS ---
 
         const transactionResult = await prisma.$transaction(async (tx) => {
             const leadData = {
@@ -1023,6 +1006,7 @@ export async function guardarLeadYAsignarCitaAction(
 
         const { lead, cita } = transactionResult;
 
+
         // ✅ Lógica de envío de correo (FUERA de la transacción)
         if (enviarNotificacion && cita && lead.email && tipoDeCitaId) {
             const [tipoCitaData, negocioData, ofertaData] = await Promise.all([
@@ -1060,5 +1044,31 @@ export async function guardarLeadYAsignarCitaAction(
         const errorMessage = error instanceof Error ? error.message : "Error desconocido.";
         console.error("Error en guardarLeadYAsignarCitaAction:", errorMessage);
         return { success: false, error: errorMessage };
+    }
+}
+
+export async function eliminarLeadAction(params: { leadId: string }): Promise<ActionResult<boolean>> {
+    try {
+        const citasAsociadas = await prisma.agenda.count({
+            where: { leadId: params.leadId, status: 'PENDIENTE' }
+        });
+
+        if (citasAsociadas > 0) {
+            return { success: false, error: "Este lead tiene citas pendientes. Por favor, cancélalas primero antes de borrar el lead." };
+        }
+
+        // Eliminación en cascada de las relaciones en LeadEtiqueta
+        await prisma.leadEtiqueta.deleteMany({
+            where: { leadId: params.leadId }
+        });
+
+        await prisma.lead.delete({
+            where: { id: params.leadId }
+        });
+
+        return { success: true, data: true };
+    } catch (error) {
+        console.error("Error en eliminarLeadAction:", error);
+        return { success: false, error: "No se pudo eliminar el lead." };
     }
 }
