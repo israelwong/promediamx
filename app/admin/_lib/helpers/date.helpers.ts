@@ -16,14 +16,15 @@ export function combineDateAndTime(utcDateString: string, timeString: string): D
     const datePart = utcDateString.slice(0, 10);
     console.log(`[date.helper] 3. Parte de la fecha extraída:`, datePart);
 
-    // Construye un nuevo string ISO 8601 completo, especificando que es UTC con la 'Z'.
-    const finalISOString = `${datePart}T${timeString}:00.000Z`;
-    console.log(`[date.helper] 4. String ISO final construido:`, finalISOString);
+    // Construye un string de fecha y hora local, sin información de zona horaria.
+    const localDateTimeString = `${datePart}T${timeString}:00`;
+    console.log(`[date.helper] 4. String de fecha-hora local construido:`, localDateTimeString);
 
-    // Crea el objeto Date a partir del string UTC. El resultado será el mismo
-    // sin importar la zona horaria del servidor.
-    const finalDate = new Date(finalISOString);
-    console.log(`[date.helper] 5. Fecha final construida:`, finalDate.toISOString());
+    // Crea el objeto Date a partir de este string. El motor de JavaScript
+    // interpretará este string como si estuviera en la zona horaria local del servidor,
+    // lo que resulta en un objeto Date correcto tanto en local (CST) como en Vercel (UTC).
+    const finalDate = new Date(localDateTimeString);
+    console.log(`[date.helper] 5. Fecha final construida (ISO):`, finalDate.toISOString());
 
     return finalDate;
 }
