@@ -16,14 +16,14 @@ export function combineDateAndTime(utcDateString: string, timeString: string): D
     const datePart = utcDateString.slice(0, 10);
     console.log(`[date.helper] 3. Parte de la fecha extraída:`, datePart);
 
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const [year, month, day] = datePart.split('-').map(Number);
+    // Construye un nuevo string ISO 8601 completo, especificando que es UTC con la 'Z'.
+    const finalISOString = `${datePart}T${timeString}:00.000Z`;
+    console.log(`[date.helper] 4. String ISO final construido:`, finalISOString);
 
-    // El mes en el constructor de Date es 0-indexed, por lo que restamos 1.
-    // new Date(year, month, day, hours, minutes) crea una fecha en la
-    // zona horaria local del sistema que está ejecutando el código.
-    const finalDate = new Date(year, month - 1, day, hours, minutes);
-    console.log(`[date.helper] 4. Fecha final construida en la zona horaria del servidor:`, finalDate.toISOString());
+    // Crea el objeto Date a partir del string UTC. El resultado será el mismo
+    // sin importar la zona horaria del servidor.
+    const finalDate = new Date(finalISOString);
+    console.log(`[date.helper] 5. Fecha final construida:`, finalDate.toISOString());
 
     return finalDate;
 }
