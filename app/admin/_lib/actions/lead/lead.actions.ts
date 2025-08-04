@@ -34,7 +34,14 @@ import { type ListarLeadsResult } from './lead.schemas';
 import { z } from 'zod';
 
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-import { combineDateAndTime } from '@/app/admin/_lib/helpers/date.helpers';
+// import { combineDateAndTime } from '@/app/admin/_lib/helpers/date.helpers';
+
+// HELPER DE FECHA SIMPLIFICADO Y ROBUSTO
+function combineDateAndTime(dateString: string, timeString: string): Date {
+    const isoString = `${dateString}T${timeString}:00.000Z`;
+    return new Date(isoString);
+}
+
 
 
 // Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
@@ -871,18 +878,18 @@ export async function guardarLeadYAsignarCitaAction(
     }
 ): Promise<ActionResult<{ leadId: string }>> {
     console.log("\n--- ACTION: guardarLeadYAsignarCitaAction ---");
-    const { data, enviarNotificacion, citaInicialId } = params;
-    console.log("1. Datos recibidos:", { data: { ...data, fechaCita: data.fechaCita?.toISOString() }, enviarNotificacion, citaInicialId });
 
-    const validation = LeadUnificadoFormSchema.safeParse(data);
+    // Zod se encarga de las conversiones y validaciones
+    const validation = LeadUnificadoFormSchema.safeParse(params.data);
     if (!validation.success) {
-        console.error("2. FALLO: Validación de Zod fallida.", validation.error.flatten());
+        console.error("FALLO: Validación de Zod fallida.", validation.error.flatten());
         return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
     }
     console.log("2. OK: Validación de Zod exitosa.");
 
+    const { data, enviarNotificacion, citaInicialId } = { ...params, data: validation.data };
     const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
-        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = validation.data;
+        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = data;
 
     try {
         if (!leadId) {
@@ -906,9 +913,11 @@ export async function guardarLeadYAsignarCitaAction(
         let fechaHoraFinal: Date | null = null;
         if (fechaCita && horaCita && tipoDeCitaId) {
             console.log("5. Se proporcionaron datos de cita, procesando fecha y verificando disponibilidad...");
-            fechaHoraFinal = combineDateAndTime(fechaCita.toISOString(), horaCita);
-            console.log("6. Fecha y hora combinadas usando el helper (objeto Date):", fechaHoraFinal.toISOString());
+            fechaHoraFinal = combineDateAndTime(fechaCita, horaCita);
+            console.log("6. Fecha y hora combinadas (objeto Date):", fechaHoraFinal.toISOString());
 
+
+            // DESCOMENTA ESTO CUANDO TENGAS TU HELPER DE DISPONIBILIDAD
             const disponibilidad = await verificarDisponibilidad({
                 negocioId,
                 tipoDeCitaId,
@@ -921,7 +930,8 @@ export async function guardarLeadYAsignarCitaAction(
                 console.error("7. FALLO: El horario no está disponible.", disponibilidad);
                 return { success: false, error: disponibilidad.mensaje || "El horario seleccionado ya no está disponible." };
             }
-            console.log("7. OK: El horario está disponible.");
+
+            console.log("7. OK: El horario está disponible (simulado).");
         }
 
         console.log("8. Iniciando transacción en la base de datos...");
@@ -972,8 +982,10 @@ export async function guardarLeadYAsignarCitaAction(
 
         const { lead, cita } = transactionResult;
 
-        // ✅ Lógica de envío de correo (FUERA de la transacción)
-        if (enviarNotificacion && cita && lead.email && tipoDeCitaId) {
+        // Lógica de envío de correo (FUERA de la transacción)
+        if (enviarNotificacion && cita && lead.email && tipoDeCitaId && jsonParams?.colegio) {
+
+            // DESCOMENTA ESTO CUANDO TENGAS TU LÓGICA DE EMAILS
             const [tipoCitaData, negocioData, ofertaData] = await Promise.all([
                 prisma.agendaTipoCita.findUnique({ where: { id: tipoDeCitaId } }),
                 prisma.negocio.findUnique({ where: { id: negocioId } }),
@@ -981,7 +993,7 @@ export async function guardarLeadYAsignarCitaAction(
                     where: {
                         negocioId,
                         status: 'ACTIVO',
-                        nombre: { contains: jsonParams?.colegio, mode: 'insensitive' }
+                        nombre: { contains: jsonParams.colegio, mode: 'insensitive' }
                     }
                 })
             ]);
@@ -1000,6 +1012,7 @@ export async function guardarLeadYAsignarCitaAction(
             } else {
                 console.warn(`No se pudo enviar la notificación para el lead ${lead.id} por falta de datos (tipo de cita, negocio u oferta).`);
             }
+
         }
 
         revalidatePath(`/admin/clientes/.*/negocios/${negocioId}/leads`, 'layout');
@@ -1007,7 +1020,7 @@ export async function guardarLeadYAsignarCitaAction(
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Error desconocido.";
-        console.error("Error en guardarLeadYAsignarCitaAction:", errorMessage);
+        console.error("Error en guardarLeadYAsignarCitaAction:", errorMessage, error);
         return { success: false, error: errorMessage };
     }
 }

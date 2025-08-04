@@ -328,18 +328,34 @@ export const LeadUnificadoFormSchema = z.object({
     telefono: z.string().optional(),
     status: z.string(),
     pipelineId: z.string().cuid("Debes seleccionar una etapa del pipeline."),
-    valorEstimado: z.number().nullable().optional()
-        .refine(val => val === undefined || val === null || val > 0, {
-            message: "El valor estimado debe ser un número positivo.",
-        }),
+
+    // Solución definitiva para la comisión:
+    // Acepta un string del formulario y lo convierte a número para el backend.
+    valorEstimado: z.preprocess(
+        (val) => {
+            if (val === '' || val === null || val === undefined) return null;
+            return parseFloat(String(val));
+        },
+        z.number({ invalid_type_error: "El valor debe ser un número." })
+            .positive("La comisión debe ser un número positivo.")
+            .nullable()
+            .optional()
+    ),
+
     jsonParams: z.object({
         colegio: z.string().optional(),
         nivel_educativo: z.string().optional(),
         grado: z.string().optional(),
     }).optional(),
+
     etiquetaIds: z.array(z.string().cuid()).optional(),
-    fechaCita: z.date().optional().nullable(),
-    horaCita: z.string().optional().nullable(),
+
+    // Se valida la fecha y hora como strings con formato específico.
+    fechaCita: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido.")
+        .optional().nullable(),
+    horaCita: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido.")
+        .optional().nullable(),
+
     tipoDeCitaId: z.string().cuid().optional().nullable(),
     modalidadCita: z.string().optional().nullable(),
     negocioId: z.string().cuid(),

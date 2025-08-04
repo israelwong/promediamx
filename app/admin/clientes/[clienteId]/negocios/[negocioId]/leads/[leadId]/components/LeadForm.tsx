@@ -1,7 +1,3 @@
-/*
-  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/LeadForm.tsx
-  (Esta es la versión final y completa del componente de formulario)
-*/
 "use client";
 
 import React, { useTransition, useMemo, useEffect } from 'react';
@@ -10,7 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
-// import { es } from 'date-fns/locale';
+import { es } from 'date-fns/locale';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 
 import { LeadUnificadoFormSchema, type LeadUnificadoFormData } from '@/app/admin/_lib/actions/lead/lead.schemas';
 import { guardarLeadYAsignarCitaAction, eliminarLeadAction } from '@/app/admin/_lib/actions/lead/lead.actions';
@@ -19,10 +17,9 @@ import type { Lead, Agenda, PipelineCRM, AgendaTipoCita, EtiquetaCRM } from '@pr
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
-import { SimpleCalendar } from "@/app/components/ui/SimpleCalendar";
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card';
-import { Loader2, Save, Trash, Send, XCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Trash, Send, XCircle } from 'lucide-react';
 import NotasSection from './NotasSection';
 
 // Lógica de negocio para colegios
@@ -37,13 +34,6 @@ const comissionData = {
     }
 };
 const colegiosOptions = ['Colegio Albatros', 'Colegio Tecno'];
-const generarHorarios = (inicio = 8, fin = 18) => {
-    const horarios = [];
-    for (let i = inicio; i <= fin; i++) {
-        horarios.push(`${String(i).padStart(2, '0')}:00`);
-    }
-    return horarios;
-};
 
 type LeadJsonParams = {
     colegio?: string;
@@ -67,7 +57,6 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
     const [isNotifying, startNotifyTransition] = useTransition();
     const isPending = isSaving || isNotifying;
 
-    const horarios = generarHorarios();
     const citaInicial = initialLeadData?.Agenda[0];
 
     const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<LeadUnificadoFormData>({
@@ -79,10 +68,10 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
             telefono: initialLeadData?.telefono || '',
             status: initialLeadData?.status || 'activo',
             pipelineId: initialLeadData?.pipelineId || etapasPipeline[0]?.id || '',
-            valorEstimado: initialLeadData?.valorEstimado,
+            valorEstimado: initialLeadData?.valorEstimado ?? null,
             jsonParams: (initialLeadData?.jsonParams as LeadJsonParams) || {},
             etiquetaIds: initialLeadData?.Etiquetas?.map(e => e.etiquetaId) || [],
-            fechaCita: citaInicial ? new Date(citaInicial.fecha) : undefined,
+            fechaCita: citaInicial ? format(new Date(citaInicial.fecha), 'yyyy-MM-dd') : undefined,
             horaCita: citaInicial ? format(new Date(citaInicial.fecha), 'HH:mm') : undefined,
             tipoDeCitaId: citaInicial?.tipoDeCitaId,
             modalidadCita: citaInicial?.modalidad,
@@ -92,7 +81,8 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
     });
 
     const watchedJsonParams = watch('jsonParams');
-    const fechaCitaSeleccionada = watch('fechaCita');
+    const fechaCita = watch('fechaCita');
+    const horaCita = watch('horaCita');
 
     const nivelOptions = useMemo(() => {
         if (!watchedJsonParams?.colegio) return [];
@@ -124,30 +114,15 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                 }
             }
         }
-        const finalValue = calculatedValue !== null ? parseFloat(calculatedValue.toFixed(2)) : null;
-        setValue('valorEstimado', finalValue, { shouldValidate: true, shouldDirty: true });
+        const finalValueAsNumber = calculatedValue !== null ? Number(calculatedValue.toFixed(2)) : null;
+        setValue('valorEstimado', finalValueAsNumber, { shouldValidate: true, shouldDirty: true });
     }, [initialLeadData?.valorEstimado, watchedJsonParams?.colegio, watchedJsonParams?.nivel_educativo, setValue]);
 
     const onSubmit = (data: LeadUnificadoFormData, enviarNotificacion: boolean) => {
         const transition = enviarNotificacion ? startNotifyTransition : startSaveTransition;
-
         transition(async () => {
-            const dataToSend = {
-                ...data,
-                email: data.email === '' ? null : data.email,
-                valorEstimado: (data.valorEstimado === null || typeof data.valorEstimado === 'undefined')
-                    ? null
-                    : Number(String(data.valorEstimado)),
-                jsonParams: {
-                    ...data.jsonParams,
-                    grado: data.jsonParams?.grado !== undefined && data.jsonParams?.grado !== null
-                        ? String(data.jsonParams.grado)
-                        : data.jsonParams?.grado,
-                },
-            };
-
             const result = await guardarLeadYAsignarCitaAction({
-                data: dataToSend,
+                data,
                 enviarNotificacion,
                 citaInicialId: citaInicial?.id
             });
@@ -189,6 +164,13 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
         setValue('modalidadCita', null);
         toast.success("Cita cancelada. Guarda los cambios para confirmar la eliminación.");
     };
+
+    const selectedDateForPicker = useMemo(() => {
+        if (fechaCita && horaCita) {
+            return new Date(`${fechaCita}T${horaCita}`);
+        }
+        return null;
+    }, [fechaCita, horaCita]);
 
     return (
         <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
@@ -252,7 +234,7 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                             </div>
                             <div>
                                 <Label htmlFor="valorEstimado">Comisión Estimada (MXN)</Label>
-                                <Input id="valorEstimado" type="number" step="0.01" {...register("valorEstimado")} />
+                                <Input id="valorEstimado" type="text" inputMode="decimal" {...register("valorEstimado")} placeholder="Ej: 1500.50" />
                                 {errors.valorEstimado && <p className="text-red-500 text-xs mt-1">{errors.valorEstimado.message}</p>}
                             </div>
                         </CardContent>
@@ -334,7 +316,7 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                     <Card className="bg-zinc-800/50 border-zinc-700">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Agendar Cita</CardTitle>
-                            {fechaCitaSeleccionada && (
+                            {fechaCita && (
                                 <Button type="button" variant="ghost" size="sm" onClick={handleCancelarCita} className="text-red-400 hover:text-red-300">
                                     <XCircle className="mr-2 h-4 w-4" />
                                     Cancelar Cita
@@ -342,35 +324,39 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                             )}
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <Controller
-                                name="fechaCita"
-                                control={control}
-                                render={({ field }) => (
-                                    <SimpleCalendar
-                                        selectedDate={field.value}
-                                        onDateSelect={field.onChange}
-                                    />
-                                )}
-                            />
-                            {errors.fechaCita && (
-                                <div className="flex items-center gap-2 text-sm text-red-400 p-2 bg-red-900/20 rounded-md">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <p>{errors.fechaCita.message}</p>
-                                </div>
-                            )}
-                            {fechaCitaSeleccionada && (
+                            <div>
+                                <Label>Fecha y Hora de la Cita</Label>
+                                <Controller
+                                    name="fechaCita"
+                                    control={control}
+                                    render={() => (
+                                        <div className="w-full">
+                                            <DatePicker
+                                                selected={selectedDateForPicker}
+                                                onChange={(date) => {
+                                                    if (date) {
+                                                        setValue('fechaCita', format(date, 'yyyy-MM-dd'), { shouldValidate: true });
+                                                        setValue('horaCita', format(date, 'HH:mm'), { shouldValidate: true });
+                                                    } else {
+                                                        setValue('fechaCita', null);
+                                                        setValue('horaCita', null);
+                                                    }
+                                                }}
+                                                showTimeSelect
+                                                locale={es}
+                                                dateFormat="dd 'de' MMMM, yyyy h:mm aa"
+                                                className="w-full bg-zinc-900 border border-zinc-700 rounded-md p-2 text-white"
+                                                placeholderText="Selecciona fecha y hora..."
+                                                wrapperClassName="w-full"
+                                            />
+                                        </div>
+                                    )}
+                                />
+                                {errors.fechaCita && <p className="text-red-500 text-xs mt-1">{errors.fechaCita.message}</p>}
+                            </div>
+
+                            {fechaCita && (
                                 <>
-                                    <div>
-                                        <Label>Hora de la Cita</Label>
-                                        <Controller name="horaCita" control={control} render={({ field }) => (
-                                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                                                <SelectTrigger><SelectValue placeholder="Selecciona..." /></SelectTrigger>
-                                                <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
-                                                    {horarios.map(hora => <SelectItem key={hora} value={hora}>{format(new Date(`1970-01-01T${hora}`), 'h:mm a')}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                        )} />
-                                    </div>
                                     <div>
                                         <Label>Asunto de la Cita</Label>
                                         <Controller name="tipoDeCitaId" control={control} render={({ field }) => (
