@@ -1,6 +1,6 @@
 'use server';
 
-import { ZodObject, ZodRawShape } from 'zod';
+// import { ZodObject, ZodRawShape } from 'zod';
 
 import prisma from '@/app/admin/_lib/prismaClient';
 import { revalidatePath } from 'next/cache';
@@ -102,8 +102,8 @@ export async function actualizarExcepcionHorarioAction(
     // Validar solo los campos que vienen. Usamos .partial() sobre el objeto base del schema.
     // upsertExcepcionHorarioFormSchema es un ZodEffects anidado, así que accedemos al schema interno dos veces.
 
-    // Extraer el objeto base del esquema anidado de ZodEffects
-    const baseObjectSchema = (upsertExcepcionHorarioFormSchema.innerType().innerType() as ZodObject<ZodRawShape>).partial();
+    // Extraer el objeto base del esquema para validación parcial
+    const baseObjectSchema = upsertExcepcionHorarioFormSchema.partial();
 
     const validation = baseObjectSchema.safeParse(inputData);
     if (!validation.success) {
