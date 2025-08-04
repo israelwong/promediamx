@@ -25,10 +25,8 @@ export type IniciarConexionWhatsAppOutput = z.infer<typeof IniciarConexionWhatsA
 // Esquema para la entrada de manejarCallbackWhatsAppOAuthAction (que recibirá el API Route Handler)
 // Estos son los parámetros que Meta envía a nuestra URL de callback
 export const MetaOAuthCallbackQuerySchema = z.object({
-    code: z.string({ required_error: "El código de autorización de Meta es requerido." }),
-    state: z.string({ required_error: "El parámetro 'state' es requerido." }), // El estado que enviamos, ahora lo recibimos
-    // Meta puede enviar otros parámetros como 'granted_scopes', 'denied_scopes', etc.
-    // Puedes añadirlos aquí si los necesitas.
+    code: z.string().min(1, "El código de autorización de Meta es requerido."),
+    state: z.string().min(1, "El parámetro 'state' es requerido."),
 });
 export type MetaOAuthCallbackQuery = z.infer<typeof MetaOAuthCallbackQuerySchema>;
 
