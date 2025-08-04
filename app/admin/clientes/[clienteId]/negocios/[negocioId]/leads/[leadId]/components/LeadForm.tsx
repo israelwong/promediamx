@@ -22,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app
 import { Loader2, Save, Trash, Send, XCircle } from 'lucide-react';
 import NotasSection from './NotasSection';
 
-// Lógica de negocio para colegios
 const comissionData = {
     albatros: {
         comisionFija: 1500,
@@ -68,7 +67,10 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
             telefono: initialLeadData?.telefono || '',
             status: initialLeadData?.status || 'activo',
             pipelineId: initialLeadData?.pipelineId || etapasPipeline[0]?.id || '',
-            valorEstimado: initialLeadData?.valorEstimado ?? null,
+
+            // --- CORRECCIÓN 1: El valor por defecto debe ser de tipo number o null ---
+            valorEstimado: initialLeadData?.valorEstimado ?? undefined,
+
             jsonParams: (initialLeadData?.jsonParams as LeadJsonParams) || {},
             etiquetaIds: initialLeadData?.Etiquetas?.map(e => e.etiquetaId) || [],
             fechaCita: citaInicial ? format(new Date(citaInicial.fecha), 'yyyy-MM-dd') : undefined,
@@ -114,8 +116,9 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                 }
             }
         }
-        const finalValueAsNumber = calculatedValue !== null ? Number(calculatedValue.toFixed(2)) : null;
-        setValue('valorEstimado', finalValueAsNumber, { shouldValidate: true, shouldDirty: true });
+        // --- CORRECCIÓN 2: `setValue` debe usar el tipo correcto (number) ---
+        const finalValue = calculatedValue !== null ? parseFloat(calculatedValue.toFixed(2)) : undefined;
+        setValue('valorEstimado', finalValue, { shouldValidate: true, shouldDirty: true });
     }, [initialLeadData?.valorEstimado, watchedJsonParams?.colegio, watchedJsonParams?.nivel_educativo, setValue]);
 
     const onSubmit = (data: LeadUnificadoFormData, enviarNotificacion: boolean) => {
@@ -330,26 +333,25 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                     name="fechaCita"
                                     control={control}
                                     render={() => (
-                                        <div className="w-full">
-                                            <DatePicker
-                                                selected={selectedDateForPicker}
-                                                onChange={(date) => {
-                                                    if (date) {
-                                                        setValue('fechaCita', format(date, 'yyyy-MM-dd'), { shouldValidate: true });
-                                                        setValue('horaCita', format(date, 'HH:mm'), { shouldValidate: true });
-                                                    } else {
-                                                        setValue('fechaCita', null);
-                                                        setValue('horaCita', null);
-                                                    }
-                                                }}
-                                                showTimeSelect
-                                                locale={es}
-                                                dateFormat="dd 'de' MMMM, yyyy h:mm aa"
-                                                className="w-full bg-zinc-900 border border-zinc-700 rounded-md p-2 text-white"
-                                                placeholderText="Selecciona fecha y hora..."
-                                                wrapperClassName="w-full"
-                                            />
-                                        </div>
+                                        <DatePicker
+                                            selected={selectedDateForPicker}
+                                            onChange={(date) => {
+                                                if (date) {
+                                                    setValue('fechaCita', format(date, 'yyyy-MM-dd'), { shouldValidate: true });
+                                                    setValue('horaCita', format(date, 'HH:mm'), { shouldValidate: true });
+                                                } else {
+                                                    setValue('fechaCita', null);
+                                                    setValue('horaCita', null);
+                                                }
+                                            }}
+                                            showTimeSelect
+                                            locale={es}
+                                            dateFormat="dd 'de' MMMM, yyyy h:mm aa"
+                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-md p-2 text-white"
+                                            placeholderText="Selecciona fecha y hora..."
+                                            timeFormat="h:mm aa"
+                                            timeCaption="Hora"
+                                        />
                                     )}
                                 />
                                 {errors.fechaCita && <p className="text-red-500 text-xs mt-1">{errors.fechaCita.message}</p>}

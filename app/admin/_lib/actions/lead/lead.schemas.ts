@@ -48,7 +48,7 @@ const actualizarLeadFormValidationSchema = z.object({
     canalId: z.string().cuid().nullable().optional(),
     agenteId: z.string().cuid().nullable().optional(),
     etiquetaIds: z.array(z.string().cuid()).optional(),
-    jsonParams: z.record(z.string()).optional(),
+    jsonParams: z.record(z.string(), z.any()).optional(),
 });
 export type ActualizarLeadFormData = z.infer<typeof actualizarLeadFormValidationSchema>;
 
@@ -331,16 +331,7 @@ export const LeadUnificadoFormSchema = z.object({
 
     // Solución definitiva para la comisión:
     // Acepta un string del formulario y lo convierte a número para el backend.
-    valorEstimado: z.preprocess(
-        (val) => {
-            if (val === '' || val === null || val === undefined) return null;
-            return parseFloat(String(val));
-        },
-        z.number({ invalid_type_error: "El valor debe ser un número." })
-            .positive("La comisión debe ser un número positivo.")
-            .nullable()
-            .optional()
-    ),
+    valorEstimado: z.number().optional(),
 
     jsonParams: z.object({
         colegio: z.string().optional(),
