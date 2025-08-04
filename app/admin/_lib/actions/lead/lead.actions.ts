@@ -924,7 +924,7 @@ export async function guardarLeadYAsignarCitaAction(
     try {
         // --- INICIO DE VALIDACIONES PREVIAS ---
 
-        if (!leadId) { // Verificación de duplicados
+        if (!leadId) { // 1. VERIFICACIÓN DE DUPLICADOS (Solo al crear un nuevo lead)
             const orConditions = [];
             if (email) orConditions.push({ email });
             if (telefono) orConditions.push({ telefono });
@@ -940,9 +940,7 @@ export async function guardarLeadYAsignarCitaAction(
         }
 
         let fechaHoraFinal: Date | null = null;
-        if (fechaCita && horaCita && tipoDeCitaId) { // Verificación de disponibilidad
-            // ✅ 2. Se utiliza la nueva librería para construir la fecha final de manera segura.
-            // Se convierte el objeto Date del formulario a un string ISO para pasarlo a la función.
+        if (fechaCita && horaCita && tipoDeCitaId) { // 2. VERIFICACIÓN DE DISPONIBILIDAD
             fechaHoraFinal = combineDateAndTime(fechaCita.toISOString(), horaCita);
 
             const disponibilidad = await verificarDisponibilidad({
@@ -1042,24 +1040,18 @@ export async function guardarLeadYAsignarCitaAction(
     }
 }
 
+
 export async function eliminarLeadAction(params: { leadId: string }): Promise<ActionResult<boolean>> {
     try {
-        const citasAsociadas = await prisma.agenda.count({
-            where: { leadId: params.leadId, status: 'PENDIENTE' }
-        });
-
-        if (citasAsociadas > 0) {
-            return { success: false, error: "Este lead tiene citas pendientes. Por favor, cancélalas primero antes de borrar el lead." };
-        }
-
-        // Eliminación en cascada de las relaciones en LeadEtiqueta
-        await prisma.leadEtiqueta.deleteMany({
-            where: { leadId: params.leadId }
-        });
-
-        await prisma.lead.delete({
-            where: { id: params.leadId }
-        });
+        // Se eliminan todas las dependencias dentro de una transacción para asegurar la integridad.
+        await prisma.$transaction([
+            // Eliminar citas asociadas
+            prisma.agenda.deleteMany({ where: { leadId: params.leadId } }),
+            // Eliminar relaciones de etiquetas
+            prisma.leadEtiqueta.deleteMany({ where: { leadId: params.leadId } }),
+            // Finalmente, eliminar el lead
+            prisma.lead.delete({ where: { id: params.leadId } })
+        ]);
 
         return { success: true, data: true };
     } catch (error) {
