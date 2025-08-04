@@ -328,11 +328,7 @@ export const LeadUnificadoFormSchema = z.object({
     telefono: z.string().optional(),
     status: z.string(),
     pipelineId: z.string().cuid("Debes seleccionar una etapa del pipeline."),
-
-    // Solución definitiva para la comisión:
-    // Acepta un string del formulario y lo convierte a número para el backend.
     valorEstimado: z.number().optional(),
-
     jsonParams: z.object({
         colegio: z.string().optional(),
         nivel_educativo: z.string().optional(),
@@ -340,13 +336,10 @@ export const LeadUnificadoFormSchema = z.object({
     }).optional(),
 
     etiquetaIds: z.array(z.string().cuid()).optional(),
-
-    // Se valida la fecha y hora como strings con formato específico.
     fechaCita: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido.")
         .optional().nullable(),
     horaCita: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora inválido.")
         .optional().nullable(),
-
     tipoDeCitaId: z.string().cuid().optional().nullable(),
     modalidadCita: z.string().optional().nullable(),
     negocioId: z.string().cuid(),

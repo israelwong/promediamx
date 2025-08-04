@@ -66,12 +66,11 @@ const citaFormFields = {
         .transform(val => (val === "" || val === "null" ? null : val)), // Permite string vacío o "null" para deseleccionar
     asunto: z.string().min(1, "El asunto es requerido.").max(150, "Asunto muy largo."),
     fecha: z.date({
-        required_error: "La fecha y hora son requeridas.",
-        invalid_type_error: "Formato de fecha y hora inválido.",
+        // required_error: "La fecha y hora son requeridas.",
     }),
     descripcion: z.string().nullable().optional().transform(val => (val === "" ? null : val)),
     meetingUrl: z.string().url("URL de reunión inválida.").or(z.literal('')).transform(val => (val === "" ? null : val)).nullable().optional(),
-    fechaRecordatorio: z.date({ invalid_type_error: "Formato de recordatorio inválido." }).nullable().optional(),
+    fechaRecordatorio: z.date().nullable().optional(),
 };
 
 // Schema para NUEVA Cita
@@ -253,8 +252,8 @@ export type ListarCitasAgendaResultData = z.infer<typeof listarCitasAgendaResult
 // ✅ ESQUEMA REFACTORIZADO: Ahora valida la fecha y la hora por separado.
 export const nuevaCitaSimpleFormSchema = z.object({
     modalidad: z.enum(['PRESENCIAL', 'VIRTUAL']),
-    fecha: z.date({ required_error: "La fecha es requerida." }),
-    hora: z.string({ required_error: "La hora es requerida." }).regex(/^([01]\d|2[0-3]):00$/, "Formato de hora inválido."),
+    fecha: z.date(),
+    hora: z.string().min(1, "La hora es requerida.").regex(/^([01]\d|2[0-3]):00$/, "Formato de hora inválido."),
     linkReunionVirtual: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.modalidad === 'VIRTUAL') {

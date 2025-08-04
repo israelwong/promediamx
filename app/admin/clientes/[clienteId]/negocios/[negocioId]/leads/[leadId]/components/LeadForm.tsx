@@ -333,25 +333,29 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                     name="fechaCita"
                                     control={control}
                                     render={() => (
-                                        <DatePicker
-                                            selected={selectedDateForPicker}
-                                            onChange={(date) => {
-                                                if (date) {
-                                                    setValue('fechaCita', format(date, 'yyyy-MM-dd'), { shouldValidate: true });
-                                                    setValue('horaCita', format(date, 'HH:mm'), { shouldValidate: true });
-                                                } else {
-                                                    setValue('fechaCita', null);
-                                                    setValue('horaCita', null);
-                                                }
-                                            }}
-                                            showTimeSelect
-                                            locale={es}
-                                            dateFormat="dd 'de' MMMM, yyyy h:mm aa"
-                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-md p-2 text-white"
-                                            placeholderText="Selecciona fecha y hora..."
-                                            timeFormat="h:mm aa"
-                                            timeCaption="Hora"
-                                        />
+                                        <div className="w-full">
+                                            <DatePicker
+                                                selected={selectedDateForPicker}
+                                                onChange={(date) => {
+                                                    if (date) {
+                                                        setValue('fechaCita', format(date, 'yyyy-MM-dd'), { shouldValidate: true });
+                                                        setValue('horaCita', format(date, 'HH:mm'), { shouldValidate: true });
+                                                    } else {
+                                                        setValue('fechaCita', null);
+                                                        setValue('horaCita', null);
+                                                    }
+                                                }}
+                                                showTimeSelect
+                                                locale={es}
+                                                dateFormat="dd 'de' MMMM, yyyy h:mm aa"
+                                                className="w-full bg-zinc-900 border border-zinc-700 rounded-md p-2 text-white"
+                                                placeholderText="Selecciona fecha y hora..."
+                                                timeFormat="h:mm aa"
+                                                timeCaption="Hora"
+                                                popperClassName="w-full min-w-[320px]"
+                                                wrapperClassName="w-full"
+                                            />
+                                        </div>
                                     )}
                                 />
                                 {errors.fechaCita && <p className="text-red-500 text-xs mt-1">{errors.fechaCita.message}</p>}
