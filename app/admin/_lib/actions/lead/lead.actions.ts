@@ -305,47 +305,6 @@ export async function actualizarLeadAction(
     }
 }
 
-
-// --- NUEVA VERSIÓN DE eliminarLead (ahora eliminarLeadAction) ---
-
-// export async function eliminarLeadAction(
-//     params: z.infer<typeof eliminarLeadParamsSchema>
-// ): Promise<ActionResult<{ id: string } | null>> {
-//     const validation = eliminarLeadParamsSchema.safeParse(params);
-//     if (!validation.success) {
-//         return { success: false, error: "ID de Lead inválido.", errorDetails: validation.error.flatten().fieldErrors };
-//     }
-//     const { leadId } = validation.data;
-
-//     try {
-//         // Verificar si el lead tiene citas agendadas
-//         const citasAgendadas = await prisma.agenda.findMany({
-//             where: { leadId: leadId }
-//         });
-//         if (citasAgendadas.length > 0) {
-//             return { success: false, error: "El lead tiene una cita agendada. Debes eliminar la cita antes de eliminar el lead." };
-//         }
-
-//         await prisma.lead.delete({
-//             where: { id: leadId },
-//         });
-//         return { success: true, data: { id: leadId } };
-//     } catch (error) {
-//         console.error(`Error al eliminar lead ${leadId}:`, error);
-//         if (error instanceof Prisma.PrismaClientKnownRequestError) {
-//             if (error.code === 'P2025') {
-//                 return { success: false, error: "El lead que intentas eliminar no fue encontrado." };
-//             }
-//             if (error.code === 'P2003') {
-//                 return { success: false, error: "No se puede eliminar el lead porque tiene registros asociados. Debes eliminarlos o desasociarlos primero." };
-//             }
-//         }
-//         return { success: false, error: 'No se pudo eliminar el lead.' };
-//     }
-// }
-
-
-
 export async function crearLeadAction(
     params: z.infer<typeof crearLeadParamsSchema>
 ): Promise<ActionResult<LeadDetalleData | null>> {
@@ -903,7 +862,6 @@ export async function obtenerLeadDetallesAction(
     }
 }
 
-
 export async function guardarLeadYAsignarCitaAction(
     params: {
         data: LeadUnificadoFormData;
@@ -911,37 +869,45 @@ export async function guardarLeadYAsignarCitaAction(
         citaInicialId?: string | null;
     }
 ): Promise<ActionResult<{ leadId: string }>> {
+    console.log("\n--- ACTION: guardarLeadYAsignarCitaAction ---");
     const { data, enviarNotificacion, citaInicialId } = params;
+    console.log("1. Datos recibidos:", { data: { ...data, fechaCita: data.fechaCita?.toISOString() }, enviarNotificacion, citaInicialId });
 
     const validation = LeadUnificadoFormSchema.safeParse(data);
     if (!validation.success) {
+        console.error("2. FALLO: Validación de Zod fallida.", validation.error.flatten());
         return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
     }
+    console.log("2. OK: Validación de Zod exitosa.");
 
     const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
         fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = validation.data;
 
     try {
-        // --- INICIO DE VALIDACIONES PREVIAS ---
-
-        if (!leadId) { // 1. VERIFICACIÓN DE DUPLICADOS (Solo al crear un nuevo lead)
+        if (!leadId) {
+            console.log("3. Es un nuevo lead, verificando duplicados...");
             const orConditions = [];
             if (email) orConditions.push({ email });
             if (telefono) orConditions.push({ telefono });
 
             if (orConditions.length > 0) {
-                const leadExistente = await prisma.lead.findFirst({
-                    where: { crmId, OR: orConditions }
-                });
+                const leadExistente = await prisma.lead.findFirst({ where: { crmId, OR: orConditions } });
                 if (leadExistente) {
+                    console.error("4. FALLO: Se encontró un lead duplicado.", leadExistente);
                     return { success: false, error: "Ya existe un lead con este email o teléfono en el CRM." };
                 }
             }
+            console.log("4. OK: No se encontraron duplicados.");
+        } else {
+            console.log("3. Es un lead existente, omitiendo verificación de duplicados.");
         }
 
         let fechaHoraFinal: Date | null = null;
-        if (fechaCita && horaCita && tipoDeCitaId) { // 2. VERIFICACIÓN DE DISPONIBILIDAD
+        if (fechaCita && horaCita && tipoDeCitaId) {
+            console.log("5. Se proporcionaron datos de cita, procesando fecha y verificando disponibilidad...");
+            // ✅ CORREGIDO: Se utiliza el helper 'combineDateAndTime' que ya validamos.
             fechaHoraFinal = combineDateAndTime(fechaCita.toISOString(), horaCita);
+            console.log("6. Fecha y hora combinadas usando el helper (objeto Date):", fechaHoraFinal.toISOString());
 
             const disponibilidad = await verificarDisponibilidad({
                 negocioId,
@@ -952,12 +918,13 @@ export async function guardarLeadYAsignarCitaAction(
             });
 
             if (!disponibilidad.disponible) {
+                console.error("7. FALLO: El horario no está disponible.", disponibilidad);
                 return { success: false, error: disponibilidad.mensaje || "El horario seleccionado ya no está disponible." };
             }
+            console.log("7. OK: El horario está disponible.");
         }
 
-        // --- FIN DE VALIDACIONES PREVIAS ---
-
+        console.log("8. Iniciando transacción en la base de datos...");
         const transactionResult = await prisma.$transaction(async (tx) => {
             const leadData = {
                 nombre, email: email || null, telefono: telefono || null,
@@ -973,16 +940,19 @@ export async function guardarLeadYAsignarCitaAction(
                 if (etiquetaIds && etiquetaIds.length > 0) {
                     await tx.leadEtiqueta.createMany({ data: etiquetaIds.map(id => ({ leadId: leadId, etiquetaId: id })) });
                 }
+                console.log("9. Lead actualizado en la BD:", finalLead.id);
             } else {
                 finalLead = await tx.lead.create({
                     data: { ...leadData, Etiquetas: { create: etiquetaIds?.map(id => ({ etiquetaId: id })) || [] } },
                     select: { id: true, nombre: true, email: true }
                 });
+                console.log("9. Nuevo lead creado en la BD:", finalLead.id);
             }
 
             let citaGuardada = null;
             if (citaInicialId && !fechaCita) {
                 await tx.agenda.delete({ where: { id: citaInicialId } });
+                console.log("10. Cita eliminada:", citaInicialId);
             }
             else if (fechaHoraFinal && tipoDeCitaId && modalidadCita) {
                 citaGuardada = await tx.agenda.upsert({
@@ -994,11 +964,14 @@ export async function guardarLeadYAsignarCitaAction(
                         status: 'PENDIENTE', tipo: 'Cita CRM', modalidad: modalidadCita,
                     }
                 });
+                console.log("10. Cita creada/actualizada:", citaGuardada.id);
             }
             return { lead: finalLead, cita: citaGuardada };
         });
+        console.log("11. Transacción completada exitosamente.");
 
         const { lead, cita } = transactionResult;
+
 
         // ✅ Lógica de envío de correo (FUERA de la transacción)
         if (enviarNotificacion && cita && lead.email && tipoDeCitaId) {
