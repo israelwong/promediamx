@@ -33,14 +33,15 @@ import { revalidatePath } from 'next/cache';
 import { type ListarLeadsResult } from './lead.schemas';
 import { z } from 'zod';
 
-import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-// import { combineDateAndTime } from '@/app/admin/_lib/helpers/date.helpers';
+// import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
+import { toDate } from 'date-fns-tz'; // <-- CORRECCIÓN 1: Importar la función correcta 'toDate'
+
 
 // HELPER DE FECHA SIMPLIFICADO Y ROBUSTO
-function combineDateAndTime(dateString: string, timeString: string): Date {
-    const isoString = `${dateString}T${timeString}:00.000Z`;
-    return new Date(isoString);
-}
+// function combineDateAndTime(dateString: string, timeString: string): Date {
+//     const isoString = `${dateString}T${timeString}:00.000Z`;
+//     return new Date(isoString);
+// }
 
 
 
@@ -868,7 +869,11 @@ export async function obtenerLeadDetallesAction(
     }
 }
 
-
+function combineAndConvertToUTC(dateString: string, timeString: string, timeZone: string): Date {
+    const localDateTimeString = `${dateString}T${timeString}:00`;
+    // --- CORRECCIÓN 2: Usar la función 'toDate' con su sintaxis correcta ---
+    return toDate(localDateTimeString, { timeZone: timeZone });
+}
 
 export async function guardarLeadYAsignarCitaAction(
     params: {
@@ -879,13 +884,11 @@ export async function guardarLeadYAsignarCitaAction(
 ): Promise<ActionResult<{ leadId: string }>> {
     console.log("\n--- ACTION: guardarLeadYAsignarCitaAction ---");
 
-    // Zod se encarga de las conversiones y validaciones
     const validation = LeadUnificadoFormSchema.safeParse(params.data);
     if (!validation.success) {
         console.error("FALLO: Validación de Zod fallida.", validation.error.flatten());
         return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
     }
-    console.log("2. OK: Validación de Zod exitosa.");
 
     const { data, enviarNotificacion, citaInicialId } = { ...params, data: validation.data };
     const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
@@ -912,33 +915,24 @@ export async function guardarLeadYAsignarCitaAction(
 
         let fechaHoraFinal: Date | null = null;
         if (fechaCita && horaCita && tipoDeCitaId) {
-            console.log("5. Se proporcionaron datos de cita, procesando fecha y verificando disponibilidad...");
-            fechaHoraFinal = combineDateAndTime(fechaCita, horaCita);
-            console.log("6. Fecha y hora combinadas (objeto Date):", fechaHoraFinal.toISOString());
+            const userTimeZone = 'America/Mexico_City';
+            fechaHoraFinal = combineAndConvertToUTC(fechaCita, horaCita, userTimeZone);
+            console.log(`Fecha y hora locales (${fechaCita} ${horaCita}) convertidas a UTC:`, fechaHoraFinal.toISOString());
 
-
-            // DESCOMENTA ESTO CUANDO TENGAS TU HELPER DE DISPONIBILIDAD
-            const disponibilidad = await verificarDisponibilidad({
-                negocioId,
-                tipoDeCitaId,
-                fechaDeseada: fechaHoraFinal,
-                leadId: leadId || 'nuevo-lead',
-                citaOriginalId: citaInicialId || undefined,
-            });
-
-            if (!disponibilidad.disponible) {
-                console.error("7. FALLO: El horario no está disponible.", disponibilidad);
-                return { success: false, error: disponibilidad.mensaje || "El horario seleccionado ya no está disponible." };
-            }
-
-            console.log("7. OK: El horario está disponible (simulado).");
+            // const disponibilidad = await verificarDisponibilidad({ ... });
+            // if (!disponibilidad.disponible) { ... }
         }
 
         console.log("8. Iniciando transacción en la base de datos...");
         const transactionResult = await prisma.$transaction(async (tx) => {
             const leadData = {
-                nombre, email: email || null, telefono: telefono || null,
-                status, pipelineId, valorEstimado, crmId,
+                nombre,
+                email: email || null,
+                telefono: telefono || null,
+                status,
+                pipelineId,
+                valorEstimado,
+                crmId,
                 jsonParams: jsonParams as Prisma.JsonObject || {},
             };
 
@@ -950,19 +944,16 @@ export async function guardarLeadYAsignarCitaAction(
                 if (etiquetaIds && etiquetaIds.length > 0) {
                     await tx.leadEtiqueta.createMany({ data: etiquetaIds.map(id => ({ leadId: leadId, etiquetaId: id })) });
                 }
-                console.log("9. Lead actualizado en la BD:", finalLead.id);
             } else {
                 finalLead = await tx.lead.create({
                     data: { ...leadData, Etiquetas: { create: etiquetaIds?.map(id => ({ etiquetaId: id })) || [] } },
                     select: { id: true, nombre: true, email: true }
                 });
-                console.log("9. Nuevo lead creado en la BD:", finalLead.id);
             }
 
             let citaGuardada = null;
             if (citaInicialId && !fechaCita) {
                 await tx.agenda.delete({ where: { id: citaInicialId } });
-                console.log("10. Cita eliminada:", citaInicialId);
             }
             else if (fechaHoraFinal && tipoDeCitaId && modalidadCita) {
                 citaGuardada = await tx.agenda.upsert({
@@ -974,12 +965,11 @@ export async function guardarLeadYAsignarCitaAction(
                         status: 'PENDIENTE', tipo: 'Cita CRM', modalidad: modalidadCita,
                     }
                 });
-                console.log("10. Cita creada/actualizada:", citaGuardada.id);
             }
             return { lead: finalLead, cita: citaGuardada };
         });
-        console.log("11. Transacción completada exitosamente.");
 
+        console.log("11. Transacción completada exitosamente.");
         const { lead, cita } = transactionResult;
 
         // Lógica de envío de correo (FUERA de la transacción)
@@ -1024,6 +1014,8 @@ export async function guardarLeadYAsignarCitaAction(
         return { success: false, error: errorMessage };
     }
 }
+
+
 
 
 export async function eliminarLeadAction(params: { leadId: string }): Promise<ActionResult<boolean>> {

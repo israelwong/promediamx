@@ -352,8 +352,11 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                                 placeholderText="Selecciona fecha y hora..."
                                                 timeFormat="h:mm aa"
                                                 timeCaption="Hora"
-                                                popperClassName="w-full min-w-[320px]"
                                                 wrapperClassName="w-full"
+                                                popperClassName="z-30"
+
+                                                // --- AÑADE ESTA LÍNEA PARA CORREGIR LA POSICIÓN ---
+                                                popperProps={{ strategy: 'fixed' }}
                                             />
                                         </div>
                                     )}
