@@ -229,7 +229,11 @@ export async function actualizarOrdenImagenesGaleriaPaqueteAction(
         return {
             success: false,
             error: "Datos de orden inválidos.",
-            errorDetails: validation.error.flatten().fieldErrors as Record<string, string[]>
+            errorDetails: Object.fromEntries(
+                Object.entries(validation.error.flatten().fieldErrors).filter(
+                    ([v]) => Array.isArray(v) && v !== undefined
+                )
+            ) as Record<string, string[]>
         };
     }
 

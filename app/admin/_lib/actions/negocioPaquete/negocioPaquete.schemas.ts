@@ -28,7 +28,7 @@ export const CrearNegocioPaqueteSchema = z.object({
     nombre: z.string().min(1, { message: "El nombre del paquete es obligatorio." }),
     descripcionCorta: z.string().optional().nullable(),
     descripcion: z.string().optional().nullable(),
-    precio: z.number({ invalid_type_error: "El precio debe ser un número.", required_error: "El precio es obligatorio." })
+    precio: z.number({ message: "El precio es obligatorio." })
         .positive({ message: "El precio debe ser un valor positivo." }),
     linkPago: z.string().url({ message: "Por favor, ingresa una URL válida." }).optional().nullable(),
     negocioPaqueteCategoriaId: z.string().cuid({ message: "ID de categoría inválido." }).optional().nullable(),
@@ -93,7 +93,7 @@ export const ActualizarNegocioPaqueteSchema = z.object({
     nombre: z.string().min(1, { message: "El nombre del paquete es obligatorio." }).optional(),
     descripcionCorta: z.string().optional().nullable(),
     descripcion: z.string().optional().nullable(),
-    precio: z.number({ invalid_type_error: "El precio debe ser un número.", required_error: "El precio es obligatorio." })
+    precio: z.number({ message: "El precio es obligatorio." })
         .positive({ message: "El precio debe ser un valor positivo." }).optional(),
     linkPago: z.string().url({ message: "URL de pago inválida." }).optional().nullable(),
     status: z.string().min(1, { message: "El estado es obligatorio." }).optional(),

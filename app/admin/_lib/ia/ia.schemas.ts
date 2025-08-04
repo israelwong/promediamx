@@ -22,8 +22,10 @@ export const ChatMessageItemSchema = z.object({
     // Campos estructurales opcionales
     parteTipo: z.nativeEnum(InteraccionParteTipo).default('TEXT').nullable().optional(),
     functionCallNombre: z.string().nullable().optional(),
-    functionCallArgs: z.record(z.any()).nullable().optional(),
-    functionResponseData: z.record(z.any()).nullable().optional(),
+    // --- CORRECCIÓN AQUÍ ---
+    // Se añade z.string() como primer argumento y se usa z.unknown() por seguridad.
+    functionCallArgs: z.record(z.string(), z.unknown()).nullable().optional(),
+    functionResponseData: z.record(z.string(), z.unknown()).nullable().optional(),
 
     mediaUrl: z.string().url().nullable().optional(),
     mediaType: z.string().nullable().optional(),
@@ -69,7 +71,7 @@ export type TareaCapacidadIA = z.infer<typeof TareaCapacidadIASchema>;
 // Esquema para LlamadaFuncionDetectada
 export const LlamadaFuncionDetectadaSchema = z.object({
     nombreFuncion: z.string(),
-    argumentos: z.record(z.unknown()), // Record<string, unknown>
+    argumentos: z.record(z.string(), z.unknown()), // Record<string, unknown>
 });
 export type LlamadaFuncionDetectada = z.infer<typeof LlamadaFuncionDetectadaSchema>;
 

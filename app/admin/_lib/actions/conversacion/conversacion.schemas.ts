@@ -16,10 +16,12 @@ export type MediaItem = z.infer<typeof MediaItemSchema>;
 export const FunctionResponseMediaDataSchema = z.object({
     content: z.string().nullable().optional(),
     media: z.array(MediaItemSchema).nullable().optional(),
-    additionalData: z.record(z.unknown()).nullable().optional(), // Cambiado de z.any() a z.unknown()
-    uiComponentPayload: z.record(z.unknown()).nullable().optional(), // Cambiado de z.any() a z.unknown()
+
+    // La forma correcta es: z.record(keyType, valueType)
+    additionalData: z.record(z.string(), z.unknown()).nullable().optional(),
+
+    uiComponentPayload: z.record(z.string(), z.unknown()).nullable().optional(),
 });
-export type FunctionResponseMediaData = z.infer<typeof FunctionResponseMediaDataSchema>;
 
 
 // --- ESQUEMA CORREGIDO ---

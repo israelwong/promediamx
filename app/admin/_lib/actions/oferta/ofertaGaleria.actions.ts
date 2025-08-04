@@ -159,9 +159,9 @@ export async function actualizarDetallesImagenGaleriaOfertaAction(
         console.error(`Error actualizando detalles de imagen ${imagenGaleriaId}:`, error);
         if (error && typeof error === 'object' && 'flatten' in error && error instanceof z.ZodError) {
             // Filtrar los undefined para cumplir con Record<string, string[]>
-            const filteredFieldErrors = Object.fromEntries(
-                Object.entries(error.flatten().fieldErrors).filter(([v]) => Array.isArray(v))
-                    .map(([k, v]) => [k, v ?? []])
+            const filteredFieldErrors: Record<string, string[]> = Object.fromEntries(
+                Object.entries(error.flatten().fieldErrors)
+                    .map(([k, v]) => [k, Array.isArray(v) ? v : []])
             );
             return { success: false, error: "Datos de imagen con formato inesperado.", errorDetails: filteredFieldErrors };
         }

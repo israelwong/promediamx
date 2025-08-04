@@ -63,7 +63,9 @@ export type ActualizarOrdenItemsData = z.infer<typeof ActualizarOrdenItemsDataSc
 // Esquema para los datos mínimos al crear un ítem
 export const CrearItemBasicoDataSchema = z.object({
     nombre: z.string().min(1, "El nombre es obligatorio.").max(150, "Máximo 150 caracteres."),
-    precio: z.number({ required_error: "El precio es obligatorio.", invalid_type_error: "El precio debe ser un número." }).positive("El precio debe ser positivo o cero.").gte(0, "El precio no puede ser negativo."), // Permitir 0
+    precio: z.number()
+        .min(0, "El precio no puede ser negativo.")
+        .refine((val) => typeof val === "number", { message: "El precio debe ser un número." }),
     categoriaId: z.string().cuid().nullish(),
 });
 export type CrearItemBasicoData = z.infer<typeof CrearItemBasicoDataSchema>;

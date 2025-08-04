@@ -10,10 +10,7 @@ export const ItemCatalogoGaleriaItemSchema = z.object({
     descripcion: z.string().max(500, "Máximo 500 caracteres.").nullable().optional(),
     orden: z.number().int().min(0).default(0),
     tamañoBytes: z.number().int().min(0).nullable().optional(),
-    createdAt: z.date({ // createdAt SÍ existe en el modelo Prisma
-        required_error: "La fecha de creación es requerida.",
-        invalid_type_error: "Debe ser una fecha válida para createdAt.",
-    }),
+    createdAt: z.date(), // createdAt SÍ existe en el modelo Prisma
 });
 export type ItemCatalogoGaleriaItemType = z.infer<typeof ItemCatalogoGaleriaItemSchema>;
 

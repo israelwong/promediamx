@@ -45,9 +45,9 @@ export const IniciarConexionStripeOutputSchema = z.object({
 // --- NUEVO ESQUEMA PARA ACTUALIZAR OPCIONES DE PAGO ---
 export const ActualizarOpcionesPagoInputSchema = z.object({
     negocioId: z.string().cuid({ message: "ID de negocio inválido." }),
-    aceptaPagosOnline: z.boolean({ required_error: "Debe indicar si acepta pagos online." }),
-    aceptaOxxoPay: z.boolean({ required_error: "Debe indicar si acepta OXXO Pay." }),
-    aceptaMesesSinIntereses: z.boolean({ required_error: "Debe indicar si acepta Meses sin Intereses." }),
+    aceptaPagosOnline: z.boolean(),
+    aceptaOxxoPay: z.boolean(),
+    aceptaMesesSinIntereses: z.boolean(),
     mesesPermitidosMSI: z.array(z.number().int().min(3).max(24)) // Validar que sean números enteros y dentro de un rango razonable
         .refine(arr => arr.every(val => [3, 6, 9, 12, 18, 24].includes(val)), { // Asegurar que los valores sean de los plazos permitidos
             message: "Los plazos de MSI seleccionados no son válidos."

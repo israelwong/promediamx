@@ -287,7 +287,7 @@ export async function manejarAgendarCita(
                 const tareaActualizada = await prisma.tareaEnProgreso.update({ where: { id: tarea.id }, data: { contexto: tareaContexto as Prisma.JsonObject, estado: EstadoTareaConversacional.PENDIENTE_CONFIRMACION_USUARIO } });
                 return manejarAgendarCita(tareaActualizada, mensaje, contexto);
             } else {
-                await enviarMensajeAsistente(conversacionId, validation.error.errors[0].message, usuarioWaId, negocioPhoneNumberId);
+                await enviarMensajeAsistente(conversacionId, validation.error.issues[0].message, usuarioWaId, negocioPhoneNumberId);
                 return { success: true, data: null };
             }
         }

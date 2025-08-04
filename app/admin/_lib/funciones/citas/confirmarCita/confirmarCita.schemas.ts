@@ -10,7 +10,7 @@ export const ConfirmarCitaArgsSchema = z.object({
     // un objeto Date y luego validamos que sea una fecha válida. Es más robusto.
     fecha_hora_deseada: z.preprocess((arg) => {
         if (typeof arg == "string" || arg instanceof Date) return new Date(arg);
-    }, z.date({ invalid_type_error: "La fecha proporcionada no es válida." })),
+    }, z.date({ error: "La fecha proporcionada no es válida." })),
 
     email_contacto: z.string().email(),
     nombre_contacto: z.string().nullable().optional(),

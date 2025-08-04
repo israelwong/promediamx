@@ -17,13 +17,9 @@ export type ListarHorariosDisponiblesData = z.infer<typeof ListarHorariosDisponi
  * Argumentos que la IA debe proveer para listar los horarios disponibles.
  */
 export const ListarHorariosDisponiblesArgsSchema = z.object({
-    servicio_nombre: z.string({
-        required_error: "Se necesita el nombre del servicio para buscar horarios."
-    }).min(1, "El nombre del servicio no puede estar vacío."),
+    servicio_nombre: z.string().min(1, "Se necesita el nombre del servicio para buscar horarios."),
 
-    fecha_deseada: z.string({
-        required_error: "Se necesita una fecha para buscar horarios."
-    }).min(1, "La fecha no puede estar vacía."),
+    fecha_deseada: z.string().min(1, "Se necesita una fecha para buscar horarios."),
 });
 
 export type ListarHorariosDisponiblesArgs = z.infer<typeof ListarHorariosDisponiblesArgsSchema>;

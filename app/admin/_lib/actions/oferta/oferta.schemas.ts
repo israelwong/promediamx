@@ -73,8 +73,8 @@ const ofertaBaseSchema = z.object({
     objetivoCitaUbicacion: z.string().max(255).nullable().optional(),
     objetivoCitaDuracionMinutos: z.number().int().positive().nullable().optional(),
     objetivoCitaLimiteConcurrencia: z.number().int().positive().nullable().optional(),
-    fechaInicio: z.date({ required_error: 'La fecha de inicio es requerida.' }),
-    fechaFin: z.date({ required_error: 'La fecha de fin es requerida.' }),
+    fechaInicio: z.date(),
+    fechaFin: z.date(),
     status: EstadoOfertaZodEnum,
 });
 
@@ -134,9 +134,7 @@ export const CrearOfertaSuperSimplificadoInputSchema = z.object({
      * @property {string} nombre - El nombre de la oferta.
      * @description Campo requerido. Debe ser una cadena de texto no vacía.
      */
-    nombre: z.string({
-        required_error: "El nombre de la oferta es obligatorio."
-    })
+    nombre: z.string()
         .min(1, "El nombre de la oferta no puede estar vacío.")
         .max(255, "El nombre de la oferta es demasiado largo."), // Ajusta la longitud máxima si es necesario
 

@@ -159,8 +159,8 @@ export const ActualizarTareaInputSchema = z.object({
     rol: z.string().max(50).nullable().optional(),
     personalidad: z.string().max(50).nullable().optional(),
     version: z.number().min(0.1, "La versión debe ser al menos 0.1").nullable().optional(), // Hacerla opcional y validar mínimo si se provee
-    status: z.enum(['activo', 'inactivo', 'beta', 'proximamente'], { // Ejemplo de enum, ajusta según tus status
-        errorMap: () => ({ message: "Status inválido." })
+    status: z.enum(['activo', 'inactivo', 'beta', 'proximamente'], {
+        message: "Status inválido."
     }),
     categoriaTareaId: z.string().cuid("Categoría inválida.").nullable().optional(),
     iconoUrl: z.string().url("URL de icono inválida.").nullable().optional(),

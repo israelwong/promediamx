@@ -3,8 +3,7 @@ import { z } from 'zod';
 
 // Enum para los tipos de video (reutilizable)
 export const TipoVideoEnumSchema = z.enum(['SUBIDO', 'YOUTUBE', 'VIMEO', 'OTRO_URL'], {
-    required_error: "El tipo de video es requerido.",
-    invalid_type_error: "Tipo de video no válido.",
+    error: "Tipo de video no válido.",
 });
 export type TipoVideoType = z.infer<typeof TipoVideoEnumSchema>;
 
