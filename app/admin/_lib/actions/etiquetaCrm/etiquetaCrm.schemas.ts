@@ -47,7 +47,8 @@ export const etiquetaCrmFormSchema = z.object({
     color: z.string()
         .regex(/^#([0-9A-Fa-f]{3}){1,2}$/, "Debe ser un color hexadecimal válido (ej. #RRGGBB).")
         .nullable().optional().or(z.literal('')) // Permite string vacío para input
-        .transform(val => (val === "" || val === "#ffffff" ? null : val)), // #ffffff (blanco) también se trata como "sin color" (null)
+        .transform(val => (val === "" || val === "#ffffff" ? null : val))
+        .optional(), // <-- Hacemos 'color' opcional a nivel del objeto
 
     // status: z.string().optional().default('activo'), // <-- LÍNEA ANTIGUA
     status: z.string(), // <-- LÍNEA NUEVA: Simplemente un string. Asumimos que siempre tendrá un valor.

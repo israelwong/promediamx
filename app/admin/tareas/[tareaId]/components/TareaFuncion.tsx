@@ -69,7 +69,7 @@ export default function TareaFuncion({ tareaFuncionId, nombreFuncionActual, onNo
 
         const validationResult = ActualizarDescripcionTareaFuncionInputSchema.safeParse({ descripcion: descripcionEdit });
         if (!validationResult.success) {
-            setValidationErrorDescripcion(validationResult.error.errors[0]?.message || "Descripción inválida.");
+            setValidationErrorDescripcion(validationResult.error.issues[0]?.message || "Descripción inválida.");
             return;
         }
 

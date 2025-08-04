@@ -44,8 +44,8 @@ export type ListarAgentesCrmParams = z.infer<typeof listarAgentesCrmParamsSchema
 // Esquema para el formulario de CREACIÓN de Agente
 export const crearAgenteCrmFormSchema = z.object({
     nombre: z.string().min(1, "El nombre es obligatorio.").max(100),
-    email: z.string().email("Email inválido.").min(1, "El email es obligatorio."),
-    telefono: z.string().nullable().optional().transform(val => val === "" ? null : val),
+    email: z.string().email().min(1, "El email es obligatorio."),
+    telefono: z.string().nullable().transform(val => val === "" ? null : val),
     password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres."),
     rol: rolAgenteCrmEnum,
     status: statusAgenteCrmEnum,
@@ -66,7 +66,7 @@ export type CrearAgenteCrmParams = z.infer<typeof crearAgenteCrmParamsSchema>;
 export const editarAgenteCrmFormSchema = z.object({
     // crmId: z.string().cuid("Se requiere el ID del CRM."),
     nombre: z.string().min(1, "El nombre es obligatorio.").max(100),
-    telefono: z.string().nullable().optional().transform(val => val === "" ? null : val),
+    telefono: z.string().nullable().transform(val => val === "" ? null : val),
     rol: rolAgenteCrmEnum,
     status: statusAgenteCrmEnum,
     // email: z.string().email().optional(), // Si permites editar email, pero usualmente no.
