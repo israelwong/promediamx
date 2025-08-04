@@ -32,11 +32,10 @@ import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/e
 import { crearInteraccionSistemaAction } from '../conversacion/conversacion.actions'; // Necesitaremos esta acción refactorizada
 import { revalidatePath } from 'next/cache';
 import { type ListarLeadsResult } from './lead.schemas';
-// import { setHours, setMinutes, setSeconds } from 'date-fns';
 import { z } from 'zod';
 
 import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-import { set } from 'date-fns';
+import { combineDateAndTime } from '@/app/admin/_lib/helpers/date.helpers';
 
 
 // Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
@@ -905,9 +904,6 @@ export async function obtenerLeadDetallesAction(
 }
 
 
-/**
- * ✅ NUEVA ACCIÓN: Crea o actualiza un Lead y su cita agendada en una sola transacción.
- */
 export async function guardarLeadYAsignarCitaAction(
     params: {
         data: LeadUnificadoFormData;
@@ -928,7 +924,7 @@ export async function guardarLeadYAsignarCitaAction(
     try {
         // --- INICIO DE VALIDACIONES PREVIAS ---
 
-        if (!leadId) { // 1. VERIFICACIÓN DE DUPLICADOS (Solo al crear un nuevo lead)
+        if (!leadId) { // Verificación de duplicados
             const orConditions = [];
             if (email) orConditions.push({ email });
             if (telefono) orConditions.push({ telefono });
@@ -944,10 +940,10 @@ export async function guardarLeadYAsignarCitaAction(
         }
 
         let fechaHoraFinal: Date | null = null;
-        if (fechaCita && horaCita && tipoDeCitaId) { // 2. VERIFICACIÓN DE DISPONIBILIDAD
-            const [hours, minutes] = horaCita.split(':').map(Number);
-            // ✅ CORREGIDO: Se construye la fecha de forma segura para evitar problemas de zona horaria.
-            fechaHoraFinal = set(fechaCita, { hours, minutes, seconds: 0, milliseconds: 0 });
+        if (fechaCita && horaCita && tipoDeCitaId) { // Verificación de disponibilidad
+            // ✅ 2. Se utiliza la nueva librería para construir la fecha final de manera segura.
+            // Se convierte el objeto Date del formulario a un string ISO para pasarlo a la función.
+            fechaHoraFinal = combineDateAndTime(fechaCita.toISOString(), horaCita);
 
             const disponibilidad = await verificarDisponibilidad({
                 negocioId,
@@ -1005,7 +1001,6 @@ export async function guardarLeadYAsignarCitaAction(
         });
 
         const { lead, cita } = transactionResult;
-
 
         // ✅ Lógica de envío de correo (FUERA de la transacción)
         if (enviarNotificacion && cita && lead.email && tipoDeCitaId) {
