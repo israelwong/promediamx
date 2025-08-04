@@ -38,6 +38,8 @@ export async function verificarDisponibilidad(
                     tipoDeCitaId: tipoDeCitaId,
                     fecha: fechaDeseada,
                     status: StatusAgenda.PENDIENTE,
+                    // Se añade esta condición para ignorar la cita actual en la búsqueda
+                    id: { not: citaOriginalId }
                 }
             })
         ]);
