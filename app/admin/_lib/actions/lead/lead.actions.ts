@@ -11,7 +11,6 @@ import {
     DatosFiltrosLead,
     obtenerDatosFormularioLeadParamsSchema,
     DatosFormularioLeadData,
-    // eliminarLeadParamsSchema,
     crearLeadParamsSchema,
     leadDetalleSchema,
     marcarLeadComoGanadoParamsSchema,
@@ -862,6 +861,8 @@ export async function obtenerLeadDetallesAction(
     }
 }
 
+
+
 export async function guardarLeadYAsignarCitaAction(
     params: {
         data: LeadUnificadoFormData;
@@ -905,7 +906,6 @@ export async function guardarLeadYAsignarCitaAction(
         let fechaHoraFinal: Date | null = null;
         if (fechaCita && horaCita && tipoDeCitaId) {
             console.log("5. Se proporcionaron datos de cita, procesando fecha y verificando disponibilidad...");
-            // ✅ CORREGIDO: Se utiliza el helper 'combineDateAndTime' que ya validamos.
             fechaHoraFinal = combineDateAndTime(fechaCita.toISOString(), horaCita);
             console.log("6. Fecha y hora combinadas usando el helper (objeto Date):", fechaHoraFinal.toISOString());
 
@@ -971,7 +971,6 @@ export async function guardarLeadYAsignarCitaAction(
         console.log("11. Transacción completada exitosamente.");
 
         const { lead, cita } = transactionResult;
-
 
         // ✅ Lógica de envío de correo (FUERA de la transacción)
         if (enviarNotificacion && cita && lead.email && tipoDeCitaId) {
