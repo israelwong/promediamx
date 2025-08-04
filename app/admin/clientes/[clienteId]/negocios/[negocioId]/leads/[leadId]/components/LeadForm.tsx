@@ -1,7 +1,3 @@
-/*
-  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/LeadForm.tsx
-  (Esta es la versión final y completa del componente de formulario)
-*/
 "use client";
 
 import React, { useTransition, useMemo, useEffect } from 'react';
@@ -308,8 +304,8 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                                                         field.onChange(newEtiquetas);
                                                     }}
                                                     className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${isSelected
-                                                            ? 'bg-blue-600 text-white border-transparent'
-                                                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                                                        ? 'bg-blue-600 text-white border-transparent'
+                                                        : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
                                                         }`}
                                                 >
                                                     {etiqueta.nombre}
