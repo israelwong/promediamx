@@ -1,3 +1,7 @@
+/*
+  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/LeadForm.tsx
+  (Esta es la versión final y completa del componente de formulario)
+*/
 "use client";
 
 import React, { useTransition, useMemo, useEffect } from 'react';
