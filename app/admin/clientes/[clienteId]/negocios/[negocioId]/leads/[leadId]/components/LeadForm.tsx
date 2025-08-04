@@ -137,7 +137,13 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                 email: data.email === '' ? null : data.email,
                 valorEstimado: (data.valorEstimado === null || typeof data.valorEstimado === 'undefined')
                     ? null
-                    : Number(data.valorEstimado),
+                    : Number(String(data.valorEstimado)),
+                jsonParams: {
+                    ...data.jsonParams,
+                    grado: data.jsonParams?.grado !== undefined && data.jsonParams?.grado !== null
+                        ? String(data.jsonParams.grado)
+                        : data.jsonParams?.grado,
+                },
             };
 
             const result = await guardarLeadYAsignarCitaAction({

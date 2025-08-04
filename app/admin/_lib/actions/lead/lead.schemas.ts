@@ -328,7 +328,10 @@ export const LeadUnificadoFormSchema = z.object({
     telefono: z.string().optional(),
     status: z.string(),
     pipelineId: z.string().cuid("Debes seleccionar una etapa del pipeline."),
-    valorEstimado: z.number().positive("El valor estimado debe ser un número positivo.").nullable().optional(),
+    valorEstimado: z.number().nullable().optional()
+        .refine(val => val === undefined || val === null || val > 0, {
+            message: "El valor estimado debe ser un número positivo.",
+        }),
     jsonParams: z.object({
         colegio: z.string().optional(),
         nivel_educativo: z.string().optional(),
