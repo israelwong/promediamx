@@ -16,7 +16,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // Habilitamos CORS para pruebas locales
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access--Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
@@ -37,12 +37,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const { fechaCita, horaCita } = validation.data;
 
-    // Convertimos el string ISO de la fecha a un objeto Date real
-    const dateObject = new Date(fechaCita);
-    console.log("C. String de fecha convertido a objeto Date:", dateObject.toISOString());
-
-    // Usamos nuestra nueva librería para combinar la fecha y la hora
-    const finalDate = combineDateAndTime(dateObject, horaCita);
+    // ✅ CORREGIDO: Se elimina la conversión innecesaria a objeto 'Date'.
+    // Ahora pasamos el 'fechaCita' (que ya es un string) directamente a la librería.
+    const finalDate = combineDateAndTime(fechaCita, horaCita);
     console.log("D. Resultado final de la librería:", finalDate.toISOString());
 
     // Devolvemos una respuesta estructurada para verificar los resultados
@@ -51,10 +48,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         input: {
             fechaString: fechaCita,
             horaString: horaCita,
-        },
-        processing: {
-            dateObject_ISO: dateObject.toISOString(),
-            dateObject_Local: format(dateObject, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
         },
         output: {
             finalDate_ISO_UTC: finalDate.toISOString(),
