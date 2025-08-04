@@ -33,17 +33,7 @@ import { revalidatePath } from 'next/cache';
 import { type ListarLeadsResult } from './lead.schemas';
 import { z } from 'zod';
 
-// import { verificarDisponibilidad } from '@/app/admin/_lib/actions/whatsapp/helpers/availability.helpers';
-import { toDate } from 'date-fns-tz'; // <-- CORRECCIÓN 1: Importar la función correcta 'toDate'
-
-
-// HELPER DE FECHA SIMPLIFICADO Y ROBUSTO
-// function combineDateAndTime(dateString: string, timeString: string): Date {
-//     const isoString = `${dateString}T${timeString}:00.000Z`;
-//     return new Date(isoString);
-// }
-
-
+import { toDate } from 'date-fns-tz';
 
 // Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
 type LeadDetalleData = {
@@ -121,9 +111,6 @@ export async function listarLeadsAction(
     }
 }
 
-/**
- * ✅ NUEVA ACCIÓN: Obtiene el conteo de leads agrupados por cada etapa del pipeline.
- */
 export async function obtenerConteoLeadsPorEtapaAction(
     negocioId: string
 ): Promise<ActionResult<ConteoPorEtapa>> {
@@ -250,7 +237,6 @@ export async function actualizarEtiquetasDelLeadAction( // Renombrada para clari
         return { success: false, error: 'No se pudieron actualizar las etiquetas del lead.' };
     }
 }
-
 
 export async function actualizarLeadAction(
     params: ActualizarLeadParams
@@ -464,7 +450,6 @@ export async function obtenerDetallesLeadAction(
     }
 }
 
-
 export async function marcarLeadComoGanadoAction(
     params: z.infer<typeof marcarLeadComoGanadoParamsSchema>
 ): Promise<ActionResult<boolean>> {
@@ -498,8 +483,6 @@ export async function marcarLeadComoGanadoAction(
     }
 }
 
-
-
 export async function actualizarEstadoCitaAction(
     params: z.infer<typeof actualizarEstadoCitaParamsSchema>
 ): Promise<ActionResult<boolean>> {
@@ -522,7 +505,6 @@ export async function actualizarEstadoCitaAction(
         return { success: false, error: "Error al actualizar el estado de la cita." };
     }
 }
-
 
 export async function asignarEtiquetaLeadAction(
     params: z.infer<typeof asignarEtiquetaLeadParamsSchema>
@@ -567,8 +549,6 @@ export async function asignarEtiquetaLeadAction(
     }
 }
 
-
-// import { etiquetarYReubicarLeadParamsSchema } from './lead.schemas';
 export async function etiquetarYReubicarLeadAction(
     params: z.infer<typeof etiquetarYReubicarLeadParamsSchema>
 ): Promise<ActionResult<boolean>> {
