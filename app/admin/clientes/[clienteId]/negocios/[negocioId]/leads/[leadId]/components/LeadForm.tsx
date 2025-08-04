@@ -1,3 +1,7 @@
+/*
+  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/leads/components/LeadForm.tsx
+  (Esta es la versión final y completa del componente de formulario)
+*/
 "use client";
 
 import React, { useTransition, useMemo, useEffect } from 'react';
@@ -6,6 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
+// import { es } from 'date-fns/locale';
 
 import { LeadUnificadoFormSchema, type LeadUnificadoFormData } from '@/app/admin/_lib/actions/lead/lead.schemas';
 import { guardarLeadYAsignarCitaAction, eliminarLeadAction } from '@/app/admin/_lib/actions/lead/lead.actions';
@@ -19,7 +24,6 @@ import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card';
 import { Loader2, Save, Trash, Send, XCircle, AlertCircle } from 'lucide-react';
 import NotasSection from './NotasSection';
-import { useState } from 'react';
 
 // Lógica de negocio para colegios
 const comissionData = {
@@ -66,20 +70,13 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
     const horarios = generarHorarios();
     const citaInicial = initialLeadData?.Agenda[0];
 
-    const [estatusGuardado, setEstatusGuardado] = useState<'idle' | 'success' | 'error'>('idle');
-
-    const capitalizeWords = (str: string) =>
-        str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
-
     const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<LeadUnificadoFormData>({
         resolver: zodResolver(LeadUnificadoFormSchema),
         defaultValues: {
             id: initialLeadData?.id,
-            nombre: initialLeadData?.nombre ? capitalizeWords(initialLeadData.nombre) : '',
-            email: initialLeadData?.email?.toLowerCase() || '',
-            telefono: initialLeadData?.telefono
-                ? initialLeadData.telefono.replace(/\s+/g, '').slice(-10)
-                : '',
+            nombre: initialLeadData?.nombre || '',
+            email: initialLeadData?.email || '',
+            telefono: initialLeadData?.telefono || '',
             status: initialLeadData?.status || 'activo',
             pipelineId: initialLeadData?.pipelineId || etapasPipeline[0]?.id || '',
             valorEstimado: initialLeadData?.valorEstimado,
@@ -149,12 +146,11 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                 citaInicialId: citaInicial?.id
             });
             if (result.success) {
-                // ✅ CORREGIDO: Se define el mensaje de éxito antes para usarlo en ambos casos.
+                const message = initialLeadData
+                    ? `Lead actualizado ${enviarNotificacion ? 'y notificado' : ''} correctamente.`
+                    : `Lead creado ${enviarNotificacion ? 'y notificado' : ''} exitosamente.`;
 
-                setEstatusGuardado('success');
-                setTimeout(() => setEstatusGuardado('idle'), 3000);
-
-
+                toast.success(message);
 
                 if (!initialLeadData && result.data?.leadId) {
                     router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/leads/${result.data.leadId}`);
@@ -217,16 +213,6 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-
-                {estatusGuardado === 'success' && (
-                    <div className="col-span-full">
-                        <div className="flex items-center gap-2 p-3 rounded-md bg-green-900/20 text-green-300 border border-green-700 mb-4">
-                            <Save className="h-5 w-5" />
-                            <span>¡Cambios guardados correctamente!</span>
-                        </div>
-                    </div>
-                )}
-
                 {/* --- Columna 1: Info Principal y Adicional --- */}
                 <div className="space-y-6">
                     <Card className="bg-zinc-800/50 border-zinc-700">
@@ -300,7 +286,41 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                             </div>
                         </CardContent>
                     </Card>
-
+                    <Card className="bg-zinc-800/50 border-zinc-700">
+                        <CardHeader><CardTitle>Etiquetas</CardTitle></CardHeader>
+                        <CardContent>
+                            <Controller
+                                name="etiquetaIds"
+                                control={control}
+                                render={({ field }) => (
+                                    <div className="flex flex-wrap gap-2">
+                                        {etiquetasDisponibles.map(etiqueta => {
+                                            const isSelected = field.value?.includes(etiqueta.id);
+                                            return (
+                                                <button
+                                                    key={etiqueta.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const current = field.value || [];
+                                                        const newEtiquetas = isSelected
+                                                            ? current.filter(id => id !== etiqueta.id)
+                                                            : [...current, etiqueta.id];
+                                                        field.onChange(newEtiquetas);
+                                                    }}
+                                                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${isSelected
+                                                            ? 'bg-blue-600 text-white border-transparent'
+                                                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                                                        }`}
+                                                >
+                                                    {etiqueta.nombre}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            />
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* --- Columna 2: Agendamiento --- */}
@@ -375,45 +395,7 @@ export default function LeadForm({ clienteId, negocioId, crmId, initialLeadData,
                 </div>
 
                 {/* --- Columna 3: Notas --- */}
-                <div>
-                    <Card className="bg-zinc-800/50 border-zinc-700 mb-5">
-                        <CardHeader><CardTitle>Etiquetas</CardTitle></CardHeader>
-                        <CardContent>
-                            <Controller
-                                name="etiquetaIds"
-                                control={control}
-                                render={({ field }) => (
-                                    <div className="flex flex-wrap gap-2">
-                                        {etiquetasDisponibles.map(etiqueta => {
-                                            const isSelected = field.value?.includes(etiqueta.id);
-                                            return (
-                                                <button
-                                                    key={etiqueta.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const current = field.value || [];
-                                                        const newEtiquetas = isSelected
-                                                            ? current.filter(id => id !== etiqueta.id)
-                                                            : [...current, etiqueta.id];
-                                                        field.onChange(newEtiquetas);
-                                                    }}
-                                                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${isSelected
-                                                        ? 'bg-blue-600 text-white border-transparent'
-                                                        : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-                                                        }`}
-                                                >
-                                                    {etiqueta.nombre}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            />
-                        </CardContent>
-                    </Card>
-
-                    {initialLeadData && <div className="space-y-6"><NotasSection leadId={initialLeadData.id} /></div>}
-                </div>
+                {initialLeadData && <div className="space-y-6"><NotasSection leadId={initialLeadData.id} /></div>}
             </div>
         </form>
     );

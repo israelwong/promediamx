@@ -348,7 +348,7 @@ export const LeadUnificadoFormSchema = z.object({
     return true;
 }, {
     message: "Si agendas una cita, debes completar todos sus detalles.",
-    path: ["fechaCita"], // El error se asociará a este campo
+    path: ["fechaCita"],
 });
 
 export type LeadUnificadoFormData = z.infer<typeof LeadUnificadoFormSchema>;
