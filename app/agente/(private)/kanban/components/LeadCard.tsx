@@ -40,7 +40,7 @@ export default function LeadCard({ lead, isDragging = false }: LeadCardProps) {
 
     const colegio = (lead.jsonParams as { colegio?: string })?.colegio;
 
-    console.log("LeadCard render:", lead);
+    // console.log("LeadCard render:", lead);
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>

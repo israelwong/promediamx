@@ -13,7 +13,6 @@ import "react-datepicker/dist/react-datepicker.css";
 import type { CanalAdquisicion } from '@prisma/client';
 import HistorialYNotas from './HistorialYNotas';
 
-
 import { setHours, setMinutes, startOfDay } from 'date-fns';
 import { HorarioAtencion, ExcepcionHorario } from '@prisma/client';
 
@@ -35,12 +34,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app
 import { Loader2, Save, Trash, Send, XCircle, ShieldAlert } from 'lucide-react';
 
 // --- Componentes Personalizados ---
-// import { WhatsAppContactCard } from '@/app/admin/components/WhatsAppContactCard';
+
 import { ContactCard } from './ContactCard';
+import { HistorialItem } from '@/app/admin/_lib/actions/bitacora/bitacora.schemas';
 
 
 const DIAS_MAP: { [key: number]: string } = { 1: 'LUNES', 2: 'MARTES', 3: 'MIERCOLES', 4: 'JUEVES', 5: 'VIERNES', 6: 'SABADO', 0: 'DOMINGO' };
-
 
 const comissionData = {
     albatros: {
@@ -82,7 +81,7 @@ interface LeadFormProps {
     tiposDeCita: AgendaTipoCita[];
     agenteId?: string;
     canalesDeAdquisicion?: CanalAdquisicion[]; // <-- Añadir la nueva prop
-    historialItems?: { id: string; descripcion: string; createdAt: Date; agente: { nombre: string } }[]; // <-- Añadir historial de acciones
+    historialItems?: HistorialItem[]; // <-- Añadir la nueva prop
     canalAdquisicionId?: string;
     configuracionAgenda?: {
         horarios: HorarioAtencion[];
@@ -107,6 +106,8 @@ export default function LeadForm({
     ofertasDisponiblesParaAgente = []
 
 }: LeadFormProps) {
+
+    console.log("LeadForm Props:", { historialItems });//!
 
     const router = useRouter();
     const [isSaving, startSaveTransition] = useTransition();
@@ -297,6 +298,14 @@ export default function LeadForm({
     }, [watchedFechaCita, configuracionAgenda]);
 
 
+    const handleClose = () => {
+        if (isDirty && !confirm("Tienes cambios sin guardar. ¿Seguro que deseas cerrar?")) {
+            return;
+        }
+        router.push('/agente/');
+    };
+
+
     return (
         <form
             onSubmit={handleSubmit(data => onSubmit(data, false))}
@@ -357,10 +366,10 @@ export default function LeadForm({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => router.back()}
+                                onClick={handleClose}
                                 disabled={isPending}
                             >
-                                Cancelar / Cerrar ventana
+                                Cerrar ventana
                             </Button>
 
 
@@ -402,64 +411,6 @@ export default function LeadForm({
                                 <Input id="telefono" {...register("telefono")} disabled={isReadOnly} />
                             </div>
 
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-zinc-800/50 border-zinc-700">
-                        <CardHeader>
-                            <CardTitle>Seguimiento</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label htmlFor="pipelineId">Etapa del Pipeline</Label>
-                                <Controller
-                                    name="pipelineId"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly} >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
-                                                {etapasPipeline.map(etapa => (
-                                                    <SelectItem key={etapa.id} value={etapa.id}>
-                                                        {etapa.nombre}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                />
-                                {errors.pipelineId && (
-                                    <p className="text-red-500 text-xs mt-1">{errors.pipelineId.message}</p>
-                                )}
-                            </div>
-
-                            <div>
-                                <Label>Canal de Adquisición</Label>
-                                <Controller
-                                    name="canalAdquisicionId"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value || ""}
-                                            disabled={isReadOnly}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecciona un canal..." />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
-                                                {canalesDeAdquisicion.map(canal => (
-                                                    <SelectItem key={canal.id} value={canal.id}>
-                                                        {canal.nombre}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                />
-                            </div>
                         </CardContent>
                     </Card>
 
@@ -552,7 +503,6 @@ export default function LeadForm({
                             </div>
                         </CardContent>
                     </Card>
-
                 </div>
 
                 {/* Columna 2 */}
@@ -608,11 +558,6 @@ export default function LeadForm({
                                             filterDate={filterDate}
                                             minTime={minTime ?? undefined}
                                             maxTime={maxTime ?? undefined}
-
-                                        // Opcional: mostrar un tooltip en los días deshabilitados
-                                        // dayClassName={(date) =>
-                                        //     !filterDate(date) ? 'react-datepicker__day--disabled' : ''
-                                        // }
                                         />
                                     )}
                                 />
@@ -674,6 +619,64 @@ export default function LeadForm({
                         </CardContent>
                     </Card>
 
+                    <Card className="bg-zinc-800/50 border-yellow-700">
+                        <CardHeader>
+                            <CardTitle>Seguimiento</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <Label htmlFor="pipelineId">Etapa del Pipeline</Label>
+                                <Controller
+                                    name="pipelineId"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly} >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
+                                                {etapasPipeline.map(etapa => (
+                                                    <SelectItem key={etapa.id} value={etapa.id}>
+                                                        {etapa.nombre}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                                {errors.pipelineId && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.pipelineId.message}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <Label>Canal de Adquisición</Label>
+                                <Controller
+                                    name="canalAdquisicionId"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select
+                                            onValueChange={field.onChange}
+                                            value={field.value || ""}
+                                            disabled={isReadOnly}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Selecciona un canal..." />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
+                                                {canalesDeAdquisicion.map(canal => (
+                                                    <SelectItem key={canal.id} value={canal.id}>
+                                                        {canal.nombre}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <Card className="bg-zinc-800/50 border-zinc-700">
                         <CardHeader>
                             <CardTitle>Etiquetas</CardTitle>
@@ -713,10 +716,11 @@ export default function LeadForm({
                         </CardContent>
                     </Card>
 
+
                 </div>
 
                 {/* Columna 3 */}
-                <>
+                <div className="space-y-6">
                     {initialLeadData && !isReadOnly && (
                         <div className="space-y-6">
                             <ContactCard lead={initialLeadData} />
@@ -730,7 +734,7 @@ export default function LeadForm({
                             </p>
                         </div>
                     )}
-                </>
+                </div>
 
 
                 {/* --- COLUMNA 4: HISTORIAL UNIFICADO --- */}
@@ -742,10 +746,14 @@ export default function LeadForm({
                             initialItems={historialItems.map(item => ({
                                 ...item,
                                 updatedAt: item.createdAt, // o una fecha adecuada
-                                agenteId: null, // o el id si lo tienes
+                                agenteId: item.agenteId, // o el id si lo tienes
                                 leadId: initialLeadData.id,
-                                metadata: {},
-                                tipoAccion: "desconocido" // o el tipo real si lo tienes
+                                metadata: {
+                                    ...item.metadata,
+                                    agenteNombre: item.agente?.nombre || 'Sistema',
+                                    descripcion: item.descripcion || '',
+                                },
+                                tipoAccion: item.tipoAccion || 'NOTA_MANUAL', // Asegúrate de que tipoAccion tenga un valor por defecto
                             }))}
                         />
                     )}

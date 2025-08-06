@@ -1,6 +1,7 @@
 // app/admin/_lib/actions/agente/agente.schemas.ts
 import { z } from 'zod';
 
+
 export const agenteBasicoSchema = z.object({ // Mover aquí desde conversacion.schemas.ts
     id: z.string().cuid(),
     nombre: z.string().nullable(),
@@ -33,3 +34,47 @@ export const EditarAgenteSchema = z.object({
     status: z.string(),
 });
 export type EditarAgenteData = z.infer<typeof EditarAgenteSchema>;
+
+
+
+// Define la "forma" de una etapa del pipeline para el Kanban
+// Nota: forzamos a que 'orden' sea un número, manejando el null en la acción.
+export const PipelineKanbanSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    crmId: z.string(),
+    // Forzamos el contrato: el cliente siempre recibirá un número para 'orden'.
+    orden: z.number(),
+});
+
+// Define la "forma" exacta que el componente LeadCard.tsx espera para cada prospecto
+export const LeadInKanbanCardSchema = z.object({
+    id: z.string(),
+    nombre: z.string(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    valorEstimado: z.number().nullable(),
+    jsonParams: z.any(),
+    fechaProximaCita: z.date().nullable(),
+    pipelineId: z.string().nullable(),
+    agente: z.object({
+        id: z.string(),
+        nombre: z.string().nullable(),
+    }).nullable(),
+    Etiquetas: z.array(z.object({
+        id: z.string(),
+        nombre: z.string(),
+        color: z.string().nullable(),
+    })),
+});
+
+// Define la estructura completa de datos que necesita el tablero Kanban
+export const KanbanDataSchema = z.object({
+    leads: z.array(LeadInKanbanCardSchema),
+    etapasPipeline: z.array(PipelineKanbanSchema),
+});
+
+// Exportamos los tipos de TypeScript inferidos desde los schemas de Zod
+export type LeadInKanbanCard = z.infer<typeof LeadInKanbanCardSchema>;
+export type KanbanData = z.infer<typeof KanbanDataSchema>;
+export type PipelineKanban = z.infer<typeof PipelineKanbanSchema>;

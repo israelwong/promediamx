@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { CrearAgenteSchema, type CrearAgenteData } from "./agente.schemas"; // <-- Nueva importación
 import bcrypt from 'bcrypt';
 import { EditarAgenteSchema, type EditarAgenteData } from "./agente.schemas"; // <-- Nueva importación
+import { type KanbanData, type LeadInKanbanCard, type PipelineKanban } from './agente.schemas';
 
 
 // --- NUEVA FUNCIÓN PARA OBTENER LA LISTA DE AGENTES ---
@@ -199,86 +200,102 @@ export async function editarAgenteAction(data: EditarAgenteData): Promise<Action
 
 
 
-export async function obtenerDatosPipelineAgente(agenteId: string) {
+export async function obtenerDatosPipelineAgente(agenteId: string): Promise<ActionResult<KanbanData>> {
+    if (!agenteId) {
+        return { success: false, error: "El ID del agente es requerido." };
+    }
+
     try {
         const agente = await prisma.agente.findUnique({
             where: { id: agenteId },
-            select: { crmId: true }
+            include: {
+                ofertasAsignadas: {
+                    select: {
+                        oferta: { select: { nombre: true } }
+                    }
+                }
+            }
         });
 
-        if (!agente || !agente.crmId) {
-            throw new Error("Agente o CRM no encontrado.");
+        if (!agente) return { success: false, error: "Agente no encontrado" };
+
+        const crmId = agente.crmId;
+        const nombresOfertas = agente.ofertasAsignadas.map(oa => oa.oferta.nombre);
+
+        if (nombresOfertas.length === 0) {
+            const etapasPipelineVacias = await prisma.pipelineCRM.findMany({ where: { crmId }, orderBy: { orden: 'asc' } });
+            return {
+                success: true,
+                data: {
+                    leads: [],
+                    etapasPipeline: etapasPipelineVacias.map(e => ({ ...e, orden: e.orden ?? 0 })),
+                }
+            };
         }
 
-        const ofertasAsignadas = await prisma.oferta.findMany({
-            where: { agentesAsignados: { some: { agenteId: agenteId } } },
-            select: { nombre: true }
-        });
-        const nombresDeOfertas = ofertasAsignadas.map(o => o.nombre);
-
-        const etapasPipeline = await prisma.pipelineCRM.findMany({
-            where: { crmId: agente.crmId },
-            orderBy: { orden: 'asc' }
-        });
-
-        if (nombresDeOfertas.length === 0) {
-            return { success: true, data: { leads: [], etapasPipeline } };
-        }
-
-        // --- INICIO DE LA CORRECCIÓN ---
-
-        const leadsDesdeDB = await prisma.lead.findMany({
+        // --- FIX #1: Se corrige el filtro JSON. Usamos un 'OR' en lugar de 'in'. ---
+        const leads = await prisma.lead.findMany({
             where: {
-                crmId: agente.crmId,
-                // Se reemplaza el filtro 'in' por una estructura 'OR' que Prisma sí soporta para JSON.
-                OR: nombresDeOfertas.map(nombreOferta => ({
+                crmId: crmId,
+                OR: nombresOfertas.map(nombreOferta => ({
                     jsonParams: {
                         path: ['colegio'],
                         equals: nombreOferta,
                     }
                 }))
             },
-            include: {
-                Etiquetas: { include: { etiqueta: true } },
-                // --- INICIO DE LA CORRECCIÓN ---
-                Agenda: {
-                    // Se busca la próxima cita con estado 'PENDIENTE'
-                    where: { status: 'PENDIENTE' },
-                    // Se ordena por fecha para obtener la más próxima primero
-                    orderBy: { fecha: 'asc' },
-                    // Solo necesitamos la primera que encuentre
-                    take: 1,
-                },
-                agente: {
-                    select: {
-                        id: true,
-                        nombre: true,
-                    }
-                }
-            },
-            orderBy: { updatedAt: 'desc' }
+            select: {
+                id: true,
+                nombre: true,
+                createdAt: true,
+                updatedAt: true,
+                valorEstimado: true,
+                jsonParams: true,
+                pipelineId: true,
+                agente: { select: { id: true, nombre: true } },
+                Etiquetas: { select: { etiqueta: { select: { id: true, nombre: true, color: true } } } },
+                Agenda: { where: { status: 'PENDIENTE' }, orderBy: { fecha: 'asc' }, take: 1, select: { fecha: true } }
+            }
         });
 
-        const leadsParaKanban = leadsDesdeDB.map(lead => {
+        const etapasPipeline = await prisma.pipelineCRM.findMany({
+            where: { crmId: crmId },
+            orderBy: { orden: 'asc' }
+        });
+
+        // --- FIX #2: Se hace la transformación de datos de forma explícita para evitar errores de tipo. ---
+        const leadsFormateados: LeadInKanbanCard[] = leads.map(lead => {
             return {
                 id: lead.id,
                 nombre: lead.nombre,
                 createdAt: lead.createdAt,
                 updatedAt: lead.updatedAt,
                 valorEstimado: lead.valorEstimado,
-                pipelineId: lead.pipelineId,
-                Etiquetas: lead.Etiquetas.map(e => e.etiqueta),
-                agente: lead.agente,
                 jsonParams: lead.jsonParams,
-                fechaProximaCita: lead.Agenda.length > 0 ? lead.Agenda[0].fecha : null
+                pipelineId: lead.pipelineId,
+                agente: lead.agente,
+                // Aplanamos la estructura de etiquetas para que sea más fácil de consumir
+                Etiquetas: lead.Etiquetas.map(etiquetaLead => etiquetaLead.etiqueta),
+                // Extraemos la fecha de la próxima cita o la dejamos como null
+                fechaProximaCita: lead.Agenda.length > 0 ? lead.Agenda[0].fecha : null,
             };
         });
 
-        // --- FIN DE LA CORRECCIÓN ---
+        const etapasFormateadas: PipelineKanban[] = etapasPipeline.map(etapa => ({
+            ...etapa,
+            orden: etapa.orden ?? 0,
+        }));
 
-        return { success: true, data: { leads: leadsParaKanban, etapasPipeline } };
+        return {
+            success: true,
+            data: {
+                leads: leadsFormateados,
+                etapasPipeline: etapasFormateadas,
+            }
+        };
 
     } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : "Error al obtener datos del pipeline." };
+        console.error("Error en obtenerDatosPipelineAgente:", error);
+        return { success: false, error: "No se pudieron obtener los datos del pipeline." };
     }
 }

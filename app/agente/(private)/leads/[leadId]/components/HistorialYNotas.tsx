@@ -1,40 +1,47 @@
 "use client";
 
-import React, { useState, useTransition, useEffect } from 'react';
-import { Bitacora, Agente } from '@prisma/client';
+import React, { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation'; // <-- CAMBIO: Importamos useRouter
+// import { Bitacora, Agente } from '@prisma/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Textarea } from '@/app/components/ui/textarea';
-import { MessageSquare, UserPlus, ArrowRightLeft, Pencil, UserCheck, Loader2, Edit, Trash2, Save, X } from 'lucide-react';
+import { UserPlus, ArrowRightLeft, UserCheck, Loader2, Edit, Trash2, Save, X, Settings } from 'lucide-react'; // <-- CAMBIO: Añadimos Settings y User
 import { agregarNotaLeadAction, editarNotaManualAction, eliminarNotaManualAction } from '@/app/admin/_lib/actions/bitacora/bitacora.actions';
 import { toast } from 'react-hot-toast';
+import { type HistorialItem } from '@/app/admin/_lib/actions/bitacora/bitacora.schemas';
 
-export type HistorialItem = Bitacora & { agente: Pick<Agente, 'nombre'> | null };
 
+// export type HistorialItem = Bitacora & { agente: Pick<Agente, 'nombre'> | null };
+
+// --- CAMBIO: Iconos mejorados como solicitaste ---
 const actionIcons: { [key: string]: React.ReactNode } = {
-    NOTA_MANUAL: <MessageSquare className="h-4 w-4 text-zinc-400" />,
+    NOTA_MANUAL: <Edit className="h-4 w-4 text-yellow-400" />, // Icono de lápiz para notas
     CREACION_LEAD: <UserPlus className="h-4 w-4 text-green-400" />,
-    EDICION_LEAD: <Pencil className="h-4 w-4 text-amber-400" />,
+    EDICION_LEAD: <Settings className="h-4 w-4 text-cyan-400" />,
     CAMBIO_ETAPA: <ArrowRightLeft className="h-4 w-4 text-blue-400" />,
     ASIGNACION_AGENTE: <UserCheck className="h-4 w-4 text-purple-400" />,
+    // Añadimos un icono por defecto para otras acciones del sistema
+    SISTEMA: <Settings className="h-4 w-4 text-cyan-400" />,
 };
 
 interface HistorialYNotasProps {
     leadId: string;
     agenteId: string | null;
-    initialItems: HistorialItem[];
+    initialItems: HistorialItem[]; // Ahora usa el tipo importado
 }
 
 export default function HistorialYNotas({ leadId, agenteId, initialItems }: HistorialYNotasProps) {
-    const [items, setItems] = useState(initialItems);
+
+    // console.log("HistorialYNotas Props:", { initialItems });
+    // --- CAMBIO: Eliminamos el estado 'items' y el useEffect. Renderizaremos directamente desde 'initialItems'.
+    const router = useRouter(); // <-- CAMBIO: Usamos el router para refrescar
     const [nuevaNota, setNuevaNota] = useState("");
     const [isSaving, startSavingTransition] = useTransition();
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [editText, setEditText] = useState("");
-
-    useEffect(() => { setItems(initialItems); }, [initialItems]);
 
     const handleAddNota = () => {
         if (!nuevaNota.trim()) return;
@@ -45,28 +52,11 @@ export default function HistorialYNotas({ leadId, agenteId, initialItems }: Hist
                 agenteId
             });
 
-            if (result.success && result.data) {
+            if (result.success) {
                 toast.success("Nota añadida.");
-
-                // Construimos manualmente el objeto 'HistorialItem' completo
-                // para que coincida con el tipo de nuestro estado 'items'.
-                const newItem: HistorialItem = {
-                    // Datos que vienen del servidor (los más importantes)
-                    id: result.data.id,
-                    createdAt: result.data.createdAt,
-                    updatedAt: result.data.createdAt, // En creación, son iguales
-                    agente: result.data.agente,
-
-                    // Datos que ya tenemos en el cliente
-                    descripcion: nuevaNota,
-                    leadId: leadId,
-                    agenteId: agenteId,
-                    tipoAccion: 'NOTA_MANUAL',
-                    metadata: {}, // Por defecto un objeto vacío
-                };
-
-                setItems([newItem, ...items]);
                 setNuevaNota("");
+                // --- CAMBIO: En lugar de actualizar el estado local, refrescamos los datos del servidor ---
+                router.refresh();
             } else {
                 toast.error(result.error || "No se pudo guardar la nota.");
             }
@@ -78,8 +68,9 @@ export default function HistorialYNotas({ leadId, agenteId, initialItems }: Hist
             const result = await editarNotaManualAction({ notaId, nuevaDescripcion: editText });
             if (result.success) {
                 toast.success("Nota actualizada.");
-                setItems(items.map(item => item.id === notaId ? { ...item, descripcion: editText } : item));
                 setEditingNoteId(null);
+                // --- CAMBIO: Refrescamos los datos del servidor ---
+                router.refresh();
             } else {
                 toast.error(result.error || "Ocurrió un error al actualizar la nota.");
             }
@@ -92,7 +83,8 @@ export default function HistorialYNotas({ leadId, agenteId, initialItems }: Hist
             const result = await eliminarNotaManualAction({ notaId });
             if (result.success) {
                 toast.success("Nota eliminada.");
-                setItems(items.filter(item => item.id !== notaId));
+                // --- CAMBIO: Refrescamos los datos del servidor ---
+                router.refresh();
             } else {
                 toast.error(result.error || "Ocurrió un error al eliminar la nota.");
             }
@@ -111,9 +103,12 @@ export default function HistorialYNotas({ leadId, agenteId, initialItems }: Hist
                     </Button>
                 </div>
                 <div className="max-h-80 overflow-y-auto space-y-4 custom-scrollbar pr-2 border-t border-zinc-700 pt-4">
-                    {items.map(item => (
+                    {/* --- CAMBIO: Mapeamos directamente desde la prop 'initialItems' --- */}
+                    {initialItems.map(item => (
                         <div key={item.id} className="flex gap-3 group relative">
-                            <div className="mt-1">{actionIcons[item.tipoAccion] || <Pencil className="h-4 w-4 text-zinc-500" />}</div>
+                            <div className="mt-1">
+                                {actionIcons[item.tipoAccion] || actionIcons.SISTEMA}
+                            </div>
                             <div className="flex-1">
                                 {editingNoteId === item.id ? (
                                     <div className="space-y-2">
@@ -126,16 +121,21 @@ export default function HistorialYNotas({ leadId, agenteId, initialItems }: Hist
                                 ) : (
                                     <>
                                         <p className="text-sm text-zinc-200 whitespace-pre-wrap">{item.descripcion}</p>
-                                        <p className="text-xs text-zinc-500 mt-1">{item.agente?.nombre || 'Sistema'} • {format(new Date(item.createdAt), "d MMM, yyyy HH:mm", { locale: es })}h</p>
+                                        {/* --- CAMBIO: Lógica mejorada para mostrar el autor --- */}
+                                        <p className="text-xs text-zinc-500 mt-1">
+                                            Por: <span className="font-medium">{item.agente?.nombre || 'Sistema'}</span> • {format(new Date(item.createdAt), "d MMM, yyyy HH:mm", { locale: es })}h
+                                        </p>
                                     </>
                                 )}
                             </div>
-                            {item.tipoAccion === 'NOTA_MANUAL' && editingNoteId !== item.id && (
+                            {/* --- CAMBIO: Condición de seguridad para editar/eliminar --- */}
+                            {/* Solo muestra los botones si es una nota manual Y el agente logueado es el autor */}
+                            {item.tipoAccion === 'NOTA_MANUAL' && item.agenteId === agenteId && editingNoteId !== item.id && (
                                 <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingNoteId(item.id); setEditText(item.descripcion); }}>
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-400" onClick={() => handleDelete(item.id)}>
+                                    <Button disabled={isSaving} variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-400" onClick={() => handleDelete(item.id)}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>

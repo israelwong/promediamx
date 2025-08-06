@@ -5,7 +5,7 @@ import { useTransition } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cerrarSesion } from '../_lib/actions/auth.actions';
-import { Loader2, LogOut, LayoutDashboard, User, CalendarCheck } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, User, CalendarCheck, Calendar } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { toast } from 'react-hot-toast';
 
@@ -21,9 +21,9 @@ function AgenteSidebar({ user, handleLogout, isLoggingOut }: { user: UserPayload
     const pathname = usePathname();
     const navItems = [
         { href: '/agente', label: 'Pipeline', icon: LayoutDashboard },
-        { href: '/agente/leads', label: 'Leads', icon: User },
         { href: '/agente/citas', label: 'Citas', icon: CalendarCheck },
-        // { href: '/agente/calendario', label: 'Calendario', icon: Calendar },
+        { href: '/agente/calendario', label: 'Calendario', icon: Calendar },
+        { href: '/agente/leads', label: 'Leads', icon: User },
         // Puedes añadir más items aquí en el futuro
     ];
 

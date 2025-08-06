@@ -1,6 +1,4 @@
-/*
-  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/calendario/components/CitasCalendario.tsx
-*/
+
 "use client";
 
 import React from 'react';

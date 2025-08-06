@@ -1,20 +1,17 @@
-/*
-  Ruta: app/admin/clientes/[clienteId]/negocios/[negocioId]/calendario/components/RealtimeCalendarioView.tsx
-*/
+// app/agente/calendario/components/RealtimeCalendarioView.tsx
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-// ✅ Se importa el nuevo tipo de datos para el calendario
-import { type CitaParaCalendario } from '@/app/admin/_lib/actions/citas/citas.schemas';
+import { type CitaParaCalendario } from '@/app/admin/_lib/actions/citas/citas.schemas'; // Reutilizamos el schema
 import CitasCalendario from './CitasCalendario';
-// ✅ Se importa la nueva acción
-import { listarCitasParaCalendarioAction } from '@/app/admin/_lib/actions/citas/citas.actions';
+// --- CAMBIO: Se importa la nueva acción específica para el agente ---
+import { listarCitasParaCalendarioAgenteAction } from '@/app/admin/_lib/actions/citas/citas.actions';
 
 interface RealtimeCalendarioViewProps {
     initialData: CitaParaCalendario[];
-    negocioId: string;
-    clienteId: string;
+    negocioId: string; // Necesario para el filtro del canal de Supabase
 }
 
 let supabase: SupabaseClient | null = null;
@@ -31,23 +28,30 @@ export default function RealtimeCalendarioView({ initialData, negocioId }: Realt
 
     useEffect(() => {
         if (!supabase) return;
+
+        // El canal sigue escuchando por negocio, ya que Supabase no puede filtrar por relaciones complejas.
+        // El filtrado real se hace en la server action que llamamos.
         const channel = supabase.channel(`citas-calendario-updates-${negocioId}`);
+
         channel.on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'Agenda', filter: `negocioId=eq.${negocioId}` },
             async () => {
-                // ✅ Se llama a la nueva acción y se actualiza el estado directamente, sin mapeos complejos.
-                const result = await listarCitasParaCalendarioAction({ negocioId });
+                // --- CAMBIO: Al detectar un cambio, se llama a la acción del AGENTE ---
+                // Esta acción ya contiene la lógica de filtrado por las ofertas del agente.
+                const result = await listarCitasParaCalendarioAgenteAction();
                 if (result.success && result.data) {
                     setCitas(result.data);
                 }
             }
         ).subscribe();
+
         return () => { if (supabase) supabase.removeChannel(channel); };
     }, [negocioId]);
 
     return (
         <div className="flex-grow bg-zinc-800/50 p-4 rounded-lg border border-zinc-700">
+            {/* El componente CitasCalendario no necesita cambios */}
             <CitasCalendario events={citas} />
         </div>
     );

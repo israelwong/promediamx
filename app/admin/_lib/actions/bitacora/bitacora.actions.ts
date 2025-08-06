@@ -6,7 +6,12 @@ import { obtenerNotasLeadParamsSchema, type NotaBitacora } from './bitacora.sche
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import type { Prisma } from '@prisma/client';
+import { type HistorialItem } from './bitacora.schemas';
 
+
+const ObtenerHistorialSchema = z.object({
+    leadId: z.string(),
+});
 
 
 export async function obtenerNotasLeadAction(
@@ -25,7 +30,13 @@ export async function obtenerNotasLeadAction(
                 id: true,
                 descripcion: true,
                 createdAt: true,
-                agente: { select: { nombre: true } },
+                agente: {
+                    select: {
+                        id: true,
+                        nombre: true
+                    }
+                },
+                agenteId: true, // Incluimos el ID del agente para futuras referencias
             },
             orderBy: { createdAt: 'desc' }, // Las más recientes primero
         });
@@ -35,21 +46,47 @@ export async function obtenerNotasLeadAction(
     }
 }
 
-export async function agregarNotaLeadAction(params: { leadId: string; descripcion: string; agenteId: string | null; }): Promise<ActionResult<NotaBitacora>> {
+const AgregarNotaSchema = z.object({
+    leadId: z.string(),
+    descripcion: z.string().min(1, "La nota no puede estar vacía."),
+    agenteId: z.string().nullable(),
+});
+
+export async function agregarNotaLeadAction(
+    params: z.infer<typeof AgregarNotaSchema>
+): Promise<ActionResult<NotaBitacora>> {
+    const validation = AgregarNotaSchema.safeParse(params);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos." };
+    }
+
+    const { leadId, descripcion, agenteId } = validation.data;
+
     try {
         const nuevaNota = await prisma.bitacora.create({
             data: {
-                leadId: params.leadId,
-                descripcion: params.descripcion,
-                agenteId: params.agenteId,
-                tipoAccion: 'NOTA_MANUAL', // <-- Se asegura el tipo correcto
+                leadId,
+                descripcion,
+                agenteId,
+                tipoAccion: 'NOTA_MANUAL',
+                metadata: { autor: 'agente' } // Metadata opcional para más contexto
             },
-            include: { agente: { select: { nombre: true } } },
+            include: {
+                agente: {
+                    select: { nombre: true }
+                }
+            }
         });
-        revalidatePath(`/agente/prospectos/${params.leadId}`);
-        return { success: true, data: nuevaNota as NotaBitacora };
-    } catch {
-        return { success: false, error: "No se pudo guardar la nota." };
+
+        // Opcional: Revalidar la ruta para asegurar que los datos se refrescan
+        // router.refresh() en el cliente ya hace esto, pero es una buena práctica tenerlo.
+        revalidatePath(`/agente/leads/${leadId}`);
+
+        return { success: true, data: nuevaNota };
+
+    } catch (error) {
+        console.error("Error al agregar nota:", error);
+        return { success: false, error: "Ocurrió un error en el servidor." };
     }
 }
 
@@ -82,20 +119,52 @@ export async function eliminarNotaLeadAction(params: { notaId: string; }): Promi
     }
 }
 
-export async function obtenerHistorialLeadAction(params: { leadId: string; }) {
+
+
+export async function obtenerHistorialLeadAction(
+    params: z.infer<typeof ObtenerHistorialSchema>
+): Promise<ActionResult<HistorialItem[]>> {
+    const validation = ObtenerHistorialSchema.safeParse(params);
+    if (!validation.success) {
+        return { success: false, error: "ID de lead inválido." };
+    }
+
     try {
         const historial = await prisma.bitacora.findMany({
-            where: { leadId: params.leadId },
-            orderBy: { createdAt: 'desc' },
-            include: {
-                agente: { select: { nombre: true } } // Incluimos el nombre del agente
+            where: {
+                leadId: validation.data.leadId,
+            },
+            // --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
+            // Seleccionamos explícitamente todos los campos que el componente necesita.
+            select: {
+                id: true,
+                descripcion: true,
+                createdAt: true,
+                updatedAt: true,
+                tipoAccion: true,
+                metadata: true,
+                leadId: true,
+                agenteId: true, // <-- Seleccionamos el ID del agente
+                agente: {      // <-- Incluimos la relación para obtener el nombre
+                    select: {
+                        nombre: true,
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc', // Ordenamos del más reciente al más antiguo
             },
         });
+
+        // Prisma devuelve el tipo correcto, no es necesario un mapeo adicional.
         return { success: true, data: historial };
-    } catch {
-        return { success: false, error: "No se pudo obtener el historial." };
+
+    } catch (error) {
+        console.error("Error al obtener el historial del lead:", error);
+        return { success: false, error: "No se pudo cargar el historial." };
     }
 }
+
 
 export async function registrarEnBitacora(params: {
     leadId: string;

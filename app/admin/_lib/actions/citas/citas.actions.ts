@@ -19,6 +19,10 @@ import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/app/agente/_lib/actions/auth.actions';
+
+
 
 /**
  * Obtiene todas las citas de un negocio, ordenadas por fecha.
@@ -306,51 +310,79 @@ export async function listarCitasParaAgenteAction(params: {
 }
 
 // --- NUEVA ACCIÓN PARA EL CALENDARIO DEL AGENTE ---
-export async function listarCitasParaCalendarioAgenteAction(params: { agenteId: string; }) {
-    try {
-        // 1. Obtenemos las ofertas (colegios) asignadas al agente
-        const ofertasAsignadas = await prisma.oferta.findMany({
-            where: { agentesAsignados: { some: { agenteId: params.agenteId } } },
-            select: { nombre: true }
-        });
-        const nombresDeOfertas = ofertasAsignadas.map(o => o.nombre);
+export async function listarCitasParaCalendarioAgenteAction(): Promise<ActionResult<CitaParaCalendario[]>> {
+    // --- LÓGICA AGENTE: Seguridad y Contexto ---
+    // 1. Obtenemos la sesión del agente desde la cookie.
+    const cookieStore = await cookies();
+    const tokenCookie = cookieStore.get('auth_token');
+    if (!tokenCookie) {
+        return { success: false, error: "No autenticado." };
+    }
+    const verificationResult = await verifyToken(tokenCookie.value);
+    if (!verificationResult.success || !verificationResult.payload) {
+        return { success: false, error: "Token inválido." };
+    }
+    const agenteSession = verificationResult.payload;
 
-        if (nombresDeOfertas.length === 0) {
-            return { success: true, data: [] }; // Si no tiene ofertas, no tiene citas
+    try {
+        // --- LÓGICA AGENTE: Filtrado de Datos ---
+        // 2. Obtenemos las ofertas (colegios) asignadas a este agente.
+        const agenteConOfertas = await prisma.agente.findUnique({
+            where: { id: agenteSession.id },
+            select: {
+                ofertasAsignadas: {
+                    select: {
+                        oferta: { select: { nombre: true } }
+                    }
+                },
+                // Necesitamos el negocioId para el canal de Supabase
+                crm: { select: { negocioId: true } }
+            }
+        });
+
+        if (!agenteConOfertas) {
+            return { success: false, error: "Agente no encontrado." };
         }
 
-        // 2. Buscamos todas las citas de los leads que pertenecen a esas ofertas
+        const nombresOfertas = agenteConOfertas.ofertasAsignadas.map(oa => oa.oferta.nombre);
+
+        // 3. Buscamos citas ('Agenda') donde el 'Lead' asociado tenga un 'colegio'
+        //    que coincida con una de las ofertas asignadas al agente.
         const citas = await prisma.agenda.findMany({
             where: {
+                status: 'PENDIENTE',
                 lead: {
+                    // Filtramos en el campo JSONB
                     jsonParams: {
-                        path: ['colegio'],
-                        equals: nombresDeOfertas.length === 1 ? nombresDeOfertas[0] : undefined
-                    }
-                }
+                        path: ['colegio'], // Nos interesa la propiedad 'colegio' del JSON
+                        equals: nombresOfertas.length === 1 ? nombresOfertas[0] : undefined, // Solo soporta 'equals'
+                    },
+                },
             },
             select: {
                 id: true,
                 asunto: true,
-                fecha: true, // Usamos 'fecha' como campo de inicio
-                lead: { select: { nombre: true } },
+                fecha: true,
+                lead: { select: { id: true, nombre: true } },
                 tipoDeCita: { select: { nombre: true, duracionMinutos: true } },
-            }
+            },
         });
 
-        // 3. Mapeamos al formato que espera el calendario
-        const citasParaCalendario = citas.map(cita => ({
-            id: cita.id,
-            asunto: cita.asunto,
-            start: cita.fecha, // Renombramos 'fecha' a 'start'
-            lead: cita.lead,
-            tipoDeCita: cita.tipoDeCita,
-        }));
+        // 4. Mapeamos los datos al formato que el calendario necesita (esta lógica se reutiliza).
+        const citasParaCalendario: CitaParaCalendario[] = citas
+            .filter(c => c.lead)
+            .map(cita => ({
+                id: cita.id,
+                asunto: cita.asunto,
+                start: cita.fecha,
+                lead: cita.lead!,
+                tipoDeCita: cita.tipoDeCita,
+            }));
 
         return { success: true, data: citasParaCalendario };
 
     } catch (error) {
-        console.error("Error al listar citas para calendario de agente:", error);
-        return { success: false, error: "No se pudieron cargar las citas." };
+        console.error("Error en listarCitasParaCalendarioAgenteAction:", error);
+        return { success: false, error: "No se pudieron cargar los datos del calendario." };
     }
 }

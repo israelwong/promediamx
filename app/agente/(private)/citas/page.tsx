@@ -51,7 +51,7 @@ export default async function AgentCitasPage(searchParams: { params: Promise<Age
                     data={citasData.citas}
                     totalCount={citasData.totalCount}
                     startIndex={citasData.startIndex}
-                    basePath="/agente/prospectos"
+                    basePath="/agente/leads"
                 />
             </main>
         </div>

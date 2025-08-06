@@ -1113,7 +1113,7 @@ export async function guardarLeadYAsignarCitaAction(
                 await registrarEnBitacora({
                     leadId: lead.id,
                     agenteId: autorId,
-                    tipoAccion: 'EDICION_LEAD',
+                    tipoAccion: 'SISTEMA',
                     descripcion: `Canal de adquisición cambiado de "${nombreCanalAntes}" a "${nombreCanalNuevo}".`
                 });
             }

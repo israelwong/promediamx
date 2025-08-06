@@ -7,8 +7,8 @@ import { Metadata } from 'next';
 import type { Lead, Agenda, CanalAdquisicion } from '@prisma/client';
 import { obtenerHistorialLeadAction } from '@/app/admin/_lib/actions/bitacora/bitacora.actions';
 import { obtenerCanalesPorCrmAction } from '@/app/admin/_lib/actions/canales/canales.actions';
-import { obtenerConfiguracionAgendaAction } from '@/app/admin/_lib/actions/agendaConfiguracion/agendaConfiguracion.actions';
-import { HistorialItem } from './components/HistorialYNotas';
+import { obtenerConfiguracionAgendaAction } from '@/app/admin/_lib/actions/agendaConfiguracion/agendaConfiguracion.actions'; // Corregido a la ruta correcta
+import type { HistorialItem } from '@/app/admin/_lib/actions/bitacora/bitacora.schemas';
 
 interface EditLeadPageProps {
     leadId: string;
@@ -19,14 +19,9 @@ export const metadata: Metadata = {
     description: 'Formulario para editar o crear un prospecto',
 };
 
-// --- CORRECCIÓN 1: Tipar `params` como una Promesa ---
 export default async function PaginaEditarCrearProspectoAgente({ params }: { params: Promise<EditLeadPageProps> }) {
-
-    // --- CORRECCIÓN 2: Resolver la promesa `params` con `await` ---
-    const resolvedParams = await params;
-
-    // Ahora usamos resolvedParams.leadId en todo el componente
-    const isNewLead = resolvedParams.leadId === 'nuevo';
+    const { leadId } = await params;
+    const isNewLead = leadId === 'nuevo';
 
     // 1. Verificar sesión del agente
     const tokenCookie = (await cookies()).get('auth_token');
@@ -37,7 +32,7 @@ export default async function PaginaEditarCrearProspectoAgente({ params }: { par
 
     const agenteSession = verificationResult.payload;
 
-    // 2. Obtener los datos de contexto
+    // 2. Obtener los datos de contexto (Agente, CRM, Configuración de Agenda, Canales)
     const agenteCompleto = await prisma.agente.findUnique({
         where: { id: agenteSession.id },
         include: {
@@ -57,7 +52,6 @@ export default async function PaginaEditarCrearProspectoAgente({ params }: { par
     }
 
     const ofertasDisponiblesParaAgente = agenteCompleto.ofertasAsignadas.map(oa => oa.oferta.nombre);
-
     const crmData = agenteCompleto.crm;
     const [canalesResult, configAgendaResult] = await Promise.all([
         obtenerCanalesPorCrmAction(crmData.id),
@@ -67,22 +61,19 @@ export default async function PaginaEditarCrearProspectoAgente({ params }: { par
     const canalesDeAdquisicion = canalesResult.success ? (canalesResult.data as CanalAdquisicion[]) : [];
     const configuracionAgenda = configAgendaResult.success ? configAgendaResult.data : { horarios: [], excepciones: [] };
 
-    // 3. Obtener datos específicos del Lead si estamos en modo "Editar"
+    // 3. Obtener datos específicos del Lead SÓLO si estamos en modo "Editar"
     let leadData: (Lead & { Agenda: Agenda[], Etiquetas: { etiquetaId: string }[] }) | null = null;
     let historialItems: HistorialItem[] = [];
-
     if (!isNewLead) {
         const [leadResult, historialResult] = await Promise.all([
             prisma.lead.findUnique({
-                // --- CORRECCIÓN 3: Usar el parámetro resuelto ---
-                where: { id: resolvedParams.leadId },
+                where: { id: leadId },
                 include: {
                     Agenda: { where: { status: 'PENDIENTE' } },
                     Etiquetas: { select: { etiquetaId: true } }
                 }
             }),
-            // --- CORRECCIÓN 4: Usar el parámetro resuelto ---
-            obtenerHistorialLeadAction({ leadId: resolvedParams.leadId })
+            obtenerHistorialLeadAction({ leadId })
         ]);
 
         if (!leadResult) return notFound();
@@ -97,25 +88,18 @@ export default async function PaginaEditarCrearProspectoAgente({ params }: { par
         }
     }
 
-    const safeHistorialItems = historialItems.map(item => ({
-        ...item,
-        agente: {
-            nombre: item.agente?.nombre ?? 'Desconocido'
-        }
-    }));
-
     return (
         <LeadForm
             clienteId={crmData.negocio.clienteId ?? ''}
             negocioId={crmData.negocioId}
             crmId={crmData.id}
-            initialLeadData={leadData || undefined}
+            initialLeadData={leadData || undefined} // Será undefined si es nuevo
             etapasPipeline={crmData.Pipeline}
             etiquetasDisponibles={crmData.Etiqueta}
             tiposDeCita={crmData.negocio.agendaTipoCita}
             agenteId={agenteSession.id}
             canalesDeAdquisicion={canalesDeAdquisicion}
-            historialItems={safeHistorialItems}
+            historialItems={historialItems}
             configuracionAgenda={configuracionAgenda}
             ofertasDisponiblesParaAgente={ofertasDisponiblesParaAgente}
         />

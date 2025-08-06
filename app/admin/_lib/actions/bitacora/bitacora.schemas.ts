@@ -33,3 +33,22 @@ export const TIPOS_ACCION_BITACORA = {
     CITA_AGENDADA: 'CITA_AGENDADA',
     CITA_CANCELADA: 'CITA_CANCELADA',
 } as const;
+
+
+export const HistorialItemSchema = z.object({
+    id: z.string(),
+    descripcion: z.string(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    tipoAccion: z.string(),
+    metadata: z.any().nullable(),
+    leadId: z.string(),
+    // Permitimos que agenteId sea string o null, como en la base de datos
+    agenteId: z.string().nullable(),
+    // Permitimos que el objeto agente sea un objeto con nombre o null
+    agente: z.object({
+        nombre: z.string().nullable(),
+    }).nullable(),
+});
+
+export type HistorialItem = z.infer<typeof HistorialItemSchema>;
