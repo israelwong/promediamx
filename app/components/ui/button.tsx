@@ -13,6 +13,8 @@ const buttonVariants = {
         secondary: "bg-zinc-700 text-zinc-100 hover:bg-zinc-600/80",
         ghost: "hover:bg-zinc-700 hover:text-zinc-100",
         link: "text-sky-400 underline-offset-4 hover:underline",
+        green: "bg-green-600 text-green-50 hover:bg-green-700/90",
+        warning: "bg-yellow-500 text-yellow-50 hover:bg-yellow-600/90",
     },
     size: {
         default: "h-10 px-4 py-2",

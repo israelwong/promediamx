@@ -234,3 +234,123 @@ export async function obtenerEtapasPipelineParaFiltroAction(
         return { success: false, error: "No se pudieron cargar las etapas del pipeline." };
     }
 }
+
+
+
+export async function listarCitasParaAgenteAction(params: {
+    agenteId: string;
+    page?: number;
+    pageSize?: number;
+}) {
+    const { agenteId, page = 1, pageSize = 15 } = params;
+
+    try {
+        // 1. Obtenemos las ofertas (colegios) asignadas al agente
+        const ofertasAsignadas = await prisma.oferta.findMany({
+            where: { agentesAsignados: { some: { agenteId: agenteId } } },
+            select: { nombre: true }
+        });
+        const nombresDeOfertas = ofertasAsignadas.map(o => o.nombre);
+
+        if (nombresDeOfertas.length === 0) {
+            return { success: true, data: { citas: [], totalCount: 0, startIndex: 0 } };
+        }
+
+        // 2. Definimos la cláusula 'where' para filtrar citas
+        const whereClause: Prisma.AgendaWhereInput = {
+            lead: {
+                jsonParams: {
+                    path: ['colegio'],
+                    equals: nombresDeOfertas.length === 1 ? nombresDeOfertas[0] : undefined
+                }
+            }
+        };
+
+        const [citas, totalCount] = await prisma.$transaction([
+            prisma.agenda.findMany({
+                where: whereClause,
+                include: {
+                    lead: {
+                        select: {
+                            nombre: true,
+                            telefono: true,
+                            Pipeline: {
+                                select: {
+                                    nombre: true
+                                }
+                            }
+                        }
+                    }
+                },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                orderBy: { fecha: 'desc' },
+            }),
+            prisma.agenda.count({ where: whereClause }),
+        ]);
+
+        const citasParaTabla = citas.map(cita => ({
+            id: cita.id,
+            fecha: cita.fecha,
+            leadId: cita.leadId,
+            leadNombre: cita.lead.nombre,
+            leadTelefono: cita.lead.telefono,
+            pipelineNombre: cita.lead.Pipeline?.nombre ?? 'Sin etapa',
+        }));
+
+        return { success: true, data: { citas: citasParaTabla, totalCount, startIndex: (page - 1) * pageSize } };
+    } catch (error) {
+        console.error("Error al listar citas para agente:", error);
+        return { success: false, error: "No se pudieron cargar las citas del agente." };
+    }
+}
+
+// --- NUEVA ACCIÓN PARA EL CALENDARIO DEL AGENTE ---
+export async function listarCitasParaCalendarioAgenteAction(params: { agenteId: string; }) {
+    try {
+        // 1. Obtenemos las ofertas (colegios) asignadas al agente
+        const ofertasAsignadas = await prisma.oferta.findMany({
+            where: { agentesAsignados: { some: { agenteId: params.agenteId } } },
+            select: { nombre: true }
+        });
+        const nombresDeOfertas = ofertasAsignadas.map(o => o.nombre);
+
+        if (nombresDeOfertas.length === 0) {
+            return { success: true, data: [] }; // Si no tiene ofertas, no tiene citas
+        }
+
+        // 2. Buscamos todas las citas de los leads que pertenecen a esas ofertas
+        const citas = await prisma.agenda.findMany({
+            where: {
+                lead: {
+                    jsonParams: {
+                        path: ['colegio'],
+                        equals: nombresDeOfertas.length === 1 ? nombresDeOfertas[0] : undefined
+                    }
+                }
+            },
+            select: {
+                id: true,
+                asunto: true,
+                fecha: true, // Usamos 'fecha' como campo de inicio
+                lead: { select: { nombre: true } },
+                tipoDeCita: { select: { nombre: true, duracionMinutos: true } },
+            }
+        });
+
+        // 3. Mapeamos al formato que espera el calendario
+        const citasParaCalendario = citas.map(cita => ({
+            id: cita.id,
+            asunto: cita.asunto,
+            start: cita.fecha, // Renombramos 'fecha' a 'start'
+            lead: cita.lead,
+            tipoDeCita: cita.tipoDeCita,
+        }));
+
+        return { success: true, data: citasParaCalendario };
+
+    } catch (error) {
+        console.error("Error al listar citas para calendario de agente:", error);
+        return { success: false, error: "No se pudieron cargar las citas." };
+    }
+}

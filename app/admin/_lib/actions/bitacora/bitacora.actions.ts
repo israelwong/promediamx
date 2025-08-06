@@ -2,10 +2,11 @@
 
 import prisma from '@/app/admin/_lib/prismaClient';
 import type { ActionResult } from '@/app/admin/_lib/types';
-import { obtenerNotasLeadParamsSchema, agregarNotaLeadParamsSchema, type NotaBitacora } from './bitacora.schemas';
+import { obtenerNotasLeadParamsSchema, type NotaBitacora } from './bitacora.schemas';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import type { Prisma } from '@prisma/client';
+
 
 
 export async function obtenerNotasLeadAction(
@@ -34,52 +35,132 @@ export async function obtenerNotasLeadAction(
     }
 }
 
-export async function agregarNotaLeadAction(
-    params: z.infer<typeof agregarNotaLeadParamsSchema>
-): Promise<ActionResult<NotaBitacora>> {
-
-    console.log("\n--- SERVER ACTION: agregarNotaLeadAction INVOCADA ---");
-    console.log("SERVER LOG 1. Parámetros recibidos:", params);
-
-    const validation = agregarNotaLeadParamsSchema.safeParse(params);
-    if (!validation.success) {
-        console.error("SERVER LOG 2. Falló la validación de Zod:", validation.error.flatten());
-        return { success: false, error: "Datos de nota inválidos." };
+export async function agregarNotaLeadAction(params: { leadId: string; descripcion: string; agenteId: string | null; }): Promise<ActionResult<NotaBitacora>> {
+    try {
+        const nuevaNota = await prisma.bitacora.create({
+            data: {
+                leadId: params.leadId,
+                descripcion: params.descripcion,
+                agenteId: params.agenteId,
+                tipoAccion: 'NOTA_MANUAL', // <-- Se asegura el tipo correcto
+            },
+            include: { agente: { select: { nombre: true } } },
+        });
+        revalidatePath(`/agente/prospectos/${params.leadId}`);
+        return { success: true, data: nuevaNota as NotaBitacora };
+    } catch {
+        return { success: false, error: "No se pudo guardar la nota." };
     }
-    // console.log("SERVER LOG 2. Validación de Zod exitosa.");
+}
+
+
+// --- NUEVA ACCIÓN PARA EDITAR NOTAS ---
+export async function editarNotaLeadAction(params: { notaId: string; descripcion: string; }): Promise<ActionResult<NotaBitacora>> {
+    try {
+        const notaActualizada = await prisma.bitacora.update({
+            where: { id: params.notaId },
+            data: { descripcion: params.descripcion },
+            include: { agente: true },
+        });
+        revalidatePath(`/admin/clientes/.*/negocios/.*/leads/.*`); // Revalida la ruta del lead
+        return { success: true, data: notaActualizada as NotaBitacora };
+    } catch {
+        return { success: false, error: "No se pudo actualizar la nota." };
+    }
+}
+
+// --- NUEVA ACCIÓN PARA ELIMINAR NOTAS ---
+export async function eliminarNotaLeadAction(params: { notaId: string; }): Promise<ActionResult<void>> {
+    try {
+        await prisma.bitacora.delete({
+            where: { id: params.notaId },
+        });
+        revalidatePath(`/admin/clientes/.*/negocios/.*/leads/.*`); // Revalida la ruta del lead
+        return { success: true };
+    } catch {
+        return { success: false, error: "No se pudo eliminar la nota." };
+    }
+}
+
+export async function obtenerHistorialLeadAction(params: { leadId: string; }) {
+    try {
+        const historial = await prisma.bitacora.findMany({
+            where: { leadId: params.leadId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                agente: { select: { nombre: true } } // Incluimos el nombre del agente
+            },
+        });
+        return { success: true, data: historial };
+    } catch {
+        return { success: false, error: "No se pudo obtener el historial." };
+    }
+}
+
+export async function registrarEnBitacora(params: {
+    leadId: string;
+    tipoAccion: string;
+    descripcion: string;
+    agenteId?: string | null;
+    metadata?: Prisma.JsonObject;
+}) {
+    const { leadId, tipoAccion, descripcion, agenteId = null, metadata = {} } = params;
 
     try {
-        const { leadId, agenteId, descripcion } = validation.data;
-        const dataToCreate = {
-            leadId,
-            agenteId, // Puede ser null
-            descripcion,
-            tipoAccion: 'nota' as const, // Forzamos el tipo
-        };
-        // console.log("SERVER LOG 3. Intentando crear en la base de datos con:", dataToCreate);
-
-        const nuevaNota = await prisma.bitacora.create({
-            data: dataToCreate,
-            select: {
-                id: true,
-                descripcion: true,
-                createdAt: true,
-                agente: { select: { nombre: true } },
+        await prisma.bitacora.create({
+            data: {
+                leadId,
+                tipoAccion,
+                descripcion,
+                agenteId,
+                metadata,
             }
         });
-
-        // console.log("SERVER LOG 4. Creación en base de datos EXITOSA. Nueva nota:", nuevaNota);
-        revalidatePath('/admin/clientes', 'layout');
-        // console.log("SERVER LOG 5. Ruta revalidada.");
-
-        return { success: true, data: nuevaNota };
+        // Revalidamos la ruta del lead para que el historial se actualice
+        revalidatePath(`/admin/clientes/.*/negocios/.*/leads/${leadId}`);
+        revalidatePath(`/agente/prospectos/${leadId}`);
 
     } catch (error) {
-        if (error instanceof PrismaClientKnownRequestError) {
-            if (error.code === 'P2003') {
-                return { success: false, error: "Error de clave foránea: El leadId o agenteId no existen." };
-            }
-        }
-        return { success: false, error: "No se pudo guardar la nota en la base de datos." };
+        // En una función helper como esta, no queremos que un error de log
+        // detenga la acción principal. Simplemente lo registramos en la consola del servidor.
+        console.error("Error al registrar en la bitácora:", error);
+    }
+}
+
+
+// --- NUEVA ACCIÓN PARA EDITAR UNA NOTA MANUAL ---
+export async function editarNotaManualAction(params: { notaId: string; nuevaDescripcion: string; }): Promise<ActionResult<void>> {
+    try {
+        await prisma.bitacora.update({
+            where: {
+                id: params.notaId,
+                // Seguridad: solo permite editar si es una nota manual
+                tipoAccion: 'NOTA_MANUAL',
+            },
+            data: {
+                descripcion: params.nuevaDescripcion,
+            },
+        });
+        revalidatePath(`/agente/prospectos/.*`);
+        return { success: true };
+    } catch {
+        return { success: false, error: "No se pudo actualizar la nota." };
+    }
+}
+
+// --- NUEVA ACCIÓN PARA ELIMINAR UNA NOTA MANUAL ---
+export async function eliminarNotaManualAction(params: { notaId: string; }): Promise<ActionResult<void>> {
+    try {
+        await prisma.bitacora.delete({
+            where: {
+                id: params.notaId,
+                // Seguridad: solo permite eliminar si es una nota manual
+                tipoAccion: 'NOTA_MANUAL',
+            },
+        });
+        revalidatePath(`/agente/prospectos/.*`);
+        return { success: true };
+    } catch {
+        return { success: false, error: "No se pudo eliminar la nota." };
     }
 }

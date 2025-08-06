@@ -232,6 +232,7 @@ export async function obtenerDatosPipelineKanbanAction(
                     ...lead,
                     Etiquetas: lead.Etiquetas.map(e => e.etiqueta),
                     fechaProximaCita: lead.Agenda[0]?.fecha || null,
+                    pipelineId: pipeline.id, // Añadido para cumplir con el tipo
                 }));
 
                 // Ordena los leads por la fecha de la próxima cita
@@ -262,6 +263,8 @@ export async function obtenerDatosPipelineKanbanAction(
 /**
  * Actualiza la etapa (pipeline) de un lead.
  */
+import { registrarEnBitacora } from '@/app/admin/_lib/actions/bitacora/bitacora.actions';
+
 export async function actualizarEtapaLeadEnPipelineAction(
     params: z.infer<typeof actualizarEtapaLeadParamsSchema>
 ): Promise<ActionResult<{ success: boolean }>> {
@@ -273,52 +276,60 @@ export async function actualizarEtapaLeadEnPipelineAction(
     const { leadId, nuevoPipelineId, negocioId, clienteId } = validation.data;
 
     try {
-        // Usamos una transacción para asegurar que todas las operaciones sean atómicas.
-        // Si algo falla, se revierte todo automáticamente.
-        await prisma.$transaction(async (tx) => {
-            // 1. Obtenemos el CRM del negocio para usar su ID en las verificaciones.
-            const crm = await tx.cRM.findUnique({
-                where: { negocioId },
-                select: { id: true },
-            });
-
-            if (!crm) {
-                throw new Error("El CRM para este negocio no fue encontrado.");
-            }
-
-            // 2. Verificamos que la etapa de destino exista Y pertenezca al CRM correcto.
-            const pipelineDestino = await tx.pipelineCRM.findFirst({
-                where: {
-                    id: nuevoPipelineId,
-                    crmId: crm.id, // <-- Verificación de seguridad
-                },
-                select: { nombre: true },
-            });
-
-            if (!pipelineDestino) {
-                throw new Error("La etapa de destino no existe o no pertenece a este negocio.");
-            }
-
-            // 3. Actualizamos el lead, asegurándonos de que también pertenezca al CRM correcto.
-            const updateResult = await tx.lead.updateMany({
-                where: {
-                    id: leadId,
-                    crmId: crm.id, // <-- Verificación de seguridad
-                },
-                data: {
-                    pipelineId: nuevoPipelineId,
-                    status: pipelineDestino.nombre.toLowerCase(), // Usamos el nombre de la etapa como status
-                },
-            });
-
-            // Si no se actualizó ninguna fila, significa que el lead no fue encontrado o no pertenece al CRM.
-            if (updateResult.count === 0) {
-                throw new Error("El lead no pudo ser actualizado. Es posible que no pertenezca a este negocio.");
-            }
+        // 1. Obtenemos el CRM del negocio para usar su ID en las verificaciones.
+        const crm = await prisma.cRM.findUnique({
+            where: { negocioId },
+            select: { id: true },
         });
 
-        // 4. Corregimos la revalidación de la ruta para usar correctamente las variables.
-        // La ruta anterior tenía '[clienteId]' como texto literal.
+        if (!crm) {
+            throw new Error("El CRM para este negocio no fue encontrado.");
+        }
+
+        // 2. Verificamos que la etapa de destino exista Y pertenezca al CRM correcto.
+        const pipelineDestino = await prisma.pipelineCRM.findFirst({
+            where: {
+                id: nuevoPipelineId,
+                crmId: crm.id, // <-- Verificación de seguridad
+            },
+            select: { nombre: true },
+        });
+
+        if (!pipelineDestino) {
+            throw new Error("La etapa de destino no existe o no pertenece a este negocio.");
+        }
+
+        // 3. Actualizamos el lead, asegurándonos de que también pertenezca al CRM correcto.
+        const updateResult = await prisma.lead.updateMany({
+            where: {
+                id: leadId,
+                crmId: crm.id, // <-- Verificación de seguridad
+            },
+            data: {
+                pipelineId: nuevoPipelineId,
+                status: pipelineDestino.nombre.toLowerCase(), // Usamos el nombre de la etapa como status
+            },
+        });
+
+        // Si no se actualizó ninguna fila, significa que el lead no fue encontrado o no pertenece al CRM.
+        if (updateResult.count === 0) {
+            throw new Error("El lead no pudo ser actualizado. Es posible que no pertenezca a este negocio.");
+        }
+
+        // 4. Registramos la acción en la bitácora.
+        await registrarEnBitacora({
+            leadId,
+            tipoAccion: 'actualizar_etapa',
+            descripcion: `El lead ha sido movido a la etapa '${pipelineDestino.nombre}'.`,
+            agenteId: null,
+            metadata: {
+                nuevoPipelineId,
+                negocioId,
+                clienteId,
+            } as Prisma.JsonObject
+        });
+
+        // 5. Corregimos la revalidación de la ruta para usar correctamente las variables.
         revalidatePath(`/admin/clientes/${clienteId}/negocios/${negocioId}/kanban`);
 
         return { success: true, data: { success: true } };

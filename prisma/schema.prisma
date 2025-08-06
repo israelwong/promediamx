@@ -682,6 +682,8 @@ model Oferta {
   videos                         OfertaVideos[]
   PreguntaSinRespuestaOferta     PreguntaSinRespuestaOferta[]
 
+  agentesAsignados AgenteOferta[]
+
   @@index([negocioId, status, fechaFin])
 }
 
@@ -966,6 +968,7 @@ model CRM {
   Etiqueta           EtiquetaCRM[]
   Lead               Lead[]
   Pipeline           PipelineCRM[]
+  CanalAdquisicion   CanalAdquisicion[]
 }
 
 model CRMCampoPersonalizado {
@@ -1060,7 +1063,9 @@ model Lead {
   crm           CRM?           @relation(fields: [crmId], references: [id], onDelete: Cascade)
   Pipeline      PipelineCRM?   @relation(fields: [pipelineId], references: [id])
   Etiquetas     LeadEtiqueta[]
-  BitacoraNotas LeadBitacora[]
+  
+  canalAdquisicionId String?
+  canalAdquisicion   CanalAdquisicion? @relation(fields: [canalAdquisicionId], references: [id])
 
  @@index([campanaId])
   @@index([crmId])
@@ -1071,26 +1076,29 @@ model Lead {
   @@index([telefono])
 }
 
-model CampanaPublicitaria {
-  id        String   @id // Usaremos el ad_id de ManyChat como PK
+
+model CanalAdquisicion {
+  id        String @id @default(cuid())
   nombre    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  leads     Lead[]   // Relación inversa hacia los leads
+  crmId     String // Se cambia negocioId por crmId
+  crm       CRM    @relation(fields: [crmId], references: [id], onDelete: Cascade)
+  leads     Lead[]
+  @@unique([crmId, nombre])
 }
 
-// ✅ NUEVO MODELO: Para la bitácora de notas del Lead
-model LeadBitacora {
-  id          String   @id @default(cuid())
-  leadId      String
-  nota        String
-  createdAt   DateTime @default(now())
-  // No nos importa quién la creó en este momento
-  // creadoPorId String? 
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  @@index([leadId])
-}
+// ✅ NUEVO MODELO: Para la bitácora de notas del Lead //! descontinuar
+// model LeadBitacora {
+//   id          String   @id @default(cuid())
+//   leadId      String
+//   nota        String
+//   createdAt   DateTime @default(now())
+//   // No nos importa quién la creó en este momento
+//   // creadoPorId String? 
+//   lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+//   @@index([leadId])
+// }
 
 model LeadEtiqueta {
   leadId     String
@@ -1102,6 +1110,14 @@ model LeadEtiqueta {
   @@id([leadId, etiquetaId])
   @@index([leadId])
   @@index([etiquetaId])
+}
+
+model CampanaPublicitaria {
+  id        String   @id // Usaremos el ad_id de ManyChat como PK
+  nombre    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  leads     Lead[]   // Relación inversa hacia los leads
 }
 
 model Agente {
@@ -1123,6 +1139,18 @@ model Agente {
   interaccionesRealizadas Interaccion[]  @relation("InteraccionesPorAgente")
   Lead                    Lead[]
   Notificacion            Notificacion[]
+  ofertasAsignadas AgenteOferta[]
+}
+
+model AgenteOferta {
+  agenteId   String
+  ofertaId   String
+  agente     Agente @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  oferta     Oferta @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  asignadoEn DateTime @default(now())
+
+  @@id([agenteId, ofertaId])
 }
 
 model Bitacora {
@@ -1215,6 +1243,7 @@ model OfertaServicioCita {
   agendaTipoCitaId String
   agendaTipoCita   AgendaTipoCita @relation(fields: [agendaTipoCitaId], references: [id], onDelete: Cascade)
   oferta           Oferta         @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+  
 
   @@id([ofertaId, agendaTipoCitaId])
 }

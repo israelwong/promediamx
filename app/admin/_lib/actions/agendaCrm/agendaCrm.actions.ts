@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '@/app/admin/_lib/prismaClient';
 import type { ActionResult } from '@/app/admin/_lib/types';
 import { startOfDay, endOfDay, setMinutes, setHours } from 'date-fns'; // Para el rango de "hoy"
-import type { Agenda, LeadBitacora } from '@prisma/client';
+import type { Agenda, Bitacora } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { enviarEmailConfirmacionCita_v2 } from '@/app/admin/_lib/actions/email/emailv2.actions';
 
@@ -474,13 +474,13 @@ export async function eliminarCitaLeadAction(params: { citaId: string }): Promis
 // Schema para agregar una nueva nota
 const agregarNotaSchema = z.object({
     leadId: z.string().cuid(),
-    nota: z.string().min(3, "La nota debe tener al menos 3 caracteres."),
+    descripcion: z.string().min(3, "La nota debe tener al menos 3 caracteres."),
 });
 
 // Schema para editar una nota existente
 const editarNotaSchema = z.object({
     notaId: z.string().cuid(),
-    nota: z.string().min(3, "La nota debe tener al menos 3 caracteres."),
+    descripcion: z.string().min(3, "La nota debe tener al menos 3 caracteres."),
 });
 
 // Schema para eliminar una nota
@@ -489,16 +489,16 @@ const eliminarNotaSchema = z.object({
 });
 
 
-export async function agregarNotaLeadAction(params: z.infer<typeof agregarNotaSchema>): Promise<ActionResult<LeadBitacora>> {
+export async function agregarNotaLeadAction(params: z.infer<typeof agregarNotaSchema>): Promise<ActionResult<Bitacora>> {
     const validation = agregarNotaSchema.safeParse(params);
     if (!validation.success) {
         return { success: false, error: "Datos inválidos." };
     }
-    const { leadId, nota } = validation.data;
+    const { leadId, descripcion } = validation.data;
 
     try {
-        const nuevaNota = await prisma.leadBitacora.create({
-            data: { leadId, nota }
+        const nuevaNota = await prisma.bitacora.create({
+            data: { leadId, descripcion, tipoAccion: "NOTA_SISTEMA" }
         });
         // Revalidar la página del lead para que la nueva nota aparezca
         revalidatePath(`/admin/clientes/.*/negocios/.*/leads/${leadId}`);
@@ -509,9 +509,9 @@ export async function agregarNotaLeadAction(params: z.infer<typeof agregarNotaSc
     }
 }
 
-export async function listarNotasLeadAction(params: { leadId: string }): Promise<ActionResult<LeadBitacora[]>> {
+export async function listarNotasLeadAction(params: { leadId: string }): Promise<ActionResult<Bitacora[]>> {
     try {
-        const notas = await prisma.leadBitacora.findMany({
+        const notas = await prisma.bitacora.findMany({
             where: { leadId: params.leadId },
             orderBy: { createdAt: 'desc' },
         });
@@ -522,17 +522,17 @@ export async function listarNotasLeadAction(params: { leadId: string }): Promise
     }
 }
 
-export async function editarNotaLeadAction(params: z.infer<typeof editarNotaSchema>): Promise<ActionResult<LeadBitacora>> {
+export async function editarNotaLeadAction(params: z.infer<typeof editarNotaSchema>): Promise<ActionResult<Bitacora>> {
     const validation = editarNotaSchema.safeParse(params);
     if (!validation.success) {
         return { success: false, error: "Datos inválidos." };
     }
-    const { notaId, nota } = validation.data;
+    const { notaId, descripcion } = validation.data;
 
     try {
-        const notaActualizada = await prisma.leadBitacora.update({
+        const notaActualizada = await prisma.bitacora.update({
             where: { id: notaId },
-            data: { nota }
+            data: { descripcion }
         });
         revalidatePath(`/admin/clientes/.*/negocios/.*/leads/${notaActualizada.leadId}`);
         return { success: true, data: notaActualizada };
@@ -550,7 +550,7 @@ export async function eliminarNotaLeadAction(params: z.infer<typeof eliminarNota
     const { notaId } = validation.data;
 
     try {
-        const notaEliminada = await prisma.leadBitacora.delete({
+        const notaEliminada = await prisma.bitacora.delete({
             where: { id: notaId },
             select: { id: true, leadId: true }
         });

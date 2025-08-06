@@ -89,3 +89,26 @@ export async function upsertAgendaConfiguracionAction(
         return { success: false, error: "No se pudo guardar la configuración de preferencias de agenda." };
     }
 }
+
+
+export async function obtenerConfiguracionAgendaAction(negocioId: string) {
+    if (!negocioId) {
+        return { success: false, error: "ID de negocio no proporcionado." };
+    }
+
+    try {
+        const [horarios, excepciones] = await Promise.all([
+            prisma.horarioAtencion.findMany({
+                where: { negocioId: negocioId },
+            }),
+            prisma.excepcionHorario.findMany({
+                where: { negocioId: negocioId, fecha: { gte: new Date() } }, // Solo excepciones futuras
+            }),
+        ]);
+
+        return { success: true, data: { horarios, excepciones } };
+
+    } catch {
+        return { success: false, error: "No se pudo cargar la configuración de la agenda." };
+    }
+}

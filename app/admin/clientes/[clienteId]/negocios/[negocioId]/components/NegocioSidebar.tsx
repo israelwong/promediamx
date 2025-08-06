@@ -11,19 +11,21 @@ import {
     // MessageSquare,
     Users, // Para Leads
     Calendar,
-    // Tag,
     // Briefcase,
     // LibraryBig,
     SlidersHorizontal,
     // Bot,
     // CreditCard,
     Kanban,
-    Columns, // Para Pipeline
+    Columns,
     Tags,
     // VariableIcon, // Para Etiquetas
     ListCheck,
     // Settings,
     // ChartAreaIcon
+    UserCog,
+    Tag,
+    GitMerge
 
 } from 'lucide-react';
 
@@ -59,18 +61,19 @@ const navSections: NavSection[] = [
     {
         title: 'Configuración',
         links: [
-            // { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
+            { hrefSuffix: '/oferta', icon: Tag, label: 'Ofertas' },
             // { hrefSuffix: '/editar', icon: Briefcase, label: 'Perfil del Negocio' },
             { hrefSuffix: '/configAgenda', icon: SlidersHorizontal, label: 'Agendamiento' },
             { hrefSuffix: '/configPipeline', icon: Columns, label: 'Ajustes de Pipeline' },
             { hrefSuffix: '/configEtiquetas', icon: Tags, label: 'Etiquetas' },
+            { hrefSuffix: '/canales', icon: GitMerge, label: 'Canales de Adquisición' },
             // { hrefSuffix: '/configParametrosPersonalizados', icon: VariableIcon, label: 'Parametros' },
             // { hrefSuffix: '/configuracion', icon: Settings, label: 'Configuración' },
             // { hrefSuffix: '/conocimiento', icon: LibraryBig, label: 'Base de Conocimiento' },
             // { hrefSuffix: '/asistente', icon: Bot, label: 'Asistente Virtual' },
             // { hrefSuffix: '/pagos', icon: CreditCard, label: 'Pagos' },
             // NUEVO: Enlaces para la configuración específica del CRM.
-            // { hrefSuffix: '/agentes', icon: UserCog, label: 'Agentes' },
+            { hrefSuffix: '/agentes', icon: UserCog, label: 'Agentes' },
         ]
     },
 ];

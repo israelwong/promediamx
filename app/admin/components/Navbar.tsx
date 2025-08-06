@@ -8,7 +8,7 @@ import Image from 'next/image';
 
 import { Usuario } from '@/app/admin/_lib/types';
 import { verifyToken, cerrarSesion } from '@/app/lib/auth';
-import { Bell, LogOut, Menu, X } from 'lucide-react'; // Iconos
+import { LogOut, Menu, X } from 'lucide-react'; // Iconos
 import { UsuarioExtendido } from '@/app/admin/_lib/types'; // Asegúrate de que la ruta sea correcta
 
 
@@ -116,7 +116,7 @@ function Navbar() {
     const navLinkBaseClasses = "text-sm font-medium transition-colors duration-150 ease-in-out";
     const navLinkInactiveClasses = "text-zinc-400 hover:text-zinc-100";
     const navLinkActiveClasses = "text-white font-semibold";
-    const iconButtonClasses = "p-2 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700";
+    // const iconButtonClasses = "p-2 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-700";
     const logoutButtonClasses = "text-sm text-zinc-400 hover:text-red-400 flex items-center gap-1.5 border border-zinc-700 hover:border-red-500/50 hover:bg-red-900/20 px-3 py-1.5 rounded-md transition-colors duration-150 ease-in-out";
     const mobileLogoutButtonClasses = `${logoutButtonClasses} w-full justify-center mt-auto`;
     const separatorClasses = "h-6 w-px bg-zinc-700";
@@ -175,9 +175,9 @@ function Navbar() {
                         <span>Chat</span>
                     </button> */}
 
-                    <button className={iconButtonClasses} title="Notificaciones (Próximamente)">
+                    {/* <button className={iconButtonClasses} title="Notificaciones (Próximamente)">
                         <Bell size={18} />
-                    </button>
+                    </button> */}
                     <button
                         className={logoutButtonClasses}
                         onClick={handleCerrarSesion}

@@ -23,7 +23,12 @@ const CreateAppointmentSchema = z.object({
     grado: z.string().optional(),
     nivel_educativo: z.string().optional(),
     source: z.string().optional(),
+    modalidadCita: z.string().optional().nullable(),
+
 });
+
+type ModalidadCita = 'PRESENCIAL' | 'VIRTUAL';
+
 
 type ApiResponse = {
     message: string;
@@ -159,6 +164,18 @@ export default async function handler(
             return res.status(404).json({ message: "Oferta no encontrada." });
         }
 
+        // --- LÓGICA DE MODALIDAD CORREGIDA ---
+        let modalidadDeterminada: ModalidadCita | null = null;
+        let modalidadParaEmail: 'presencial' | 'virtual' | undefined = undefined;
+
+        if (oferta.googleMapsUrl) {
+            modalidadDeterminada = 'PRESENCIAL'; // Usando string
+            modalidadParaEmail = 'presencial';
+        } else if (oferta.linkReunionVirtual) {
+            modalidadDeterminada = 'VIRTUAL'; // Usando string
+            modalidadParaEmail = 'virtual';
+        }
+
         const descripcionEnriquecida = `Cita desde ${jsonParams.source}. Colegio: ${data.colegio || 'N/A'}, Nivel: ${data.nivel_educativo || 'N/A'}, Grado: ${data.grado || 'N/A'}.`;
 
 
@@ -172,6 +189,7 @@ export default async function handler(
                 tipoDeCitaId: data.tipoDeCitaId,
                 status: StatusAgenda.PENDIENTE,
                 tipo: `Cita ${jsonParams.source}`,
+                modalidad: modalidadDeterminada
             }
         });
 
@@ -193,7 +211,7 @@ export default async function handler(
                 emailCopia: oferta.emailCopiaConfirmacion,
                 nombrePersonaContacto: oferta.nombrePersonaContacto,
                 telefonoContacto: oferta.telefonoContacto,
-                modalidadCita: oferta.googleMapsUrl ? 'presencial' : (oferta.linkReunionVirtual ? 'virtual' : undefined),
+                modalidadCita: modalidadParaEmail,
                 ubicacionCita: oferta.direccionUbicacion,
                 googleMapsUrl: oferta.googleMapsUrl,
                 linkReunionVirtual: oferta.linkReunionVirtual,

@@ -114,6 +114,8 @@ export const LeadInKanbanCardSchema = z.object({
     Etiquetas: z.array(etiquetaSimpleSchema),
     jsonParams: z.any().nullable(),
     fechaProximaCita: z.date().nullable(),
+    pipelineId: z.string().nullable(),
+
 });
 
 // Esquema para una columna del Kanban

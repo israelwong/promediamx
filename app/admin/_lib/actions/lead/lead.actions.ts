@@ -32,8 +32,9 @@ import { crearInteraccionSistemaAction } from '../conversacion/conversacion.acti
 import { revalidatePath } from 'next/cache';
 import { type ListarLeadsResult } from './lead.schemas';
 import { z } from 'zod';
-
 import { toDate } from 'date-fns-tz';
+
+import { registrarEnBitacora } from '../bitacora/bitacora.actions';
 
 // Si LeadDetalleData no incluye createdAt y updatedAt, extiéndelo aquí temporalmente:
 type LeadDetalleData = {
@@ -169,11 +170,11 @@ export async function obtenerDatosFiltrosLeadAction(
             FROM "Lead"
             WHERE "crmId" = ${crm.id} AND jsonb_extract_path_text("jsonParams", 'colegio') IS NOT NULL;
         `;
-        console.log("3. Resultado crudo de la consulta a la base de datos:", colegiosResult);
+        // console.log("3. Resultado crudo de la consulta a la base de datos:", colegiosResult);
 
         // Se extraen los nombres de los colegios del resultado de la consulta
         const colegios = colegiosResult.map(item => item.colegio).filter(Boolean);
-        console.log("4. Colegios extraídos y filtrados:", colegios);
+        // console.log("4. Colegios extraídos y filtrados:", colegios);
 
         return {
             success: true,
@@ -604,8 +605,6 @@ export async function etiquetarYReubicarLeadAction(
     }
 }
 
-// import { cambiarEtapaLeadParamsSchema } from './lead.schemas';
-
 export async function cambiarEtapaLeadAction(
     params: z.infer<typeof cambiarEtapaLeadParamsSchema>
 ): Promise<ActionResult<boolean>> {
@@ -647,16 +646,6 @@ export async function cambiarEtapaLeadAction(
     }
 }
 
-/**
- * Acción para crear un nuevo Lead con datos básicos.
- * Asigna el lead al primer pipeline disponible.
- * @param params - crmId y los datos del formulario.
- * @returns El ID del lead recién creado para la redirección.
- */
-/**
- * Acción para crear un nuevo Lead con datos básicos.
- * Infiere el crmId a partir del negocioId.
- */
 export async function crearLeadBasicoAction(
     params: CrearLeadBasicoParams
 ): Promise<ActionResult<{ id: string }>> {
@@ -715,7 +704,6 @@ export async function crearLeadBasicoAction(
         return { success: false, error: 'No se pudo crear el lead.' };
     }
 }
-
 
 export async function obtenerDatosParaFormularioLeadAction(
     params: z.infer<typeof obtenerDatosFormularioLeadParamsSchema>
@@ -780,7 +768,6 @@ export async function obtenerDatosParaFormularioLeadAction(
         return { success: false, error: "No se pudieron cargar los datos para el formulario.", data: null };
     }
 }
-
 
 export async function obtenerLeadDetallesAction(
     params: z.infer<typeof obtenerLeadDetallesParamsSchema>
@@ -855,14 +842,16 @@ function combineAndConvertToUTC(dateString: string, timeString: string, timeZone
     return toDate(localDateTimeString, { timeZone: timeZone });
 }
 
-export async function guardarLeadYAsignarCitaAction(
+export async function guardarLeadYAsignarCitaActionBU(
     params: {
         data: LeadUnificadoFormData;
         enviarNotificacion: boolean;
         citaInicialId?: string | null;
+        agenteIdQueEdita?: string | null;
     }
 ): Promise<ActionResult<{ leadId: string }>> {
     console.log("\n--- ACTION: guardarLeadYAsignarCitaAction ---");
+    console.log(params.agenteIdQueEdita ? `Agente que edita: ${params.agenteIdQueEdita}` : "Administrador edita (creación o edición de lead).");
 
     const validation = LeadUnificadoFormSchema.safeParse(params.data);
     if (!validation.success) {
@@ -872,7 +861,7 @@ export async function guardarLeadYAsignarCitaAction(
 
     const { data, enviarNotificacion, citaInicialId } = { ...params, data: validation.data };
     const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
-        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds } = data;
+        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId, jsonParams, etiquetaIds, canalAdquisicionId } = data;
 
     try {
         if (!leadId) {
@@ -898,10 +887,8 @@ export async function guardarLeadYAsignarCitaAction(
             const userTimeZone = 'America/Mexico_City';
             fechaHoraFinal = combineAndConvertToUTC(fechaCita, horaCita, userTimeZone);
             console.log(`Fecha y hora locales (${fechaCita} ${horaCita}) convertidas a UTC:`, fechaHoraFinal.toISOString());
-
-            // const disponibilidad = await verificarDisponibilidad({ ... });
-            // if (!disponibilidad.disponible) { ... }
         }
+
 
         console.log("8. Iniciando transacción en la base de datos...");
         const transactionResult = await prisma.$transaction(async (tx) => {
@@ -913,6 +900,7 @@ export async function guardarLeadYAsignarCitaAction(
                 pipelineId,
                 valorEstimado,
                 crmId,
+                canalAdquisicionId, // <-- AÑADIDO
                 jsonParams: jsonParams as Prisma.JsonObject || {},
             };
 
@@ -982,8 +970,19 @@ export async function guardarLeadYAsignarCitaAction(
             } else {
                 console.warn(`No se pudo enviar la notificación para el lead ${lead.id} por falta de datos (tipo de cita, negocio u oferta).`);
             }
-
         }
+
+        //! Registrar en la bitácora de acciones del CRM
+        await registrarEnBitacora({
+            leadId: lead.id,
+            tipoAccion: 'GUARDAR_LEAD',
+            descripcion: leadId ? 'Lead actualizado.' : 'Lead creado.',
+            agenteId: params.agenteIdQueEdita ?? null,
+            metadata: {
+                citaId: cita?.id ?? null,
+                modalidadCita: cita?.modalidad ?? null,
+            },
+        });
 
         revalidatePath(`/admin/clientes/.*/negocios/${negocioId}/leads`, 'layout');
         return { success: true, data: { leadId: lead.id } };
@@ -996,7 +995,229 @@ export async function guardarLeadYAsignarCitaAction(
 }
 
 
+export async function guardarLeadYAsignarCitaAction(
+    params: {
+        data: LeadUnificadoFormData;
+        enviarNotificacion?: boolean;
+        citaInicialId?: string | null;
+        agenteIdQueEdita?: string | null;
+    }
+): Promise<ActionResult<{ leadId: string }>> {
 
+    console.log(params.data);
+
+
+    const { data, enviarNotificacion = false, citaInicialId, agenteIdQueEdita } = params;
+
+    const validation = LeadUnificadoFormSchema.safeParse(data);
+    if (!validation.success) {
+        return { success: false, error: "Datos inválidos.", errorDetails: validation.error.flatten().fieldErrors };
+    }
+
+    const wasAnUpdate = !!validation.data.id;
+    const newData = validation.data;
+    const { id: leadId, nombre, email, telefono, status, pipelineId, valorEstimado,
+        fechaCita, horaCita, tipoDeCitaId, modalidadCita, negocioId, crmId,
+        jsonParams, etiquetaIds = [], canalAdquisicionId } = newData;
+
+    try {
+        // 1. OBTENER EL ESTADO "ANTES" DEL LEAD (SI ES UNA ACTUALIZACIÓN)
+        let leadAntes = null;
+        if (wasAnUpdate && leadId) {
+            leadAntes = await prisma.lead.findUnique({
+                where: { id: leadId },
+                include: {
+                    Pipeline: { select: { id: true, nombre: true } },
+                    Etiquetas: { include: { etiqueta: { select: { id: true, nombre: true } } } },
+                    Agenda: { where: { status: 'PENDIENTE' }, orderBy: { fecha: 'asc' }, take: 1 },
+                    canalAdquisicion: { select: { id: true, nombre: true } },
+                }
+            });
+        }
+
+        const transactionResult = await prisma.$transaction(async (tx) => {
+            const leadData = {
+                nombre,
+                email: email || null,
+                telefono: telefono || null,
+                status,
+                pipelineId,
+                valorEstimado,
+                crmId,
+                canalAdquisicionId,
+                agenteId: leadAntes?.agenteId ?? agenteIdQueEdita,
+                jsonParams: jsonParams as Prisma.JsonObject || {},
+            };
+
+            const finalLead = leadId
+                ? await tx.lead.update({ where: { id: leadId }, data: leadData })
+                : await tx.lead.create({ data: leadData });
+
+            const currentLeadId = finalLead.id;
+
+            if (leadId) await tx.leadEtiqueta.deleteMany({ where: { leadId } });
+            if (etiquetaIds.length > 0) {
+                await tx.leadEtiqueta.createMany({
+                    data: etiquetaIds.map(id => ({ leadId: currentLeadId, etiquetaId: id }))
+                });
+            }
+
+            let fechaHoraFinal: Date | null = null;
+            if (fechaCita && horaCita) {
+                fechaHoraFinal = combineAndConvertToUTC(fechaCita, horaCita, 'America/Mexico_City');
+            }
+
+            let citaGuardada = null;
+            if (citaInicialId && !fechaCita) {
+                await tx.agenda.delete({ where: { id: citaInicialId } });
+            } else if (fechaHoraFinal && tipoDeCitaId && modalidadCita) {
+                // CORRECCIÓN: Se elimina el tipo 'ModalidadCita' y se usa 'as string' para que coincida con tu schema
+                citaGuardada = await tx.agenda.upsert({
+                    where: { id: citaInicialId || '' },
+                    update: { fecha: fechaHoraFinal, tipoDeCitaId, modalidad: modalidadCita as string },
+                    create: {
+                        leadId: currentLeadId, negocioId, fecha: fechaHoraFinal,
+                        tipoDeCitaId, asunto: 'Cita agendada desde CRM',
+                        status: 'PENDIENTE', tipo: 'Cita CRM', modalidad: modalidadCita as string,
+                    }
+                });
+            }
+            return { lead: finalLead, cita: citaGuardada };
+        });
+
+        const { lead, cita } = transactionResult;
+
+        // 2. COMPARAR Y REGISTRAR DETALLADAMENTE EN LA BITÁCORA
+        const autorId = agenteIdQueEdita;
+
+        if (!wasAnUpdate) {
+            await registrarEnBitacora({
+                leadId: lead.id,
+                agenteId: autorId,
+                tipoAccion: 'CREACION_LEAD',
+                descripcion: `Prospecto "${lead.nombre}" fue creado.`
+            });
+        } else if (leadAntes) {
+            // Comparar campos simples
+            if (leadAntes.nombre !== nombre) await registrarEnBitacora({ leadId: lead.id, agenteId: autorId, tipoAccion: 'EDICION_LEAD', descripcion: `Nombre cambiado de "${leadAntes.nombre}" a "${nombre}".` });
+            if (leadAntes.pipelineId !== pipelineId) {
+                const nuevaEtapa = await prisma.pipelineCRM.findUnique({ where: { id: pipelineId! } });
+                await registrarEnBitacora({ leadId: lead.id, agenteId: autorId, tipoAccion: 'CAMBIO_ETAPA', descripcion: `Etapa cambiada de "${leadAntes.Pipeline?.nombre || 'N/A'}" a "${nuevaEtapa?.nombre || 'N/A'}".` });
+            }
+
+            // --- INICIO DE LA LÓGICA PARA REGISTRAR CAMBIO DE CANAL ---
+            if (leadAntes.canalAdquisicionId !== canalAdquisicionId) {
+                const canalNuevo = canalAdquisicionId ? await prisma.canalAdquisicion.findUnique({ where: { id: canalAdquisicionId } }) : null;
+                const nombreCanalAntes = leadAntes.canalAdquisicion?.nombre || 'Ninguno';
+                const nombreCanalNuevo = canalNuevo?.nombre || 'Ninguno';
+                await registrarEnBitacora({
+                    leadId: lead.id,
+                    agenteId: autorId,
+                    tipoAccion: 'EDICION_LEAD',
+                    descripcion: `Canal de adquisición cambiado de "${nombreCanalAntes}" a "${nombreCanalNuevo}".`
+                });
+            }
+            // --- FIN DE LA LÓGICA ---
+
+            // Comparar etiquetas
+            const etiquetasAntesIds = new Set(leadAntes.Etiquetas.map(e => e.etiquetaId));
+            const etiquetasAhoraIds = new Set(etiquetaIds);
+            const etiquetasAñadidas = etiquetaIds.filter(id => !etiquetasAntesIds.has(id));
+            const etiquetasEliminadas = leadAntes.Etiquetas.filter(e => !etiquetasAhoraIds.has(e.etiquetaId));
+
+            if (etiquetasAñadidas.length > 0) {
+                const nombres = await prisma.etiquetaCRM.findMany({ where: { id: { in: etiquetasAñadidas } }, select: { nombre: true } });
+                await registrarEnBitacora({ leadId: lead.id, agenteId: autorId, tipoAccion: 'EDICION_LEAD', descripcion: `Etiquetas añadidas: ${nombres.map(e => e.nombre).join(', ')}.` });
+            }
+            if (etiquetasEliminadas.length > 0) {
+                await registrarEnBitacora({ leadId: lead.id, agenteId: autorId, tipoAccion: 'EDICION_LEAD', descripcion: `Etiquetas eliminadas: ${etiquetasEliminadas.map(e => e.etiqueta.nombre).join(', ')}.` });
+            }
+
+
+            // --- INICIO DE LA LÓGICA DE REGISTRO DE CITA ---
+            const citaAntes = leadAntes?.Agenda[0];
+
+            // Caso 1: Se creó una cita nueva
+            if (!citaAntes && cita) {
+                const tipoCita = await prisma.agendaTipoCita.findUnique({ where: { id: cita.tipoDeCitaId! } });
+                await registrarEnBitacora({
+                    leadId: lead.id,
+                    agenteId: autorId,
+                    tipoAccion: 'CITA_AGENDADA',
+                    descripcion: `Cita de "${tipoCita?.nombre}" agendada para el ${new Date(cita.fecha).toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}.`
+                });
+            }
+            // Caso 2: Se canceló una cita
+            else if (citaAntes && !cita) {
+                await registrarEnBitacora({
+                    leadId: lead.id,
+                    agenteId: autorId,
+                    tipoAccion: 'CITA_CANCELADA',
+                    descripcion: `Cita cancelada.`
+                });
+            }
+            // Caso 3: Se reagendó o modificó una cita existente
+            else if (citaAntes && cita && (citaAntes.fecha.getTime() !== cita.fecha.getTime() || citaAntes.tipoDeCitaId !== cita.tipoDeCitaId)) {
+                // 1. Obtenemos el nombre del tipo de cita.
+                const tipoCita = await prisma.agendaTipoCita.findUnique({ where: { id: cita.tipoDeCitaId! } });
+
+                await registrarEnBitacora({
+                    leadId: lead.id,
+                    agenteId: autorId,
+                    tipoAccion: 'CITA_REAGENDADA',
+                    // 2. Usamos el nombre del tipo de cita en la descripción.
+                    descripcion: `Cita de "${tipoCita?.nombre || 'N/A'}" reagendada para el ${new Date(cita.fecha).toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}.`
+                });
+            }
+            // --- FIN DE LA LÓGICA DE REGISTRO DE CITA ---
+
+
+            //! Aquí puedes añadir más comparaciones si lo necesitas en el futuro
+        }
+
+        // Lógica de envío de correo (FUERA de la transacción)
+        if (enviarNotificacion && cita && lead.email && tipoDeCitaId && jsonParams?.colegio) {
+
+            // DESCOMENTA ESTO CUANDO TENGAS TU LÓGICA DE EMAILS
+            const [tipoCitaData, negocioData, ofertaData] = await Promise.all([
+                prisma.agendaTipoCita.findUnique({ where: { id: tipoDeCitaId } }),
+                prisma.negocio.findUnique({ where: { id: negocioId } }),
+                prisma.oferta.findFirst({
+                    where: {
+                        negocioId,
+                        status: 'ACTIVO',
+                        nombre: { contains: jsonParams.colegio, mode: 'insensitive' }
+                    }
+                })
+            ]);
+
+            if (tipoCitaData && negocioData && ofertaData) {
+                await enviarEmailConfirmacionCita_v2({
+                    emailDestinatario: lead.email,
+                    nombreDestinatario: lead.nombre,
+                    nombreNegocio: negocioData.nombre,
+                    nombreServicio: tipoCitaData.nombre,
+                    nombreOferta: ofertaData.nombre,
+                    fechaHoraCita: cita.fecha,
+                    emailRespuestaNegocio: negocioData.email || 'contacto@promedia.mx',
+                    emailCopia: ofertaData.emailCopiaConfirmacion,
+                });
+            } else {
+                console.warn(`No se pudo enviar la notificación para el lead ${lead.id} por falta de datos (tipo de cita, negocio u oferta).`);
+            }
+        }
+
+        revalidatePath('/admin', 'layout');
+        revalidatePath('/agente', 'layout');
+
+        return { success: true, data: { leadId: lead.id } };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Error desconocido.";
+        console.error("Error en guardarLeadYAsignarCitaAction:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
+}
 
 export async function eliminarLeadAction(params: { leadId: string }): Promise<ActionResult<boolean>> {
     try {
@@ -1016,3 +1237,197 @@ export async function eliminarLeadAction(params: { leadId: string }): Promise<Ac
         return { success: false, error: "No se pudo eliminar el lead." };
     }
 }
+
+
+//! AGENTES
+
+export async function actualizarEtapaDeLeadAction(params: { leadId: string; nuevaEtapaId: string; }): Promise<ActionResult<boolean>> {
+    const { leadId, nuevaEtapaId } = params;
+
+    try {
+        await prisma.lead.update({
+            where: { id: leadId },
+            data: {
+                pipelineId: nuevaEtapaId,
+                // También actualizamos la fecha de 'updatedAt' automáticamente
+            },
+        });
+
+        // Revalidamos la ruta del kanban del agente para que todos los que lo vean
+        // (si hubiera concurrencia) tengan la información actualizada.
+        revalidatePath("/agente/kanban");
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error al actualizar la etapa del lead:", error);
+        return { success: false, error: "No se pudo actualizar la etapa del lead." };
+    }
+}
+
+// --- NUEVA ACCIÓN PARA LA LISTA DE LEADS DEL AGENTE ---
+export async function listarLeadsParaAgenteAction(params: {
+    agenteId: string;
+    page?: number;
+    pageSize?: number;
+    searchTerm?: string;
+    colegio?: string;
+    etapa?: string;
+}) {
+    const { agenteId, page = 1, pageSize = 10, searchTerm, colegio, etapa } = params;
+
+    try {
+        // 1. Obtenemos las ofertas (colegios) que el agente puede ver
+        const ofertasAsignadas = await prisma.oferta.findMany({
+            where: { agentesAsignados: { some: { agenteId: agenteId } } },
+            select: { nombre: true }
+        });
+        const nombresDeOfertas = ofertasAsignadas.map(o => o.nombre);
+
+        // Si el agente no tiene ofertas, no puede tener leads
+        if (nombresDeOfertas.length === 0) {
+            return { success: true, data: { leads: [], totalCount: 0, page, pageSize, startIndex: 0 } };
+        }
+
+        // --- INICIO DE LA REFACTORIZACIÓN DE FILTROS ---
+
+        // 2. Construimos la lista de condiciones de filtro
+        const filters: Prisma.LeadWhereInput[] = [
+            // Condición base: El lead debe pertenecer a una de las ofertas del agente
+            // Prisma no soporta 'in' para JSON fields, así que usamos OR con equals
+            {
+                OR: nombresDeOfertas.map(nombre => ({
+                    jsonParams: { path: ['colegio'], equals: nombre }
+                }))
+            }
+        ];
+
+        // 3. Añadimos los filtros opcionales solo si tienen un valor
+        if (searchTerm) {
+            filters.push({
+                OR: [
+                    { nombre: { contains: searchTerm, mode: 'insensitive' } },
+                    { email: { contains: searchTerm, mode: 'insensitive' } },
+                ],
+            });
+        }
+        if (colegio) {
+            filters.push({ jsonParams: { path: ['colegio'], equals: colegio } });
+        }
+        if (etapa) {
+            filters.push({ Pipeline: { nombre: etapa } });
+        }
+
+        // 4. Combinamos todas las condiciones en una única cláusula 'where'
+        const whereClause: Prisma.LeadWhereInput = { AND: filters };
+
+        // --- FIN DE LA REFACTORIZACIÓN ---
+
+        const [leads, totalCount] = await prisma.$transaction([
+            prisma.lead.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    nombre: true,
+                    email: true,
+                    telefono: true,
+                    createdAt: true,
+                    Pipeline: { select: { nombre: true } },
+                    jsonParams: true,
+                },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma.lead.count({ where: whereClause }),
+        ]);
+
+        const leadsParaTabla = leads.map(lead => ({
+            id: lead.id,
+            nombre: lead.nombre,
+            email: lead.email,
+            telefono: lead.telefono,
+            createdAt: lead.createdAt,
+            pipelineNombre: lead.Pipeline?.nombre ?? 'Sin etapa',
+            colegio: (lead.jsonParams as Record<string, unknown>)?.colegio as string ?? 'N/A',
+        }));
+
+        return { success: true, data: { leads: leadsParaTabla, totalCount, page, pageSize, startIndex: (page - 1) * pageSize } };
+    } catch (error) {
+        console.error("Error al listar leads para agente:", error);
+        return { success: false, error: "No se pudieron cargar los leads del agente." };
+    }
+}
+
+// --- NUEVA ACCIÓN PARA LOS FILTROS DEL AGENTE ---
+export async function obtenerFiltrosParaAgenteAction(agenteId: string) {
+    try {
+        const agente = await prisma.agente.findUnique({
+            where: { id: agenteId },
+            select: { crmId: true }
+        });
+        if (!agente?.crmId) throw new Error("Agente no asociado a un CRM.");
+
+        const [pipelines, ofertasAsignadas] = await Promise.all([
+            prisma.pipelineCRM.findMany({ where: { crmId: agente.crmId }, orderBy: { orden: 'asc' } }),
+            prisma.oferta.findMany({ where: { agentesAsignados: { some: { agenteId } } }, select: { nombre: true } })
+        ]);
+
+        return {
+            success: true,
+            data: {
+                pipelines,
+                colegios: ofertasAsignadas.map(o => o.nombre),
+            }
+        };
+    } catch {
+        return { success: false, error: "No se pudieron cargar los filtros." };
+    }
+}
+
+export async function asignarAgenteALeadAction(params: { leadId: string; agenteId: string; }): Promise<ActionResult<boolean>> {
+    const { leadId, agenteId } = params;
+    try {
+        // Usamos una transacción para asegurar la consistencia
+        await prisma.$transaction(async (tx) => {
+            // Primero, verificamos si el lead ya fue tomado por alguien más
+            const leadActual = await tx.lead.findUnique({
+                where: { id: leadId },
+                select: { agenteId: true, nombre: true }
+            });
+
+            if (!leadActual) {
+                throw new Error("El prospecto no fue encontrado.");
+            }
+
+            if (leadActual.agenteId) {
+                // Si ya tiene un agente, no hacemos nada o devolvemos un error específico
+                throw new Error("Este prospecto ya ha sido asignado a otro agente.");
+            }
+
+            // Si está libre, lo asignamos
+            await tx.lead.update({
+                where: { id: leadId },
+                data: { agenteId: agenteId },
+            });
+
+            // Y registramos la acción en la bitácora
+            await tx.bitacora.create({
+                data: {
+                    leadId: leadId,
+                    agenteId: agenteId,
+                    tipoAccion: 'ASIGNACION_AGENTE',
+                    descripcion: `El prospecto "${leadActual.nombre}" fue tomado por el agente.`,
+                }
+            });
+        });
+
+        // Revalidamos las rutas donde se muestra la información del lead
+        revalidatePath("/agente", "layout"); // Revalida todo el layout del agente
+        revalidatePath(`/admin/clientes/.*/negocios/.*/leads/${leadId}`);
+
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo asignar el prospecto." };
+    }
+}
+

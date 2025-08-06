@@ -66,3 +66,13 @@ export const reordenarCanalesCrmParamsSchema = z.object({
     canalesOrdenados: z.array(canalOrdenSchema), // Array de canales con su nuevo orden
 });
 export type ReordenarCanalesCrmParams = z.infer<typeof reordenarCanalesCrmParamsSchema>;
+
+
+export const CanalCRMSchema = z.object({
+    id: z.string().cuid(),
+    nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
+    crmId: z.string().cuid(),
+    status: z.string(),
+});
+
+export const UpsertCanalCRMSchema = CanalCRMSchema.omit({ id: true, status: true });

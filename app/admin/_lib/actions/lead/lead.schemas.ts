@@ -344,6 +344,9 @@ export const LeadUnificadoFormSchema = z.object({
     modalidadCita: z.string().optional().nullable(),
     negocioId: z.string().cuid(),
     crmId: z.string().cuid(),
+    canalAdquisicionId: z.string().cuid("El canal seleccionado es inválido.").nullable().optional(),
+    agenteId: z.string().cuid("El agente seleccionado es inválido.").nullable().optional(),
+
 }).refine(data => {
     if (data.fechaCita) {
         return !!data.horaCita && !!data.tipoDeCitaId && !!data.modalidadCita;
