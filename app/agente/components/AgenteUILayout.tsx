@@ -20,11 +20,10 @@ type UserPayload = {
 function AgenteSidebar({ user, handleLogout, isLoggingOut }: { user: UserPayload; handleLogout: () => void; isLoggingOut: boolean; }) {
     const pathname = usePathname();
     const navItems = [
-        { href: '/agente', label: 'Pipeline', icon: LayoutDashboard },
+        { href: '/agente/kanban', label: 'Pipeline', icon: LayoutDashboard },
         { href: '/agente/citas', label: 'Citas', icon: CalendarCheck },
         { href: '/agente/calendario', label: 'Calendario', icon: Calendar },
         { href: '/agente/leads', label: 'Leads', icon: User },
-        // Puedes añadir más items aquí en el futuro
     ];
 
     return (
@@ -34,19 +33,26 @@ function AgenteSidebar({ user, handleLogout, isLoggingOut }: { user: UserPayload
                     <h1 className="text-xl font-bold text-white">Portal Agente</h1>
                 </div>
                 <nav className="flex-1 px-4 py-4 space-y-2">
-                    {navItems.map((item) => (
-                        <Link
-                            key={item.label}
-                            href={item.href}
-                            className={`flex items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${pathname === item.href
-                                ? 'bg-zinc-800 text-white'
-                                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
-                                }`}
-                        >
-                            <item.icon className="h-5 w-5" />
-                            {item.label}
-                        </Link>
-                    ))}
+                    {navItems.map((item) => {
+                        // --- CAMBIO #2: Mejoramos la lógica para detectar el enlace activo ---
+                        const isActive = item.href === '/agente/kanban'
+                            ? pathname === item.href // Coincidencia exacta para la página principal
+                            : pathname?.startsWith(item.href); // Coincidencia de prefijo para las demás
+
+                        return (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={`flex items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${isActive
+                                    ? 'bg-zinc-800 text-white'
+                                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                                    }`}
+                            >
+                                <item.icon className="h-5 w-5" />
+                                {item.label}
+                            </Link>
+                        );
+                    })}
                 </nav>
             </div>
             <div className="border-t border-zinc-800 p-4">
