@@ -305,6 +305,35 @@ export default function LeadForm({
         router.push('/agente/');
     };
 
+    const formatMexicanPhoneNumber = (value: string): string => {
+        if (!value) return '';
+
+        // 1. Elimina todo lo que no sea un dígito (espacios, +, -, etc.)
+        const digitsOnly = value.replace(/\D/g, '');
+
+        // 2. Si el número tiene más de 10 dígitos (ej. 52155... o +5255...),
+        //    toma solo los últimos 10.
+        // Si hay más de 10 dígitos, toma los últimos 10 (los más recientes, típicamente el número nacional)
+        if (digitsOnly.length > 10) {
+            return digitsOnly.substring(digitsOnly.length - 10);
+        }
+
+        // 3. Si tiene 10 o menos, devuélvelo tal cual.
+        return digitsOnly;
+    };
+
+    // --- INICIO DE LA IMPLEMENTACIÓN ---
+    // 1. Obtenemos las propiedades del registro para el teléfono
+    const telefonoRegister = register("telefono");
+
+    // 2. Creamos nuestro propio manejador de cambios
+    const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const formatted = formatMexicanPhoneNumber(event.target.value);
+        event.target.value = formatted;
+        telefonoRegister.onChange(event);
+    };
+
+    // --- FIN DE LA IMPLEMENTACIÓN ---
 
     return (
         <form
@@ -408,7 +437,21 @@ export default function LeadForm({
                             </div>
                             <div>
                                 <Label htmlFor="telefono">Teléfono</Label>
-                                <Input id="telefono" {...register("telefono")} disabled={isReadOnly} />
+                                <Input
+                                    id="telefono"
+                                    // Pasamos las propiedades de registro excepto el onChange original
+                                    {...telefonoRegister}
+                                    // Usamos nuestro manejador personalizado
+                                    onChange={handlePhoneChange}
+                                    disabled={isReadOnly}
+                                    // Buena práctica: limitar la longitud máxima a 10
+                                    // maxLength={10}
+                                    placeholder="Ej: 5512345678"
+                                />
+                                <p className="text-xs text-zinc-500">
+                                    Nota: Si el número tiene más de 10 dígitos, el sistema ajustará la longitud y solo se usarán los últimos 10.
+                                </p>
+
                             </div>
 
                         </CardContent>
