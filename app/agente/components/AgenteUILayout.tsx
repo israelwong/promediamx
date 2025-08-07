@@ -5,7 +5,7 @@ import { useTransition } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cerrarSesion } from '../_lib/actions/auth.actions';
-import { Loader2, LogOut, LayoutDashboard, User, CalendarCheck, Calendar } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, User, CalendarCheck, Calendar, ChartLine } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { toast } from 'react-hot-toast';
 
@@ -24,6 +24,7 @@ function AgenteSidebar({ user, handleLogout, isLoggingOut }: { user: UserPayload
         { href: '/agente/citas', label: 'Citas', icon: CalendarCheck },
         { href: '/agente/calendario', label: 'Calendario', icon: Calendar },
         { href: '/agente/leads', label: 'Leads', icon: User },
+        { href: '/agente/estadisticas', label: 'Estadísticas', icon: ChartLine },
     ];
 
     return (
