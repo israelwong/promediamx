@@ -6,7 +6,7 @@ import { Calendar } from 'lucide-react';
 import { headers } from 'next/headers';
 import { verifyToken } from '@/app/agente/_lib/actions/auth.actions'; // Para obtener el negocioId
 import { redirect } from 'next/navigation';
-// --- CAMBIO: Se importa la nueva acción específica para el agente ---
+
 import { listarCitasParaCalendarioAgenteAction } from '@/app/admin/_lib/actions/citas/citas.actions';
 import RealtimeCalendarioView from './components/RealtimeCalendarioView';
 import prisma from '@/app/admin/_lib/prismaClient';

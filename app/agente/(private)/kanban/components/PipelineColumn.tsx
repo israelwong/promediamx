@@ -32,9 +32,15 @@ export default function PipelineColumn({ column }: { column: KanbanColumn }) {
     return (
         <div className="w-80 flex-shrink-0">
             <div ref={setNodeRef} className="bg-zinc-900/70 rounded-lg flex flex-col gap-y-4 h-full max-h-[calc(100vh-12rem)]">
-                <div className="p-3 border-b border-zinc-700">
+                {/* --- INICIO DE LA MODIFICACIÓN --- */}
+                <div className="p-3 border-b border-zinc-700 flex items-center justify-between">
                     <h3 className="font-semibold text-zinc-100">{column.nombre}</h3>
+                    {/* Añadimos un span para mostrar el conteo de leads */}
+                    <span className="text-sm font-medium text-zinc-400 bg-zinc-800/80 h-6 w-6 flex items-center justify-center rounded-full">
+                        {column.leads.length}
+                    </span>
                 </div>
+                {/* --- FIN DE LA MODIFICACIÓN --- */}
                 {/* --- MEJORA: Añadimos una altura mínima para que la zona de drop siempre exista --- */}
                 <div className="flex-grow flex flex-col gap-y-2 overflow-y-auto px-2 min-h-[100px]">
                     <SortableContext items={leadsIds}>

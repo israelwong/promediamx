@@ -263,10 +263,12 @@ export async function listarCitasParaAgenteAction(params: {
         // 2. Definimos la cláusula 'where' para filtrar citas
         const whereClause: Prisma.AgendaWhereInput = {
             lead: {
-                jsonParams: {
-                    path: ['colegio'],
-                    equals: nombresDeOfertas.length === 1 ? nombresDeOfertas[0] : undefined
-                }
+                OR: nombresDeOfertas.map(nombre => ({
+                    jsonParams: {
+                        path: ['colegio'],
+                        equals: nombre
+                    }
+                }))
             }
         };
 
@@ -352,11 +354,12 @@ export async function listarCitasParaCalendarioAgenteAction(): Promise<ActionRes
             where: {
                 status: 'PENDIENTE',
                 lead: {
-                    // Filtramos en el campo JSONB
-                    jsonParams: {
-                        path: ['colegio'], // Nos interesa la propiedad 'colegio' del JSON
-                        equals: nombresOfertas.length === 1 ? nombresOfertas[0] : undefined, // Solo soporta 'equals'
-                    },
+                    OR: nombresOfertas.map(nombreOferta => ({
+                        jsonParams: {
+                            path: ['colegio'],
+                            equals: nombreOferta,
+                        }
+                    }))
                 },
             },
             select: {

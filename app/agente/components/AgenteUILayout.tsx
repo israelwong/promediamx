@@ -2,7 +2,7 @@
 "use client";
 
 import { useTransition } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cerrarSesion } from '../_lib/actions/auth.actions';
 import { Loader2, LogOut, LayoutDashboard, User, CalendarCheck, Calendar } from 'lucide-react';
@@ -74,15 +74,15 @@ function AgenteSidebar({ user, handleLogout, isLoggingOut }: { user: UserPayload
 // Este es el componente principal que exportamos
 export default function AgenteUILayout({ user, children }: { user: UserPayload, children: React.ReactNode }) {
     const [isLoggingOut, startLogoutTransition] = useTransition();
-    const router = useRouter();
+    // const router = useRouter();
 
     const handleLogout = () => {
         startLogoutTransition(async () => {
             // Llamamos a la server action que borra la cookie
-            await cerrarSesion(user.id); // Cambia 'user.id' por el campo correcto si el token es diferente
+            await cerrarSesion(); // Cambia 'user.id' por el campo correcto si el token es diferente
             toast.success("Sesión cerrada.");
             // Redirigimos al login
-            router.push('/agente/login');
+            // router.push('/agente/login');
         });
     };
 

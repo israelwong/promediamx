@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers'; // <-- 1. Importar cookies
+import { redirect as nextRedirect } from 'next/navigation';
 
 const prisma = new PrismaClient();
 
@@ -68,14 +69,15 @@ export async function login(email: string, password: string) {
     return response;
 }
 
-export async function cerrarSesion(token: string) {
-    // --- 3. Eliminar la cookie al cerrar sesión ---
+export async function cerrarSesion() {
     const cookieStore = await cookies();
+
+    console.log("Cerrando sesión y eliminando cookie 'auth_token'...");
     cookieStore.delete('auth_token');
 
-    // La lógica de invalidar la sesión en la BD puede permanecer si la necesitas en el futuro
-    console.log(`Cerrando sesión para el token: ${token}`);
-    return { success: true, message: 'Sesión cerrada exitosamente.' };
+    // --- 4. Reemplazamos el 'return' con una redirección ---
+    // Esto completa el flujo en el servidor y envía al usuario al login.
+    nextRedirect('/agente/login');
 }
 
 /**
