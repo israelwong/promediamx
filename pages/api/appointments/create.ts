@@ -141,7 +141,8 @@ export default async function handler(
                 pipelineId: pipelineFinal.id,
                 status: pipelineFinal.nombre.toLowerCase(),
             }),
-            status: 'activo'
+            status: 'activo',
+            canalAdquisicionId: 'cmdz3a5c60003gu2hmdh40kwe'
         };
 
         const lead = await prisma.lead.upsert({

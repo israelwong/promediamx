@@ -107,7 +107,7 @@ export default function LeadForm({
 
 }: LeadFormProps) {
 
-    console.log("LeadForm Props:", { historialItems });//!
+    // console.log("LeadForm Props:", { historialItems });//!
 
     const router = useRouter();
     const [isSaving, startSaveTransition] = useTransition();
@@ -124,7 +124,6 @@ export default function LeadForm({
         setValue,
         reset, // <-- AÑADIR ESTO
         formState: { errors, isDirty } // <-- Añade 'isDirty' aquí
-
     } = useForm<LeadUnificadoFormData>({
         resolver: zodResolver(LeadUnificadoFormSchema),
         defaultValues: {
@@ -716,6 +715,9 @@ export default function LeadForm({
                                         </Select>
                                     )}
                                 />
+                                {errors.canalAdquisicionId && (
+                                    <p className="text-sm text-red-500 mt-1.5">{errors.canalAdquisicionId.message}</p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
