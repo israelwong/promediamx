@@ -31,7 +31,7 @@ import { Button } from "@/app/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card';
-import { Loader2, Save, Trash, Send, XCircle, ShieldAlert } from 'lucide-react';
+import { Loader2, Save, Trash, Send, XCircle, ShieldAlert, UserCheck, X } from 'lucide-react';
 
 // --- Componentes Personalizados ---
 
@@ -338,8 +338,9 @@ export default function LeadForm({
         <form
             onSubmit={handleSubmit(data => onSubmit(data, false))}
             className="space-y-6"
+
         >
-            <div className="flex items-center justify-between sticky top-0 bg-zinc-900 p-4 z-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sticky top-0 bg-zinc-900 p-4 z-10 border-b border-zinc-800">
                 <div>
                     <h1 className="text-2xl font-semibold text-zinc-100">
                         {initialLeadData ? 'Editar Lead' : 'Crear Nuevo Lead'}
@@ -353,41 +354,51 @@ export default function LeadForm({
                     </div>
                 )}
 
-                <div className="flex items-center gap-3">
-                    {/* --- LÓGICA DE VISIBILIDAD DE BOTONES --- */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-start sm:justify-end">
+                    {/* --- LÓGICA DE VISIBILIDAD DE BOTONES (SIN CAMBIOS) --- */}
                     {isReadOnly ? (
-                        <Button type="button" onClick={handleTomarLead} disabled={isTakingLead} className="bg-green-600 hover:bg-green-700">
+                        <Button
+                            type="button"
+                            onClick={handleTomarLead}
+                            disabled={isTakingLead}
+                            className="bg-green-600 hover:bg-green-700"
+                        >
                             {isTakingLead && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Tomar y Dar Seguimiento
+                            {/* --- DISEÑO RESPONSIVO --- */}
+                            <UserCheck className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Tomar y Dar Seguimiento</span>
                         </Button>
                     ) : (
                         <>
+                            {/* --- BOTÓN PRINCIPAL --- */}
                             <Button
                                 type="submit"
                                 variant={isDirty ? "warning" : "green"}
                                 disabled={isPending}
                                 className={isDirty ? "animate-pulse" : ""}
+                                title={initialLeadData ? 'Guardar Cambios' : 'Crear Lead'}
                             >
                                 {isSaving ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                    <Save className="mr-2 h-4 w-4" />
+                                    <Save className="h-4 w-4" />
                                 )}
-                                {initialLeadData ? 'Guardar Cambios' : 'Crear Lead'}
+                                {/* --- DISEÑO RESPONSIVO --- */}
+                                <span className="ml-2">{initialLeadData ? 'Guardar Cambios' : 'Crear Lead'}</span>
                             </Button>
 
-                            {/* Puedes decidir si el botón de notificar se muestra en modo lectura */}
+                            {/* --- BOTONES SECUNDARIOS --- */}
                             <Button
                                 type="button"
                                 onClick={handleSubmit(data => onSubmit(data, true))}
-                                disabled={
-                                    isPending ||
-                                    !watch('email') ||
-                                    !watch('fechaCita')
-                                }
+                                disabled={isPending || !watch('email') || !watch('fechaCita')}
+                                title="Guardar y Notificar"
+                                size="icon" // Hace el botón cuadrado por defecto
+                                className="sm:w-auto sm:px-4" // En pantallas sm+, le devolvemos el tamaño automático
                             >
-                                <Send className="mr-2 h-4 w-4" />
-                                Guardar y Notificar
+                                <Send className="h-4 w-4" />
+                                {/* --- DISEÑO RESPONSIVO --- */}
+                                <span className="hidden sm:inline ml-2">Guardar y Notificar</span>
                             </Button>
 
 
@@ -396,14 +407,29 @@ export default function LeadForm({
                                 variant="outline"
                                 onClick={handleClose}
                                 disabled={isPending}
+                                title="Cerrar ventana"
+                                size="icon"
+                                className="sm:w-auto sm:px-4"
                             >
-                                Cerrar ventana
+                                <X className="h-4 w-4" /> {/* Añadí un ícono X para la vista móvil */}
+                                {/* --- DISEÑO RESPONSIVO --- */}
+                                <span className="hidden sm:inline ml-2">Cerrar ventana</span>
                             </Button>
 
 
                             {initialLeadData && (
-                                <Button type="button" variant="destructiveOutline" onClick={handleDelete} disabled={isPending}>
-                                    <Trash className="mr-2 h-4 w-4" /> Eliminar
+                                <Button
+                                    type="button"
+                                    variant="destructiveOutline"
+                                    onClick={handleDelete}
+                                    disabled={isPending}
+                                    title="Eliminar"
+                                    size="icon"
+                                    className="sm:w-auto sm:px-4"
+                                >
+                                    <Trash className="h-4 w-4" />
+                                    {/* --- DISEÑO RESPONSIVO --- */}
+                                    <span className="hidden sm:inline ml-2">Eliminar</span>
                                 </Button>
                             )}
                         </>

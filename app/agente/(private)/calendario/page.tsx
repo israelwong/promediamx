@@ -19,6 +19,7 @@ export default async function CalendarioAgentePage() {
 
     // --- LÓGICA AGENTE: Se llama a la nueva acción sin parámetros ---
     const initialCitasResult = await listarCitasParaCalendarioAgenteAction();
+    // // console.log("--- [Calendario Agente] Resultado de listarCitasParaCalendarioAgenteAction:", initialCitasResult);
 
     // --- LÓGICA AGENTE: Obtenemos el negocioId para el canal de Supabase ---
     // Esta lógica es necesaria para que el canal de Supabase sepa a qué negocio escuchar.
@@ -42,7 +43,7 @@ export default async function CalendarioAgentePage() {
     }
 
     return (
-        <div className="space-y-6 h-full flex flex-col">
+        <div className="space-y-6 h-screen flex flex-col">
             <header>
                 <h1 className="text-2xl font-semibold text-zinc-100 flex items-center gap-3">
                     <Calendar /> Mi Calendario de Citas

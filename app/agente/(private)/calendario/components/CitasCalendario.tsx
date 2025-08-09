@@ -17,6 +17,8 @@ interface CitasCalendarioProps {
 }
 
 export default function CitasCalendario({ events }: CitasCalendarioProps) {
+
+    // console.log("--- [Calendario Agente] Inicializando citas:", events);
     const calendarEvents = events.map(cita => {
         const start = new Date(cita.start);
         // ✅ Se calcula la hora de fin sumando la duración a la hora de inicio.

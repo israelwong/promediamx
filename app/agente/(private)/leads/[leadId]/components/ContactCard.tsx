@@ -59,7 +59,7 @@ export function ContactCard({ lead }: { lead: LeadContactInfo }) {
 
                     {/* --- Contenido de la Pestaña de WhatsApp --- */}
                     <TabsContent value="whatsapp" className="mt-4 space-y-4 text-center">
-                        <div className="p-4 bg-white rounded-md inline-block">
+                        <div className="p-4 bg-white rounded-md hidden md:inline-block">
                             <QRCodeDisplay url={whatsappUrl} />
                         </div>
                         <p className="text-xs text-zinc-400">Escanea para enviar un mensaje desde tu teléfono.</p>
@@ -72,7 +72,7 @@ export function ContactCard({ lead }: { lead: LeadContactInfo }) {
 
                     {/* --- Contenido de la Pestaña de Llamada --- */}
                     <TabsContent value="llamar" className="mt-4 space-y-4 text-center">
-                        <div className="p-4 bg-white rounded-md inline-block">
+                        <div className="p-4 bg-white rounded-md hidden md:inline-block">
                             <QRCodeDisplay url={phoneUrl} />
                         </div>
                         <p className="text-xs text-zinc-400">Escanea para marcar el número en tu teléfono.</p>

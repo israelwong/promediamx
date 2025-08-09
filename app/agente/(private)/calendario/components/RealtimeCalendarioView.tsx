@@ -24,6 +24,8 @@ if (typeof window !== 'undefined') {
 export default function RealtimeCalendarioView({ initialData, negocioId }: RealtimeCalendarioViewProps) {
     const [citas, setCitas] = useState(initialData);
 
+    // console.log("--- [Calendario Agente] Inicializando citas:", initialData);
+
     useEffect(() => { setCitas(initialData); }, [initialData]);
 
     useEffect(() => {

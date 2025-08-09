@@ -2,12 +2,9 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '../_lib/actions/auth.actions';
 import { redirect } from 'next/navigation';
 import AgenteUILayout from "../components/AgenteUILayout";
-// import Link from 'next/link';
-// import { Button } from '@/app/components/ui/button';
 
 export default async function AgenteLayout({ children }: { children: React.ReactNode }) {
     // console.log("--- [Layout Agente] Iniciando verificación de sesión ---");
-
     const tokenCookie = (await cookies()).get('auth_token');
 
     if (!tokenCookie) {
