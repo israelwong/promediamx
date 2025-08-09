@@ -92,7 +92,7 @@ export default function AgenteUILayout({ user, children }: { user: UserPayload, 
 
             {/* Layout adaptativo que ya tenías */}
             {isFullHeightPage ? (
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                     <header className="md:hidden h-16 flex items-center justify-between px-4 sm:px-6 border-b border-zinc-800 bg-zinc-900 flex-shrink-0">
                         <h1 className="text-lg font-bold">Portal Agente</h1>
                         <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}><Menu className="h-6 w-6" /></Button>
@@ -104,7 +104,7 @@ export default function AgenteUILayout({ user, children }: { user: UserPayload, 
                     </main>
                 </div>
             ) : (
-                <div className="flex-1 relative overflow-y-auto">
+                <div className="flex-1 relative overflow-y-auto min-w-0">
                     <header className="md:hidden sticky top-0 z-20 h-16 flex items-center justify-between px-4 sm:px-6 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
                         <h1 className="text-lg font-bold">Portal Agente</h1>
                         <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}><Menu className="h-6 w-6" /></Button>
