@@ -243,7 +243,7 @@ export default function PagosConfiguracion({ configuracionInicial, negocioId }: 
                         <div>
                             <Label htmlFor="aceptaOxxoPaySwitch" className="text-base font-semibold text-zinc-100 flex items-center">
                                 <Image
-                                    src="https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logos_pasarela/oxxo.svg"
+                                    src="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/pasarela/oxxo.svg"
                                     alt="OXXO Pay"
                                     width={24}
                                     height={20}

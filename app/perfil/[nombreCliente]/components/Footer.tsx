@@ -7,7 +7,7 @@ export default function Footer() {
         <footer className="text-zinc-700 p-4 pt-12 pb-16 mx-auto w-full flex-col items-center text-center border-t border-zinc-800">
             <div className="flex justify-center">
                 <Image
-                    src='https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia//logo_dark_gray.svg'
+                    src='https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/promedia_full_gray.svg'
                     width={150}
                     height={150}
                     alt='Logo de Promedia México'

@@ -377,6 +377,7 @@ model Negocio {
   Notificacion                 Notificacion[]
   ofertas                      Oferta[]
   preguntasSinRespuestaGeneral PreguntaSinRespuestaGeneral[]
+  campanas            Campana[]  // ← AGREGAR ESTA LÍNEA
 }
 
 model PreguntaSinRespuestaGeneral {
@@ -1469,4 +1470,111 @@ enum InteraccionParteTipo {
   TEXT
   FUNCTION_CALL
   FUNCTION_RESPONSE
+}
+
+
+
+
+
+// Agregar al final de tu schema.prisma existente
+
+model Campana {
+  id                String   @id @default(cuid())
+  negocioId         String
+  nombre            String
+  descripcion       String?
+  objetivo          String?
+  
+  plantillaMensaje  String
+  
+  status            String   @default("borrador")
+  
+  totalDestinatarios Int     @default(0)
+  totalEnviados     Int      @default(0)
+  totalEntregados   Int      @default(0)
+  totalLeidos       Int      @default(0)
+  totalFallidos     Int      @default(0)
+  totalVisitas      Int      @default(0)
+  totalClicks       Int      @default(0)
+  
+  templateLanding   String   @default("educativo")
+  colorPrimario     String?
+  colorSecundario   String?
+  
+  tokenPublico      String   @unique @default(cuid())
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  negocio           Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  destinatarios     CampanaDestinatario[]
+  envios            CampanaEnvio[]
+  
+  @@index([negocioId])
+  @@index([status])
+}
+
+model CampanaDestinatario {
+  id                  String   @id @default(cuid())
+  campanaId           String
+  nombre              String
+  telefono            String
+  email               String?
+  datosPersonalizados Json
+  yaConvirtio         Boolean  @default(false)
+  fechaConversion     DateTime?
+  tokenLanding        String   @unique @default(cuid())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  campana             Campana  @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+  envios              CampanaEnvio[]
+  visitas             VisitaLanding[]
+  
+  @@index([campanaId])
+  @@index([telefono])
+  @@index([tokenLanding])
+}
+
+model CampanaEnvio {
+  id                  String    @id @default(cuid())
+  campanaId           String
+  destinatarioId      String
+  whatsappMessageId   String?   @unique
+  status              String    @default("pendiente")
+  intentos            Int       @default(0)
+  errorMensaje        String?
+  errorCodigo         String?
+  fechaEncolado       DateTime?
+  fechaEnviado        DateTime?
+  fechaEntregado      DateTime?
+  fechaLeido          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  campana             Campana              @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+  destinatario        CampanaDestinatario  @relation(fields: [destinatarioId], references: [id], onDelete: Cascade)
+  
+  @@index([campanaId])
+  @@index([destinatarioId])
+  @@index([status])
+  @@index([whatsappMessageId])
+}
+
+model VisitaLanding {
+  id                  String   @id @default(cuid())
+  destinatarioId      String
+  ip                  String?
+  userAgent           String?
+  referer             String?
+  duracionSegundos    Int?
+  scrollPercentage    Int?
+  hizoClic            Boolean  @default(false)
+  elementoClicado     String?
+  createdAt           DateTime @default(now())
+  
+  destinatario        CampanaDestinatario @relation(fields: [destinatarioId], references: [id], onDelete: Cascade)
+  
+  @@index([destinatarioId])
+  @@index([createdAt])
 }

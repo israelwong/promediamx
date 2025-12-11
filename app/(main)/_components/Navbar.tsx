@@ -31,7 +31,7 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex flex-row items-center">
             <Link href="/" className="flex-shrink-0">
-              <Image src="https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/logo_fullcolor.svg" alt="ProMedia Logo" width={120} height={30} className="block h-5 md:h-8 w-auto" />
+              <Image src="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/promedia_full_color.svg" alt="ProMedia Logo" width={120} height={30} className="block h-5 md:h-8 w-auto" />
             </Link>
           </div>
 

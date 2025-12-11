@@ -81,7 +81,7 @@ export default function Leadform() {
                 <Header
                     nombre='Prosocial'
                     slogan="Momentos para toda la vida"
-                    url_image="https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia//favicon_fullcolor.svg"
+                    url_image="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg"
                     web="https://www.prosocial.mx"
                 />
             </div>

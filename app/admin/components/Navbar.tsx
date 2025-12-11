@@ -141,7 +141,7 @@ function Navbar() {
         <div className={navContainerClasses}>
             <Link href="/admin/dashboard" className={logoContainerClasses}>
                 <Image
-                    src="https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/favicon_fullcolor.svg"
+                    src="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg"
                     width={20}
                     height={20}
                     alt="ProMedia Logo"

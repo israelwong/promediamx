@@ -92,7 +92,7 @@ const LoginForm = () => {
 
             <div>
                 <div className='mt-10 text-center items-center flex flex-col font-FunnelSans-Light text-zinc-500'>
-                    <Image className="mb-2" src='https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia//favicon_fullcolor.svg' width={30} height={30} alt='Logo' />
+                    <Image className="mb-2" src='https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg' width={30} height={30} alt='Logo' />
                     ProMedia México
                 </div>
 

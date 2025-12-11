@@ -97,7 +97,7 @@ export default function Linkpage({ nombreCliente }: Props) {
                 <Header
                     nombre={nombreCliente}
                     slogan="Más de 10 años de experiencia en fotografía y video profesional"
-                    url_image="https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia//favicon_fullcolor.svg"
+                    url_image="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg"
                 />
             </div>
 
@@ -145,7 +145,7 @@ export default function Linkpage({ nombreCliente }: Props) {
                                 titulo="Video de presentación"
                                 descripcion="Te compartimos algunas muestras de nuestro trabajo para que nos conozcas mejor."
                                 video={{
-                                    src: "https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia/videos/reel2024_1min_SD.webm?t=2024-09-27T18%3A17%3A22.773Z",
+                                    src: "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/video/reel2024_1min_SD.mp4?t=2024-09-27T18%3A17%3A22.773Z",
                                     muted: false,
                                     controls: true,
                                     autoPlay: false,

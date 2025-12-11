@@ -9,7 +9,7 @@ export default function page() {
             <div className="justify-center max-w-screen-md mx-auto">
 
                 <Image
-                    src="https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia//favicon_fullcolor.svg"
+                    src="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg"
                     width={50}
                     height={50}
                     alt="ProMedia"

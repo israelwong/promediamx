@@ -20,7 +20,7 @@ export default function Linktree() {
         <div className='bg-zinc-900/80 min-h-screen'>
             <div className='md:max-w-screen-md mx-auto text-center p-5'>
                 <div className='mt-5 mb-2 flex justify-center '>
-                    <Image className="" src='https://sfsjdyuwttrcgchbsxim.supabase.co/storage/v1/object/public/ProMedia//favicon_fullcolor.svg' width={40} height={40} alt='Logo' />
+                    <Image className="" src='https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg' width={40} height={40} alt='Logo' />
                 </div>
 
                 <p className="text-xl font-FunnelSans-Light text-zinc-200 mb-5">
