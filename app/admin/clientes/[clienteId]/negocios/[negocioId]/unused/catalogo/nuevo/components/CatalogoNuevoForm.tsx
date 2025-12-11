@@ -72,4 +72,114 @@ export default function CatalogoNuevoForm({ clienteId, negocioId }: Props) {
                 // o lo dejará como string vacío si solo es `optional()`.
                 // El schema actual tiene `nullish()`, por lo que string vacío se vuelve null.
                 descripcion: formData.descripcion?.trim() || null,
-                // statu
+                // status se añade por defecto en la action
+            };
+
+            const result = await crearCatalogoNegocio(negocioId, clienteId, dataToSend);
+
+            if (result.success && result.data) {
+                setSuccessMessage("Catálogo creado exitosamente. Redirigiendo...");
+                setFormData(getInitialState()); // Resetear formulario
+                setTimeout(() => {
+                    router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/catalogo/${result.data!.id}`);
+                }, 1500);
+            } else {
+                let errorMsg = result.error || "No se pudo crear el catálogo.";
+                if (result.errorDetails) {
+                    errorMsg = Object.entries(result.errorDetails)
+                        .map(([field, errors]) => `${field.charAt(0).toUpperCase() + field.slice(1)}: ${errors.join(', ')}`)
+                        .join('; ');
+                }
+                setError(errorMsg);
+            }
+        } catch (err) {
+            console.error("Error creando catálogo:", err);
+            setError(err instanceof Error ? err.message : "Ocurrió un error desconocido.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCancel = () => {
+        // Navegar a la lista de catálogos
+        router.push(`/admin/clientes/${clienteId}/negocios/${negocioId}/catalogo`);
+    };
+
+    return (
+        <div className={mainContainerClasses}>
+            <button
+                onClick={handleCancel}
+                className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200 mb-4 transition-colors"
+            >
+                <ArrowLeft size={16} />
+                Volver a Catálogos
+            </button>
+
+            <h1 className="text-2xl font-semibold text-zinc-100 mb-2">Crear Nuevo Catálogo</h1>
+            <p className="text-sm text-zinc-400 mb-6 border-b border-zinc-700 pb-4">
+                Estás creando un catálogo para el negocio: <span className='font-medium text-zinc-300'>{negocioId}</span>
+            </p>
+
+            {error && <div className={errorBoxClasses}><AlertCircle size={18} /><span>{error}</span></div>}
+            {successMessage && <div className={successBoxClasses}><CheckCircle size={18} /><span>{successMessage}</span></div>}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                    <label htmlFor="nombre" className={labelBaseClasses}>
+                        Nombre del Catálogo <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="nombre"
+                        name="nombre"
+                        value={formData.nombre}
+                        onChange={handleChange}
+                        className={inputBaseClasses}
+                        disabled={isSubmitting}
+                        placeholder="Ej: Productos de Verano, Servicios Premium"
+                        required
+                    />
+                    <p className="text-xs text-zinc-500 mt-1.5">Un nombre claro y descriptivo para tu catálogo.</p>
+                </div>
+
+                <div>
+                    <label htmlFor="descripcion" className={labelBaseClasses}>
+                        Descripción (Opcional)
+                    </label>
+                    <textarea
+                        id="descripcion"
+                        name="descripcion"
+                        value={formData.descripcion || ''}
+                        onChange={handleChange}
+                        className={textareaBaseClasses}
+                        disabled={isSubmitting}
+                        rows={4}
+                        placeholder="Describe brevemente qué tipo de productos o servicios encontrarán los clientes en este catálogo..."
+                    />
+                </div>
+
+                <div className="pt-5 space-y-3 border-t border-zinc-700">
+                    <button
+                        type="submit"
+                        className={primaryButtonClasses + " w-full"}
+                        disabled={isSubmitting || !!successMessage} // Deshabilitar si hay mensaje de éxito para evitar doble envío
+                    >
+                        {isSubmitting ? (
+                            <> <Loader2 className='animate-spin' size={18} /> Creando Catálogo... </>
+                        ) : (
+                            'Guardar y Crear Catálogo'
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCancel}
+                        className={secondaryButtonClasses + " w-full"}
+                        disabled={isSubmitting}
+                    >
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}

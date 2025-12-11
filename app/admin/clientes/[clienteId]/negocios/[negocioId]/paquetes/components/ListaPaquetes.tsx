@@ -165,4 +165,180 @@ function DraggablePaqueteItem({ paquete, basePath, onDelete, isDeleting, current
 export default function ListaPaquetes({ negocioId, clienteId }: ListaPaquetesProps) {
 
     const [paquetes, setPaquetes] = useState<NegocioPaqueteListItem[]>([]);
-    c
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isSavingOrder, setIsSavingOrder] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [currentDeletingId, setCurrentDeletingId] = useState<string | null>(null);
+    const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    const fetchPaquetes = useCallback(async () => {
+        if (negocioId) {
+            setIsLoading(true);
+            setError(null);
+            // setOperationMessage(null); // No limpiar aquí para que persista después de re-fetch por DND
+            const result = await obtenerPaquetesPorNegocioAction(negocioId);
+            if (result.success && result.data) {
+                setPaquetes(result.data);
+            } else {
+                setError(result.error || "Error desconocido al cargar los paquetes.");
+                setPaquetes([]);
+            }
+            setIsLoading(false);
+        }
+    }, [negocioId]);
+
+    useEffect(() => {
+        fetchPaquetes();
+    }, [fetchPaquetes]);
+
+    const basePath = `/admin/clientes/${clienteId}/negocios/${negocioId}/paquetes`;
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Evitar activar DND con clics simples
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (active.id !== over?.id && over) {
+            const oldIndex = paquetes.findIndex((p) => p.id === active.id);
+            const newIndex = paquetes.findIndex((p) => p.id === over.id);
+            if (oldIndex === -1 || newIndex === -1) return;
+
+            const newOrderedPaquetes = arrayMove(paquetes, oldIndex, newIndex);
+            setPaquetes(newOrderedPaquetes);
+
+            const ordenesParaGuardar: ReordenarPaquetesData = newOrderedPaquetes.map((paq, index) => ({
+                id: paq.id,
+                orden: index,
+            }));
+
+            setIsSavingOrder(true);
+            setOperationMessage(null);
+            const result = await actualizarOrdenPaquetesAction(negocioId, clienteId, ordenesParaGuardar);
+            if (!result.success) {
+                setOperationMessage({ type: 'error', text: result.error || "Error al guardar el nuevo orden." });
+                fetchPaquetes();
+            } else {
+                setOperationMessage({ type: 'success', text: "Orden de paquetes guardado." });
+                // Actualizar el campo 'orden' en el estado local para reflejar el guardado
+                const paquetesConOrdenActualizado = newOrderedPaquetes.map((paq, index) => ({ ...paq, orden: index }));
+                setPaquetes(paquetesConOrdenActualizado);
+            }
+            setIsSavingOrder(false);
+            setTimeout(() => setOperationMessage(null), 3000);
+        }
+    };
+
+    const handleDeletePaquete = async (paqueteIdToDelete: string) => {
+        if (confirm("¿Estás seguro de que quieres eliminar este paquete? Esta acción no se puede deshacer.")) {
+            setIsDeleting(true);
+            setCurrentDeletingId(paqueteIdToDelete);
+            setOperationMessage(null);
+            const result = await eliminarNegocioPaqueteAction(paqueteIdToDelete, clienteId, negocioId);
+            if (result.success) {
+                setOperationMessage({ type: 'success', text: "Paquete eliminado con éxito." });
+                fetchPaquetes();
+            } else {
+                setOperationMessage({ type: 'error', text: result.error || "No se pudo eliminar el paquete." });
+            }
+            setIsDeleting(false);
+            setCurrentDeletingId(null);
+            setTimeout(() => setOperationMessage(null), 3000);
+        }
+    };
+
+    if (isLoading && paquetes.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-60 p-6 text-zinc-400">
+                <Loader2 size={48} className="animate-spin mb-4" />
+                <p>Cargando paquetes...</p>
+            </div>
+        );
+    }
+
+    if (error && paquetes.length === 0) {
+        return (
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg shadow-md p-6 text-center">
+                <AlertTriangle size={48} className="mx-auto mb-4 text-red-500" />
+                <p className="mb-2 text-lg font-semibold text-red-400">Error al cargar los paquetes</p>
+                <p className="text-red-500 mb-4">{error}</p>
+                <Button onClick={fetchPaquetes} variant="outline" className="border-zinc-600 hover:bg-zinc-700">Reintentar</Button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 bg-zinc-800 p-6 rounded-lg shadow-md">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 mb-4 border-b border-zinc-700">
+                <h2 className="text-xl font-semibold">
+                    <Package size={24} className="inline-block mr-2 text-blue-500" />
+                    Paquetes del Negocio
+                </h2>
+                <div className="flex items-center gap-3">
+                    <Link href={`${basePath}/categoria`}>
+                        <Button variant="outline" className="border-zinc-600 hover:bg-zinc-700 text-zinc-300">
+                            <Settings2 size={16} className="mr-2" />
+                            Gestionar Categorías
+                        </Button>
+                    </Link>
+                    <Link href={`${basePath}/nuevo`}>
+                        <Button className="bg-blue-600 hover:bg-blue-700">
+                            <PlusCircle size={18} className="mr-2" />
+                            Nuevo Paquete
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+
+            {operationMessage && (
+                <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${operationMessage.type === 'success' ? 'bg-green-500/10 border border-green-500/30 text-green-300' : 'bg-red-500/10 border border-red-500/30 text-red-400'}`}>
+                    {operationMessage.type === 'success' ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
+                    <p>{operationMessage.text}</p>
+                </div>
+            )}
+            {isSavingOrder && (
+                <div className="text-sm text-blue-300 flex items-center justify-end"> {/* Alineado a la derecha */}
+                    <Loader2 className="animate-spin mr-2" size={16} /> Guardando nuevo orden...
+                </div>
+            )}
+
+            {paquetes.length === 0 && !isLoading && !error && ( // Añadido !error aquí
+                <div className="bg-zinc-800 border border-dashed border-zinc-700 rounded-lg p-6 py-12 text-center text-zinc-400">
+                    <HelpCircle size={48} className="mx-auto mb-4 text-zinc-500" />
+                    <p className="mb-2 text-lg font-semibold text-zinc-300">Aún no hay paquetes creados.</p>
+                    <p className="mb-6">Comienza creando tu primer paquete de servicios o productos para este negocio.</p>
+                    <Link href={`${basePath}/nuevo`}>
+                        <Button className="bg-blue-600 hover:bg-blue-700">
+                            <PlusCircle size={18} className="mr-2" />
+                            Crear Mi Primer Paquete
+                        </Button>
+                    </Link>
+                </div>
+            )}
+            {paquetes.length > 0 && (
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext items={paquetes.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                        <ul className="space-y-4">
+                            {paquetes.map((paquete) => (
+                                <DraggablePaqueteItem
+                                    key={paquete.id}
+                                    paquete={paquete}
+                                    basePath={basePath}
+                                    onDelete={handleDeletePaquete}
+                                    isDeleting={isDeleting}
+                                    currentDeletingId={currentDeletingId}
+                                />
+                            ))}
+                        </ul>
+                    </SortableContext>
+                </DndContext>
+            )}
+        </div>
+    );
+}
