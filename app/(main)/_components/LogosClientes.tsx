@@ -182,11 +182,11 @@ function LogosClientes() {
             "Barsa Acuática And Sport Center"
         ],
         [
-            "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Aluvitec.svg",
+            "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/aluvitec.svg",
             "Aluvitec"
         ],
         [
-            "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/ateneo/logo_sin_sombra.svg",
+            "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Ateneo.svg",
             "Colegio Ateneo Mexicano"
         ],
         [
