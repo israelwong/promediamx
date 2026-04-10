@@ -8,11 +8,12 @@ import { usePathname } from 'next/navigation'
 export default function Navbar() {
 
   const pathname = usePathname()
+  const path = pathname ?? ''
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname === href || pathname.startsWith(`${href}/`)
+    if (href === '/') return path === '/'
+    return path === href || path.startsWith(`${href}/`)
   }
 
   const linkClassDesktop = (href: string) =>
