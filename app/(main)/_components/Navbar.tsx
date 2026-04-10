@@ -3,10 +3,33 @@ import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 
 export default function Navbar() {
 
+  const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/'
+    return pathname === href || pathname.startsWith(`${href}/`)
+  }
+
+  const linkClassDesktop = (href: string) =>
+    [
+      'px-3 py-2 rounded-md transition-colors',
+      isActive(href)
+        ? 'bg-green-800 text-zinc-100'
+        : 'text-zinc-400 hover:text-zinc-500',
+    ].join(' ')
+
+  const linkClassMobile = (href: string) =>
+    [
+      'block px-3 py-2 rounded-md text-base font-medium transition-colors',
+      isActive(href)
+        ? 'bg-green-800 text-zinc-100'
+        : 'text-zinc-400 hover:text-zinc-500',
+    ].join(' ')
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -41,7 +64,8 @@ export default function Navbar() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="px-3 py-2 rounded-md text-zinc-400 hover:text-zinc-500"
+                    className={linkClassDesktop(link.href)}
+                    aria-current={isActive(link.href) ? 'page' : undefined}
                   >
                     {link.label}
                   </Link>
@@ -77,7 +101,8 @@ export default function Navbar() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="block px-3 py-2 rounded-md text-base font-medium text-zinc-400"
+                    className={linkClassMobile(link.href)}
+                    aria-current={isActive(link.href) ? 'page' : undefined}
                     onClick={closeMenu}
                   >
                     <div className="flex items-center space-x-2">
