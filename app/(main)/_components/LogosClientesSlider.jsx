@@ -1,46 +1,50 @@
 "use client";
 import Image from "next/image";
+import VideoPlayer from "./VideoPlayer";
+
+const REEL_URL =
+  "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/video/reel2024_1min_SD.mp4";
 
 function LogosClientesSlider() {
   const logos = [
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/UIN.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/UIN.svg",
       "Logo de Universidad Insurgentes",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Grupo-Concentra.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Grupo-Concentra.svg",
       "Logo de Grupo Concentra",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Movistar.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Movistar.svg",
       "Logo de Telefónica Movistar",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Vinte.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Vinte.svg",
       "Logo de Inmobiliarias Vinte",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Goberno-de-mexico.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Goberno-de-mexico.svg",
       "Logo del Gobierno de Mexico",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/UIN.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/UIN.svg",
       "Logo de Universidad Insurgentes",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Grupo-Concentra.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Grupo-Concentra.svg",
       "Logo de Grupo Concentra",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Movistar.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Movistar.svg",
       "Logo de Telefónica Movistar",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Vinte.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Vinte.svg",
       "Logo de Inmobiliarias Vinte",
     ],
     [
-      "https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Goberno-de-mexico.svg",
+      "https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/clientes/Goberno-de-mexico.svg",
       "Logo del Gobierno de Mexico",
     ],
   ];
@@ -67,6 +71,17 @@ function LogosClientesSlider() {
                   </li>
                 ))}
               </ul>
+            </div>
+            <div className="mt-8 flex w-full justify-center px-1">
+              <div className="w-full max-w-2xl overflow-hidden rounded-lg">
+                <VideoPlayer
+                  src={REEL_URL}
+                  autoPlay
+                  muted
+                  loop
+                  controls={false}
+                />
+              </div>
             </div>
           </div>
         </div>

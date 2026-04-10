@@ -4,11 +4,11 @@ import Tarifario from './_components/Tarifario'
 
 export const metadata: Metadata = {
     title: 'Tarifario | ProMedia',
-    description: 'Conoce nuestros precios y contrata los servicios de ProMedia.',
+    description: 'Conoce los servicios de ProMedia.',
     metadataBase: new URL('https://promedia.mx/tarifario'),
     openGraph: {
         title: 'Tarifario | ProMedia',
-        description: 'Conoce nuestros precios y contrata los servicios de ProMedia.',
+        description: 'Conoce los servicios de ProMedia.',
         url: 'https://promedia.mx/tarifario',
         siteName: 'ProMedia',
         images: [

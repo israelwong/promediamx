@@ -23,7 +23,7 @@ export default function RootLayout({
       <head>
         <link
           rel="icon"
-          href="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg"
+          href="https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/favicon_color.svg"
           type="image/<generated>"
           sizes="<generated>"
         />

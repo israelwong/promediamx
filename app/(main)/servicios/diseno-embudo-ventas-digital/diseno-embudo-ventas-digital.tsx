@@ -84,11 +84,6 @@ export default function EmbudoDeVentas() {
                 </section>
 
                 <section className='gap-2 items-center'>
-                    <h3 className='sr-only'>Plan de Precios</h3>
-                    <p className='text-zinc-300 text-2xl font-FunnelSans-Light mb-2'>
-                        Plan desde $7,000 <span className='text-zinc-500'>/mes</span>
-                    </p>
-
                     <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'
                         onClick={() => mostrarModalLeadForm()}
                     >
@@ -98,7 +93,7 @@ export default function EmbudoDeVentas() {
 
                 <footer>
                     <p className='text-zinc-500 text-xs font-light mt-5'>
-                        Contratación mínima de 6 meses. El precio del servicio varía según la complejidad del embudo de ventas. La agencia cobra una comisión adicional, a negociar, independiente de la comisión de Stripe.
+                        Contratación mínima de 6 meses. El alcance se define según la complejidad del embudo de ventas. Comisiones de agencia y de Stripe se acuerdan por separado.
                     </p>
                 </footer>
 

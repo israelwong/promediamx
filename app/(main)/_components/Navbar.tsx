@@ -7,7 +7,6 @@ import Image from 'next/image'
 export default function Navbar() {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const urlDashboard = '#'
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -31,7 +30,7 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex flex-row items-center">
             <Link href="/" className="flex-shrink-0">
-              <Image src="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/promedia_full_color.svg" alt="ProMedia Logo" width={120} height={30} className="block h-5 md:h-8 w-auto" />
+              <Image src="https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/promedia_full_color.svg" alt="ProMedia Logo" width={120} height={30} className="block h-5 md:h-8 w-auto" />
             </Link>
           </div>
 
@@ -48,11 +47,6 @@ export default function Navbar() {
                   </Link>
                 </li>
               ))}
-              <li>
-                <Link href={urlDashboard} className='bg-slate-900 border border-slate-800 text-cyan-700 rounded-md leading-3 py-3 px-5 font-light'>
-                  Dashboard
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -92,11 +86,6 @@ export default function Navbar() {
                   </Link>
                 </li>
               ))}
-              <li>
-                <Link href={urlDashboard} className='bg-slate-900 border border-slate-800 text-cyan-700 rounded-md leading-3 py-3 px-5 font-light block text-center mt-5 text-sm' onClick={closeMenu}>
-                  Dashboard
-                </Link>
-              </li>
             </ul>
           </div>
         </div>

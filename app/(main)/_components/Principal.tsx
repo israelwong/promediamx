@@ -27,7 +27,7 @@ export default function Principal() {
                 <Hero />
             </div>
 
-            <div className="mb-28 text-center">
+            <div className="mb-10 text-center md:mb-12">
                 <ProyectosSlider />
             </div>
 

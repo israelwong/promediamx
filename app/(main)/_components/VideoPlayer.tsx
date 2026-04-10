@@ -26,7 +26,7 @@ function VideoPlayer({
   return (
     <div>
       <video
-        className="md:max-w-full"
+        className="h-auto w-full max-w-full"
         preload="auto"
         autoPlay={autoPlay}
         muted={muted}
@@ -34,7 +34,7 @@ function VideoPlayer({
         controls={controls}
         playsInline
       >
-        <source src={src} type="video/webm" />
+        <source src={src} type="video/mp4" />
         Tu navegador no soporta el elemento de video.
       </video>
     </div>

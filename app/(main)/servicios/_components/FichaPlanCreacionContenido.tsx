@@ -44,14 +44,6 @@ export default function FichaPlanCreacionContenido() {
                 </li>
             </ul>
 
-            <p className='font-FunnelSans-Light text-2xl text-zinc-200 mb-3'>
-                Plan desde $5,000/mes*
-            </p>
-
-            <p className='font-FunnelSans-Light text-sm text-zinc-500 italic'>
-                * Precio sujeto a cantidad y reccurrencia de creación de contenido y cantidad de plataformas.
-            </p>
-
         </div>
     )
 }

@@ -3,7 +3,6 @@ import React from 'react'
 import { TypeAnimation } from 'react-type-animation';
 import Link from 'next/link';
 
-
 export default function Hero() {
 
   return (
@@ -36,7 +35,6 @@ export default function Hero() {
         </div>
 
       </header>
-
 
       <div className="text-center text-sm space-x-2">
         <div className="flex items-center gap-2 justify-center">

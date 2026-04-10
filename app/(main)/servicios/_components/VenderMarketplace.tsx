@@ -59,9 +59,6 @@ export default function VenderMarketplace() {
                     </section>
 
                     <div className='gap-2 items-center'>
-                        <p className='text-zinc-300 text-2xl font-FunnelSans-Light mb-2'>
-                            Plan desde $8,000 <span className='text-zinc-500'>/mes</span>
-                        </p>
                         <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'
                             onClick={mostrarModalLeadForm}
                         >
@@ -71,7 +68,7 @@ export default function VenderMarketplace() {
 
                     <footer>
                         <p className='text-zinc-500 text-xs font-light mt-8 md:mb-1'>
-                            * Los envios y comisiones de las plataformas no están incluidos en el precio
+                            * Envíos y comisiones de cada plataforma aplican según sus políticas.
                         </p>
                     </footer>
                 </main>

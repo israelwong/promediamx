@@ -77,10 +77,6 @@ export default function ContenidoProfesional() {
                                 </ul>
 
                                 <div className='gap-2 items-center'>
-                                    <p className='text-zinc-300 text-2xl font-FunnelSans-Light mb-2'>
-                                        Plan desde $5,000 <span className='text-zinc-500'>/mes</span>
-                                    </p>
-
                                     <button className='bg-green-800 text-zinc-200 px-4 py-2 rounded-lg mt-2 text-sm'
                                         onClick={() => mostrarModalLeadForm()}
                                     >
@@ -90,7 +86,7 @@ export default function ContenidoProfesional() {
 
                                 <footer>
                                     <p className='text-zinc-500 text-xs font-light mt-5'>
-                                        * El precio del servicio se calcula y divide hasta en 12 pagos
+                                        * Condiciones de pago y plazos se acuerdan según el alcance del proyecto.
                                     </p>
                                 </footer>
                             </article>

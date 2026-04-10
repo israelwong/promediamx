@@ -12,7 +12,7 @@ export default function Clientes() {
             <div className='grid grid-cols-1 md:grid-cols-2 gap-5 mb-6'>
 
                 <VideoPlayer
-                    src="https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/video/reel2024_1min_SD.mp4"
+                    src="https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/video/reel2024_1min_SD.mp4"
                     muted={false}
                     controls={true}
                 />

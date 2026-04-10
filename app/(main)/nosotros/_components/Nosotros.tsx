@@ -64,7 +64,7 @@ export default function Nosotros() {
 
                         <div className='flex justify-left'>
                             <Image
-                                src='https://eeyewyhlfquhdgplcmcn.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/promedia_full_color.svg'
+                                src='https://fhwfdwrrnwkbnwxabkcq.supabase.co/storage/v1/object/public/ProMedia/logos/promedia/promedia_full_color.svg'
                                 width={200}
                                 height={100}
                                 alt='Logo de Promedia México'
